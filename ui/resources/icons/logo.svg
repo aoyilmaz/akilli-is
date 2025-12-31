@@ -1,0 +1,25 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dış halka (kesikli) -->
+  <circle cx="50" cy="50" r="38" stroke="url(#gradient)" stroke-width="5" fill="none" stroke-dasharray="6 3"/>
+  
+  <!-- Orta halka -->
+  <circle cx="50" cy="50" r="25" stroke="url(#gradient)" stroke-width="3.5" fill="none"/>
+  
+  <!-- İç daire -->
+  <circle cx="50" cy="50" r="12" fill="url(#gradient)"/>
+  
+  <!-- Yön okları -->
+  <path d="M50 12L54 20H46L50 12Z" fill="#6366f1"/>
+  <path d="M88 50L80 54V46L88 50Z" fill="#8b5cf6"/>
+  <path d="M50 88L46 80H54L50 88Z" fill="#a855f7"/>
+  <path d="M12 50L20 46V54L12 50Z" fill="#6366f1"/>
+  
+  <!-- Gradient tanımı -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+  </defs>
+</svg>
