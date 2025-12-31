@@ -3,20 +3,26 @@ Akıllı İş ERP - Ana Pencere
 """
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFrame,
-    QLabel, QPushButton, QStackedWidget, QScrollArea, QSizePolicy,
-    QGraphicsDropShadowEffect, QSpacerItem
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QStackedWidget
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon, QColor, QFont
-from PyQt6.QtSvgWidgets import QSvgWidget
-from pathlib import Path
 
 from config import settings
 from ui.widgets.sidebar import Sidebar
 from ui.widgets.header import Header
 from ui.pages.dashboard import DashboardPage
 from ui.pages.placeholder import PlaceholderPage
+
+# Stok Modülleri
+from modules.inventory import InventoryModule
+from modules.inventory.views import (
+    WarehouseModule, 
+    MovementModule, 
+    CategoryModule,
+    StockReportsModule,
+    StockCountModule,
+    UnitModule,
+)
 
 
 class MainWindow(QMainWindow):
@@ -29,11 +35,9 @@ class MainWindow(QMainWindow):
         self.connect_signals()
         
     def setup_window(self):
-        """Pencere özelliklerini ayarla"""
         self.setWindowTitle(f"{settings.APP_NAME} - {settings.APP_DESCRIPTION}")
         self.setMinimumSize(1280, 800)
         
-        # Tam ekran boyutunda başlat (macOS için optimize)
         screen = self.screen().availableGeometry()
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
         self.move(
@@ -42,12 +46,9 @@ class MainWindow(QMainWindow):
         )
         
     def setup_ui(self):
-        """UI bileşenlerini oluştur"""
-        # Ana container
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Ana layout (yatay - sidebar + content)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -66,33 +67,51 @@ class MainWindow(QMainWindow):
         self.header = Header()
         content_layout.addWidget(self.header)
         
-        # Sayfa container (stacked widget)
+        # Sayfa container
         self.page_stack = QStackedWidget()
         content_layout.addWidget(self.page_stack)
         
-        # Sayfaları ekle
         self.pages = {}
         self.add_pages()
         
         main_layout.addWidget(content_widget)
         
     def add_pages(self):
-        """Tüm sayfaları ekle"""
         # Dashboard
         self.pages['dashboard'] = DashboardPage()
         self.page_stack.addWidget(self.pages['dashboard'])
         
-        # Stok Modülü
-        self.pages['stock-cards'] = PlaceholderPage("Stok Kartları", "📦")
+        # ========== STOK MODÜLÜ ==========
+        # Stok Kartları
+        self.pages['stock-cards'] = InventoryModule()
+        self.pages['stock-cards'].page_title = "Stok Kartları"
         self.page_stack.addWidget(self.pages['stock-cards'])
         
-        self.pages['warehouses'] = PlaceholderPage("Depolar", "🏭")
+        # Kategoriler
+        self.pages['categories'] = CategoryModule()
+        self.page_stack.addWidget(self.pages['categories'])
+        
+        # Birimler
+        self.pages['units'] = UnitModule()
+        self.page_stack.addWidget(self.pages['units'])
+        
+        # Depolar
+        self.pages['warehouses'] = WarehouseModule()
         self.page_stack.addWidget(self.pages['warehouses'])
         
-        self.pages['movements'] = PlaceholderPage("Stok Hareketleri", "↔️")
+        # Stok Hareketleri
+        self.pages['movements'] = MovementModule()
         self.page_stack.addWidget(self.pages['movements'])
         
-        # Üretim Modülü
+        # Stok Sayımı
+        self.pages['stock-count'] = StockCountModule()
+        self.page_stack.addWidget(self.pages['stock-count'])
+        
+        # Stok Raporları
+        self.pages['stock-reports'] = StockReportsModule()
+        self.page_stack.addWidget(self.pages['stock-reports'])
+        
+        # ========== ÜRETİM MODÜLÜ ==========
         self.pages['work-orders'] = PlaceholderPage("İş Emirleri", "📋")
         self.page_stack.addWidget(self.pages['work-orders'])
         
@@ -102,7 +121,7 @@ class MainWindow(QMainWindow):
         self.pages['planning'] = PlaceholderPage("Üretim Planlama", "📅")
         self.page_stack.addWidget(self.pages['planning'])
         
-        # Diğer modüller
+        # ========== DİĞER MODÜLLER ==========
         self.pages['purchasing'] = PlaceholderPage("Satın Alma", "🛒")
         self.page_stack.addWidget(self.pages['purchasing'])
         
@@ -122,29 +141,24 @@ class MainWindow(QMainWindow):
         self.page_stack.addWidget(self.pages['settings'])
         
     def connect_signals(self):
-        """Sinyalleri bağla"""
         self.sidebar.page_changed.connect(self.change_page)
         self.sidebar.sidebar_toggled.connect(self.on_sidebar_toggle)
         self.header.search_triggered.connect(self.on_search)
         self.header.ai_assistant_clicked.connect(self.show_ai_assistant)
         
     def change_page(self, page_id: str):
-        """Sayfa değiştir"""
         if page_id in self.pages:
             self.page_stack.setCurrentWidget(self.pages[page_id])
-            self.header.set_title(self.pages[page_id].page_title)
+            
+            page = self.pages[page_id]
+            if hasattr(page, 'page_title'):
+                self.header.set_title(page.page_title)
             
     def on_sidebar_toggle(self, collapsed: bool):
-        """Sidebar toggle edildiğinde"""
-        pass  # Animasyon eklenebilir
+        pass
         
     def on_search(self, query: str):
-        """Arama yapıldığında"""
         print(f"Arama: {query}")
         
     def show_ai_assistant(self):
-        """AI Asistan penceresini göster"""
         print("AI Asistan açılıyor...")
-
-
-# UI init dosyaları

@@ -7,19 +7,18 @@ from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTextEdit, QComboBox, QDoubleSpinBox, QSpinBox,
-    QFrame, QTabWidget, QFormLayout, QCheckBox, QMessageBox,
-    QScrollArea, QGridLayout
+    QFrame, QTabWidget, QCheckBox, QMessageBox, QScrollArea,
+    QGridLayout, QFormLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from database.models import Item, ItemType, Unit, ItemCategory, Warehouse
+from database.models import Item, ItemType
 
 
 class StockFormPage(QWidget):
     """Stok kartı ekleme/düzenleme formu"""
     
-    # Sinyaller
-    saved = pyqtSignal(int)  # item_id
+    saved = pyqtSignal(dict)
     cancelled = pyqtSignal()
     
     def __init__(self, item: Optional[Item] = None, parent=None):
@@ -35,301 +34,610 @@ class StockFormPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
         
-        # Başlık satırı
+        # === Başlık ===
         header_layout = QHBoxLayout()
         
-        # Geri butonu
         back_btn = QPushButton("← Geri")
+        back_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #334155;
+                color: #94a3b8;
+                padding: 8px 16px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #334155;
+                color: #f8fafc;
+            }
+        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
         
-        # Başlık
-        title = QLabel("Yeni Stok Kartı" if not self.is_edit_mode else "Stok Kartı Düzenle")
-        title.setObjectName("title")
+        title_text = "Stok Kartı Düzenle" if self.is_edit_mode else "Yeni Stok Kartı"
+        title = QLabel(title_text)
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;")
         header_layout.addWidget(title)
         
         header_layout.addStretch()
         
         # Kaydet butonu
-        save_btn = QPushButton("  Kaydet")
-        save_btn.setProperty("primary", True)
-        save_btn.clicked.connect(self.save)
+        save_btn = QPushButton("💾 Kaydet")
+        save_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
+                border: none;
+                color: white;
+                font-weight: 600;
+                padding: 12px 32px;
+                border-radius: 12px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea);
+            }
+        """)
+        save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
         
         layout.addLayout(header_layout)
         
-        # Tab widget
+        # === Tab Widget ===
         self.tabs = QTabWidget()
-        self.tabs.setObjectName("formTabs")
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #334155;
+                border-radius: 12px;
+                background-color: rgba(30, 41, 59, 0.5);
+                padding: 16px;
+            }
+            QTabBar::tab {
+                background-color: transparent;
+                color: #94a3b8;
+                padding: 12px 24px;
+                margin-right: 4px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+            }
+            QTabBar::tab:selected {
+                background-color: rgba(30, 41, 59, 0.5);
+                color: #818cf8;
+                border: 1px solid #334155;
+                border-bottom: none;
+            }
+            QTabBar::tab:hover:!selected {
+                color: #f8fafc;
+            }
+        """)
         
-        # Tab 1: Genel Bilgiler
-        self.tabs.addTab(self.create_general_tab(), "Genel Bilgiler")
-        
-        # Tab 2: Stok Bilgileri
-        self.tabs.addTab(self.create_stock_tab(), "Stok Bilgileri")
-        
-        # Tab 3: Fiyatlandırma
-        self.tabs.addTab(self.create_pricing_tab(), "Fiyatlandırma")
+        self.tabs.addTab(self._create_general_tab(), "📋 Genel Bilgiler")
+        self.tabs.addTab(self._create_stock_tab(), "📦 Stok Ayarları")
+        self.tabs.addTab(self._create_pricing_tab(), "💰 Fiyatlandırma")
+        self.tabs.addTab(self._create_tracking_tab(), "🔍 Takip")
         
         layout.addWidget(self.tabs)
         
-    def create_general_tab(self) -> QWidget:
+    def _create_general_tab(self) -> QWidget:
         """Genel bilgiler sekmesi"""
         tab = QWidget()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; }")
-        
-        content = QWidget()
-        layout = QHBoxLayout(content)
+        layout = QHBoxLayout(tab)
         layout.setSpacing(24)
         
         # Sol kolon
-        left_layout = QVBoxLayout()
+        left_widget = QWidget()
+        left_layout = QFormLayout(left_widget)
         left_layout.setSpacing(16)
+        left_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Stok Kodu
         code_layout = QHBoxLayout()
         self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("STK001")
+        self.code_input.setPlaceholderText("STK000001")
+        self._style_input(self.code_input)
         
-        auto_code_btn = QPushButton("Otomatik")
-        auto_code_btn.clicked.connect(self.generate_code)
+        auto_btn = QPushButton("🔄")
+        auto_btn.setFixedWidth(40)
+        auto_btn.setToolTip("Otomatik Kod Üret")
+        auto_btn.clicked.connect(self._generate_code)
+        self._style_button(auto_btn)
         
         code_layout.addWidget(self.code_input)
-        code_layout.addWidget(auto_code_btn)
-        
-        left_layout.addWidget(QLabel("Stok Kodu *"))
-        left_layout.addLayout(code_layout)
+        code_layout.addWidget(auto_btn)
+        left_layout.addRow("Stok Kodu *", code_layout)
         
         # Stok Adı
-        left_layout.addWidget(QLabel("Stok Adı *"))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Ürün adını girin")
-        left_layout.addWidget(self.name_input)
+        self._style_input(self.name_input)
+        left_layout.addRow("Stok Adı *", self.name_input)
+        
+        # Kısa Ad
+        self.short_name_input = QLineEdit()
+        self.short_name_input.setPlaceholderText("Kısa ad (opsiyonel)")
+        self._style_input(self.short_name_input)
+        left_layout.addRow("Kısa Ad", self.short_name_input)
         
         # Tür
-        left_layout.addWidget(QLabel("Tür *"))
         self.type_combo = QComboBox()
-        self.type_combo.addItem("Hammadde", ItemType.HAMMADDE)
-        self.type_combo.addItem("Mamül", ItemType.MAMUL)
-        self.type_combo.addItem("Yarı Mamül", ItemType.YARI_MAMUL)
-        self.type_combo.addItem("Ambalaj", ItemType.AMBALAJ)
-        self.type_combo.addItem("Sarf Malzeme", ItemType.SARF)
-        self.type_combo.addItem("Diğer", ItemType.DIGER)
-        left_layout.addWidget(self.type_combo)
+        self.type_combo.addItem("🧱 Hammadde", ItemType.HAMMADDE)
+        self.type_combo.addItem("📦 Mamül", ItemType.MAMUL)
+        self.type_combo.addItem("⚙️ Yarı Mamül", ItemType.YARI_MAMUL)
+        self.type_combo.addItem("🎁 Ambalaj", ItemType.AMBALAJ)
+        self.type_combo.addItem("🔧 Sarf Malzeme", ItemType.SARF)
+        self.type_combo.addItem("🏷️ Ticari Mal", ItemType.TICARI)
+        self.type_combo.addItem("💼 Hizmet", ItemType.HIZMET)
+        self.type_combo.addItem("📋 Diğer", ItemType.DIGER)
+        self._style_combo(self.type_combo)
+        left_layout.addRow("Tür *", self.type_combo)
         
         # Kategori
-        left_layout.addWidget(QLabel("Kategori"))
         self.category_combo = QComboBox()
         self.category_combo.addItem("Seçiniz...", None)
-        # Kategoriler dışarıdan yüklenecek
-        left_layout.addWidget(self.category_combo)
+        self._style_combo(self.category_combo)
+        left_layout.addRow("Kategori", self.category_combo)
         
         # Birim
-        left_layout.addWidget(QLabel("Birim *"))
         self.unit_combo = QComboBox()
-        # Birimler dışarıdan yüklenecek
-        left_layout.addWidget(self.unit_combo)
+        self._style_combo(self.unit_combo)
+        left_layout.addRow("Birim *", self.unit_combo)
         
-        left_layout.addStretch()
-        layout.addLayout(left_layout)
+        layout.addWidget(left_widget)
         
         # Sağ kolon
-        right_layout = QVBoxLayout()
+        right_widget = QWidget()
+        right_layout = QFormLayout(right_widget)
         right_layout.setSpacing(16)
+        right_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Barkod
-        right_layout.addWidget(QLabel("Barkod"))
         self.barcode_input = QLineEdit()
         self.barcode_input.setPlaceholderText("Barkod numarası")
-        right_layout.addWidget(self.barcode_input)
+        self._style_input(self.barcode_input)
+        right_layout.addRow("Barkod", self.barcode_input)
         
         # Üretici Kodu
-        right_layout.addWidget(QLabel("Üretici Kodu"))
         self.manufacturer_code_input = QLineEdit()
-        right_layout.addWidget(self.manufacturer_code_input)
+        self._style_input(self.manufacturer_code_input)
+        right_layout.addRow("Üretici Kodu", self.manufacturer_code_input)
         
         # Marka
-        right_layout.addWidget(QLabel("Marka"))
         self.brand_input = QLineEdit()
-        right_layout.addWidget(self.brand_input)
+        self._style_input(self.brand_input)
+        right_layout.addRow("Marka", self.brand_input)
         
         # Model
-        right_layout.addWidget(QLabel("Model"))
         self.model_input = QLineEdit()
-        right_layout.addWidget(self.model_input)
+        self._style_input(self.model_input)
+        right_layout.addRow("Model", self.model_input)
+        
+        # Menşei
+        self.origin_input = QLineEdit()
+        self.origin_input.setPlaceholderText("Türkiye")
+        self._style_input(self.origin_input)
+        right_layout.addRow("Menşei", self.origin_input)
         
         # Açıklama
-        right_layout.addWidget(QLabel("Açıklama"))
         self.description_input = QTextEdit()
-        self.description_input.setMaximumHeight(100)
         self.description_input.setPlaceholderText("Ürün açıklaması...")
-        right_layout.addWidget(self.description_input)
+        self.description_input.setMaximumHeight(100)
+        self._style_textedit(self.description_input)
+        right_layout.addRow("Açıklama", self.description_input)
         
-        right_layout.addStretch()
-        layout.addLayout(right_layout)
-        
-        scroll.setWidget(content)
-        
-        tab_layout = QVBoxLayout(tab)
-        tab_layout.setContentsMargins(0, 0, 0, 0)
-        tab_layout.addWidget(scroll)
+        layout.addWidget(right_widget)
         
         return tab
         
-    def create_stock_tab(self) -> QWidget:
-        """Stok bilgileri sekmesi"""
+    def _create_stock_tab(self) -> QWidget:
+        """Stok ayarları sekmesi"""
         tab = QWidget()
         layout = QHBoxLayout(tab)
         layout.setSpacing(24)
-        layout.setContentsMargins(20, 20, 20, 20)
         
-        # Sol kolon - Stok limitleri
+        # Sol: Stok Limitleri
         left_frame = QFrame()
-        left_frame.setObjectName("card")
+        left_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
         left_layout = QVBoxLayout(left_frame)
-        left_layout.setSpacing(16)
         
-        left_title = QLabel("Stok Limitleri")
-        left_title.setObjectName("sectionTitle")
+        left_title = QLabel("📊 Stok Limitleri")
+        left_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 8px;")
         left_layout.addWidget(left_title)
         
-        # Minimum stok
-        left_layout.addWidget(QLabel("Minimum Stok"))
+        form = QFormLayout()
+        form.setSpacing(12)
+        
         self.min_stock_input = QDoubleSpinBox()
         self.min_stock_input.setRange(0, 999999999)
         self.min_stock_input.setDecimals(2)
-        left_layout.addWidget(self.min_stock_input)
+        self._style_spinbox(self.min_stock_input)
+        form.addRow("Minimum Stok", self.min_stock_input)
         
-        # Maksimum stok
-        left_layout.addWidget(QLabel("Maksimum Stok"))
         self.max_stock_input = QDoubleSpinBox()
         self.max_stock_input.setRange(0, 999999999)
         self.max_stock_input.setDecimals(2)
-        left_layout.addWidget(self.max_stock_input)
+        self._style_spinbox(self.max_stock_input)
+        form.addRow("Maksimum Stok", self.max_stock_input)
         
-        # Yeniden sipariş noktası
-        left_layout.addWidget(QLabel("Yeniden Sipariş Noktası"))
         self.reorder_point_input = QDoubleSpinBox()
         self.reorder_point_input.setRange(0, 999999999)
         self.reorder_point_input.setDecimals(2)
-        left_layout.addWidget(self.reorder_point_input)
+        self._style_spinbox(self.reorder_point_input)
+        form.addRow("Yeniden Sipariş Noktası", self.reorder_point_input)
         
-        # Temin süresi
-        left_layout.addWidget(QLabel("Temin Süresi (Gün)"))
+        self.reorder_qty_input = QDoubleSpinBox()
+        self.reorder_qty_input.setRange(0, 999999999)
+        self.reorder_qty_input.setDecimals(2)
+        self._style_spinbox(self.reorder_qty_input)
+        form.addRow("Sipariş Miktarı", self.reorder_qty_input)
+        
+        self.safety_stock_input = QDoubleSpinBox()
+        self.safety_stock_input.setRange(0, 999999999)
+        self.safety_stock_input.setDecimals(2)
+        self._style_spinbox(self.safety_stock_input)
+        form.addRow("Emniyet Stoğu", self.safety_stock_input)
+        
         self.lead_time_input = QSpinBox()
         self.lead_time_input.setRange(0, 365)
-        left_layout.addWidget(self.lead_time_input)
+        self.lead_time_input.setSuffix(" gün")
+        self._style_spinbox(self.lead_time_input)
+        form.addRow("Temin Süresi", self.lead_time_input)
         
+        left_layout.addLayout(form)
         left_layout.addStretch()
         layout.addWidget(left_frame)
         
-        # Sağ kolon - Takip özellikleri
+        # Sağ: Fiziksel Özellikler
         right_frame = QFrame()
-        right_frame.setObjectName("card")
+        right_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
         right_layout = QVBoxLayout(right_frame)
-        right_layout.setSpacing(16)
         
-        right_title = QLabel("Takip Özellikleri")
-        right_title.setObjectName("sectionTitle")
+        right_title = QLabel("📐 Fiziksel Özellikler")
+        right_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 8px;")
         right_layout.addWidget(right_title)
         
-        # Lot takibi
-        self.track_lot_check = QCheckBox("Lot/Parti Takibi")
-        right_layout.addWidget(self.track_lot_check)
+        form2 = QFormLayout()
+        form2.setSpacing(12)
         
-        # Seri no takibi
-        self.track_serial_check = QCheckBox("Seri Numarası Takibi")
-        right_layout.addWidget(self.track_serial_check)
-        
-        # Son kullanma tarihi takibi
-        self.track_expiry_check = QCheckBox("Son Kullanma Tarihi Takibi")
-        right_layout.addWidget(self.track_expiry_check)
-        
-        right_layout.addSpacing(20)
-        
-        # Fiziksel özellikler
-        phys_title = QLabel("Fiziksel Özellikler")
-        phys_title.setObjectName("sectionTitle")
-        right_layout.addWidget(phys_title)
-        
-        # Ağırlık
-        right_layout.addWidget(QLabel("Ağırlık (kg)"))
         self.weight_input = QDoubleSpinBox()
         self.weight_input.setRange(0, 999999)
         self.weight_input.setDecimals(4)
-        right_layout.addWidget(self.weight_input)
+        self.weight_input.setSuffix(" kg")
+        self._style_spinbox(self.weight_input)
+        form2.addRow("Ağırlık", self.weight_input)
         
-        # Hacim
-        right_layout.addWidget(QLabel("Hacim (m³)"))
         self.volume_input = QDoubleSpinBox()
         self.volume_input.setRange(0, 999999)
         self.volume_input.setDecimals(4)
-        right_layout.addWidget(self.volume_input)
+        self.volume_input.setSuffix(" m³")
+        self._style_spinbox(self.volume_input)
+        form2.addRow("Hacim", self.volume_input)
         
+        self.width_input = QDoubleSpinBox()
+        self.width_input.setRange(0, 999999)
+        self.width_input.setDecimals(2)
+        self.width_input.setSuffix(" cm")
+        self._style_spinbox(self.width_input)
+        form2.addRow("Genişlik", self.width_input)
+        
+        self.height_input = QDoubleSpinBox()
+        self.height_input.setRange(0, 999999)
+        self.height_input.setDecimals(2)
+        self.height_input.setSuffix(" cm")
+        self._style_spinbox(self.height_input)
+        form2.addRow("Yükseklik", self.height_input)
+        
+        self.depth_input = QDoubleSpinBox()
+        self.depth_input.setRange(0, 999999)
+        self.depth_input.setDecimals(2)
+        self.depth_input.setSuffix(" cm")
+        self._style_spinbox(self.depth_input)
+        form2.addRow("Derinlik", self.depth_input)
+        
+        right_layout.addLayout(form2)
         right_layout.addStretch()
         layout.addWidget(right_frame)
         
         return tab
         
-    def create_pricing_tab(self) -> QWidget:
+    def _create_pricing_tab(self) -> QWidget:
         """Fiyatlandırma sekmesi"""
         tab = QWidget()
         layout = QHBoxLayout(tab)
         layout.setSpacing(24)
-        layout.setContentsMargins(20, 20, 20, 20)
         
-        # Fiyat bilgileri
+        # Fiyatlar
         price_frame = QFrame()
-        price_frame.setObjectName("card")
+        price_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
         price_layout = QVBoxLayout(price_frame)
-        price_layout.setSpacing(16)
         
-        price_title = QLabel("Fiyat Bilgileri")
-        price_title.setObjectName("sectionTitle")
+        price_title = QLabel("💵 Fiyat Bilgileri")
+        price_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 8px;")
         price_layout.addWidget(price_title)
         
-        # Alış fiyatı
-        price_layout.addWidget(QLabel("Alış Fiyatı"))
+        form = QFormLayout()
+        form.setSpacing(12)
+        
         self.purchase_price_input = QDoubleSpinBox()
         self.purchase_price_input.setRange(0, 999999999)
         self.purchase_price_input.setDecimals(4)
         self.purchase_price_input.setPrefix("₺ ")
-        price_layout.addWidget(self.purchase_price_input)
+        self._style_spinbox(self.purchase_price_input)
+        form.addRow("Alış Fiyatı", self.purchase_price_input)
         
-        # Satış fiyatı
-        price_layout.addWidget(QLabel("Satış Fiyatı"))
         self.sale_price_input = QDoubleSpinBox()
         self.sale_price_input.setRange(0, 999999999)
         self.sale_price_input.setDecimals(4)
         self.sale_price_input.setPrefix("₺ ")
-        price_layout.addWidget(self.sale_price_input)
+        self._style_spinbox(self.sale_price_input)
+        form.addRow("Satış Fiyatı", self.sale_price_input)
         
-        # Para birimi
-        price_layout.addWidget(QLabel("Para Birimi"))
+        self.list_price_input = QDoubleSpinBox()
+        self.list_price_input.setRange(0, 999999999)
+        self.list_price_input.setDecimals(4)
+        self.list_price_input.setPrefix("₺ ")
+        self._style_spinbox(self.list_price_input)
+        form.addRow("Liste Fiyatı", self.list_price_input)
+        
+        self.min_sale_price_input = QDoubleSpinBox()
+        self.min_sale_price_input.setRange(0, 999999999)
+        self.min_sale_price_input.setDecimals(4)
+        self.min_sale_price_input.setPrefix("₺ ")
+        self._style_spinbox(self.min_sale_price_input)
+        form.addRow("Min. Satış Fiyatı", self.min_sale_price_input)
+        
         self.currency_combo = QComboBox()
-        self.currency_combo.addItem("Türk Lirası (₺)", "TRY")
-        self.currency_combo.addItem("ABD Doları ($)", "USD")
-        self.currency_combo.addItem("Euro (€)", "EUR")
-        price_layout.addWidget(self.currency_combo)
+        self.currency_combo.addItem("₺ Türk Lirası", "TRY")
+        self.currency_combo.addItem("$ ABD Doları", "USD")
+        self.currency_combo.addItem("€ Euro", "EUR")
+        self._style_combo(self.currency_combo)
+        form.addRow("Para Birimi", self.currency_combo)
         
-        # KDV oranı
-        price_layout.addWidget(QLabel("KDV Oranı"))
+        price_layout.addLayout(form)
+        price_layout.addStretch()
+        layout.addWidget(price_frame)
+        
+        # Vergiler
+        tax_frame = QFrame()
+        tax_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
+        tax_layout = QVBoxLayout(tax_frame)
+        
+        tax_title = QLabel("📊 Vergi Bilgileri")
+        tax_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 8px;")
+        tax_layout.addWidget(tax_title)
+        
+        form2 = QFormLayout()
+        form2.setSpacing(12)
+        
         self.vat_combo = QComboBox()
         self.vat_combo.addItem("%20", 20)
         self.vat_combo.addItem("%10", 10)
         self.vat_combo.addItem("%1", 1)
         self.vat_combo.addItem("%0", 0)
-        price_layout.addWidget(self.vat_combo)
+        self._style_combo(self.vat_combo)
+        form2.addRow("KDV Oranı", self.vat_combo)
         
-        price_layout.addStretch()
-        layout.addWidget(price_frame)
+        self.withholding_input = QDoubleSpinBox()
+        self.withholding_input.setRange(0, 100)
+        self.withholding_input.setDecimals(2)
+        self.withholding_input.setSuffix(" %")
+        self._style_spinbox(self.withholding_input)
+        form2.addRow("Tevkifat Oranı", self.withholding_input)
+        
+        self.gtip_input = QLineEdit()
+        self.gtip_input.setPlaceholderText("GTIP Kodu")
+        self._style_input(self.gtip_input)
+        form2.addRow("GTIP Kodu", self.gtip_input)
+        
+        tax_layout.addLayout(form2)
+        tax_layout.addStretch()
+        layout.addWidget(tax_frame)
         
         layout.addStretch()
         
         return tab
         
+    def _create_tracking_tab(self) -> QWidget:
+        """Takip sekmesi"""
+        tab = QWidget()
+        layout = QHBoxLayout(tab)
+        layout.setSpacing(24)
+        
+        # Takip Özellikleri
+        track_frame = QFrame()
+        track_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
+        track_layout = QVBoxLayout(track_frame)
+        
+        track_title = QLabel("🔍 Takip Özellikleri")
+        track_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 16px;")
+        track_layout.addWidget(track_title)
+        
+        self.track_lot_check = QCheckBox("Lot/Parti Takibi")
+        self.track_lot_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        track_layout.addWidget(self.track_lot_check)
+        
+        self.track_serial_check = QCheckBox("Seri Numarası Takibi")
+        self.track_serial_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        track_layout.addWidget(self.track_serial_check)
+        
+        self.track_expiry_check = QCheckBox("Son Kullanma Tarihi Takibi")
+        self.track_expiry_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        track_layout.addWidget(self.track_expiry_check)
+        
+        track_layout.addSpacing(16)
+        
+        form = QFormLayout()
+        self.shelf_life_input = QSpinBox()
+        self.shelf_life_input.setRange(0, 9999)
+        self.shelf_life_input.setSuffix(" gün")
+        self._style_spinbox(self.shelf_life_input)
+        form.addRow("Raf Ömrü", self.shelf_life_input)
+        
+        track_layout.addLayout(form)
+        track_layout.addStretch()
+        layout.addWidget(track_frame)
+        
+        # Durum
+        status_frame = QFrame()
+        status_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
+        status_layout = QVBoxLayout(status_frame)
+        
+        status_title = QLabel("⚙️ Durum Ayarları")
+        status_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 16px;")
+        status_layout.addWidget(status_title)
+        
+        self.is_purchasable_check = QCheckBox("Satın Alınabilir")
+        self.is_purchasable_check.setChecked(True)
+        self.is_purchasable_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        status_layout.addWidget(self.is_purchasable_check)
+        
+        self.is_saleable_check = QCheckBox("Satılabilir")
+        self.is_saleable_check.setChecked(True)
+        self.is_saleable_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        status_layout.addWidget(self.is_saleable_check)
+        
+        self.is_producible_check = QCheckBox("Üretilebilir")
+        self.is_producible_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        status_layout.addWidget(self.is_producible_check)
+        
+        self.is_active_check = QCheckBox("Aktif")
+        self.is_active_check.setChecked(True)
+        self.is_active_check.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        status_layout.addWidget(self.is_active_check)
+        
+        status_layout.addStretch()
+        layout.addWidget(status_frame)
+        
+        layout.addStretch()
+        
+        return tab
+    
+    # === Stil Yardımcıları ===
+    def _style_input(self, widget):
+        widget.setStyleSheet("""
+            QLineEdit {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: #f8fafc;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #6366f1;
+            }
+        """)
+        
+    def _style_combo(self, widget):
+        widget.setStyleSheet("""
+            QComboBox {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: #f8fafc;
+                font-size: 14px;
+                min-width: 150px;
+            }
+            QComboBox:focus {
+                border-color: #6366f1;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                selection-background-color: #334155;
+            }
+        """)
+        
+    def _style_spinbox(self, widget):
+        widget.setStyleSheet("""
+            QSpinBox, QDoubleSpinBox {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: #f8fafc;
+                font-size: 14px;
+                min-width: 150px;
+            }
+            QSpinBox:focus, QDoubleSpinBox:focus {
+                border-color: #6366f1;
+            }
+        """)
+        
+    def _style_textedit(self, widget):
+        widget.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: #f8fafc;
+                font-size: 14px;
+            }
+            QTextEdit:focus {
+                border-color: #6366f1;
+            }
+        """)
+        
+    def _style_button(self, widget):
+        widget.setStyleSheet("""
+            QPushButton {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                color: #f8fafc;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: #334155;
+            }
+        """)
+    
+    # === Veri Yönetimi ===
     def load_units(self, units: list):
         """Birimleri yükle"""
         self.unit_combo.clear()
@@ -347,13 +655,15 @@ class StockFormPage(QWidget):
         """Düzenleme modunda verileri yükle"""
         if not self.item:
             return
-            
+        
         self.code_input.setText(self.item.code)
         self.name_input.setText(self.item.name)
+        self.short_name_input.setText(self.item.short_name or "")
         self.barcode_input.setText(self.item.barcode or "")
         self.manufacturer_code_input.setText(self.item.manufacturer_code or "")
         self.brand_input.setText(self.item.brand or "")
         self.model_input.setText(self.item.model or "")
+        self.origin_input.setText(self.item.origin_country or "")
         self.description_input.setPlainText(self.item.description or "")
         
         # Tür
@@ -361,32 +671,62 @@ class StockFormPage(QWidget):
             if self.type_combo.itemData(i) == self.item.item_type:
                 self.type_combo.setCurrentIndex(i)
                 break
-                
-        # Stok bilgileri
+        
+        # Stok ayarları
         self.min_stock_input.setValue(float(self.item.min_stock or 0))
         self.max_stock_input.setValue(float(self.item.max_stock or 0))
         self.reorder_point_input.setValue(float(self.item.reorder_point or 0))
+        self.reorder_qty_input.setValue(float(self.item.reorder_quantity or 0))
+        self.safety_stock_input.setValue(float(self.item.safety_stock or 0))
         self.lead_time_input.setValue(self.item.lead_time_days or 0)
         
-        self.track_lot_check.setChecked(self.item.track_lot)
-        self.track_serial_check.setChecked(self.item.track_serial)
-        self.track_expiry_check.setChecked(self.item.track_expiry)
-        
+        # Fiziksel
         self.weight_input.setValue(float(self.item.weight or 0))
         self.volume_input.setValue(float(self.item.volume or 0))
+        self.width_input.setValue(float(self.item.width or 0))
+        self.height_input.setValue(float(self.item.height or 0))
+        self.depth_input.setValue(float(self.item.depth or 0))
         
         # Fiyatlar
         self.purchase_price_input.setValue(float(self.item.purchase_price or 0))
         self.sale_price_input.setValue(float(self.item.sale_price or 0))
+        self.list_price_input.setValue(float(self.item.list_price or 0))
+        self.min_sale_price_input.setValue(float(self.item.min_sale_price or 0))
         
-    def generate_code(self):
-        """Otomatik kod üret"""
-        # Basit örnek, gerçekte servis üzerinden üretilmeli
-        import random
-        code = f"STK{random.randint(1000, 9999)}"
+        # Vergiler
+        self.withholding_input.setValue(float(self.item.withholding_rate or 0))
+        self.gtip_input.setText(self.item.gtip_code or "")
+        
+        # Takip
+        self.track_lot_check.setChecked(self.item.track_lot)
+        self.track_serial_check.setChecked(self.item.track_serial)
+        self.track_expiry_check.setChecked(self.item.track_expiry)
+        self.shelf_life_input.setValue(self.item.shelf_life_days or 0)
+        
+        # Durum
+        self.is_purchasable_check.setChecked(self.item.is_purchasable)
+        self.is_saleable_check.setChecked(self.item.is_saleable)
+        self.is_producible_check.setChecked(self.item.is_producible)
+        self.is_active_check.setChecked(self.item.is_active)
+        
+    def _generate_code(self):
+        """Otomatik kod üret - sinyal gönder"""
+        # Bu parent'tan alınacak
+        pass
+        
+    def set_generated_code(self, code: str):
+        """Üretilen kodu ayarla"""
         self.code_input.setText(code)
         
-    def validate(self) -> bool:
+    def _on_save(self):
+        """Kaydet butonuna tıklandı"""
+        if not self._validate():
+            return
+        
+        data = self.get_form_data()
+        self.saved.emit(data)
+        
+    def _validate(self) -> bool:
         """Form doğrulama"""
         if not self.code_input.text().strip():
             QMessageBox.warning(self, "Uyarı", "Stok kodu zorunludur!")
@@ -409,10 +749,11 @@ class StockFormPage(QWidget):
         return True
         
     def get_form_data(self) -> dict:
-        """Form verilerini dictionary olarak döndür"""
+        """Form verilerini döndür"""
         return {
             "code": self.code_input.text().strip(),
             "name": self.name_input.text().strip(),
+            "short_name": self.short_name_input.text().strip() or None,
             "item_type": self.type_combo.currentData(),
             "category_id": self.category_combo.currentData(),
             "unit_id": self.unit_combo.currentData(),
@@ -420,27 +761,37 @@ class StockFormPage(QWidget):
             "manufacturer_code": self.manufacturer_code_input.text().strip() or None,
             "brand": self.brand_input.text().strip() or None,
             "model": self.model_input.text().strip() or None,
+            "origin_country": self.origin_input.text().strip() or None,
             "description": self.description_input.toPlainText().strip() or None,
+            
             "min_stock": Decimal(str(self.min_stock_input.value())),
             "max_stock": Decimal(str(self.max_stock_input.value())),
             "reorder_point": Decimal(str(self.reorder_point_input.value())),
+            "reorder_quantity": Decimal(str(self.reorder_qty_input.value())),
+            "safety_stock": Decimal(str(self.safety_stock_input.value())),
             "lead_time_days": self.lead_time_input.value(),
+            
+            "weight": Decimal(str(self.weight_input.value())) or None,
+            "volume": Decimal(str(self.volume_input.value())) or None,
+            "width": Decimal(str(self.width_input.value())) or None,
+            "height": Decimal(str(self.height_input.value())) or None,
+            "depth": Decimal(str(self.depth_input.value())) or None,
+            
+            "purchase_price": Decimal(str(self.purchase_price_input.value())),
+            "sale_price": Decimal(str(self.sale_price_input.value())),
+            "list_price": Decimal(str(self.list_price_input.value())),
+            "min_sale_price": Decimal(str(self.min_sale_price_input.value())),
+            "vat_rate": Decimal(str(self.vat_combo.currentData())),
+            "withholding_rate": Decimal(str(self.withholding_input.value())),
+            "gtip_code": self.gtip_input.text().strip() or None,
+            
             "track_lot": self.track_lot_check.isChecked(),
             "track_serial": self.track_serial_check.isChecked(),
             "track_expiry": self.track_expiry_check.isChecked(),
-            "weight": Decimal(str(self.weight_input.value())) if self.weight_input.value() > 0 else None,
-            "volume": Decimal(str(self.volume_input.value())) if self.volume_input.value() > 0 else None,
-            "purchase_price": Decimal(str(self.purchase_price_input.value())),
-            "sale_price": Decimal(str(self.sale_price_input.value())),
-            "currency": self.currency_combo.currentData(),
-            "vat_rate": Decimal(str(self.vat_combo.currentData())),
-        }
-        
-    def save(self):
-        """Formu kaydet"""
-        if not self.validate():
-            return
+            "shelf_life_days": self.shelf_life_input.value() or None,
             
-        # Kaydetme işlemi parent widget'ta yapılacak
-        # Bu sinyal ile veriyi iletiyoruz
-        self.saved.emit(self.item.id if self.item else 0)
+            "is_purchasable": self.is_purchasable_check.isChecked(),
+            "is_saleable": self.is_saleable_check.isChecked(),
+            "is_producible": self.is_producible_check.isChecked(),
+            "is_active": self.is_active_check.isChecked(),
+        }

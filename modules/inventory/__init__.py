@@ -2,27 +2,38 @@
 Akıllı İş - Stok Modülü
 """
 
+from .module import InventoryModule
 from .services import (
     ItemService,
+    UnitService,
     CategoryService,
     WarehouseService,
-    UnitService,
     StockMovementService,
 )
-
 from .views import (
     StockListPage,
     StockFormPage,
+    WarehouseModule,
+    MovementModule,
+    CategoryModule,
+    StockReportsModule,
+    StockCountModule,
+    UnitModule,
 )
 
 __all__ = [
-    # Servisler
+    "InventoryModule",
     "ItemService",
+    "UnitService",
     "CategoryService",
     "WarehouseService",
-    "UnitService",
     "StockMovementService",
-    # Görünümler
     "StockListPage",
     "StockFormPage",
+    "WarehouseModule",
+    "MovementModule",
+    "CategoryModule",
+    "StockReportsModule",
+    "StockCountModule",
+    "UnitModule",
 ]
