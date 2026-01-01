@@ -1,475 +1,407 @@
 """
-Akıllı İş ERP - Dashboard Sayfası
+Akıllı İş ERP - Dashboard Sayfası (Düzeltilmiş)
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QGridLayout, QScrollArea, QPushButton, QSizePolicy
+    QGridLayout, QScrollArea, QSizePolicy
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtSvgWidgets import QSvgWidget
+from pathlib import Path
 
-from config import settings
+from config import APP_NAME, APP_VERSION, BASE_DIR
+from config.themes import get_theme, ThemeManager
 
 
-class KPICard(QFrame):
-    """KPI gösterge kartı"""
+class StatCard(QFrame):
+    """İstatistik kartı"""
     
-    def __init__(self, title: str, value: str, change: str, positive: bool, icon: str, parent=None):
+    def __init__(self, icon: str, title: str, value: str, subtitle: str = "", 
+                 color: str = None, parent=None):
         super().__init__(parent)
-        self.setup_ui(title, value, change, positive, icon)
+        self.icon = icon
+        self.title = title
+        self.color = color
+        self.setup_ui(value, subtitle)
         
-    def setup_ui(self, title: str, value: str, change: str, positive: bool, icon: str):
-        self.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 16px;
-            }
-            QFrame:hover {
-                border-color: rgba(99, 102, 241, 0.3);
-            }
+    def setup_ui(self, value: str, subtitle: str):
+        t = get_theme()
+        color = self.color or t.accent_primary
+        
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_large}px;
+            }}
         """)
-        self.setFixedHeight(140)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
         
-        # Üst satır: icon ve değişim
-        top_row = QHBoxLayout()
+        # Header
+        header = QHBoxLayout()
         
-        # Icon container
-        icon_container = QFrame()
-        icon_container.setFixedSize(48, 48)
-        icon_container.setStyleSheet(f"""
-            background-color: {'rgba(16, 185, 129, 0.2)' if positive else 'rgba(239, 68, 68, 0.2)'};
-            border-radius: 12px;
-            border: none;
+        icon_label = QLabel(self.icon)
+        icon_label.setStyleSheet(f"""
+            background-color: {color};
+            border-radius: {t.radius_medium}px;
+            padding: 12px;
+            font-size: 24px;
         """)
-        icon_layout = QVBoxLayout(icon_container)
-        icon_layout.setContentsMargins(0, 0, 0, 0)
-        icon_label = QLabel(icon)
+        icon_label.setFixedSize(52, 52)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("font-size: 22px; background: transparent; border: none;")
-        icon_layout.addWidget(icon_label)
-        top_row.addWidget(icon_container)
+        header.addWidget(icon_label)
         
-        top_row.addStretch()
+        header.addStretch()
         
-        # Değişim göstergesi
-        change_label = QLabel(f"{'↑' if positive else '↓'} {change}")
-        change_label.setStyleSheet(f"""
-            color: {'#10b981' if positive else '#ef4444'};
-            font-weight: 600;
-            font-size: 13px;
-            background: transparent;
-            border: none;
-        """)
-        top_row.addWidget(change_label)
+        trend_label = QLabel("↑ 12%")
+        trend_label.setStyleSheet(f"color: {t.success}; font-size: 12px; background: transparent;")
+        header.addWidget(trend_label)
         
-        layout.addLayout(top_row)
-        layout.addStretch()
+        layout.addLayout(header)
         
-        # Alt satır: başlık ve değer
-        title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            color: #64748b;
-            font-size: 13px;
-            background: transparent;
-            border: none;
-        """)
-        layout.addWidget(title_label)
-        
+        # Value
         value_label = QLabel(value)
-        value_label.setStyleSheet("""
-            color: #f8fafc;
-            font-size: 28px;
-            font-weight: 700;
+        value_label.setStyleSheet(f"""
+            color: {t.text_primary};
+            font-size: 32px;
+            font-weight: bold;
             background: transparent;
-            border: none;
         """)
         layout.addWidget(value_label)
-
-
-class ActivityItem(QFrame):
-    """Aktivite listesi öğesi"""
-    
-    def __init__(self, icon: str, text: str, time: str, color: str, parent=None):
-        super().__init__(parent)
-        self.setup_ui(icon, text, time, color)
         
-    def setup_ui(self, icon: str, text: str, time: str, color: str):
-        self.setStyleSheet("""
-            QFrame {
-                background: transparent;
-                border: none;
-            }
+        # Title
+        title_label = QLabel(self.title)
+        title_label.setStyleSheet(f"color: {t.text_muted}; font-size: 14px; background: transparent;")
+        layout.addWidget(title_label)
+        
+        if subtitle:
+            sub_label = QLabel(subtitle)
+            sub_label.setStyleSheet(f"color: {t.text_muted}; font-size: 12px; background: transparent;")
+            layout.addWidget(sub_label)
+
+
+class QuickActionCard(QFrame):
+    """Hızlı işlem kartı"""
+    
+    def __init__(self, icon: str, title: str, description: str, 
+                 color: str = None, parent=None):
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._color = color
+        self._setup_ui(icon, title, description)
+        
+    def _setup_ui(self, icon: str, title: str, description: str):
+        t = get_theme()
+        color = self._color or t.accent_primary
+        
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_medium}px;
+            }}
+            QFrame:hover {{
+                background-color: {t.bg_hover};
+                border-color: {t.border_light};
+            }}
         """)
         
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 8)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
         
         # Icon
-        icon_container = QFrame()
-        icon_container.setFixedSize(36, 36)
-        icon_container.setStyleSheet(f"""
-            background-color: #1e293b;
-            border-radius: 8px;
-            border: none;
-        """)
-        icon_layout = QVBoxLayout(icon_container)
-        icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_label = QLabel(icon)
+        icon_label.setStyleSheet(f"""
+            background-color: {color};
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 20px;
+        """)
+        icon_label.setFixedSize(44, 44)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet(f"font-size: 16px; color: {color}; background: transparent; border: none;")
-        icon_layout.addWidget(icon_label)
-        layout.addWidget(icon_container)
+        layout.addWidget(icon_label)
         
-        # Metin
+        # Text
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
         
-        text_label = QLabel(text)
-        text_label.setStyleSheet("color: #e2e8f0; font-size: 13px; background: transparent; border: none;")
-        text_layout.addWidget(text_label)
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"color: {t.text_primary}; font-weight: 600; font-size: 14px; background: transparent;")
+        text_layout.addWidget(title_label)
         
-        time_label = QLabel(time)
-        time_label.setStyleSheet("color: #475569; font-size: 11px; background: transparent; border: none;")
-        text_layout.addWidget(time_label)
+        desc_label = QLabel(description)
+        desc_label.setStyleSheet(f"color: {t.text_muted}; font-size: 12px; background: transparent;")
+        text_layout.addWidget(desc_label)
         
         layout.addLayout(text_layout)
         layout.addStretch()
+        
+        # Arrow
+        arrow = QLabel("→")
+        arrow.setStyleSheet(f"color: {t.text_muted}; font-size: 16px; background: transparent;")
+        layout.addWidget(arrow)
 
 
-class QuickActionButton(QPushButton):
-    """Hızlı işlem butonu"""
+class ActivityItem(QFrame):
+    """Son aktivite öğesi"""
     
-    def __init__(self, icon: str, text: str, color: str, parent=None):
+    def __init__(self, icon: str, title: str, time: str, color: str = None, parent=None):
         super().__init__(parent)
-        self.setText(f"{icon}  {text}")
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(56)
+        
+        t = get_theme()
+        color = color or t.accent_primary
+        
         self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: rgba(30, 41, 59, 0.5);
-                color: #e2e8f0;
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 12px;
-                text-align: left;
-                padding-left: 16px;
-                font-size: 13px;
-                font-weight: 500;
-            }}
-            QPushButton:hover {{
-                background-color: rgba(51, 65, 85, 0.5);
-                border-color: {color};
+            QFrame {{
+                background-color: transparent;
+                border: none;
+                border-left: 3px solid {color};
             }}
         """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        
+        # Icon
+        icon_label = QLabel(icon)
+        icon_label.setStyleSheet(f"font-size: 16px; background: transparent;")
+        layout.addWidget(icon_label)
+        
+        # Title
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"color: {t.text_secondary}; font-size: 13px; background: transparent;")
+        layout.addWidget(title_label)
+        
+        layout.addStretch()
+        
+        # Time
+        time_label = QLabel(time)
+        time_label.setStyleSheet(f"color: {t.text_muted}; font-size: 12px; background: transparent;")
+        layout.addWidget(time_label)
 
 
 class DashboardPage(QWidget):
-    """Dashboard ana sayfası"""
+    """Ana Dashboard sayfası"""
     
     page_title = "Dashboard"
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        ThemeManager.register_callback(self._on_theme_changed)
+        
+    def _on_theme_changed(self, theme):
+        # Sayfayı yeniden oluşturmak yerine sadece renkleri güncelle
+        pass
         
     def setup_ui(self):
-        # Scroll area
+        t = get_theme()
+        
+        # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         
         # Ana container
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(32, 32, 32, 32)
         layout.setSpacing(24)
         
-        # Hoşgeldin mesajı
-        welcome_label = QLabel("Hoş geldin, Okan 👋")
-        welcome_label.setStyleSheet("""
-            font-size: 14px;
-            color: #64748b;
+        # === HEADER - LOGO VE HOŞGELDİN ===
+        header_frame = QFrame()
+        header_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_large}px;
+            }}
         """)
-        layout.addWidget(welcome_label)
+        header_layout = QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(32, 28, 32, 28)
+        header_layout.setSpacing(24)
         
-        # KPI Kartları
-        kpi_layout = QHBoxLayout()
-        kpi_layout.setSpacing(16)
-        
-        kpis = [
-            ("Günlük Ciro", "₺125.450", "+12.5%", True, "📈"),
-            ("Açık Siparişler", "47", "-8", True, "📋"),
-            ("Stok Değeri", "₺2.3M", "-3.2%", False, "📦"),
-            ("Üretim Verimi", "%87.5", "+5.2%", True, "⚡"),
-        ]
-        
-        for title, value, change, positive, icon in kpis:
-            card = KPICard(title, value, change, positive, icon)
-            kpi_layout.addWidget(card)
-            
-        layout.addLayout(kpi_layout)
-        
-        # Orta bölüm: Grafik + Uyarılar
-        middle_layout = QHBoxLayout()
-        middle_layout.setSpacing(24)
-        
-        # Sol: Grafik placeholder
-        chart_card = QFrame()
-        chart_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 16px;
-            }
+        # Logo
+        logo_container = QFrame()
+        logo_container.setFixedSize(80, 80)
+        logo_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.bg_secondary};
+                border: 2px solid {t.accent_primary};
+                border-radius: 20px;
+            }}
         """)
-        chart_card.setMinimumHeight(280)
+        logo_layout = QVBoxLayout(logo_container)
+        logo_layout.setContentsMargins(12, 12, 12, 12)
         
-        chart_layout = QVBoxLayout(chart_card)
-        chart_layout.setContentsMargins(24, 24, 24, 24)
+        logo_path = Path(BASE_DIR) / "assets" / "favicon.svg"
+        if logo_path.exists():
+            logo = QSvgWidget(str(logo_path))
+            logo.setFixedSize(56, 56)
+            logo_layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
+        else:
+            logo_label = QLabel("🔄")
+            logo_label.setStyleSheet("font-size: 36px; background: transparent;")
+            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            logo_layout.addWidget(logo_label)
         
-        chart_header = QHBoxLayout()
-        chart_title = QLabel("Haftalık Üretim")
-        chart_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
-        chart_header.addWidget(chart_title)
-        chart_header.addStretch()
+        header_layout.addWidget(logo_container)
         
-        period_btn = QPushButton("Haftalık")
-        period_btn.setStyleSheet("""
-            background-color: rgba(99, 102, 241, 0.2);
-            color: #818cf8;
-            border: none;
-            border-radius: 8px;
-            padding: 6px 16px;
+        # Hoşgeldin metni
+        welcome_layout = QVBoxLayout()
+        welcome_layout.setSpacing(4)
+        
+        welcome_title = QLabel(f"Hoş Geldiniz, {APP_NAME}")
+        welcome_title.setStyleSheet(f"""
+            color: {t.text_primary};
+            font-size: 28px;
+            font-weight: bold;
+            background: transparent;
+        """)
+        welcome_layout.addWidget(welcome_title)
+        
+        welcome_sub = QLabel("İşletmenizin güncel durumuna göz atın")
+        welcome_sub.setStyleSheet(f"color: {t.text_muted}; font-size: 15px; background: transparent;")
+        welcome_layout.addWidget(welcome_sub)
+        
+        # Tarih
+        from datetime import datetime
+        date_str = datetime.now().strftime("%d %B %Y, %A")
+        date_label = QLabel(f"📅 {date_str}")
+        date_label.setStyleSheet(f"color: {t.text_accent}; font-size: 13px; margin-top: 8px; background: transparent;")
+        welcome_layout.addWidget(date_label)
+        
+        header_layout.addLayout(welcome_layout)
+        header_layout.addStretch()
+        
+        # Sağ taraf
+        info_layout = QVBoxLayout()
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
+        
+        version_label = QLabel(f"v{APP_VERSION}")
+        version_label.setStyleSheet(f"""
+            background-color: {t.accent_primary};
+            color: white;
+            padding: 6px 14px;
+            border-radius: 12px;
             font-size: 12px;
-            font-weight: 500;
-        """)
-        chart_header.addWidget(period_btn)
-        chart_layout.addLayout(chart_header)
-        
-        # Grafik placeholder
-        chart_placeholder = QLabel("📊 Grafik burada görünecek")
-        chart_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        chart_placeholder.setStyleSheet("""
-            color: #475569;
-            font-size: 16px;
-            padding: 60px;
-        """)
-        chart_layout.addWidget(chart_placeholder)
-        
-        middle_layout.addWidget(chart_card, stretch=2)
-        
-        # Sağ: Uyarılar
-        alerts_card = QFrame()
-        alerts_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 16px;
-            }
-        """)
-        alerts_card.setMinimumHeight(280)
-        alerts_card.setFixedWidth(320)
-        
-        alerts_layout = QVBoxLayout(alerts_card)
-        alerts_layout.setContentsMargins(24, 24, 24, 24)
-        
-        alerts_header = QHBoxLayout()
-        alerts_title = QLabel("Uyarılar")
-        alerts_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
-        alerts_header.addWidget(alerts_title)
-        alerts_header.addStretch()
-        
-        alerts_badge = QLabel("3 aktif")
-        alerts_badge.setStyleSheet("""
-            background-color: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-            padding: 4px 10px;
-            border-radius: 10px;
-            font-size: 11px;
             font-weight: 600;
         """)
-        alerts_header.addWidget(alerts_badge)
-        alerts_layout.addLayout(alerts_header)
+        info_layout.addWidget(version_label, alignment=Qt.AlignmentFlag.AlignRight)
         
-        alerts_layout.addSpacing(12)
+        status_label = QLabel("● Sistem Aktif")
+        status_label.setStyleSheet(f"color: {t.success}; font-size: 13px; background: transparent;")
+        info_layout.addWidget(status_label, alignment=Qt.AlignmentFlag.AlignRight)
         
-        # Uyarı öğeleri
-        alerts = [
-            ("⚠️", "5 üründe kritik stok seviyesi", "#ef4444"),
-            ("⏰", "3 fatura vadesi yaklaşıyor", "#f59e0b"),
-            ("🔧", "Makine-3 bakım zamanı geldi", "#3b82f6"),
+        header_layout.addLayout(info_layout)
+        
+        layout.addWidget(header_frame)
+        
+        # === İSTATİSTİK KARTLARI ===
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(16)
+        
+        stats = [
+            ("📦", "Toplam Ürün", "1,248", "Aktif stok kartı", t.accent_primary),
+            ("🏭", "Depolar", "5", "Aktif depo", t.info),
+            ("📊", "Stok Değeri", "₺2.4M", "Toplam envanter", t.success),
+            ("⚠️", "Kritik Stok", "23", "Dikkat gerektiren", t.warning),
         ]
         
-        for icon, text, color in alerts:
-            alert_frame = QFrame()
-            alert_frame.setStyleSheet(f"""
-                background-color: rgba(30, 41, 59, 0.8);
-                border-radius: 10px;
-                padding: 4px;
-            """)
-            alert_layout = QHBoxLayout(alert_frame)
-            alert_layout.setContentsMargins(12, 10, 12, 10)
-            
-            alert_icon = QLabel(icon)
-            alert_icon.setStyleSheet(f"font-size: 18px;")
-            alert_layout.addWidget(alert_icon)
-            
-            alert_text = QLabel(text)
-            alert_text.setStyleSheet(f"color: #e2e8f0; font-size: 12px;")
-            alert_text.setWordWrap(True)
-            alert_layout.addWidget(alert_text, stretch=1)
-            
-            alerts_layout.addWidget(alert_frame)
+        for icon, title, value, subtitle, color in stats:
+            card = StatCard(icon, title, value, subtitle, color)
+            card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            card.setFixedHeight(160)
+            stats_layout.addWidget(card)
         
-        alerts_layout.addStretch()
+        layout.addLayout(stats_layout)
         
-        middle_layout.addWidget(alerts_card)
-        layout.addLayout(middle_layout)
-        
-        # Alt bölüm: Aktiviteler + Hızlı İşlemler
+        # === HIZLI İŞLEMLER VE SON AKTİVİTELER ===
         bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(24)
+        bottom_layout.setSpacing(20)
         
-        # Sol: Son aktiviteler
-        activities_card = QFrame()
-        activities_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 16px;
-            }
+        # Sol - Hızlı İşlemler
+        quick_frame = QFrame()
+        quick_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_large}px;
+            }}
         """)
+        quick_layout = QVBoxLayout(quick_frame)
+        quick_layout.setContentsMargins(20, 20, 20, 20)
+        quick_layout.setSpacing(12)
         
-        activities_layout = QVBoxLayout(activities_card)
-        activities_layout.setContentsMargins(24, 24, 24, 24)
-        
-        activities_header = QHBoxLayout()
-        activities_title = QLabel("Son Aktiviteler")
-        activities_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
-        activities_header.addWidget(activities_title)
-        activities_header.addStretch()
-        
-        see_all_btn = QPushButton("Tümünü Gör")
-        see_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        see_all_btn.setStyleSheet("""
-            color: #818cf8;
-            background: transparent;
-            border: none;
-            font-size: 13px;
-        """)
-        activities_header.addWidget(see_all_btn)
-        activities_layout.addLayout(activities_header)
-        
-        # Aktivite öğeleri
-        activities = [
-            ("✅", "Sipariş #1234 onaylandı", "5 dk önce", "#10b981"),
-            ("🏭", "İş Emri #567 başlatıldı", "12 dk önce", "#3b82f6"),
-            ("⚠️", "Hammadde A kritik seviyede", "25 dk önce", "#f59e0b"),
-            ("📄", "Fatura #890 kesildi", "1 saat önce", "#a855f7"),
-            ("🚚", "Sevkiyat #456 tamamlandı", "2 saat önce", "#06b6d4"),
-        ]
-        
-        for icon, text, time, color in activities:
-            item = ActivityItem(icon, text, time, color)
-            activities_layout.addWidget(item)
-        
-        bottom_layout.addWidget(activities_card)
-        
-        # Sağ: Hızlı işlemler
-        actions_card = QFrame()
-        actions_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(51, 65, 85, 0.5);
-                border-radius: 16px;
-            }
-        """)
-        actions_card.setFixedWidth(320)
-        
-        actions_layout = QVBoxLayout(actions_card)
-        actions_layout.setContentsMargins(24, 24, 24, 24)
-        
-        actions_title = QLabel("Hızlı İşlemler")
-        actions_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
-        actions_layout.addWidget(actions_title)
-        
-        actions_layout.addSpacing(12)
+        quick_title = QLabel("⚡ Hızlı İşlemler")
+        quick_title.setStyleSheet(f"color: {t.text_primary}; font-size: 18px; font-weight: bold; background: transparent;")
+        quick_layout.addWidget(quick_title)
         
         actions = [
-            ("➕", "Yeni Sipariş", "#10b981"),
-            ("🏭", "İş Emri Oluştur", "#6366f1"),
-            ("📦", "Stok Girişi", "#f59e0b"),
-            ("📄", "Fatura Kes", "#ec4899"),
+            ("📦", "Yeni Stok Kartı", "Hızlıca ürün ekleyin", t.accent_primary),
+            ("📥", "Stok Girişi", "Depoya ürün girişi", t.success),
+            ("📤", "Stok Çıkışı", "Depodan ürün çıkışı", t.error),
+            ("🔄", "Transfer", "Depolar arası transfer", t.info),
+            ("📋", "Sayım Başlat", "Envanter sayımı", t.warning),
         ]
         
-        for icon, text, color in actions:
-            btn = QuickActionButton(icon, text, color)
-            actions_layout.addWidget(btn)
+        for icon, title, desc, color in actions:
+            action_card = QuickActionCard(icon, title, desc, color)
+            quick_layout.addWidget(action_card)
         
-        actions_layout.addStretch()
+        quick_layout.addStretch()
+        bottom_layout.addWidget(quick_frame, 1)
         
-        bottom_layout.addWidget(actions_card)
+        # Sağ - Son Aktiviteler
+        activity_frame = QFrame()
+        activity_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_large}px;
+            }}
+        """)
+        activity_layout = QVBoxLayout(activity_frame)
+        activity_layout.setContentsMargins(20, 20, 20, 20)
+        activity_layout.setSpacing(8)
+        
+        activity_title = QLabel("🕐 Son Aktiviteler")
+        activity_title.setStyleSheet(f"color: {t.text_primary}; font-size: 18px; font-weight: bold; background: transparent;")
+        activity_layout.addWidget(activity_title)
+        
+        activities = [
+            ("📥", "Hammadde girişi yapıldı - 500 KG", "2 dk önce", t.success),
+            ("📤", "Mamul çıkışı - Sipariş #1234", "15 dk önce", t.error),
+            ("🔄", "Depo transferi tamamlandı", "1 saat önce", t.info),
+            ("📋", "Sayım #45 onaylandı", "3 saat önce", t.accent_primary),
+            ("⚠️", "Düşük stok uyarısı - PLT-001", "5 saat önce", t.warning),
+            ("📦", "Yeni ürün eklendi - YM-2024", "Dün", t.accent_secondary),
+        ]
+        
+        for icon, title, time, color in activities:
+            item = ActivityItem(icon, title, time, color)
+            activity_layout.addWidget(item)
+        
+        activity_layout.addStretch()
+        
+        see_all = QLabel("Tümünü Gör →")
+        see_all.setStyleSheet(f"color: {t.text_accent}; font-size: 13px; padding: 8px; background: transparent;")
+        see_all.setCursor(Qt.CursorShape.PointingHandCursor)
+        activity_layout.addWidget(see_all, alignment=Qt.AlignmentFlag.AlignRight)
+        
+        bottom_layout.addWidget(activity_frame, 1)
+        
         layout.addLayout(bottom_layout)
-        
-        # AI Asistan Banner
-        ai_banner = QFrame()
-        ai_banner.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(99, 102, 241, 0.15), 
-                    stop:1 rgba(168, 85, 247, 0.15));
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: 16px;
-            }
-        """)
-        
-        ai_layout = QHBoxLayout(ai_banner)
-        ai_layout.setContentsMargins(24, 20, 24, 20)
-        
-        ai_icon = QLabel("🤖")
-        ai_icon.setStyleSheet("font-size: 36px;")
-        ai_layout.addWidget(ai_icon)
-        
-        ai_text_layout = QVBoxLayout()
-        ai_title = QLabel("AI Asistan")
-        ai_title.setStyleSheet("font-size: 16px; font-weight: 600; color: #f8fafc;")
-        ai_text_layout.addWidget(ai_title)
-        
-        ai_message = QLabel(
-            '"Bugün satışlar geçen haftaya göre %12 arttı. Mevcut stok seviyelerine göre '
-            '3 hammadde için sipariş oluşturmanızı öneriyorum."'
-        )
-        ai_message.setStyleSheet("color: #94a3b8; font-size: 13px;")
-        ai_message.setWordWrap(True)
-        ai_text_layout.addWidget(ai_message)
-        
-        ai_layout.addLayout(ai_text_layout, stretch=1)
-        
-        ai_btn = QPushButton("Önerileri Gör")
-        ai_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        ai_btn.setStyleSheet("""
-            background-color: #6366f1;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 10px 20px;
-            font-weight: 600;
-            font-size: 13px;
-        """)
-        ai_layout.addWidget(ai_btn)
-        
-        layout.addWidget(ai_banner)
-        
-        layout.addStretch()
         
         scroll.setWidget(container)
         
-        # Ana layout
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(scroll)

@@ -1,14 +1,13 @@
 """
-Akıllı İş ERP - Header Widget
+Akıllı İş ERP - Header Widget (Düzeltilmiş)
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFrame
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
 
-from config import settings
+from config.themes import get_theme, ThemeManager
 
 
 class Header(QFrame):
@@ -16,31 +15,41 @@ class Header(QFrame):
     
     search_triggered = pyqtSignal(str)
     ai_assistant_clicked = pyqtSignal()
-    notifications_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        ThemeManager.register_callback(self._on_theme_changed)
+        
+    def _on_theme_changed(self, theme):
+        self._apply_styles()
+        
+    def _apply_styles(self):
+        t = get_theme()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.header_bg};
+                border-bottom: 1px solid {t.border};
+            }}
+        """)
         
     def setup_ui(self):
-        """UI oluştur"""
+        t = get_theme()
+        
         self.setFixedHeight(64)
-        self.setStyleSheet("""
-            QFrame {
-                background-color: rgba(15, 23, 42, 0.8);
-                border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-            }
-        """)
+        self._apply_styles()
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(24, 0, 24, 0)
+        layout.setSpacing(16)
         
         # Sayfa başlığı
         self.title_label = QLabel("Dashboard")
-        self.title_label.setStyleSheet("""
+        self.title_label.setStyleSheet(f"""
             font-size: 20px;
-            font-weight: 700;
-            color: #f8fafc;
+            font-weight: 600;
+            color: {t.text_primary};
+            background: transparent;
         """)
         layout.addWidget(self.title_label)
         
@@ -48,111 +57,92 @@ class Header(QFrame):
         
         # Arama kutusu
         search_container = QFrame()
-        search_container.setFixedWidth(380)
-        search_container.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.8);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QFrame:focus-within {
-                border: 2px solid #6366f1;
-            }
+        search_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {t.input_bg};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_medium}px;
+            }}
+            QFrame:hover {{
+                border-color: {t.border_light};
+            }}
         """)
-        
         search_layout = QHBoxLayout(search_container)
-        search_layout.setContentsMargins(16, 0, 16, 0)
+        search_layout.setContentsMargins(12, 0, 12, 0)
+        search_layout.setSpacing(8)
         
         search_icon = QLabel("🔍")
-        search_icon.setStyleSheet("font-size: 16px; border: none; background: transparent;")
+        search_icon.setStyleSheet("font-size: 14px; background: transparent;")
         search_layout.addWidget(search_icon)
         
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Ara... (⌘K)")
-        self.search_input.setStyleSheet("""
-            QLineEdit {
+        self.search_input.setStyleSheet(f"""
+            QLineEdit {{
                 background: transparent;
                 border: none;
-                color: #e2e8f0;
+                color: {t.text_primary};
                 font-size: 14px;
-                padding: 12px 0;
-            }
-            QLineEdit::placeholder {
-                color: #64748b;
-            }
+                min-width: 200px;
+                padding: 10px 0;
+            }}
+            QLineEdit::placeholder {{
+                color: {t.text_muted};
+            }}
         """)
-        self.search_input.returnPressed.connect(self.on_search)
+        self.search_input.returnPressed.connect(self._on_search)
         search_layout.addWidget(self.search_input)
         
         layout.addWidget(search_container)
         
-        layout.addSpacing(16)
+        # Bildirimler
+        notif_btn = QPushButton("🔔")
+        notif_btn.setFixedSize(40, 40)
+        notif_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        notif_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t.bg_secondary};
+                border: 1px solid {t.border};
+                border-radius: {t.radius_medium}px;
+                font-size: 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {t.bg_hover};
+                border-color: {t.border_light};
+            }}
+        """)
+        layout.addWidget(notif_btn)
         
-        # AI Asistan butonu
-        ai_btn = QPushButton("  🤖  AI Asistan")
+        # AI Asistan
+        ai_btn = QPushButton("✨ AI Asistan")
         ai_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        ai_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
-                    stop:0 #6366f1, stop:1 #a855f7);
-                color: white;
+        ai_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {t.accent_primary};
                 border: none;
-                border-radius: 12px;
-                padding: 10px 20px;
+                color: white;
                 font-weight: 600;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
-                    stop:0 #818cf8, stop:1 #c084fc);
-            }
+                padding: 10px 20px;
+                border-radius: {t.radius_medium}px;
+            }}
+            QPushButton:hover {{
+                background-color: {t.accent_secondary};
+            }}
         """)
         ai_btn.clicked.connect(self.ai_assistant_clicked.emit)
         layout.addWidget(ai_btn)
         
-        layout.addSpacing(8)
-        
-        # Bildirimler butonu
-        notif_btn = QPushButton("🔔")
-        notif_btn.setFixedSize(44, 44)
-        notif_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        notif_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                font-size: 18px;
-            }
-            QPushButton:hover {
-                background-color: #334155;
-            }
-        """)
-        notif_btn.clicked.connect(self.notifications_clicked.emit)
-        layout.addWidget(notif_btn)
-        
-        # Yardım butonu
-        help_btn = QPushButton("❓")
-        help_btn.setFixedSize(44, 44)
-        help_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        help_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                font-size: 18px;
-            }
-            QPushButton:hover {
-                background-color: #334155;
-            }
-        """)
-        layout.addWidget(help_btn)
-        
     def set_title(self, title: str):
-        """Sayfa başlığını güncelle"""
+        t = get_theme()
         self.title_label.setText(title)
+        self.title_label.setStyleSheet(f"""
+            font-size: 20px;
+            font-weight: 600;
+            color: {t.text_primary};
+            background: transparent;
+        """)
         
-    def on_search(self):
-        """Arama yapıldığında"""
+    def _on_search(self):
         query = self.search_input.text().strip()
         if query:
             self.search_triggered.emit(query)

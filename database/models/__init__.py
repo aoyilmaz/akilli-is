@@ -43,14 +43,13 @@ from database.models.common import (
 __all__ = [
     # User
     "User",
-    "Role", 
+    "Role",
     "Permission",
     "AuditLog",
     "Setting",
     "Sequence",
     "user_roles",
     "role_permissions",
-    
     # Inventory
     "Unit",
     "UnitConversion",
@@ -63,7 +62,6 @@ __all__ = [
     "StockMovement",
     "ItemType",
     "StockMovementType",
-    
     # Common
     "Currency",
     "ExchangeRate",
@@ -73,3 +71,17 @@ __all__ = [
     "Attachment",
     "Note",
 ]
+
+from .production import (
+    BillOfMaterials,
+    BOMLine,
+    BOMOperation,
+    BOMStatus,
+    WorkStation,
+    WorkStationType,
+    WorkOrder,
+    WorkOrderLine,
+    WorkOrderOperation,
+    WorkOrderStatus,
+    WorkOrderPriority,
+)
