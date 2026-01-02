@@ -85,3 +85,4 @@ from .production import (
     WorkOrderStatus,
     WorkOrderPriority,
 )
+from .calendar import ProductionShift, ProductionHoliday, WorkstationSchedule

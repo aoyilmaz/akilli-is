@@ -34,6 +34,8 @@ from modules.production import (
     WorkStationModule,
 )
 
+from modules.production.views.calendar_module import CalendarModule
+
 
 class MainWindow(QMainWindow):
     """Ana uygulama penceresi"""
@@ -151,6 +153,9 @@ class MainWindow(QMainWindow):
 
         self.pages["work-stations"] = WorkStationModule()
         self.page_stack.addWidget(self.pages["work-stations"])
+
+        self.pages["calendar"] = CalendarModule()  # YENİ
+        self.page_stack.addWidget(self.pages["calendar"])
 
         # ========== DİĞER MODÜLLER ==========
         self.pages["purchasing"] = PlaceholderPage("Satın Alma", "🛒")

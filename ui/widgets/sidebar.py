@@ -340,10 +340,11 @@ class Sidebar(QFrame):
                 "Üretim",
                 "🏭",
                 [
-                    ("work-orders", "İş Emirleri"),
                     ("bom", "Ürün Reçeteleri"),
-                    ("planning", "Üretim Planlama"),
                     ("work-stations", "İş İstasyonları"),
+                    ("work-orders", "İş Emirleri"),
+                    ("planning", "Üretim Planlama"),
+                    ("calendar", "Çalışma Takvimi"),
                 ],
             ),
             ("purchasing", "Satın Alma", "🛒", []),

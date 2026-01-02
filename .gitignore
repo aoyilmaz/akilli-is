@@ -38,4 +38,4 @@ build/
 # Test
 .pytest_cache/
 .coverage
-htmlcov/
+htmlcov/**/*_backup.py
