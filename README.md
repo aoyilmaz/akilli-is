@@ -36,10 +36,24 @@
 - Stok Sayımı (envanter)
 - Stok Raporları
 
+### Üretim ✅
+
+- Ürün Reçeteleri
+- İş Emirleri
+- Üretim Planlama
+- İş İstasyonları
+- Çalışma Takvimi
+
+
+### Satınalma ✅
+
+- Tedarikçiler
+- Talepler
+- Siparişler
+- Mal Kabul
+
 ### Planlanan Modüller 🚧
 
-- Üretim (İş emirleri, BOM)
-- Satın Alma
 - Satış
 - Finans
 - CRM
@@ -84,23 +98,127 @@ python main.py
 ## 📁 Proje Yapısı
 
 ```
-akilli-is/
-├── assets/              # Logo, ikonlar
-├── config/              # Ayar dosyaları
-├── database/            # Veritabanı modelleri
-│   ├── models/
-│   └── base.py
-├── docs/                # Dokümantasyon
-├── modules/             # Uygulama modülleri
-│   └── inventory/       # Stok modülü
+
+├── alembic
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions
+│       └── 20260101_001_add_actual_fields.py
+├── alembic.ini
+├── config
+│   ├── __init__.py
+│   ├── settings.py
+│   └── themes.py
+├── data
+├── database
+│   ├── __init__.py
+│   ├── base.py
+│   └── models
+│       ├── __init__.py
+│       ├── calendar.py
+│       ├── common.py
+│       ├── inventory.py
+│       ├── production.py
+│       ├── purchasing.py
+│       └── user.py
+├── docs
+│   └── akilli-is-erp-dokumantasyon.docx
+├── init_db.py
+├── logs
+│   ├── akilli_is_2025-12-31_14-30-47_011255.log
+│   ├── akilli_is_2025-12-31_14-33-55_403321.log
+│   └── akilli_is_2025-12-31_14-43-35_235183.log
+├── main.py
+├── modules
+│   ├── __init__.py
+│   ├── inventory
+│   │   ├── __init__.py
+│   │   ├── module.py
+│   │   ├── services.py
+│   │   └── views
+│   │       ├── __init__.py
+│   │       ├── category_form.py
+│   │       ├── category_list.py
+│   │       ├── category_module.py
+│   │       ├── movement_form.py
+│   │       ├── movement_list.py
+│   │       ├── movement_module.py
+│   │       ├── reports_module.py
+│   │       ├── reports_page.py
+│   │       ├── stock_count_form.py
+│   │       ├── stock_count_list.py
+│   │       ├── stock_count_module.py
+│   │       ├── stock_form.py
+│   │       ├── stock_list.py
+│   │       ├── unit_management.py
+│   │       ├── unit_module.py
+│   │       ├── warehouse_form.py
+│   │       ├── warehouse_list.py
+│   │       └── warehouse_module.py
+│   ├── production
+│   │   ├── __init__.py
+│   │   ├── calendar_services.py
+│   │   ├── services.py
+│   │   └── views
+│   │       ├── __init__.py
+│   │       ├── bom_form.py
+│   │       ├── bom_list.py
+│   │       ├── bom_module.py
+│   │       ├── calendar_module.py
+│   │       ├── planning_module.py
+│   │       ├── planning_module_backup.py
+│   │       ├── planning_page.py
+│   │       ├── planning_page_backup.py
+│   │       ├── work_order_form.py
+│   │       ├── work_order_list.py
+│   │       ├── work_order_module.py
+│   │       ├── work_station_form.py
+│   │       ├── work_station_list.py
+│   │       └── work_station_module.py
+│   └── purchasing
+│       ├── __init__.py
 │       ├── services.py
-│       └── views/
-├── ui/                  # Arayüz bileşenleri
-│   ├── pages/
-│   └── widgets/
-├── main.py              # Ana giriş noktası
-├── init_db.py           # Veritabanı başlatma
-└── requirements.txt
+│       └── views
+│           ├── __init__.py
+│           ├── goods_receipt_form.py
+│           ├── goods_receipt_list.py
+│           ├── goods_receipt_module.py
+│           ├── purchase_order_form.py
+│           ├── purchase_order_list.py
+│           ├── purchase_order_module.py
+│           ├── purchase_request_form.py
+│           ├── purchase_request_list.py
+│           ├── purchase_request_module.py
+│           ├── supplier_form.py
+│           ├── supplier_list.py
+│           └── supplier_module.py
+├── requirements.txt
+├── scripts
+│   └── daily-commit.sh
+├── setup.sh
+├── ui
+│   ├── __init__.py
+│   ├── main_window.py
+│   ├── pages
+│   │   ├── __init__.py
+│   │   ├── dashboard.py
+│   │   └── placeholder.py
+│   ├── resources
+│   │   └── icons
+│   │       └── logo.svg
+│   ├── themes
+│   │   └── dark.qss
+│   └── widgets
+│       ├── __init__.py
+│       ├── header.py
+│       └── sidebar.py
+└── {assets,config,core
+    └── {auth,base},database
+        └── {models,repositories,migrations},modules
+            └── {inventory,production,purchasing,sales,finance,hr},ui
+                └── {widgets,dialogs,themes,resources},reports
+                    └── {designer,templates},ai,exports,utils,tests
+                        └── {unit,integration}}
 ```
 
 ## 📖 Dokümantasyon
@@ -127,6 +245,6 @@ MIT License - Detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 👨‍💻 Geliştirici
 
-**Okan** - [GitHub](https://github.com/kullanici)
+**Ahmet Okan YILMAZ** - [GitHub](https://github.com/aoyilmaz)
 
 ---
