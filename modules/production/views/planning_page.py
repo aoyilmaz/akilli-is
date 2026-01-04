@@ -1,9 +1,9 @@
 """
 Akıllı İş - Üretim Planlama Sayfası
-MAKİNE BAZLI GANTT CHART
+TAKVİM ENTEGRASYONlu MAKİNE BAZLI GANTT CHART
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -76,7 +76,6 @@ class GanttBar(QWidget):
         font.setBold(True)
         painter.setFont(font)
         
-        # Çubuk genişliğine göre metin
         text = f"{self.order_no}"
         if rect.width() > 120:
             text = f"{self.order_no} - {self.item_name[:15]}"
@@ -94,6 +93,124 @@ class GanttBar(QWidget):
         return QSize(100, 36)
 
 
+class TimelineHeader(QWidget):
+    """Zaman çizelgesi başlığı - Tatil gösterimli"""
+    
+    def __init__(self, start_date: QDate, num_days: int, pixels_per_day: int, 
+                 holidays: list = None, parent=None):
+        super().__init__(parent)
+        self.start_date = start_date
+        self.num_days = num_days
+        self.pixels_per_day = pixels_per_day
+        self.holidays = holidays or []  # [(date, name, is_half_day), ...]
+        
+        # Holiday'leri set olarak tut (hızlı lookup için)
+        self.holiday_dates = {h[0]: (h[1], h[2]) for h in self.holidays}
+        
+        self.setFixedHeight(50)
+        self.setMinimumWidth(180 + num_days * pixels_per_day)
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Sol kenar boşluğu (makine isimleri için)
+        left_margin = 180
+        
+        # Arka plan
+        painter.fillRect(0, 0, left_margin, self.height(), QColor("#0f172a"))
+        painter.fillRect(left_margin, 0, self.width() - left_margin, self.height(), QColor("#1e293b"))
+        
+        # Sol başlık
+        painter.setPen(QColor("#64748b"))
+        painter.setFont(QFont("Segoe UI", 10))
+        painter.drawText(10, 0, left_margin - 20, self.height(), 
+                        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                        "İş İstasyonu")
+        
+        # Gün başlıkları
+        day_names_short = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+        months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+        
+        for i in range(self.num_days):
+            x = left_margin + i * self.pixels_per_day
+            day = self.start_date.addDays(i)
+            day_date = date(day.year(), day.month(), day.day())
+            
+            is_weekend = day.dayOfWeek() >= 6
+            is_holiday = day_date in self.holiday_dates
+            is_today = day == QDate.currentDate()
+            
+            # Arka plan rengi
+            if is_holiday:
+                # Tatil - Kırmızımsı
+                bg_color = QColor("#7f1d1d")  # red-900
+            elif is_weekend:
+                # Hafta sonu - Koyu
+                bg_color = QColor("#0f172a")
+            elif is_today:
+                # Bugün - Vurgu rengi
+                bg_color = QColor("#312e81")  # indigo-900
+            else:
+                bg_color = QColor("#1e293b")
+            
+            painter.fillRect(x, 0, self.pixels_per_day, self.height(), bg_color)
+            
+            # Dikey çizgi
+            painter.setPen(QPen(QColor("#334155"), 1))
+            painter.drawLine(x, 0, x, self.height())
+            
+            # Gün bilgisi
+            if self.pixels_per_day >= 40:
+                # Geniş görünüm - iki satır
+                day_name = day_names_short[day.dayOfWeek() - 1]
+                
+                # Tatil adı göster
+                if is_holiday:
+                    holiday_name, is_half = self.holiday_dates[day_date]
+                    painter.setPen(QColor("#fca5a5"))  # red-300
+                    font = QFont("Segoe UI", 8)
+                    painter.setFont(font)
+                    # Kısalt
+                    short_name = holiday_name[:8] + ".." if len(holiday_name) > 10 else holiday_name
+                    painter.drawText(x + 2, 2, self.pixels_per_day - 4, 14, 
+                                    Qt.AlignmentFlag.AlignCenter, short_name)
+                    
+                    painter.setPen(QColor("#f87171"))
+                    painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                    painter.drawText(x, 14, self.pixels_per_day, 18, 
+                                    Qt.AlignmentFlag.AlignCenter, f"{day.day()}")
+                    
+                    half_text = "½" if is_half else "✗"
+                    painter.setPen(QColor("#fca5a5"))
+                    painter.setFont(QFont("Segoe UI", 8))
+                    painter.drawText(x, 32, self.pixels_per_day, 14, 
+                                    Qt.AlignmentFlag.AlignCenter, half_text)
+                else:
+                    # Normal gün
+                    painter.setPen(QColor("#64748b") if is_weekend else QColor("#94a3b8"))
+                    painter.setFont(QFont("Segoe UI", 8))
+                    painter.drawText(x, 2, self.pixels_per_day, 14, 
+                                    Qt.AlignmentFlag.AlignCenter, day_name)
+                    
+                    painter.setPen(QColor("#e2e8f0") if is_today else QColor("#f8fafc") if not is_weekend else QColor("#64748b"))
+                    painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold if is_today else QFont.Weight.Normal))
+                    painter.drawText(x, 14, self.pixels_per_day, 20, 
+                                    Qt.AlignmentFlag.AlignCenter, f"{day.day()}")
+                    
+                    if day.day() == 1 or i == 0:
+                        painter.setPen(QColor("#818cf8"))
+                        painter.setFont(QFont("Segoe UI", 8))
+                        painter.drawText(x, 32, self.pixels_per_day, 14, 
+                                        Qt.AlignmentFlag.AlignCenter, months[day.month() - 1])
+            else:
+                # Dar görünüm - sadece gün
+                painter.setPen(QColor("#f87171") if is_holiday else QColor("#f8fafc") if not is_weekend else QColor("#64748b"))
+                painter.setFont(QFont("Segoe UI", 9))
+                painter.drawText(x, 0, self.pixels_per_day, self.height(), 
+                                Qt.AlignmentFlag.AlignCenter, f"{day.day()}")
+
+
 class MachineRow(QFrame):
     """Makine satırı - Sol etiket + Gantt alanı"""
     
@@ -107,7 +224,8 @@ class MachineRow(QFrame):
         self.station_name = station_name
         self.station_type = station_type
         self.capacity = capacity
-        self.operations = []  # Bu makinedeki operasyonlar
+        self.operations = []
+        self.holidays = []
         
         self.setFixedHeight(52)
         self.setStyleSheet("""
@@ -118,13 +236,13 @@ class MachineRow(QFrame):
         """)
         
     def set_operations(self, operations: list, period_start: datetime, 
-                       period_days: int, pixels_per_day: int):
+                       period_days: int, pixels_per_day: int, holidays: list = None):
         """Operasyonları ayarla ve çubukları oluştur"""
         self.operations = operations
+        self.holidays = holidays or []
         self._build_ui(period_start, period_days, pixels_per_day)
         
     def _build_ui(self, period_start: datetime, period_days: int, pixels_per_day: int):
-        # Mevcut layout'u temizle
         if self.layout():
             QWidget().setLayout(self.layout())
             
@@ -145,7 +263,6 @@ class MachineRow(QFrame):
         label_layout.setContentsMargins(12, 6, 12, 6)
         label_layout.setSpacing(2)
         
-        # Makine ikonu ve kodu
         type_icons = {
             "machine": "⚙️",
             "workstation": "🔧",
@@ -166,10 +283,14 @@ class MachineRow(QFrame):
         
         # Gantt bar alanı
         bar_area = QWidget()
-        bar_area.setStyleSheet("background: transparent;")
         bar_area.setMinimumWidth(period_days * pixels_per_day)
         
-        # Operasyonları çiz
+        # Holiday set'i
+        holiday_dates = {h[0] for h in self.holidays}
+        
+        # Arka plan çiz (hafta sonları ve tatiller)
+        bar_area.setStyleSheet("background: transparent;")
+        
         period_end = period_start + timedelta(days=period_days)
         
         status_colors = {
@@ -199,150 +320,76 @@ class MachineRow(QFrame):
             if not op_start or not op_end:
                 continue
                 
-            # Datetime'a çevir
             if not isinstance(op_start, datetime):
                 op_start = datetime.combine(op_start, datetime.min.time())
             if not isinstance(op_end, datetime):
                 op_end = datetime.combine(op_end, datetime.min.time())
             
-            # Bu dönemde görünür mü?
             if op_start >= period_end or op_end <= period_start:
                 continue
-            
+                
             # Görünür kısmı hesapla
             visible_start = max(op_start, period_start)
             visible_end = min(op_end, period_end)
             
             # Pozisyon hesapla
-            start_offset_days = (visible_start - period_start).total_seconds() / 86400
+            start_offset = (visible_start - period_start).total_seconds() / 86400
             duration_days = (visible_end - visible_start).total_seconds() / 86400
             
-            x_pos = int(start_offset_days * pixels_per_day)
-            width = max(40, int(duration_days * pixels_per_day) - 4)  # Min 40px
+            x = int(start_offset * pixels_per_day)
+            width = max(int(duration_days * pixels_per_day), 20)
             
-            # Süre hesapla (saat)
-            total_duration = (op_end - op_start).total_seconds() / 3600
+            # Süre hesapla
+            total_hours = (op_end - op_start).total_seconds() / 3600
             
-            # Gantt bar oluştur
             status = op.get("status", "planned")
             color = status_colors.get(status, "#3b82f6")
+            status_name = status_names.get(status, status)
             
             bar = GanttBar(
                 wo_id=op.get("work_order_id", 0),
                 order_no=op.get("order_no", ""),
                 item_name=op.get("item_name", ""),
                 operation_name=op.get("operation_name", ""),
-                progress=op.get("progress", 0),
-                status=status_names.get(status, "?"),
+                progress=float(op.get("progress", 0) or 0),
+                status=status_name,
                 color=color,
-                duration_hours=total_duration,
+                duration_hours=total_hours,
                 parent=bar_area
             )
-            bar.setGeometry(x_pos, 8, width, 36)
             bar.clicked.connect(self.work_order_clicked.emit)
+            bar.setGeometry(x, 8, width, 36)
             bar.show()
         
         layout.addWidget(bar_area)
-        layout.addStretch()
-
-
-class TimelineHeader(QWidget):
-    """Zaman çizelgesi başlığı"""
     
-    def __init__(self, start_date: QDate, days: int, pixels_per_day: int, parent=None):
-        super().__init__(parent)
-        self.start_date = start_date
-        self.days = days
-        self.pixels_per_day = pixels_per_day
-        self.setFixedHeight(60)
-        self.setMinimumWidth(180 + days * pixels_per_day)
-        
     def paintEvent(self, event):
+        super().paintEvent(event)
+        
+        # Hafta sonu ve tatil arkaplanlarını çiz
+        if not hasattr(self, '_period_info'):
+            return
+            
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        period_start, period_days, pixels_per_day = self._period_info
+        holiday_dates = {h[0] for h in self.holidays}
         
-        # Arka plan
-        painter.fillRect(self.rect(), QColor("#1e293b"))
-        
-        today = QDate.currentDate()
-        x_offset = 180  # Sol etiket alanı
-        
-        # Ay başlıkları için
-        current_month = None
-        month_start_x = x_offset
-        months_tr = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                     "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
-        
-        for i in range(self.days):
-            date = self.start_date.addDays(i)
-            x = x_offset + i * self.pixels_per_day
+        for i in range(period_days):
+            x = 180 + i * pixels_per_day
+            day = period_start + timedelta(days=i)
+            day_date = day.date() if isinstance(day, datetime) else day
             
-            is_today = date == today
-            is_weekend = date.dayOfWeek() >= 6
+            is_weekend = day_date.weekday() >= 5
+            is_holiday = day_date in holiday_dates
             
-            # Ay değişimi kontrolü
-            if current_month != date.month():
-                if current_month is not None:
-                    # Önceki ay başlığını çiz
-                    month_width = x - month_start_x
-                    painter.setPen(QPen(QColor("#475569")))
-                    painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-                    month_text = f"{months_tr[current_month-1]}"
-                    painter.drawText(QRect(month_start_x, 2, month_width, 20), 
-                                   Qt.AlignmentFlag.AlignCenter, month_text)
-                
-                current_month = date.month()
-                month_start_x = x
-            
-            # Gün arka planı
-            if is_today:
-                painter.fillRect(x, 22, self.pixels_per_day, 38, QColor("#6366f130"))
+            if is_holiday:
+                painter.fillRect(x, 0, pixels_per_day, self.height(), QColor(127, 29, 29, 60))  # red-900/60
             elif is_weekend:
-                painter.fillRect(x, 22, self.pixels_per_day, 38, QColor("#1e293b"))
-            
-            # Dikey çizgi
-            painter.setPen(QPen(QColor("#334155"), 1))
-            painter.drawLine(x, 22, x, 60)
-            
-            # Gün adı
-            day_names = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
-            day_name = day_names[date.dayOfWeek() - 1]
-            
-            painter.setFont(QFont("Segoe UI", 8))
-            color = "#6366f1" if is_today else ("#64748b" if is_weekend else "#94a3b8")
-            painter.setPen(QPen(QColor(color)))
-            painter.drawText(QRect(x, 24, self.pixels_per_day, 16), 
-                           Qt.AlignmentFlag.AlignCenter, day_name)
-            
-            # Gün numarası
-            painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold if is_today else QFont.Weight.Normal))
-            color = "#ffffff" if is_today else ("#64748b" if is_weekend else "#e2e8f0")
-            painter.setPen(QPen(QColor(color)))
-            painter.drawText(QRect(x, 38, self.pixels_per_day, 20), 
-                           Qt.AlignmentFlag.AlignCenter, str(date.day()))
-        
-        # Son ay başlığı
-        if current_month is not None:
-            month_width = x_offset + self.days * self.pixels_per_day - month_start_x
-            painter.setPen(QPen(QColor("#475569")))
-            painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-            month_text = f"{months_tr[current_month-1]}"
-            painter.drawText(QRect(month_start_x, 2, month_width, 20), 
-                           Qt.AlignmentFlag.AlignCenter, month_text)
-        
-        # Sol etiket alanı başlığı
-        painter.fillRect(0, 0, 180, 60, QColor("#0f172a"))
-        painter.setPen(QPen(QColor("#94a3b8")))
-        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        painter.drawText(QRect(0, 0, 180, 60), Qt.AlignmentFlag.AlignCenter, "İş İstasyonları")
-        
-        # Sağ kenarlık
-        painter.setPen(QPen(QColor("#334155"), 2))
-        painter.drawLine(180, 0, 180, 60)
+                painter.fillRect(x, 0, pixels_per_day, self.height(), QColor(15, 23, 42, 120))  # slate-950/120
 
 
 class ProductionPlanningPage(QWidget):
-    """Üretim Planlama sayfası - Makine Bazlı Gantt"""
+    """Üretim Planlama Sayfası - Takvim Entegrasyonlu"""
     
     page_title = "Üretim Planlama"
     
@@ -351,11 +398,14 @@ class ProductionPlanningPage(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.current_date = QDate.currentDate()
-        self.view_days = 14
-        self.pixels_per_day = 80  # Her gün için piksel
         self.work_stations = []
         self.operations = []
+        self.holidays = []  # [(date, name, is_half_day), ...]
+        
+        self.current_date = QDate.currentDate()
+        self.view_days = 14
+        self.pixels_per_day = 60
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -363,51 +413,45 @@ class ProductionPlanningPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
         
-        # === Başlık ===
+        # Header
         header_layout = QHBoxLayout()
         
-        title_layout = QVBoxLayout()
-        title = QLabel("🏭 Üretim Planlama")
+        title = QLabel("📅 Üretim Planlama")
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
-        subtitle = QLabel("Makinelere göre iş emirlerini planlayın ve takip edin")
-        subtitle.setStyleSheet("font-size: 14px; color: #94a3b8;")
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        header_layout.addWidget(title)
         
         header_layout.addStretch()
         
         # Navigasyon
+        nav_layout = QHBoxLayout()
+        nav_layout.setSpacing(8)
+        
         prev_btn = QPushButton("◀")
-        prev_btn.setFixedSize(36, 36)
+        prev_btn.setFixedSize(32, 32)
         prev_btn.setStyleSheet(self._nav_btn_style())
         prev_btn.clicked.connect(self._prev_period)
-        header_layout.addWidget(prev_btn)
-        
-        self.period_label = QLabel("")
-        self.period_label.setStyleSheet("color: #f8fafc; font-weight: 600; font-size: 14px; padding: 0 12px;")
-        header_layout.addWidget(self.period_label)
-        
-        next_btn = QPushButton("▶")
-        next_btn.setFixedSize(36, 36)
-        next_btn.setStyleSheet(self._nav_btn_style())
-        next_btn.clicked.connect(self._next_period)
-        header_layout.addWidget(next_btn)
+        nav_layout.addWidget(prev_btn)
         
         today_btn = QPushButton("Bugün")
-        today_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6366f1; border: none; color: white;
-                padding: 8px 16px; border-radius: 6px; font-weight: 600;
-            }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
+        today_btn.setStyleSheet(self._btn_style())
         today_btn.clicked.connect(self._go_today)
-        header_layout.addWidget(today_btn)
+        nav_layout.addWidget(today_btn)
         
+        next_btn = QPushButton("▶")
+        next_btn.setFixedSize(32, 32)
+        next_btn.setStyleSheet(self._nav_btn_style())
+        next_btn.clicked.connect(self._next_period)
+        nav_layout.addWidget(next_btn)
+        
+        self.period_label = QLabel("")
+        self.period_label.setStyleSheet("color: #e2e8f0; font-size: 14px; font-weight: 600; margin-left: 12px;")
+        nav_layout.addWidget(self.period_label)
+        
+        header_layout.addLayout(nav_layout)
+        
+        # Görünüm seçici
         header_layout.addSpacing(16)
         
-        # Görünüm seçimi
         view_label = QLabel("Görünüm:")
         view_label.setStyleSheet("color: #94a3b8;")
         header_layout.addWidget(view_label)
@@ -415,110 +459,120 @@ class ProductionPlanningPage(QWidget):
         self.view_combo = QComboBox()
         self.view_combo.addItem("1 Hafta", 7)
         self.view_combo.addItem("2 Hafta", 14)
-        self.view_combo.addItem("3 Hafta", 21)
         self.view_combo.addItem("1 Ay", 30)
+        self.view_combo.addItem("2 Ay", 60)
         self.view_combo.setCurrentIndex(1)
         self.view_combo.setStyleSheet(self._combo_style())
         self.view_combo.currentIndexChanged.connect(self._on_view_changed)
         header_layout.addWidget(self.view_combo)
         
-        # Yakınlaştırma
+        # Zoom
+        header_layout.addSpacing(8)
         zoom_label = QLabel("Zoom:")
-        zoom_label.setStyleSheet("color: #94a3b8; margin-left: 16px;")
+        zoom_label.setStyleSheet("color: #94a3b8;")
         header_layout.addWidget(zoom_label)
         
         self.zoom_combo = QComboBox()
-        self.zoom_combo.addItem("Küçük", 50)
-        self.zoom_combo.addItem("Normal", 80)
-        self.zoom_combo.addItem("Büyük", 120)
+        self.zoom_combo.addItem("Küçük", 30)
+        self.zoom_combo.addItem("Normal", 60)
+        self.zoom_combo.addItem("Büyük", 90)
         self.zoom_combo.setCurrentIndex(1)
         self.zoom_combo.setStyleSheet(self._combo_style())
         self.zoom_combo.currentIndexChanged.connect(self._on_zoom_changed)
         header_layout.addWidget(self.zoom_combo)
         
-        # Yenile
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setStyleSheet(self._btn_style())
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-        
         layout.addLayout(header_layout)
         
-        # === Özet Kartlar ===
+        # Bilgi kartları
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(12)
         
-        self.machines_card = self._create_card("⚙️ Aktif Makine", "0", "#6366f1")
+        self.machines_card = self._create_stat_card("🏭", "Aktif Makine", "0", "#6366f1")
         cards_layout.addWidget(self.machines_card)
         
-        self.planned_card = self._create_card("📅 Planlanan İş", "0", "#3b82f6")
+        self.planned_card = self._create_stat_card("📋", "Planlanan", "0", "#3b82f6")
         cards_layout.addWidget(self.planned_card)
         
-        self.in_progress_card = self._create_card("🔄 Üretimde", "0", "#f59e0b")
+        self.in_progress_card = self._create_stat_card("⚡", "Üretimde", "0", "#f59e0b")
         cards_layout.addWidget(self.in_progress_card)
         
-        self.utilization_card = self._create_card("📊 Kapasite", "%0", "#10b981")
+        self.delayed_card = self._create_stat_card("⚠️", "Geciken", "0", "#ef4444")
+        cards_layout.addWidget(self.delayed_card)
+        
+        self.utilization_card = self._create_stat_card("📊", "Kapasite", "%0", "#10b981")
         cards_layout.addWidget(self.utilization_card)
         
-        self.delayed_card = self._create_card("⚠️ Geciken", "0", "#ef4444")
-        cards_layout.addWidget(self.delayed_card)
+        # Tatil kartı
+        self.holiday_card = self._create_stat_card("🎉", "Tatil", "0 gün", "#a855f7")
+        cards_layout.addWidget(self.holiday_card)
+        
+        cards_layout.addStretch()
         
         layout.addLayout(cards_layout)
         
-        # === Gantt Chart Container ===
-        gantt_container = QFrame()
-        gantt_container.setStyleSheet("""
+        # Gantt alanı
+        gantt_frame = QFrame()
+        gantt_frame.setStyleSheet("""
             QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
+                background-color: #0f172a;
                 border: 1px solid #334155;
                 border-radius: 12px;
             }
         """)
-        gantt_main_layout = QVBoxLayout(gantt_container)
-        gantt_main_layout.setContentsMargins(0, 0, 0, 0)
-        gantt_main_layout.setSpacing(0)
+        gantt_layout = QVBoxLayout(gantt_frame)
+        gantt_layout.setContentsMargins(0, 0, 0, 0)
+        gantt_layout.setSpacing(0)
         
-        # Timeline header (ayrı scroll yok, sabit)
-        self.timeline_header = TimelineHeader(self.current_date, self.view_days, self.pixels_per_day)
-        self.timeline_header.setStyleSheet("border-top-left-radius: 12px; border-top-right-radius: 12px;")
-        gantt_main_layout.addWidget(self.timeline_header)
+        # Zaman çizelgesi header
+        self.timeline_header = TimelineHeader(self.current_date, self.view_days, 
+                                              self.pixels_per_day, self.holidays)
+        gantt_layout.addWidget(self.timeline_header)
         
-        # Scroll area for machine rows
+        # Scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setStyleSheet("""
-            QScrollArea { border: none; background: transparent; }
-            QScrollBar:vertical {
-                background: #1e293b; width: 12px; border-radius: 6px; margin: 2px;
+            QScrollArea { 
+                background: transparent; 
+                border: none; 
             }
-            QScrollBar::handle:vertical {
-                background: #475569; border-radius: 5px; min-height: 30px;
-            }
-            QScrollBar::handle:vertical:hover { background: #64748b; }
             QScrollBar:horizontal {
-                background: #1e293b; height: 12px; border-radius: 6px; margin: 2px;
+                background: #1e293b;
+                height: 10px;
+                border-radius: 5px;
             }
             QScrollBar::handle:horizontal {
-                background: #475569; border-radius: 5px; min-width: 30px;
+                background: #475569;
+                border-radius: 5px;
+                min-width: 40px;
             }
-            QScrollBar::handle:horizontal:hover { background: #64748b; }
-            QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+            QScrollBar:vertical {
+                background: #1e293b;
+                width: 10px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #475569;
+                border-radius: 5px;
+                min-height: 40px;
+            }
         """)
         
+        # Gantt içerik alanı
         self.gantt_content = QWidget()
+        self.gantt_content.setStyleSheet("background: transparent;")
         self.gantt_content_layout = QVBoxLayout(self.gantt_content)
         self.gantt_content_layout.setContentsMargins(0, 0, 0, 0)
         self.gantt_content_layout.setSpacing(0)
-        self.gantt_content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         self.scroll_area.setWidget(self.gantt_content)
-        gantt_main_layout.addWidget(self.scroll_area)
+        gantt_layout.addWidget(self.scroll_area)
         
-        layout.addWidget(gantt_container)
+        layout.addWidget(gantt_frame)
         
-        # === Alt bilgi ===
+        # Alt bilgi
         footer_layout = QHBoxLayout()
         
         # Lejant
@@ -526,26 +580,23 @@ class ProductionPlanningPage(QWidget):
         legend_layout.setSpacing(16)
         
         legend_items = [
-            ("Planlandı", "#3b82f6"),
-            ("Serbest", "#8b5cf6"),
-            ("Üretimde", "#f59e0b"),
-            ("Tamamlandı", "#10b981"),
+            ("🎉 Tatil", "#7f1d1d"),
+            ("📋 Planlandı", "#3b82f6"),
+            ("🔓 Serbest", "#8b5cf6"),
+            ("⚡ Üretimde", "#f59e0b"),
+            ("✅ Tamamlandı", "#10b981"),
         ]
         
-        for name, color in legend_items:
-            item_layout = QHBoxLayout()
-            item_layout.setSpacing(4)
-            
-            color_box = QLabel()
-            color_box.setFixedSize(16, 16)
-            color_box.setStyleSheet(f"background-color: {color}; border-radius: 3px;")
-            item_layout.addWidget(color_box)
-            
-            text_label = QLabel(name)
-            text_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
-            item_layout.addWidget(text_label)
-            
-            legend_layout.addLayout(item_layout)
+        for text, color in legend_items:
+            item = QLabel(text)
+            item.setStyleSheet(f"""
+                background-color: {color}40;
+                color: {color};
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+            """)
+            legend_layout.addWidget(item)
         
         footer_layout.addLayout(legend_layout)
         footer_layout.addStretch()
@@ -558,24 +609,31 @@ class ProductionPlanningPage(QWidget):
         
         self._update_period_label()
         
-    def _create_card(self, title: str, value: str, color: str) -> QFrame:
+    def _create_stat_card(self, icon: str, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
+        card.setFixedSize(130, 70)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: {color}15;
-                border: 1px solid {color}40;
+                border: 1px solid {color}30;
                 border-radius: 10px;
             }}
         """)
-        card.setFixedHeight(70)
         
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(2)
         
+        header = QHBoxLayout()
+        icon_label = QLabel(icon)
+        icon_label.setStyleSheet("font-size: 14px; background: transparent;")
+        header.addWidget(icon_label)
+        
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
-        layout.addWidget(title_label)
+        title_label.setStyleSheet(f"color: {color}; font-size: 11px; background: transparent;")
+        header.addWidget(title_label)
+        header.addStretch()
+        layout.addLayout(header)
         
         value_label = QLabel(value)
         value_label.setObjectName("value")
@@ -658,28 +716,46 @@ class ProductionPlanningPage(QWidget):
         
     def _refresh_view(self):
         self._update_period_label()
-        self.timeline_header = TimelineHeader(self.current_date, self.view_days, self.pixels_per_day)
-        # Header'ı güncelle (layout'un ilk elemanını değiştir)
-        gantt_container = self.scroll_area.parent()
-        if gantt_container and gantt_container.layout():
-            old_header = gantt_container.layout().itemAt(0)
-            if old_header and old_header.widget():
-                old_header.widget().deleteLater()
-            gantt_container.layout().insertWidget(0, self.timeline_header)
-        self._build_gantt()
         
-    def load_data(self, work_stations: list, operations: list):
+        # Timeline header'ı yeniden oluştur
+        self.timeline_header.deleteLater()
+        self.timeline_header = TimelineHeader(self.current_date, self.view_days, 
+                                              self.pixels_per_day, self.holidays)
+        
+        gantt_frame = self.scroll_area.parent()
+        if gantt_frame and gantt_frame.layout():
+            gantt_frame.layout().insertWidget(0, self.timeline_header)
+        
+        self._build_gantt()
+        self._update_stats()
+        
+    def set_holidays(self, holidays: list):
+        """
+        Tatil listesini ayarla
+        holidays: [{"date": date, "name": str, "is_half_day": bool}, ...]
+        """
+        self.holidays = []
+        for h in holidays:
+            hdate = h.get("date")
+            if hdate:
+                self.holidays.append((hdate, h.get("name", ""), h.get("is_half_day", False)))
+        
+    def load_data(self, work_stations: list, operations: list, holidays: list = None):
         """
         Veri yükle
         
         work_stations: [{"id", "code", "name", "station_type", "capacity_per_hour"}, ...]
         operations: [{"work_order_id", "order_no", "item_name", "work_station_id", 
                       "operation_name", "start_time", "end_time", "status", "progress"}, ...]
+        holidays: [{"date": date, "name": str, "is_half_day": bool}, ...]
         """
         self.work_stations = work_stations
         self.operations = operations
-        self._build_gantt()
-        self._update_stats()
+        
+        if holidays:
+            self.set_holidays(holidays)
+        
+        self._refresh_view()
         
     def _update_stats(self):
         """İstatistikleri güncelle"""
@@ -694,6 +770,15 @@ class ProductionPlanningPage(QWidget):
         
         now = datetime.now()
         
+        # Dönemdeki tatil sayısı
+        holiday_dates = {h[0] for h in self.holidays}
+        holiday_count = 0
+        
+        for i in range(self.view_days):
+            check_date = (period_start + timedelta(days=i)).date()
+            if check_date in holiday_dates:
+                holiday_count += 1
+        
         for op in self.operations:
             start_time = op.get("start_time")
             end_time = op.get("end_time")
@@ -707,7 +792,6 @@ class ProductionPlanningPage(QWidget):
             if not isinstance(end_time, datetime):
                 end_time = datetime.combine(end_time, datetime.min.time())
             
-            # Bu dönemde mi?
             if start_time < period_end and end_time > period_start:
                 ws_id = op.get("work_station_id")
                 if ws_id:
@@ -718,11 +802,9 @@ class ProductionPlanningPage(QWidget):
                 elif status == "in_progress":
                     in_progress_count += 1
                     
-                # Gecikme kontrolü
                 if status in ["planned", "released", "in_progress"] and end_time < now:
                     delayed_count += 1
                     
-                # Toplam saat
                 duration = (min(end_time, period_end) - max(start_time, period_start)).total_seconds() / 3600
                 total_hours += max(0, duration)
         
@@ -730,17 +812,24 @@ class ProductionPlanningPage(QWidget):
         self._update_card(self.planned_card, str(planned_count))
         self._update_card(self.in_progress_card, str(in_progress_count))
         self._update_card(self.delayed_card, str(delayed_count))
+        self._update_card(self.holiday_card, f"{holiday_count} gün")
         
-        # Kapasite kullanımı (basit hesap)
-        total_capacity = len(self.work_stations) * self.view_days * 8  # 8 saat/gün
+        # Kapasite kullanımı (tatilleri çıkar)
+        working_days = self.view_days - holiday_count
+        # Hafta sonlarını da çıkar
+        for i in range(self.view_days):
+            check_date = (period_start + timedelta(days=i)).date()
+            if check_date.weekday() >= 5 and check_date not in holiday_dates:
+                working_days -= 1
+        
+        total_capacity = len(self.work_stations) * max(working_days, 1) * 8
         utilization = int(total_hours / total_capacity * 100) if total_capacity > 0 else 0
         self._update_card(self.utilization_card, f"%{min(100, utilization)}")
         
-        self.info_label.setText(f"{len(self.work_stations)} makine, {len(self.operations)} operasyon")
+        self.info_label.setText(f"{len(self.work_stations)} makine, {len(self.operations)} operasyon, {working_days} iş günü")
         
     def _build_gantt(self):
         """Gantt satırlarını oluştur"""
-        # Mevcut içeriği temizle
         while self.gantt_content_layout.count():
             child = self.gantt_content_layout.takeAt(0)
             if child.widget():
@@ -755,7 +844,6 @@ class ProductionPlanningPage(QWidget):
         
         period_start = datetime(self.current_date.year(), self.current_date.month(), self.current_date.day())
         
-        # Operasyonları iş istasyonuna göre grupla
         ops_by_station = {}
         for op in self.operations:
             ws_id = op.get("work_station_id")
@@ -764,7 +852,6 @@ class ProductionPlanningPage(QWidget):
                     ops_by_station[ws_id] = []
                 ops_by_station[ws_id].append(op)
         
-        # Her makine için satır oluştur
         for ws in self.work_stations:
             ws_id = ws.get("id")
             
@@ -777,14 +864,11 @@ class ProductionPlanningPage(QWidget):
             )
             row.work_order_clicked.connect(self.work_order_clicked.emit)
             
-            # Bu makinenin operasyonlarını ayarla
             station_ops = ops_by_station.get(ws_id, [])
-            row.set_operations(station_ops, period_start, self.view_days, self.pixels_per_day)
+            row.set_operations(station_ops, period_start, self.view_days, 
+                             self.pixels_per_day, self.holidays)
             
             self.gantt_content_layout.addWidget(row)
         
-        # Alt boşluk
         self.gantt_content_layout.addStretch()
-        
-        # Content genişliğini ayarla
         self.gantt_content.setMinimumWidth(180 + self.view_days * self.pixels_per_day)

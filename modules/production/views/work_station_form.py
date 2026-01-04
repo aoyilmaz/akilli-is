@@ -1,5 +1,6 @@
 """
 Akıllı İş - İş İstasyonu Form Sayfası
+Varsayılan Operasyon Değerleri Eklendi
 """
 
 from typing import Optional
@@ -7,7 +8,7 @@ from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTextEdit, QComboBox, QDoubleSpinBox, QSpinBox,
-    QFrame, QMessageBox, QGridLayout, QCheckBox
+    QFrame, QMessageBox, QGridLayout, QCheckBox, QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -60,6 +61,17 @@ class WorkStationFormPage(QWidget):
         
         layout.addLayout(header_layout)
         
+        # Scroll Area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(16)
+        
         # Form Frame
         form_frame = QFrame()
         form_frame.setStyleSheet("""
@@ -72,7 +84,7 @@ class WorkStationFormPage(QWidget):
         form_layout = QGridLayout(form_frame)
         form_layout.setContentsMargins(24, 24, 24, 24)
         form_layout.setSpacing(16)
-        form_layout.setColumnMinimumWidth(0, 150)
+        form_layout.setColumnMinimumWidth(0, 180)
         
         row = 0
         
@@ -117,6 +129,91 @@ class WorkStationFormPage(QWidget):
         self.description_input.setPlaceholderText("İstasyon hakkında notlar...")
         self._style_textedit(self.description_input)
         form_layout.addWidget(self.description_input, row, 1)
+        row += 1
+        
+        # === VARSAYILAN OPERASYON DEĞERLERİ (YENİ) ===
+        section_op = QLabel("⚡ Varsayılan Operasyon Değerleri")
+        section_op.setStyleSheet("color: #f59e0b; font-size: 16px; font-weight: bold; background: transparent; margin-top: 16px;")
+        form_layout.addWidget(section_op, row, 0, 1, 2)
+        row += 1
+        
+        # Bilgi notu
+        op_info = QLabel("ℹ️ Bu değerler, iş emrine operasyon eklerken otomatik doldurulur")
+        op_info.setStyleSheet("color: #64748b; font-size: 12px; background: transparent; margin-bottom: 8px;")
+        form_layout.addWidget(op_info, row, 0, 1, 2)
+        row += 1
+        
+        # Varsayılan Operasyon Adı
+        form_layout.addWidget(self._create_label("Varsayılan Operasyon Adı"), row, 0)
+        self.default_op_name_input = QLineEdit()
+        self.default_op_name_input.setPlaceholderText("Örn: Ekstrüzyon, Kesim, Montaj")
+        self._style_input(self.default_op_name_input)
+        form_layout.addWidget(self.default_op_name_input, row, 1)
+        row += 1
+        
+        # Varsayılan Kurulum Süresi
+        form_layout.addWidget(self._create_label("Varsayılan Kurulum Süresi"), row, 0)
+        setup_time_layout = QHBoxLayout()
+        setup_time_layout.setSpacing(8)
+        self.default_setup_time_input = QSpinBox()
+        self.default_setup_time_input.setRange(0, 9999)
+        self.default_setup_time_input.setValue(0)
+        self.default_setup_time_input.setMinimumWidth(150)
+        self._style_spinbox(self.default_setup_time_input)
+        setup_time_layout.addWidget(self.default_setup_time_input)
+        setup_label = QLabel("dakika")
+        setup_label.setStyleSheet("color: #94a3b8; background: transparent;")
+        setup_time_layout.addWidget(setup_label)
+        setup_info = QLabel("(Makineyi hazırlama süresi)")
+        setup_info.setStyleSheet("color: #64748b; font-size: 11px; background: transparent;")
+        setup_time_layout.addWidget(setup_info)
+        setup_time_layout.addStretch()
+        form_layout.addLayout(setup_time_layout, row, 1)
+        row += 1
+        
+        # Varsayılan Birim Çalışma Süresi
+        form_layout.addWidget(self._create_label("Varsayılan Birim Süresi"), row, 0)
+        run_time_layout = QHBoxLayout()
+        run_time_layout.setSpacing(8)
+        self.default_run_time_input = QDoubleSpinBox()
+        self.default_run_time_input.setRange(0, 9999)
+        self.default_run_time_input.setDecimals(4)
+        self.default_run_time_input.setValue(0)
+        self.default_run_time_input.setMinimumWidth(150)
+        self._style_spinbox(self.default_run_time_input)
+        run_time_layout.addWidget(self.default_run_time_input)
+        run_label = QLabel("dk/birim")
+        run_label.setStyleSheet("color: #94a3b8; background: transparent;")
+        run_time_layout.addWidget(run_label)
+        run_info = QLabel("(1 birim üretmek için gereken süre)")
+        run_info.setStyleSheet("color: #64748b; font-size: 11px; background: transparent;")
+        run_time_layout.addWidget(run_info)
+        run_time_layout.addStretch()
+        form_layout.addLayout(run_time_layout, row, 1)
+        row += 1
+        
+        # Hesaplama örneği
+        calc_example = QFrame()
+        calc_example.setStyleSheet("""
+            QFrame {
+                background-color: rgba(99, 102, 241, 0.1);
+                border: 1px solid #6366f130;
+                border-radius: 8px;
+            }
+        """)
+        calc_layout = QVBoxLayout(calc_example)
+        calc_layout.setContentsMargins(12, 8, 12, 8)
+        calc_layout.setSpacing(4)
+        
+        calc_title = QLabel("📊 Süre Hesaplama Örneği:")
+        calc_title.setStyleSheet("color: #818cf8; font-weight: 600; font-size: 12px; background: transparent;")
+        calc_layout.addWidget(calc_title)
+        
+        calc_text = QLabel("Kurulum: 60 dk + (Birim Süre: 0.27 dk × Miktar: 1000) = 330 dk = 5.5 saat")
+        calc_text.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
+        calc_layout.addWidget(calc_text)
+        
+        form_layout.addWidget(calc_example, row, 0, 1, 2)
         row += 1
         
         # === KAPASİTE BİLGİLERİ ===
@@ -257,8 +354,11 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self.active_check, row, 1)
         row += 1
         
-        layout.addWidget(form_frame)
-        layout.addStretch()
+        scroll_layout.addWidget(form_frame)
+        scroll_layout.addStretch()
+        
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
         
     def _create_label(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -288,6 +388,11 @@ class WorkStationFormPage(QWidget):
             if self.type_combo.itemData(i) == station_type:
                 self.type_combo.setCurrentIndex(i)
                 break
+        
+        # Varsayılan operasyon değerleri
+        self.default_op_name_input.setText(self.station_data.get("default_operation_name", "") or "")
+        self.default_setup_time_input.setValue(int(self.station_data.get("default_setup_time", 0) or 0))
+        self.default_run_time_input.setValue(float(self.station_data.get("default_run_time_per_unit", 0) or 0))
         
         # Kapasite
         self.capacity_input.setValue(float(self.station_data.get("capacity_per_hour", 0) or 0))
@@ -332,11 +437,18 @@ class WorkStationFormPage(QWidget):
             "name": name,
             "description": self.description_input.toPlainText().strip(),
             "station_type": self.type_combo.currentData(),
+            # Varsayılan operasyon değerleri
+            "default_operation_name": self.default_op_name_input.text().strip(),
+            "default_setup_time": self.default_setup_time_input.value(),
+            "default_run_time_per_unit": Decimal(str(self.default_run_time_input.value())),
+            # Kapasite
             "capacity_per_hour": Decimal(str(self.capacity_input.value())),
             "efficiency_rate": Decimal(str(self.efficiency_input.value())),
             "working_hours_per_day": Decimal(str(self.working_hours_input.value())),
+            # Maliyet
             "hourly_rate": Decimal(str(self.hourly_rate_input.value())),
             "setup_cost": Decimal(str(self.setup_cost_input.value())),
+            # Konum
             "warehouse_id": self.warehouse_combo.currentData(),
             "location": self.location_input.text().strip(),
             "is_active": self.active_check.isChecked(),

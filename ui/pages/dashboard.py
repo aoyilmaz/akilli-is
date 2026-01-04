@@ -1,18 +1,89 @@
 """
-Akıllı İş ERP - Dashboard Sayfası (Düzeltilmiş)
+Akıllı İş ERP - Dashboard Sayfası
+Doğru Logo ile
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QGridLayout, QScrollArea, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtSvgWidgets import QSvgWidget
-from pathlib import Path
+from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtGui import QColor, QPainter, QPen, QBrush, QLinearGradient, QPainterPath
 
-from config import APP_NAME, APP_VERSION, BASE_DIR
+from config import APP_NAME, APP_VERSION
 from config.themes import get_theme, ThemeManager
+
+
+class DashboardLogo(QWidget):
+    """Dashboard için büyük logo"""
+    
+    def __init__(self, size: int = 56, parent=None):
+        super().__init__(parent)
+        self._size = size
+        self.setFixedSize(size, size)
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        color1 = QColor("#6366f1")
+        color2 = QColor("#8b5cf6")
+        color3 = QColor("#a855f7")
+        
+        gradient = QLinearGradient(0, 0, self._size, self._size)
+        gradient.setColorAt(0, color1)
+        gradient.setColorAt(0.5, color2)
+        gradient.setColorAt(1, color3)
+        
+        center = self._size / 2
+        scale = self._size / 100
+        
+        # Dış kesikli daire
+        pen = QPen(QBrush(gradient), 5 * scale)
+        pen.setStyle(Qt.PenStyle.CustomDashLine)
+        pen.setDashPattern([6, 3])
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        r1 = 38 * scale
+        painter.drawEllipse(QPointF(center, center), r1, r1)
+        
+        # İç düz daire
+        pen2 = QPen(QBrush(gradient), 3.5 * scale)
+        pen2.setStyle(Qt.PenStyle.SolidLine)
+        painter.setPen(pen2)
+        r2 = 25 * scale
+        painter.drawEllipse(QPointF(center, center), r2, r2)
+        
+        # Merkez dolu daire
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(gradient))
+        r3 = 12 * scale
+        painter.drawEllipse(QPointF(center, center), r3, r3)
+        
+        # Oklar
+        self._draw_arrow(painter, center, 12 * scale, 0, color1, scale)
+        self._draw_arrow(painter, 88 * scale, center, 90, color2, scale)
+        self._draw_arrow(painter, center, 88 * scale, 180, color3, scale)
+        self._draw_arrow(painter, 12 * scale, center, 270, color1, scale)
+    
+    def _draw_arrow(self, painter, x, y, angle, color, scale):
+        painter.save()
+        painter.translate(x, y)
+        painter.rotate(angle)
+        
+        size = 8 * scale
+        
+        path = QPainterPath()
+        path.moveTo(0, -size)
+        path.lineTo(size * 0.5, 0)
+        path.lineTo(-size * 0.5, 0)
+        path.closeSubpath()
+        
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(color))
+        painter.drawPath(path)
+        
+        painter.restore()
 
 
 class StatCard(QFrame):
@@ -42,7 +113,6 @@ class StatCard(QFrame):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
         
-        # Header
         header = QHBoxLayout()
         
         icon_label = QLabel(self.icon)
@@ -64,7 +134,6 @@ class StatCard(QFrame):
         
         layout.addLayout(header)
         
-        # Value
         value_label = QLabel(value)
         value_label.setStyleSheet(f"""
             color: {t.text_primary};
@@ -74,7 +143,6 @@ class StatCard(QFrame):
         """)
         layout.addWidget(value_label)
         
-        # Title
         title_label = QLabel(self.title)
         title_label.setStyleSheet(f"color: {t.text_muted}; font-size: 14px; background: transparent;")
         layout.addWidget(title_label)
@@ -115,7 +183,6 @@ class QuickActionCard(QFrame):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
         
-        # Icon
         icon_label = QLabel(icon)
         icon_label.setStyleSheet(f"""
             background-color: {color};
@@ -127,7 +194,6 @@ class QuickActionCard(QFrame):
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
         
-        # Text
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
         
@@ -142,7 +208,6 @@ class QuickActionCard(QFrame):
         layout.addLayout(text_layout)
         layout.addStretch()
         
-        # Arrow
         arrow = QLabel("→")
         arrow.setStyleSheet(f"color: {t.text_muted}; font-size: 16px; background: transparent;")
         layout.addWidget(arrow)
@@ -168,19 +233,16 @@ class ActivityItem(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
         
-        # Icon
         icon_label = QLabel(icon)
         icon_label.setStyleSheet(f"font-size: 16px; background: transparent;")
         layout.addWidget(icon_label)
         
-        # Title
         title_label = QLabel(title)
         title_label.setStyleSheet(f"color: {t.text_secondary}; font-size: 13px; background: transparent;")
         layout.addWidget(title_label)
         
         layout.addStretch()
         
-        # Time
         time_label = QLabel(time)
         time_label.setStyleSheet(f"color: {t.text_muted}; font-size: 12px; background: transparent;")
         layout.addWidget(time_label)
@@ -197,25 +259,22 @@ class DashboardPage(QWidget):
         ThemeManager.register_callback(self._on_theme_changed)
         
     def _on_theme_changed(self, theme):
-        # Sayfayı yeniden oluşturmak yerine sadece renkleri güncelle
         pass
         
     def setup_ui(self):
         t = get_theme()
         
-        # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         
-        # Ana container
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(32, 32, 32, 32)
         layout.setSpacing(24)
         
-        # === HEADER - LOGO VE HOŞGELDİN ===
+        # === HEADER ===
         header_frame = QFrame()
         header_frame.setStyleSheet(f"""
             QFrame {{
@@ -228,33 +287,26 @@ class DashboardPage(QWidget):
         header_layout.setContentsMargins(32, 28, 32, 28)
         header_layout.setSpacing(24)
         
-        # Logo
+        # Logo container
         logo_container = QFrame()
         logo_container.setFixedSize(80, 80)
         logo_container.setStyleSheet(f"""
             QFrame {{
                 background-color: {t.bg_secondary};
-                border: 2px solid {t.accent_primary};
+                border: 2px solid {t.border};
                 border-radius: 20px;
             }}
         """)
         logo_layout = QVBoxLayout(logo_container)
-        logo_layout.setContentsMargins(12, 12, 12, 12)
+        logo_layout.setContentsMargins(10, 10, 10, 10)
         
-        logo_path = Path(BASE_DIR) / "assets" / "favicon.svg"
-        if logo_path.exists():
-            logo = QSvgWidget(str(logo_path))
-            logo.setFixedSize(56, 56)
-            logo_layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
-        else:
-            logo_label = QLabel("🔄")
-            logo_label.setStyleSheet("font-size: 36px; background: transparent;")
-            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            logo_layout.addWidget(logo_label)
+        # DOĞRU LOGO
+        logo = DashboardLogo(60)
+        logo_layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
         
         header_layout.addWidget(logo_container)
         
-        # Hoşgeldin metni
+        # Hoşgeldin
         welcome_layout = QVBoxLayout()
         welcome_layout.setSpacing(4)
         
@@ -271,7 +323,6 @@ class DashboardPage(QWidget):
         welcome_sub.setStyleSheet(f"color: {t.text_muted}; font-size: 15px; background: transparent;")
         welcome_layout.addWidget(welcome_sub)
         
-        # Tarih
         from datetime import datetime
         date_str = datetime.now().strftime("%d %B %Y, %A")
         date_label = QLabel(f"📅 {date_str}")
@@ -304,7 +355,7 @@ class DashboardPage(QWidget):
         
         layout.addWidget(header_frame)
         
-        # === İSTATİSTİK KARTLARI ===
+        # === İSTATİSTİKLER ===
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(16)
         
@@ -323,11 +374,11 @@ class DashboardPage(QWidget):
         
         layout.addLayout(stats_layout)
         
-        # === HIZLI İŞLEMLER VE SON AKTİVİTELER ===
+        # === HIZLI İŞLEMLER VE AKTİVİTELER ===
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(20)
         
-        # Sol - Hızlı İşlemler
+        # Hızlı İşlemler
         quick_frame = QFrame()
         quick_frame.setStyleSheet(f"""
             QFrame {{
@@ -359,7 +410,7 @@ class DashboardPage(QWidget):
         quick_layout.addStretch()
         bottom_layout.addWidget(quick_frame, 1)
         
-        # Sağ - Son Aktiviteler
+        # Aktiviteler
         activity_frame = QFrame()
         activity_frame.setStyleSheet(f"""
             QFrame {{

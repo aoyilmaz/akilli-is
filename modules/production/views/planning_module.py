@@ -1,8 +1,11 @@
 """
 Akıllı İş - Üretim Planlama Modülü
 Makine bazlı Gantt chart için veri yönetimi
+Takvim entegrasyonu (tatil gösterimi)
 """
 
+from datetime import date, timedelta
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from PyQt6.QtCore import pyqtSignal
 
@@ -18,6 +21,7 @@ class PlanningModule(QWidget):
         super().__init__(parent)
         self.wo_service = None
         self.ws_service = None
+        self.holiday_service = None
         self.setup_ui()
         
     def setup_ui(self):
@@ -44,6 +48,41 @@ class PlanningModule(QWidget):
                 self.ws_service = WorkStationService()
             except Exception as e:
                 print(f"Servis yükleme hatası: {e}")
+        
+        # Tatil servisini yükle
+        if not self.holiday_service:
+            try:
+                from modules.production.calendar_services import HolidayService
+                self.holiday_service = HolidayService()
+            except Exception as e:
+                print(f"Tatil servisi yükleme hatası: {e}")
+                
+    def _load_holidays(self) -> list:
+        """Tatilleri yükle"""
+        holidays = []
+        
+        if not self.holiday_service:
+            return holidays
+            
+        try:
+            # Bu yıl için tatilleri al
+            current_year = date.today().year
+            start_date = date(current_year, 1, 1)
+            end_date = date(current_year, 12, 31)
+            
+            holiday_records = self.holiday_service.get_holidays_in_range(start_date, end_date)
+            
+            for h in holiday_records:
+                holidays.append({
+                    "date": h.date,
+                    "name": h.name,
+                    "is_half_day": h.is_half_day if hasattr(h, 'is_half_day') else False
+                })
+                
+        except Exception as e:
+            print(f"Tatil yükleme hatası: {e}")
+            
+        return holidays
                 
     def _load_data(self):
         """Verileri yükle"""
@@ -51,6 +90,9 @@ class PlanningModule(QWidget):
             return
             
         try:
+            # Tatilleri yükle
+            holidays = self._load_holidays()
+            
             # İş istasyonlarını yükle
             stations = self.ws_service.get_all(active_only=True)
             work_stations = []
@@ -88,7 +130,6 @@ class PlanningModule(QWidget):
                                 op_duration = total_duration / total_ops
                                 op_index = list(wo.operations).index(op)
                                 
-                                from datetime import timedelta
                                 op_start = wo.planned_start + timedelta(seconds=op_duration * op_index)
                                 op_end = op_start + timedelta(seconds=op_duration)
                         
@@ -137,14 +178,14 @@ class PlanningModule(QWidget):
                         "run_time": 0,
                     })
             
-            # Sayfaya verileri gönder
-            self.planning_page.load_data(work_stations, operations)
+            # Sayfaya verileri gönder (tatillerle birlikte)
+            self.planning_page.load_data(work_stations, operations, holidays)
             
         except Exception as e:
             print(f"Veri yükleme hatası: {e}")
             import traceback
             traceback.print_exc()
-            self.planning_page.load_data([], [])
+            self.planning_page.load_data([], [], [])
             
     def _on_work_order_clicked(self, wo_id: int):
         """İş emrine tıklandığında"""
@@ -163,7 +204,7 @@ class PlanningModule(QWidget):
                 
                 msg = QMessageBox(self)
                 msg.setWindowTitle("İş Emri Detayı")
-                msg.setTextFormat(1)  # Rich text
+                msg.setTextFormat(Qt.TextFormat.RichText)
                 msg.setText(info)
                 msg.setStyleSheet("""
                     QMessageBox {

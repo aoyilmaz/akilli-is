@@ -1,5 +1,6 @@
 """
-Akıllı İş ERP - Sidebar Widget (Düzeltilmiş)
+Akıllı İş ERP - Sidebar Widget
+PyERP Pro stili - Modern, badge'li, gradient'li
 """
 
 from PyQt6.QtWidgets import (
@@ -12,40 +13,183 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtSvgWidgets import QSvgWidget
-from pathlib import Path
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF
+from PyQt6.QtGui import QColor, QPainter, QPen, QBrush, QLinearGradient, QPainterPath
 
-from config import APP_NAME, APP_VERSION, BASE_DIR
+from config import APP_NAME, APP_VERSION
 from config.themes import get_theme, ThemeManager, THEMES
 
 
+# Emoji ikonlar
+ICONS = {
+    "dashboard": "📊",
+    "inventory": "📦",
+    "production": "🏭",
+    "purchasing": "🛒",
+    "sales": "📈",
+    "finance": "💳",
+    "hr": "👥",
+    "reports": "📊",
+    "settings": "⚙️",
+    "stock-cards": "🗃️",
+    "categories": "📁",
+    "units": "📏",
+    "warehouses": "🏪",
+    "movements": "↔️",
+    "stock-count": "📋",
+    "stock-reports": "📊",
+    "bom": "📝",
+    "work-stations": "🔧",
+    "work-orders": "📋",
+    "planning": "📅",
+    "calendar": "🗓️",
+}
+
+
+def get_icon(name: str) -> str:
+    return ICONS.get(name, "•")
+
+
+class AkilliIsLogo(QWidget):
+    """Akıllı İş Logosu - Tıklanabilir"""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, size: int = 40, parent=None):
+        super().__init__(parent)
+        self._size = size
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Gradient arka plan (rounded rect)
+        gradient = QLinearGradient(0, 0, self._size, self._size)
+        gradient.setColorAt(0, QColor("#6366f1"))
+        gradient.setColorAt(1, QColor("#a855f7"))
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(gradient))
+        painter.drawRoundedRect(0, 0, self._size, self._size, 12, 12)
+
+        # İç logo (beyaz)
+        center = self._size / 2
+        scale = self._size / 100
+
+        painter.setPen(QPen(QColor("white"), 4 * scale))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        # Dış daire
+        r1 = 30 * scale
+        painter.drawEllipse(QPointF(center, center), r1, r1)
+
+        # İç dolu daire
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("white"))
+        r2 = 10 * scale
+        painter.drawEllipse(QPointF(center, center), r2, r2)
+
+        # Zap/şimşek ikonu - basit
+        pen = QPen(QColor("white"), 3 * scale)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+
+        # Şimşek çizgisi
+        path = QPainterPath()
+        path.moveTo(center + 2 * scale, center - 12 * scale)
+        path.lineTo(center - 4 * scale, center + 2 * scale)
+        path.lineTo(center + 2 * scale, center + 2 * scale)
+        path.lineTo(center - 2 * scale, center + 12 * scale)
+        painter.drawPath(path)
+
+
 class MenuButton(QPushButton):
-    def __init__(self, text: str, icon_text: str = "", page_id: str = "", parent=None):
+    """Ana menü butonu - Badge destekli"""
+
+    def __init__(
+        self,
+        text: str,
+        icon_name: str = "",
+        page_id: str = "",
+        badge: int = 0,
+        parent=None,
+    ):
         super().__init__(parent)
         self.page_id = page_id
-        self.icon_text = icon_text
+        self.icon_name = icon_name
+        self.full_text = text
+        self.badge = badge
         self._selected = False
-        self.setText(f"  {icon_text}  {text}" if icon_text else text)
+        self._collapsed = False
+        self._has_children = False
+        self._expanded = False
         self.setCheckable(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(44)
+        self._update_text()
+        self.update_style()
+
+    def set_has_children(self, has: bool):
+        self._has_children = has
+        self._update_text()
+
+    def set_expanded(self, expanded: bool):
+        self._expanded = expanded
+        self._update_text()
+
+    def _update_text(self):
+        icon = get_icon(self.icon_name) if self.icon_name else ""
+        if self._collapsed:
+            self.setText(icon)
+            self.setToolTip(self.full_text)
+        else:
+            arrow = ""
+            if self._has_children:
+                arrow = " ▼" if self._expanded else " ▶"
+            self.setText(
+                f"  {icon}   {self.full_text}{arrow}" if icon else self.full_text
+            )
+            self.setToolTip("")
+
+    def set_collapsed(self, collapsed: bool):
+        self._collapsed = collapsed
+        self._update_text()
         self.update_style()
 
     def update_style(self):
         t = get_theme()
+
+        if self._collapsed:
+            align = "center"
+            padding = "0px"
+            font_size = "18px"
+        else:
+            align = "left"
+            padding = "12px"
+            font_size = f"{t.font_size}px"
+
         if self._selected:
+            # Gradient arka plan efekti
             self.setStyleSheet(
                 f"""
                 QPushButton {{
-                    background-color: {t.accent_primary};
-                    color: white;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                        stop:0 rgba(99, 102, 241, 0.2), stop:1 rgba(168, 85, 247, 0.2));
+                    color: {t.accent_primary};
                     border: none;
                     border-radius: {t.radius_medium}px;
-                    text-align: left;
-                    padding-left: 16px;
+                    text-align: {align};
+                    padding-left: {padding};
                     font-weight: 600;
-                    font-size: {t.font_size}px;
+                    font-size: {font_size};
+                    margin: 2px 8px;
                 }}
             """
             )
@@ -57,13 +201,14 @@ class MenuButton(QPushButton):
                     color: {t.text_muted};
                     border: none;
                     border-radius: {t.radius_medium}px;
-                    text-align: left;
-                    padding-left: 16px;
-                    font-size: {t.font_size}px;
+                    text-align: {align};
+                    padding-left: {padding};
+                    font-size: {font_size};
+                    margin: 2px 8px;
                 }}
                 QPushButton:hover {{
-                    background-color: {t.bg_hover};
-                    color: {t.text_primary};
+                    background-color: {t.bg_hover}80;
+                    color: {t.text_secondary};
                 }}
             """
             )
@@ -73,31 +218,95 @@ class MenuButton(QPushButton):
         self.setChecked(selected)
         self.update_style()
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        # Badge çiz
+        if self.badge > 0 and not self._collapsed:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            t = get_theme()
+
+            # Badge arka plan
+            badge_text = str(self.badge)
+            badge_width = max(20, len(badge_text) * 8 + 10)
+            badge_height = 18
+            badge_x = self.width() - badge_width - 40
+            badge_y = (self.height() - badge_height) // 2
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(t.accent_primary))
+            painter.drawRoundedRect(badge_x, badge_y, badge_width, badge_height, 9, 9)
+
+            # Badge text
+            painter.setPen(QColor("white"))
+            from PyQt6.QtGui import QFont
+
+            font = QFont()
+            font.setPointSize(9)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(
+                badge_x,
+                badge_y,
+                badge_width,
+                badge_height,
+                Qt.AlignmentFlag.AlignCenter,
+                badge_text,
+            )
+
 
 class SubMenuButton(QPushButton):
+    """Alt menü butonu"""
+
     def __init__(self, text: str, page_id: str = "", parent=None):
         super().__init__(parent)
         self.page_id = page_id
+        self.full_text = text
         self._selected = False
-        self.setText(text)
+        self._collapsed = False
         self.setCheckable(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(36)
+        self._update_text()
+        self.update_style()
+
+    def _update_text(self):
+        if self._collapsed:
+            self.setText("•")
+            self.setToolTip(self.full_text)
+        else:
+            self.setText(self.full_text)
+            self.setToolTip("")
+
+    def set_collapsed(self, collapsed: bool):
+        self._collapsed = collapsed
+        self._update_text()
         self.update_style()
 
     def update_style(self):
         t = get_theme()
+
+        if self._collapsed:
+            align = "center"
+            margin = "2px 8px"
+        else:
+            align = "left"
+            margin = "1px 8px 1px 24px"
+
         if self._selected:
             self.setStyleSheet(
                 f"""
                 QPushButton {{
-                    background-color: {t.bg_selected};
-                    color: {t.text_accent};
+                    background-color: {t.accent_primary}15;
+                    color: {t.accent_primary};
                     border: none;
                     border-radius: {t.radius_small}px;
-                    text-align: left;
-                    padding-left: 48px;
+                    text-align: {align};
+                    padding-left: 16px;
                     font-size: {t.font_size_small + 1}px;
+                    margin: {margin};
                 }}
             """
             )
@@ -108,13 +317,15 @@ class SubMenuButton(QPushButton):
                     background-color: transparent;
                     color: {t.text_muted};
                     border: none;
-                    border-radius: {t.radius_small}px;
-                    text-align: left;
-                    padding-left: 48px;
+                    border-left: 2px solid {t.border};
+                    border-radius: 0px;
+                    text-align: {align};
+                    padding-left: 14px;
                     font-size: {t.font_size_small + 1}px;
+                    margin: {margin};
                 }}
                 QPushButton:hover {{
-                    background-color: {t.bg_hover};
+                    background-color: {t.bg_hover}50;
                     color: {t.text_secondary};
                 }}
             """
@@ -127,9 +338,14 @@ class SubMenuButton(QPushButton):
 
 
 class Sidebar(QFrame):
+    """Ana sidebar - PyERP Pro stili"""
+
     page_changed = pyqtSignal(str)
     sidebar_toggled = pyqtSignal(bool)
     theme_changed = pyqtSignal(str)
+
+    EXPANDED_WIDTH = 256
+    COLLAPSED_WIDTH = 72
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -138,6 +354,7 @@ class Sidebar(QFrame):
         self.menu_buttons = {}
         self.submenu_buttons = {}
         self.expanded_menus = set()
+        self.submenu_containers = {}
         self.setup_ui()
         ThemeManager.register_callback(self._on_theme_changed)
 
@@ -160,20 +377,25 @@ class Sidebar(QFrame):
         )
 
     def setup_ui(self):
-        t = get_theme()
-
         self.setObjectName("sidebar")
-        self.setFixedWidth(260)
+        self.setFixedWidth(self.EXPANDED_WIDTH)
         self._apply_styles()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
+        # Logo bölümü
         logo_frame = self.create_logo_section()
         layout.addWidget(logo_frame)
-        layout.addSpacing(16)
 
+        # Ayırıcı
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {get_theme().border};")
+        layout.addWidget(sep)
+
+        # Menü
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -181,75 +403,78 @@ class Sidebar(QFrame):
 
         menu_widget = QWidget()
         menu_widget.setStyleSheet("background: transparent;")
-        menu_layout = QVBoxLayout(menu_widget)
-        menu_layout.setContentsMargins(0, 0, 0, 0)
-        menu_layout.setSpacing(4)
+        self.menu_layout = QVBoxLayout(menu_widget)
+        self.menu_layout.setContentsMargins(4, 12, 4, 12)
+        self.menu_layout.setSpacing(2)
 
-        self.add_menu_items(menu_layout)
-        menu_layout.addStretch()
+        self.add_menu_items(self.menu_layout)
+        self.menu_layout.addStretch()
         scroll.setWidget(menu_widget)
         layout.addWidget(scroll)
 
-        theme_frame = self.create_theme_selector()
-        layout.addWidget(theme_frame)
+        # Alt bölüm
+        bottom = QFrame()
+        bottom.setStyleSheet("background: transparent;")
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(8, 8, 8, 12)
+        bottom_layout.setSpacing(8)
 
-        user_frame = self.create_user_section()
-        layout.addWidget(user_frame)
+        self.theme_frame = self.create_theme_selector()
+        bottom_layout.addWidget(self.theme_frame)
+
+        self.user_frame = self.create_user_section()
+        bottom_layout.addWidget(self.user_frame)
+
+        layout.addWidget(bottom)
 
     def create_logo_section(self) -> QFrame:
         t = get_theme()
 
         frame = QFrame()
         frame.setStyleSheet("background: transparent;")
-        frame.setFixedHeight(60)
+        frame.setFixedHeight(64)
+
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(8, 0, 8, 0)
+        layout.setContentsMargins(16, 12, 12, 12)
+        layout.setSpacing(12)
 
-        logo_path = Path(BASE_DIR) / "assets" / "favicon.svg"
-        if logo_path.exists():
-            logo = QSvgWidget(str(logo_path))
-            logo.setFixedSize(40, 40)
-            layout.addWidget(logo)
-        else:
-            logo_label = QLabel("🔄")
-            logo_label.setStyleSheet("font-size: 32px; background: transparent;")
-            layout.addWidget(logo_label)
+        # Logo - TIKLANABİLİR
+        self.logo = AkilliIsLogo(40)
+        self.logo.clicked.connect(self.toggle_sidebar)
+        self.logo.setToolTip("Menüyü aç/kapat")
+        layout.addWidget(self.logo)
 
-        title_layout = QVBoxLayout()
+        # Başlık
+        self.title_widget = QWidget()
+        self.title_widget.setStyleSheet("background: transparent;")
+        title_layout = QVBoxLayout(self.title_widget)
+        title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(0)
-        title = QLabel(APP_NAME)
-        title.setStyleSheet(
-            f"font-size: 18px; font-weight: 700; color: {t.text_primary}; background: transparent;"
-        )
-        title_layout.addWidget(title)
-        version = QLabel(f"v{APP_VERSION}")
-        version.setStyleSheet(
-            f"font-size: 11px; color: {t.text_muted}; background: transparent;"
-        )
-        title_layout.addWidget(version)
-        layout.addLayout(title_layout)
-        layout.addStretch()
 
-        toggle_btn = QPushButton("◀")
-        toggle_btn.setFixedSize(28, 28)
-        toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        toggle_btn.setStyleSheet(
+        self.title_label = QLabel(APP_NAME)
+        self.title_label.setStyleSheet(
             f"""
-            QPushButton {{
-                background-color: {t.bg_tertiary};
-                color: {t.text_muted};
-                border: none;
-                border-radius: 8px;
-                font-size: 10px;
-            }}
-            QPushButton:hover {{
-                background-color: {t.bg_hover};
-                color: {t.text_primary};
-            }}
+            font-size: 16px; 
+            font-weight: 700; 
+            color: {t.text_primary}; 
+            background: transparent;
+            letter-spacing: -0.5px;
         """
         )
-        toggle_btn.clicked.connect(self.toggle_sidebar)
-        layout.addWidget(toggle_btn)
+        title_layout.addWidget(self.title_label)
+
+        self.subtitle_label = QLabel(f"v{APP_VERSION}")
+        self.subtitle_label.setStyleSheet(
+            f"""
+            font-size: 10px; 
+            color: {t.text_muted}; 
+            background: transparent;
+        """
+        )
+        title_layout.addWidget(self.subtitle_label)
+
+        layout.addWidget(self.title_widget)
+        layout.addStretch()
 
         return frame
 
@@ -260,7 +485,7 @@ class Sidebar(QFrame):
         frame.setStyleSheet(
             f"""
             QFrame {{
-                background-color: {t.bg_tertiary};
+                background-color: {t.bg_tertiary}80;
                 border-radius: {t.radius_medium}px;
             }}
         """
@@ -270,9 +495,9 @@ class Sidebar(QFrame):
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(8)
 
-        theme_icon = QLabel("🎨")
-        theme_icon.setStyleSheet("font-size: 14px; background: transparent;")
-        layout.addWidget(theme_icon)
+        self.theme_icon = QLabel("🎨")
+        self.theme_icon.setStyleSheet("font-size: 14px; background: transparent;")
+        layout.addWidget(self.theme_icon)
 
         self.theme_combo = QComboBox()
         self.theme_combo.setStyleSheet(
@@ -280,18 +505,13 @@ class Sidebar(QFrame):
             QComboBox {{
                 background-color: {t.bg_secondary};
                 border: 1px solid {t.border};
-                border-radius: {t.radius_small}px;
+                border-radius: 6px;
                 padding: 6px 10px;
                 color: {t.text_primary};
-                min-width: 140px;
+                min-width: 130px;
+                font-size: 12px;
             }}
-            QComboBox:hover {{
-                border-color: {t.border_light};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                padding-right: 8px;
-            }}
+            QComboBox::drop-down {{ border: none; }}
             QComboBox QAbstractItemView {{
                 background-color: {t.bg_secondary};
                 border: 1px solid {t.border};
@@ -304,59 +524,73 @@ class Sidebar(QFrame):
         for name, theme in THEMES.items():
             self.theme_combo.addItem(theme.display_name, name)
 
-        current_index = list(THEMES.keys()).index(t.name)
-        self.theme_combo.setCurrentIndex(current_index)
-
+        idx = list(THEMES.keys()).index(t.name)
+        self.theme_combo.setCurrentIndex(idx)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_selected)
         layout.addWidget(self.theme_combo)
 
         return frame
 
     def _on_theme_selected(self, index):
-        theme_name = self.theme_combo.currentData()
-        if theme_name:
-            ThemeManager.set_theme(theme_name)
-            self.theme_changed.emit(theme_name)
+        name = self.theme_combo.currentData()
+        if name:
+            ThemeManager.set_theme(name)
+            self.theme_changed.emit(name)
 
     def add_menu_items(self, layout: QVBoxLayout):
+        # Badge'li menü yapısı
         menu_structure = [
-            ("dashboard", "Dashboard", "📊", []),
+            ("dashboard", "Dashboard", "dashboard", 0, []),
             (
                 "inventory",
                 "Stok Yönetimi",
-                "📦",
+                "inventory",
+                0,
                 [
                     ("stock-cards", "Stok Kartları"),
                     ("categories", "Kategoriler"),
                     ("units", "Birimler"),
                     ("warehouses", "Depolar"),
                     ("movements", "Stok Hareketleri"),
-                    ("stock-count", "Stok Sayımı"),
+                    ("stock-count", "Sayım İşlemleri"),
                     ("stock-reports", "Stok Raporları"),
                 ],
             ),
             (
                 "production",
                 "Üretim",
-                "🏭",
+                "production",
+                3,
                 [
-                    ("bom", "Ürün Reçeteleri"),
-                    ("work-stations", "İş İstasyonları"),
                     ("work-orders", "İş Emirleri"),
+                    ("bom", "Ürün Reçeteleri"),
                     ("planning", "Üretim Planlama"),
+                    ("work-stations", "İş İstasyonları"),
                     ("calendar", "Çalışma Takvimi"),
                 ],
             ),
-            ("purchasing", "Satın Alma", "🛒", []),
-            ("sales", "Satış", "💰", []),
-            ("finance", "Finans", "💳", []),
-            ("hr", "İnsan Kaynakları", "👥", []),
-            ("reports", "Raporlar", "📈", []),
-            ("settings", "Ayarlar", "⚙️", []),
+            (
+                "purchasing",
+                "Satın Alma",
+                "purchasing",
+                0,
+                [
+                    ("suppliers", "Tedarikçiler"),
+                    ("purchase-requests", "Talepler"),
+                    ("purchase-orders", "Siparişler"),
+                    ("goods-receipts", "Mal Kabul"),
+                ],
+            ),
+            ("sales", "Satış", "sales", 5, []),
+            ("finance", "Finans", "finance", 0, []),
+            ("hr", "İnsan Kaynakları", "hr", 0, []),
+            ("reports", "Raporlar", "reports", 0, []),
+            ("settings", "Ayarlar", "settings", 0, []),
         ]
 
-        for menu_id, title, icon, submenus in menu_structure:
-            btn = MenuButton(title, icon, menu_id)
+        for menu_id, title, icon_name, badge, submenus in menu_structure:
+            btn = MenuButton(title, icon_name, menu_id, badge)
+            btn.set_has_children(len(submenus) > 0)
             btn.clicked.connect(
                 lambda checked, m=menu_id, s=submenus: self.on_menu_click(m, s)
             )
@@ -364,12 +598,12 @@ class Sidebar(QFrame):
             layout.addWidget(btn)
 
             if submenus:
-                submenu_container = QWidget()
-                submenu_container.setStyleSheet("background: transparent;")
-                submenu_container.setVisible(False)
-                submenu_layout = QVBoxLayout(submenu_container)
-                submenu_layout.setContentsMargins(0, 4, 0, 4)
-                submenu_layout.setSpacing(2)
+                container = QWidget()
+                container.setStyleSheet("background: transparent;")
+                container.setVisible(False)
+                sub_layout = QVBoxLayout(container)
+                sub_layout.setContentsMargins(0, 4, 0, 4)
+                sub_layout.setSpacing(2)
 
                 for sub_id, sub_title in submenus:
                     sub_btn = SubMenuButton(sub_title, sub_id)
@@ -377,10 +611,10 @@ class Sidebar(QFrame):
                         lambda checked, p=sub_id: self.select_page(p)
                     )
                     self.submenu_buttons[sub_id] = sub_btn
-                    submenu_layout.addWidget(sub_btn)
+                    sub_layout.addWidget(sub_btn)
 
-                layout.addWidget(submenu_container)
-                btn.submenu_container = submenu_container
+                layout.addWidget(container)
+                self.submenu_containers[menu_id] = container
 
         self.menu_buttons["dashboard"].set_selected(True)
 
@@ -391,7 +625,7 @@ class Sidebar(QFrame):
         frame.setStyleSheet(
             f"""
             QFrame {{
-                background-color: {t.bg_tertiary};
+                background-color: {t.bg_tertiary}80;
                 border-radius: {t.radius_medium}px;
             }}
         """
@@ -400,46 +634,69 @@ class Sidebar(QFrame):
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(12, 10, 12, 10)
 
-        avatar = QLabel("OK")
-        avatar.setFixedSize(36, 36)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar.setStyleSheet(
+        # Avatar - gradient
+        self.avatar = QLabel("OK")
+        self.avatar.setFixedSize(36, 36)
+        self.avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avatar.setStyleSheet(
             f"""
-            background-color: {t.success};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                stop:0 #34d399, stop:1 #06b6d4);
             color: white;
             font-weight: 700;
-            font-size: 13px;
+            font-size: 12px;
             border-radius: 18px;
         """
         )
-        layout.addWidget(avatar)
+        layout.addWidget(self.avatar)
 
-        info_layout = QVBoxLayout()
+        self.user_info = QWidget()
+        self.user_info.setStyleSheet("background: transparent;")
+        info_layout = QVBoxLayout(self.user_info)
+        info_layout.setContentsMargins(10, 0, 0, 0)
         info_layout.setSpacing(0)
-        name = QLabel("Okan")
-        name.setStyleSheet(
-            f"color: {t.text_secondary}; font-weight: 600; font-size: 13px; background: transparent;"
+
+        self.user_name = QLabel("Okan")
+        self.user_name.setStyleSheet(
+            f"""
+            color: {t.text_primary}; 
+            font-weight: 600; 
+            font-size: 13px; 
+            background: transparent;
+        """
         )
-        info_layout.addWidget(name)
-        role = QLabel("Yönetici")
-        role.setStyleSheet(
-            f"color: {t.text_muted}; font-size: 11px; background: transparent;"
+        info_layout.addWidget(self.user_name)
+
+        self.user_role = QLabel("Yönetici")
+        self.user_role.setStyleSheet(
+            f"""
+            color: {t.text_muted}; 
+            font-size: 11px; 
+            background: transparent;
+        """
         )
-        info_layout.addWidget(role)
-        layout.addLayout(info_layout)
+        info_layout.addWidget(self.user_role)
+
+        layout.addWidget(self.user_info)
         layout.addStretch()
 
         return frame
 
     def on_menu_click(self, menu_id: str, submenus: list):
-        btn = self.menu_buttons[menu_id]
         if submenus:
-            if menu_id in self.expanded_menus:
-                self.expanded_menus.remove(menu_id)
-                btn.submenu_container.setVisible(False)
-            else:
-                self.expanded_menus.add(menu_id)
-                btn.submenu_container.setVisible(True)
+            container = self.submenu_containers.get(menu_id)
+            btn = self.menu_buttons.get(menu_id)
+            if container:
+                if menu_id in self.expanded_menus:
+                    self.expanded_menus.remove(menu_id)
+                    container.setVisible(False)
+                    if btn:
+                        btn.set_expanded(False)
+                else:
+                    self.expanded_menus.add(menu_id)
+                    container.setVisible(True)
+                    if btn:
+                        btn.set_expanded(True)
         else:
             self.select_page(menu_id)
 
@@ -459,4 +716,24 @@ class Sidebar(QFrame):
 
     def toggle_sidebar(self):
         self.collapsed = not self.collapsed
+
+        target = self.COLLAPSED_WIDTH if self.collapsed else self.EXPANDED_WIDTH
+
+        # Görünürlük
+        self.title_widget.setVisible(not self.collapsed)
+        self.theme_combo.setVisible(not self.collapsed)
+        self.user_info.setVisible(not self.collapsed)
+
+        # Butonları güncelle
+        for btn in self.menu_buttons.values():
+            btn.set_collapsed(self.collapsed)
+        for btn in self.submenu_buttons.values():
+            btn.set_collapsed(self.collapsed)
+
+        # Alt menüleri gizle
+        if self.collapsed:
+            for container in self.submenu_containers.values():
+                container.setVisible(False)
+
+        self.setFixedWidth(target)
         self.sidebar_toggled.emit(self.collapsed)

@@ -86,3 +86,17 @@ from .production import (
     WorkOrderPriority,
 )
 from .calendar import ProductionShift, ProductionHoliday, WorkstationSchedule
+
+from .purchasing import (
+    Supplier,
+    PurchaseRequest,
+    PurchaseRequestItem,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    GoodsReceipt,
+    GoodsReceiptItem,
+    PurchaseRequestStatus,
+    PurchaseOrderStatus,
+    GoodsReceiptStatus,
+    Currency,
+)

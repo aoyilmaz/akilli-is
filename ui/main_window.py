@@ -1,5 +1,5 @@
 """
-Akıllı İş ERP - Ana Pencere (Düzeltilmiş)
+Akıllı İş ERP - Ana Pencere
 """
 
 from PyQt6.QtWidgets import (
@@ -27,14 +27,23 @@ from modules.inventory.views import (
     StockCountModule,
     UnitModule,
 )
+
+# Üretim Modülleri
 from modules.production import (
     BOMModule,
     WorkOrderModule,
     PlanningModule,
     WorkStationModule,
 )
-
 from modules.production.views.calendar_module import CalendarModule
+
+# Satın Alma Modülleri
+from modules.purchasing import (
+    SupplierModule,
+    PurchaseRequestModule,
+    GoodsReceiptModule,
+    PurchaseOrderModule,
+)
 
 
 class MainWindow(QMainWindow):
@@ -104,7 +113,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(content_widget)
 
     def add_pages(self):
-        # Dashboard
+        # ========== DASHBOARD ==========
         self.pages["dashboard"] = DashboardPage()
         self.page_stack.addWidget(self.pages["dashboard"])
 
@@ -131,19 +140,9 @@ class MainWindow(QMainWindow):
         self.pages["stock-reports"] = StockReportsModule()
         self.page_stack.addWidget(self.pages["stock-reports"])
 
+        # ========== ÜRETİM MODÜLÜ ==========
         self.pages["work-orders"] = WorkOrderModule()
         self.page_stack.addWidget(self.pages["work-orders"])
-
-        self.pages["bom"] = BOMModule()
-        self.page_stack.addWidget(self.pages["bom"])
-
-        # ========== ÜRETİM MODÜLÜ ==========
-
-        self.pages["bom"] = PlaceholderPage("Ürün Reçeteleri", "📝")
-        self.page_stack.addWidget(self.pages["bom"])
-
-        self.pages["planning"] = PlaceholderPage("Üretim Planlama", "📅")
-        self.page_stack.addWidget(self.pages["planning"])
 
         self.pages["bom"] = BOMModule()
         self.page_stack.addWidget(self.pages["bom"])
@@ -154,12 +153,23 @@ class MainWindow(QMainWindow):
         self.pages["work-stations"] = WorkStationModule()
         self.page_stack.addWidget(self.pages["work-stations"])
 
-        self.pages["calendar"] = CalendarModule()  # YENİ
+        self.pages["calendar"] = CalendarModule()
         self.page_stack.addWidget(self.pages["calendar"])
 
-        # ========== DİĞER MODÜLLER ==========
-        self.pages["purchasing"] = PlaceholderPage("Satın Alma", "🛒")
-        self.page_stack.addWidget(self.pages["purchasing"])
+        # ========== SATIN ALMA MODÜLÜ ==========
+        self.pages["suppliers"] = SupplierModule()
+        self.page_stack.addWidget(self.pages["suppliers"])
+
+        self.pages["purchase-requests"] = PurchaseRequestModule()
+        self.page_stack.addWidget(self.pages["purchase-requests"])
+
+        self.pages["goods-receipts"] = GoodsReceiptModule()
+        self.page_stack.addWidget(self.pages["goods-receipts"])
+
+        self.pages["purchase-orders"] = PurchaseOrderModule()
+        self.page_stack.addWidget(self.pages["purchase-orders"])
+
+        # ========== DİĞER MODÜLLER (Placeholder) ==========
 
         self.pages["sales"] = PlaceholderPage("Satış", "💰")
         self.page_stack.addWidget(self.pages["sales"])

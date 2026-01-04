@@ -1,5 +1,6 @@
 """
-Akıllı İş ERP - Tema Yönetimi (Düzeltilmiş)
+Akıllı İş ERP - Tema Yönetimi
+PyERP Pro + One Dark Pro + Material Ocean + Dark
 """
 
 from dataclasses import dataclass
@@ -8,6 +9,9 @@ from enum import Enum
 
 
 class ThemeType(Enum):
+    """Tema türleri"""
+    PYERP_PRO = "pyerp_pro"
+    ONE_DARK_PRO = "one_dark_pro"
     DARK = "dark"
     MATERIAL_OCEAN = "material_ocean"
 
@@ -66,7 +70,107 @@ class Theme:
     radius_large: int
 
 
-# === DARK TEMA ===
+# === PYERP PRO TEMA (Prototype'tan) ===
+PYERP_PRO_THEME = Theme(
+    name="pyerp_pro",
+    display_name="PyERP Pro",
+    
+    # slate-950, slate-900, slate-800
+    bg_primary="#020617",      # slate-950
+    bg_secondary="#0f172a",    # slate-900
+    bg_tertiary="#1e293b",     # slate-800
+    bg_hover="#334155",        # slate-700
+    bg_selected="#475569",     # slate-600
+    
+    # Borders
+    border="#1e293b",          # slate-800
+    border_light="#334155",    # slate-700
+    
+    # Text - slate tones
+    text_primary="#f8fafc",    # slate-50
+    text_secondary="#e2e8f0",  # slate-200
+    text_muted="#64748b",      # slate-500
+    text_accent="#818cf8",     # indigo-400
+    
+    # Accent - indigo to purple gradient
+    accent_primary="#6366f1",  # indigo-500
+    accent_secondary="#a855f7", # purple-500
+    accent_gradient_start="#6366f1",
+    accent_gradient_end="#a855f7",
+    
+    # Status colors
+    success="#34d399",         # emerald-400
+    warning="#fbbf24",         # amber-400
+    error="#f87171",           # red-400
+    info="#38bdf8",            # sky-400
+    
+    # Special areas
+    sidebar_bg="#0f172a",      # slate-900
+    header_bg="#020617",       # slate-950 with opacity
+    card_bg="#0f172a",         # slate-900/50
+    input_bg="#0f172a",        # slate-900
+    
+    # Font - SF Pro / System
+    font_family="SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial",
+    font_size=14,
+    font_size_small=12,
+    font_size_large=16,
+    font_size_title=24,
+    
+    # Rounded corners - more rounded
+    radius_small=8,
+    radius_medium=12,
+    radius_large=16,
+)
+
+
+# === ONE DARK PRO TEMA ===
+ONE_DARK_PRO_THEME = Theme(
+    name="one_dark_pro",
+    display_name="One Dark Pro",
+    
+    bg_primary="#282c34",
+    bg_secondary="#21252b",
+    bg_tertiary="#2c313a",
+    bg_hover="#3a3f4b",
+    bg_selected="#3e4451",
+    
+    border="#3a3f4b",
+    border_light="#4b5263",
+    
+    text_primary="#abb2bf",
+    text_secondary="#9da5b4",
+    text_muted="#5c6370",
+    text_accent="#61afef",
+    
+    accent_primary="#61afef",
+    accent_secondary="#c678dd",
+    accent_gradient_start="#61afef",
+    accent_gradient_end="#c678dd",
+    
+    success="#98c379",
+    warning="#e5c07b",
+    error="#e06c75",
+    info="#56b6c2",
+    
+    sidebar_bg="#21252b",
+    header_bg="#282c34",
+    card_bg="#2c313a",
+    input_bg="#1d2025",
+    
+    font_family="SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Arial",
+    font_size=13,
+    font_size_small=11,
+    font_size_large=15,
+    font_size_title=22,
+    
+    radius_small=6,
+    radius_medium=8,
+    radius_large=12,
+)
+
+
+# === DARK TEMA (Orijinal) ===
 DARK_THEME = Theme(
     name="dark",
     display_name="Dark",
@@ -158,8 +262,10 @@ MATERIAL_OCEAN_THEME = Theme(
 )
 
 
-# Tema koleksiyonu
+# Tema koleksiyonu - PyERP Pro varsayılan
 THEMES: Dict[str, Theme] = {
+    "pyerp_pro": PYERP_PRO_THEME,
+    "one_dark_pro": ONE_DARK_PRO_THEME,
     "dark": DARK_THEME,
     "material_ocean": MATERIAL_OCEAN_THEME,
 }
@@ -169,7 +275,7 @@ class ThemeManager:
     """Tema yöneticisi"""
     
     _instance = None
-    _current_theme: Theme = DARK_THEME
+    _current_theme: Theme = PYERP_PRO_THEME  # Varsayılan PyERP Pro
     _callbacks = []
     
     def __new__(cls):
@@ -217,12 +323,13 @@ class ThemeManager:
             
             QScrollBar:vertical {{
                 background: {t.bg_secondary};
-                width: 10px;
-                border-radius: 5px;
+                width: 8px;
+                border-radius: 4px;
+                margin: 2px;
             }}
             QScrollBar::handle:vertical {{
                 background: {t.bg_tertiary};
-                border-radius: 5px;
+                border-radius: 4px;
                 min-height: 30px;
             }}
             QScrollBar::handle:vertical:hover {{
@@ -233,12 +340,13 @@ class ThemeManager:
             }}
             QScrollBar:horizontal {{
                 background: {t.bg_secondary};
-                height: 10px;
-                border-radius: 5px;
+                height: 8px;
+                border-radius: 4px;
+                margin: 2px;
             }}
             QScrollBar::handle:horizontal {{
                 background: {t.bg_tertiary};
-                border-radius: 5px;
+                border-radius: 4px;
                 min-width: 30px;
             }}
             
@@ -261,8 +369,8 @@ class ThemeManager:
                 background-color: {t.bg_secondary};
                 color: {t.text_primary};
                 border: 1px solid {t.border};
-                border-radius: 4px;
-                padding: 6px 10px;
+                border-radius: 6px;
+                padding: 8px 12px;
             }}
             
             QMessageBox {{
