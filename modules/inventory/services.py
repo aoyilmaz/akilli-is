@@ -473,11 +473,11 @@ class StockMovementService(ServiceBase):
         
         # Hareket tipine göre kontroller ve maliyet belirleme
         if movement_type in [
-            StockMovementType.GIRIS, 
+            StockMovementType.GIRIS,
             StockMovementType.SATIN_ALMA,
             StockMovementType.URETIM_CIKIS,
             StockMovementType.SAYIM_FAZLA,
-            StockMovementType.IADE_GIRIS,
+            StockMovementType.IADE_ALIS,
         ]:
             # GİRİŞ işlemleri - to_warehouse zorunlu
             if not to_warehouse_id:
@@ -491,7 +491,7 @@ class StockMovementService(ServiceBase):
             StockMovementType.URETIM_GIRIS,
             StockMovementType.SAYIM_EKSIK,
             StockMovementType.FIRE,
-            StockMovementType.IADE_CIKIS,
+            StockMovementType.IADE_SATIS,
         ]:
             # ÇIKIŞ işlemleri - from_warehouse zorunlu
             if not from_warehouse_id:

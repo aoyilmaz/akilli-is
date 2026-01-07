@@ -20,6 +20,7 @@ class PurchaseOrderListPage(QWidget):
     view_clicked = pyqtSignal(int)
     send_clicked = pyqtSignal(int)
     receive_clicked = pyqtSignal(int)
+    create_receipt_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -379,7 +380,7 @@ class PurchaseOrderListPage(QWidget):
                 receive_btn.setFixedSize(32, 32)
                 receive_btn.setStyleSheet(self._action_btn_style("#8b5cf6"))
                 receive_btn.setToolTip("Mal Kabul Oluştur")
-                receive_btn.clicked.connect(lambda checked, id=order_id: self.receive_clicked.emit(id))
+                receive_btn.clicked.connect(lambda checked, id=order_id: self.create_receipt_clicked.emit(id))
                 btn_layout.addWidget(receive_btn)
             
             self.table.setCellWidget(row, 8, btn_widget)

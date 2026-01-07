@@ -20,6 +20,7 @@ class PurchaseRequestListPage(QWidget):
     view_clicked = pyqtSignal(int)
     approve_clicked = pyqtSignal(int)
     reject_clicked = pyqtSignal(int)
+    create_order_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -377,14 +378,23 @@ class PurchaseRequestListPage(QWidget):
                 approve_btn.setToolTip("Onayla")
                 approve_btn.clicked.connect(lambda checked, id=req_id: self.approve_clicked.emit(id))
                 btn_layout.addWidget(approve_btn)
-                
+
                 reject_btn = QPushButton("❌")
                 reject_btn.setFixedSize(32, 32)
                 reject_btn.setStyleSheet(self._action_btn_style("#ef4444"))
                 reject_btn.setToolTip("Reddet")
                 reject_btn.clicked.connect(lambda checked, id=req_id: self.reject_clicked.emit(id))
                 btn_layout.addWidget(reject_btn)
-            
+
+            # Sipariş Oluştur (sadece approved)
+            if req_status == "approved":
+                order_btn = QPushButton("📦")
+                order_btn.setFixedSize(32, 32)
+                order_btn.setStyleSheet(self._action_btn_style("#8b5cf6"))
+                order_btn.setToolTip("Sipariş Oluştur")
+                order_btn.clicked.connect(lambda checked, id=req_id: self.create_order_clicked.emit(id))
+                btn_layout.addWidget(order_btn)
+
             # Sil (sadece taslak)
             if req_status == "draft":
                 del_btn = QPushButton("🗑")

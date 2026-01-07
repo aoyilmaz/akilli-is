@@ -4,32 +4,190 @@ Akıllı İş - Satın Alma Talep Modülü
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QStackedWidget, QMessageBox,
-    QDialog, QVBoxLayout as QVBox, QLabel, QTextEdit, 
-    QPushButton, QHBoxLayout
+    QDialog, QVBoxLayout as QVBox, QLabel, QTextEdit,
+    QPushButton, QHBoxLayout, QComboBox, QTableWidget,
+    QTableWidgetItem, QHeaderView, QAbstractItemView
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 
 from .purchase_request_list import PurchaseRequestListPage
 from .purchase_request_form import PurchaseRequestFormPage
 
 
+class CreateOrderDialog(QDialog):
+    """Talepten sipariş oluşturma dialogu"""
+
+    def __init__(self, request_data: dict, suppliers: list, parent=None):
+        super().__init__(parent)
+        self.request_data = request_data
+        self.suppliers = suppliers
+        self.setWindowTitle(f"Sipariş Oluştur - {request_data.get('request_no', '')}")
+        self.setMinimumSize(800, 600)
+        self.setStyleSheet("QDialog { background-color: #1e293b; }")
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBox(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+
+        # Başlık
+        title = QLabel("📦 Sipariş Oluştur")
+        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # Tedarikçi seçimi
+        supplier_layout = QHBoxLayout()
+        supplier_label = QLabel("Tedarikçi:")
+        supplier_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        supplier_layout.addWidget(supplier_label)
+
+        self.supplier_combo = QComboBox()
+        self.supplier_combo.addItem("Tedarikçi Seçin...", None)
+        for supplier in self.suppliers:
+            self.supplier_combo.addItem(
+                f"{supplier['code']} - {supplier['name']}", supplier['id']
+            )
+        self.supplier_combo.setStyleSheet(self._combo_style())
+        supplier_layout.addWidget(self.supplier_combo, 1)
+        layout.addLayout(supplier_layout)
+
+        # Kalemler tablosu
+        items_label = QLabel("Sipariş Kalemleri:")
+        items_label.setStyleSheet("color: #f8fafc; font-size: 14px; margin-top: 10px;")
+        layout.addWidget(items_label)
+
+        self.items_table = QTableWidget()
+        self.items_table.setColumnCount(6)
+        self.items_table.setHorizontalHeaderLabels([
+            "Seç", "Ürün Kodu", "Ürün Adı", "Miktar", "Birim", "Önerilen Tedarikçi"
+        ])
+        self.items_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.items_table.setStyleSheet(self._table_style())
+        layout.addWidget(self.items_table)
+
+        self._load_items()
+
+        # Butonlar
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("İptal")
+        cancel_btn.setStyleSheet(self._button_style("#334155", "#475569"))
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        create_btn = QPushButton("Sipariş Oluştur")
+        create_btn.setStyleSheet(self._button_style("#8b5cf6", "#7c3aed"))
+        create_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(create_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _load_items(self):
+        """Talep kalemlerini tabloya yükle"""
+        items = self.request_data.get('items', [])
+        self.items_table.setRowCount(len(items))
+
+        for row, item in enumerate(items):
+            # Seç checkbox (tüm kalemler varsayılan seçili)
+            check_item = QTableWidgetItem()
+            check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            check_item.setCheckState(Qt.CheckState.Checked)
+            check_item.setData(Qt.ItemDataRole.UserRole, item)
+            self.items_table.setItem(row, 0, check_item)
+
+            # Ürün bilgileri
+            self.items_table.setItem(row, 1, QTableWidgetItem(item.get('item_code', '')))
+            self.items_table.setItem(row, 2, QTableWidgetItem(item.get('item_name', '')))
+            self.items_table.setItem(row, 3, QTableWidgetItem(str(item.get('quantity', 0))))
+            self.items_table.setItem(row, 4, QTableWidgetItem(item.get('unit_name', '')))
+            self.items_table.setItem(row, 5, QTableWidgetItem(item.get('suggested_supplier_name', '-')))
+
+    def get_selected_items(self) -> list:
+        """Seçili kalemleri döndür"""
+        selected = []
+        for row in range(self.items_table.rowCount()):
+            check_item = self.items_table.item(row, 0)
+            if check_item and check_item.checkState() == Qt.CheckState.Checked:
+                selected.append(check_item.data(Qt.ItemDataRole.UserRole))
+        return selected
+
+    def get_supplier_id(self) -> int:
+        """Seçili tedarikçi ID'sini döndür"""
+        return self.supplier_combo.currentData()
+
+    def _combo_style(self):
+        return """
+            QComboBox {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px;
+                color: #f8fafc;
+                font-size: 14px;
+            }
+            QComboBox:focus { border-color: #6366f1; }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                selection-background-color: #6366f1;
+                color: #f8fafc;
+            }
+        """
+
+    def _table_style(self):
+        return """
+            QTableWidget {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                color: #f8fafc;
+            }
+            QHeaderView::section {
+                background-color: #1e293b;
+                color: #f8fafc;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+            QTableWidget::item { padding: 8px; }
+        """
+
+    def _button_style(self, bg_color, hover_color):
+        return f"""
+            QPushButton {{
+                background-color: {bg_color};
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ background-color: {hover_color}; }}
+        """
+
+
 class RejectReasonDialog(QDialog):
     """Red nedeni dialogu"""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Red Nedeni")
         self.setMinimumWidth(400)
         self.setStyleSheet("QDialog { background-color: #1e293b; }")
-        
+
         layout = QVBox(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
-        
+
         label = QLabel("Lütfen red nedenini belirtin:")
         label.setStyleSheet("color: #f8fafc; font-size: 14px;")
         layout.addWidget(label)
-        
+
         self.reason_input = QTextEdit()
         self.reason_input.setPlaceholderText("Red nedeni...")
         self.reason_input.setMinimumHeight(100)
@@ -43,10 +201,10 @@ class RejectReasonDialog(QDialog):
             }
         """)
         layout.addWidget(self.reason_input)
-        
+
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        
+
         cancel_btn = QPushButton("İptal")
         cancel_btn.setStyleSheet("""
             QPushButton {
@@ -60,7 +218,7 @@ class RejectReasonDialog(QDialog):
         """)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
-        
+
         confirm_btn = QPushButton("Reddet")
         confirm_btn.setStyleSheet("""
             QPushButton {
@@ -74,9 +232,9 @@ class RejectReasonDialog(QDialog):
         """)
         confirm_btn.clicked.connect(self.accept)
         btn_layout.addWidget(confirm_btn)
-        
+
         layout.addLayout(btn_layout)
-        
+
     def get_reason(self) -> str:
         return self.reason_input.toPlainText().strip()
 
@@ -108,6 +266,7 @@ class PurchaseRequestModule(QWidget):
         self.list_page.view_clicked.connect(self._show_view)
         self.list_page.approve_clicked.connect(self._approve_request)
         self.list_page.reject_clicked.connect(self._reject_request)
+        self.list_page.create_order_clicked.connect(self._create_order_from_request)
         self.list_page.refresh_requested.connect(self._load_data)
         self.stack.addWidget(self.list_page)
         
@@ -355,7 +514,7 @@ class PurchaseRequestModule(QWidget):
     def _delete_request(self, request_id: int):
         if not self.service:
             return
-            
+
         try:
             if self.service.delete(request_id):
                 QMessageBox.information(self, "Başarılı", "Talep silindi!")
@@ -364,7 +523,90 @@ class PurchaseRequestModule(QWidget):
                 QMessageBox.warning(self, "Uyarı", "Talep silinemedi! (Sadece taslak talepler silinebilir)")
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Silme hatası: {e}")
-            
+
+    def _create_order_from_request(self, request_id: int):
+        """Talepten sipariş oluştur"""
+        if not self.service:
+            return
+
+        try:
+            # Talep verilerini getir
+            request = self.service.get_by_id(request_id)
+            if not request:
+                QMessageBox.warning(self, "Uyarı", "Talep bulunamadı!")
+                return
+
+            if request.status.value != "approved":
+                QMessageBox.warning(self, "Uyarı", "Sadece onaylanmış talepler için sipariş oluşturulabilir!")
+                return
+
+            # Talep kalemlerini hazırla
+            items_data = []
+            for item in request.items:
+                items_data.append({
+                    'item_id': item.item_id,
+                    'item_code': item.item.code if item.item else '',
+                    'item_name': item.item.name if item.item else '',
+                    'quantity': item.quantity,
+                    'unit_id': item.unit_id,
+                    'unit_name': item.unit.name if item.unit else '',
+                    'estimated_price': item.estimated_price,
+                    'suggested_supplier_id': item.suggested_supplier_id,
+                    'suggested_supplier_name': item.suggested_supplier.name if item.suggested_supplier else '-',
+                })
+
+            request_data = {
+                'id': request.id,
+                'request_no': request.request_no,
+                'items': items_data,
+            }
+
+            # Dialog'u göster
+            suppliers = self._get_suppliers()
+            dialog = CreateOrderDialog(request_data, suppliers, self)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                supplier_id = dialog.get_supplier_id()
+                if not supplier_id:
+                    QMessageBox.warning(self, "Uyarı", "Lütfen bir tedarikçi seçin!")
+                    return
+
+                selected_items = dialog.get_selected_items()
+                if not selected_items:
+                    QMessageBox.warning(self, "Uyarı", "Lütfen en az bir kalem seçin!")
+                    return
+
+                # Sipariş oluştur
+                from modules.purchasing.services import PurchaseOrderService
+                order_service = PurchaseOrderService()
+
+                order_items = []
+                for item in selected_items:
+                    order_items.append({
+                        'item_id': item['item_id'],
+                        'quantity': item['quantity'],
+                        'unit_id': item['unit_id'],
+                        'unit_price': item.get('estimated_price', 0),
+                    })
+
+                order = order_service.create_from_request(
+                    request_id=request_id,
+                    supplier_id=supplier_id,
+                    items_data=order_items
+                )
+
+                QMessageBox.information(
+                    self,
+                    "Başarılı",
+                    f"Sipariş oluşturuldu!\nSipariş No: {order.order_no}"
+                )
+                self._load_data()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Sipariş oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _back_to_list(self):
         current = self.stack.currentWidget()
         if current != self.list_page:

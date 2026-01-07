@@ -2,11 +2,218 @@
 Akıllı İş - Satın Alma Sipariş Modülü
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QMessageBox
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QStackedWidget, QMessageBox,
+    QDialog, QVBoxLayout as QVBox, QLabel, QHBoxLayout,
+    QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView, QLineEdit
+)
+from PyQt6.QtCore import pyqtSignal, Qt
 
 from .purchase_order_list import PurchaseOrderListPage
 from .purchase_order_form import PurchaseOrderFormPage
+
+
+class CreateReceiptDialog(QDialog):
+    """Siparişten mal kabul oluşturma dialogu"""
+
+    def __init__(self, order_data: dict, warehouses: list, parent=None):
+        super().__init__(parent)
+        self.order_data = order_data
+        self.warehouses = warehouses
+        self.setWindowTitle(f"Mal Kabul Oluştur - {order_data.get('order_no', '')}")
+        self.setMinimumSize(900, 700)
+        self.setStyleSheet("QDialog { background-color: #1e293b; }")
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBox(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+
+        # Başlık
+        title = QLabel("📥 Mal Kabul Oluştur")
+        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # Sipariş bilgileri
+        info_label = QLabel(
+            f"Sipariş: {self.order_data.get('order_no', '')} | "
+            f"Tedarikçi: {self.order_data.get('supplier_name', '')}"
+        )
+        info_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        layout.addWidget(info_label)
+
+        # Depo seçimi
+        warehouse_layout = QHBoxLayout()
+        warehouse_label = QLabel("Hedef Depo:")
+        warehouse_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
+        warehouse_layout.addWidget(warehouse_label)
+
+        self.warehouse_combo = QComboBox()
+        self.warehouse_combo.addItem("Depo Seçin...", None)
+        for warehouse in self.warehouses:
+            self.warehouse_combo.addItem(
+                f"{warehouse['code']} - {warehouse['name']}", warehouse['id']
+            )
+        self.warehouse_combo.setStyleSheet(self._combo_style())
+        warehouse_layout.addWidget(self.warehouse_combo, 1)
+        layout.addLayout(warehouse_layout)
+
+        # Kalemler tablosu
+        items_label = QLabel("Sipariş Kalemleri:")
+        items_label.setStyleSheet("color: #f8fafc; font-size: 14px; margin-top: 10px;")
+        layout.addWidget(items_label)
+
+        self.items_table = QTableWidget()
+        self.items_table.setColumnCount(7)
+        self.items_table.setHorizontalHeaderLabels([
+            "Seç", "Ürün Kodu", "Ürün Adı", "Sipariş Miktarı",
+            "Teslim Alınan", "Kabul Miktarı", "Birim"
+        ])
+        self.items_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.items_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.items_table.setStyleSheet(self._table_style())
+        layout.addWidget(self.items_table)
+
+        self._load_items()
+
+        # Butonlar
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("İptal")
+        cancel_btn.setStyleSheet(self._button_style("#334155", "#475569"))
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        create_btn = QPushButton("Mal Kabul Oluştur")
+        create_btn.setStyleSheet(self._button_style("#8b5cf6", "#7c3aed"))
+        create_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(create_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _load_items(self):
+        """Sipariş kalemlerini tabloya yükle"""
+        items = self.order_data.get('items', [])
+        self.items_table.setRowCount(len(items))
+
+        for row, item in enumerate(items):
+            # Seç checkbox (varsayılan seçili)
+            check_item = QTableWidgetItem()
+            check_item.setFlags(
+                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+            )
+            check_item.setCheckState(Qt.CheckState.Checked)
+            check_item.setData(Qt.ItemDataRole.UserRole, item)
+            self.items_table.setItem(row, 0, check_item)
+
+            # Ürün bilgileri
+            self.items_table.setItem(row, 1, QTableWidgetItem(item.get('item_code', '')))
+            self.items_table.setItem(row, 2, QTableWidgetItem(item.get('item_name', '')))
+            self.items_table.setItem(
+                row, 3, QTableWidgetItem(str(item.get('quantity', 0)))
+            )
+            self.items_table.setItem(
+                row, 4, QTableWidgetItem(str(item.get('received_quantity', 0)))
+            )
+
+            # Kabul miktarı (editable)
+            remaining = float(item.get('quantity', 0)) - float(
+                item.get('received_quantity', 0)
+            )
+            qty_input = QLineEdit(str(remaining if remaining > 0 else 0))
+            qty_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #0f172a;
+                    border: 1px solid #334155;
+                    border-radius: 4px;
+                    padding: 4px;
+                    color: #f8fafc;
+                }
+            """)
+            self.items_table.setCellWidget(row, 5, qty_input)
+
+            self.items_table.setItem(row, 6, QTableWidgetItem(item.get('unit_name', '')))
+
+    def get_selected_items(self) -> list:
+        """Seçili kalemleri ve kabul miktarlarını döndür"""
+        selected = []
+        for row in range(self.items_table.rowCount()):
+            check_item = self.items_table.item(row, 0)
+            if check_item and check_item.checkState() == Qt.CheckState.Checked:
+                item_data = check_item.data(Qt.ItemDataRole.UserRole)
+                qty_widget = self.items_table.cellWidget(row, 5)
+                if qty_widget:
+                    try:
+                        accepted_qty = float(qty_widget.text() or 0)
+                        if accepted_qty > 0:
+                            item_data['accepted_quantity'] = accepted_qty
+                            selected.append(item_data)
+                    except ValueError:
+                        pass
+        return selected
+
+    def get_warehouse_id(self) -> int:
+        """Seçili depo ID'sini döndür"""
+        return self.warehouse_combo.currentData()
+
+    def _combo_style(self):
+        return """
+            QComboBox {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 10px;
+                color: #f8fafc;
+                font-size: 14px;
+            }
+            QComboBox:focus { border-color: #6366f1; }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                selection-background-color: #6366f1;
+                color: #f8fafc;
+            }
+        """
+
+    def _table_style(self):
+        return """
+            QTableWidget {
+                background-color: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                color: #f8fafc;
+            }
+            QHeaderView::section {
+                background-color: #1e293b;
+                color: #f8fafc;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+            QTableWidget::item { padding: 8px; }
+        """
+
+    def _button_style(self, bg_color, hover_color):
+        return f"""
+            QPushButton {{
+                background-color: {bg_color};
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ background-color: {hover_color}; }}
+        """
 
 
 class PurchaseOrderModule(QWidget):
@@ -35,7 +242,7 @@ class PurchaseOrderModule(QWidget):
         self.list_page.delete_clicked.connect(self._delete_order)
         self.list_page.view_clicked.connect(self._show_view)
         self.list_page.send_clicked.connect(self._send_order)
-        self.list_page.receive_clicked.connect(self._create_receipt)
+        self.list_page.create_receipt_clicked.connect(self._create_receipt_from_order)
         self.list_page.refresh_requested.connect(self._load_data)
         self.stack.addWidget(self.list_page)
         
@@ -251,14 +458,94 @@ class PurchaseOrderModule(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Hata", f"Hata: {e}")
                 
-    def _create_receipt(self, order_id: int):
+    def _create_receipt_from_order(self, order_id: int):
         """Siparişten mal kabul oluştur"""
-        QMessageBox.information(
-            self, "Bilgi",
-            "Mal kabul sayfasından 'Siparişten' butonunu kullanarak\n"
-            "bu sipariş için mal kabul oluşturabilirsiniz.\n\n"
-            "(Tam entegrasyon yakında eklenecek)"
-        )
+        if not self.service:
+            return
+
+        try:
+            # Sipariş verilerini getir
+            order = self.service.get_by_id(order_id)
+            if not order:
+                QMessageBox.warning(self, "Uyarı", "Sipariş bulunamadı!")
+                return
+
+            if order.status.value not in ["sent", "confirmed", "partial"]:
+                QMessageBox.warning(
+                    self, "Uyarı",
+                    "Sadece gönderilmiş, onaylanmış veya kısmi teslim edilmiş "
+                    "siparişler için mal kabul oluşturulabilir!"
+                )
+                return
+
+            # Sipariş kalemlerini hazırla
+            items_data = []
+            for item in order.items:
+                items_data.append({
+                    'po_item_id': item.id,
+                    'item_id': item.item_id,
+                    'item_code': item.item.code if item.item else '',
+                    'item_name': item.item.name if item.item else '',
+                    'quantity': item.quantity,
+                    'received_quantity': item.received_quantity or 0,
+                    'unit_id': item.unit_id,
+                    'unit_name': item.unit.name if item.unit else '',
+                    'unit_price': item.unit_price,
+                })
+
+            order_data = {
+                'id': order.id,
+                'order_no': order.order_no,
+                'supplier_name': order.supplier.name if order.supplier else '',
+                'items': items_data,
+            }
+
+            # Dialog'u göster
+            warehouses = self._get_warehouses()
+            dialog = CreateReceiptDialog(order_data, warehouses, self)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                warehouse_id = dialog.get_warehouse_id()
+                if not warehouse_id:
+                    QMessageBox.warning(self, "Uyarı", "Lütfen bir depo seçin!")
+                    return
+
+                selected_items = dialog.get_selected_items()
+                if not selected_items:
+                    QMessageBox.warning(self, "Uyarı", "Lütfen en az bir kalem seçin!")
+                    return
+
+                # Mal kabul oluştur
+                from modules.purchasing.services import GoodsReceiptService
+                receipt_service = GoodsReceiptService()
+
+                receipt_items = []
+                for item in selected_items:
+                    receipt_items.append({
+                        'po_item_id': item.get('po_item_id'),
+                        'item_id': item['item_id'],
+                        'quantity': item['quantity'],
+                        'accepted_quantity': item.get('accepted_quantity', 0),
+                        'unit_id': item['unit_id'],
+                    })
+
+                receipt = receipt_service.create_from_order(
+                    order_id=order_id,
+                    warehouse_id=warehouse_id,
+                    items_data=receipt_items
+                )
+
+                QMessageBox.information(
+                    self,
+                    "Başarılı",
+                    f"Mal kabul oluşturuldu!\nMal Kabul No: {receipt.receipt_no}"
+                )
+                self._load_data()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Mal kabul oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
             
     def _delete_order(self, order_id: int):
         if not self.service:
