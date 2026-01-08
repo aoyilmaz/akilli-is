@@ -241,6 +241,60 @@ class ErrorHandler:
             return None
 
     @classmethod
+    def log_error(cls, exception: Exception, location: str, show_message: bool = False):
+        """
+        Basit hata loglama metodu
+
+        Args:
+            exception: Yakalanan exception
+            location: Hata konumu (ör: "SalesQuoteModule._save_quote")
+            show_message: QMessageBox göster mi? (default: False)
+
+        Kullanım:
+            ErrorHandler.log_error(e, "SalesQuoteModule._save_quote")
+        """
+        # location'ı parçala: "SalesQuoteModule._save_quote"
+        # -> module="sales", screen="SalesQuoteModule", function="_save_quote"
+        parts = location.rsplit(".", 1)
+        if len(parts) == 2:
+            screen = parts[0]
+            function = parts[1]
+        else:
+            screen = location
+            function = "unknown"
+
+        # Module adını tahmin et
+        module_map = {
+            "SalesQuote": "sales",
+            "SalesOrder": "sales",
+            "DeliveryNote": "sales",
+            "Invoice": "sales",
+            "Customer": "sales",
+            "Warehouse": "inventory",
+            "Item": "inventory",
+            "Stock": "inventory",
+            "Unit": "inventory",
+            "PurchaseRequest": "purchasing",
+            "PurchaseOrder": "purchasing",
+            "GoodsReceipt": "purchasing",
+            "Supplier": "purchasing",
+            "WorkOrder": "production",
+            "BOM": "production",
+            "Error": "development",
+        }
+
+        module = "unknown"
+        for key, value in module_map.items():
+            if key in screen:
+                module = value
+                break
+
+        return cls.handle_error(
+            exception, module, screen, function,
+            show_message=show_message, severity='error'
+        )
+
+    @classmethod
     def _show_message_box(cls, exception, severity, parent):
         """QMessageBox göster"""
 

@@ -106,3 +106,20 @@ from database.models.development import (
     ErrorLog,
     ErrorSeverity,
 )
+
+# Satış modülü
+from database.models.sales import (
+    Customer,
+    SalesQuote,
+    SalesQuoteItem,
+    SalesQuoteStatus,
+    SalesOrder,
+    SalesOrderItem,
+    SalesOrderStatus,
+    DeliveryNote,
+    DeliveryNoteItem,
+    DeliveryNoteStatus,
+    Invoice,
+    InvoiceItem,
+    InvoiceStatus,
+)

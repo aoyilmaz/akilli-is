@@ -109,6 +109,19 @@ try:
 except ImportError:
     DevelopmentModule = PlaceholderPage
 
+try:
+    from modules.sales import (
+        CustomerModule,
+        SalesQuoteModule,
+        SalesOrderModule,
+        DeliveryNoteModule,
+        InvoiceModule,
+    )
+except ImportError:
+    CustomerModule = SalesQuoteModule = SalesOrderModule = (
+        DeliveryNoteModule
+    ) = InvoiceModule = PlaceholderPage
+
 
 # --- DASHBOARD BİLEŞENLERİ ---
 
@@ -454,6 +467,16 @@ MENU_DATA = {
             ("Takvim", "fa5s.calendar-day", "calendar"),
         ],
     },
+    "sales": {
+        "title": "SATIŞ",
+        "items": [
+            ("Müşteriler", "fa5s.users", "customers"),
+            ("Teklifler", "fa5s.file-invoice", "sales-quotes"),
+            ("Siparişler", "fa5s.shopping-cart", "sales-orders"),
+            ("İrsaliyeler", "fa5s.truck", "delivery-notes"),
+            ("Faturalar", "fa5s.file-invoice-dollar", "invoices"),
+        ],
+    },
     "development": {
         "title": "GELİŞTİRME",
         "items": [
@@ -466,7 +489,6 @@ MENU_DATA = {
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
             ("İnsan Kaynakları", "fa5s.users", "hr"),
             ("Finans", "fa5s.wallet", "finance"),
-            ("Satış", "fa5s.shopping-bag", "sales"),
             ("Raporlar", "fa5s.chart-pie", "reports"),
         ],
     },
@@ -599,6 +621,7 @@ class ActivityBar(QFrame):
             ("dashboard", "fa5s.home", "Genel Bakış"),
             ("inventory", "fa5s.boxes", "Stok"),
             ("purchasing", "fa5s.shopping-cart", "Satınalma"),
+            ("sales", "fa5s.cash-register", "Satış"),
             ("production", "fa5s.industry", "Üretim"),
             ("development", "fa5s.bug", "Geliştirme"),
             ("settings", "fa5s.cog", "Ayarlar"),
@@ -755,7 +778,12 @@ class MainWindow(QMainWindow):
         self.pages["goods-receipts"] = GoodsReceiptModule()
         self.pages["purchase-orders"] = PurchaseOrderModule()
         self.pages["error-logs"] = DevelopmentModule()
-        self.pages["sales"] = PlaceholderPage("Satış", "💰")
+        # Satış modülü sayfaları
+        self.pages["customers"] = CustomerModule()
+        self.pages["sales-quotes"] = SalesQuoteModule()
+        self.pages["sales-orders"] = SalesOrderModule()
+        self.pages["delivery-notes"] = DeliveryNoteModule()
+        self.pages["invoices"] = InvoiceModule()
         self.pages["finance"] = PlaceholderPage("Finans", "💳")
         self.pages["hr"] = PlaceholderPage("İnsan Kaynakları", "👥")
         self.pages["reports"] = PlaceholderPage("Genel Raporlar", "📊")
