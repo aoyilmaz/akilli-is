@@ -430,9 +430,13 @@ class StockMovementService(ServiceBase):
         ).first()
     
     def get_available_quantity(self, item_id: int, warehouse_id: int) -> Decimal:
-        """Mevcut stok miktarı"""
+        """Mevcut stok miktarı (rezerve edilen hariç)"""
         balance = self.get_balance(item_id, warehouse_id)
-        return balance.quantity if balance else Decimal(0)
+        if not balance:
+            return Decimal(0)
+        # Kullanılabilir miktar = Toplam miktar - Rezerve miktar
+        reserved = balance.reserved_quantity or Decimal(0)
+        return balance.quantity - reserved
     
     def get_current_cost(self, item_id: int, warehouse_id: int) -> Decimal:
         """Mevcut stok birim maliyeti (ağırlıklı ortalama)"""
@@ -705,3 +709,98 @@ class StockMovementService(ServiceBase):
         
         self.session.commit()
         return balance
+
+    def reserve_stock(
+        self,
+        item_id: int,
+        warehouse_id: int,
+        quantity: Decimal,
+        reference_type: str = None,
+        reference_id: int = None
+    ) -> bool:
+        """
+        Stok rezerve et (fiziksel çıkış yapmadan)
+
+        Args:
+            item_id: Stok kartı ID
+            warehouse_id: Depo ID
+            quantity: Rezerve edilecek miktar
+            reference_type: Referans tipi (work_order, sales_order, etc.)
+            reference_id: Referans ID
+
+        Returns:
+            bool: Başarılı ise True
+
+        Raises:
+            NegativeStockError: Yetersiz stok varsa
+        """
+        quantity = Decimal(str(quantity))
+
+        if quantity <= 0:
+            raise ValueError("Rezerve miktarı sıfırdan büyük olmalıdır!")
+
+        # Kullanılabilir miktarı kontrol et
+        available = self.get_available_quantity(item_id, warehouse_id)
+        if available < quantity:
+            item = self.session.query(Item).filter(Item.id == item_id).first()
+            warehouse = self.session.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
+            raise NegativeStockError(
+                item.code if item else str(item_id),
+                warehouse.name if warehouse else str(warehouse_id),
+                available,
+                quantity
+            )
+
+        # Bakiyeyi getir veya oluştur
+        balance = self.get_balance(item_id, warehouse_id)
+        if not balance:
+            balance = StockBalance(
+                item_id=item_id,
+                warehouse_id=warehouse_id,
+                quantity=Decimal(0),
+                reserved_quantity=Decimal(0)
+            )
+            self.session.add(balance)
+
+        # Rezerve miktarı artır
+        if balance.reserved_quantity is None:
+            balance.reserved_quantity = Decimal(0)
+        balance.reserved_quantity += quantity
+
+        self.session.commit()
+        return True
+
+    def release_reservation(
+        self,
+        item_id: int,
+        warehouse_id: int,
+        quantity: Decimal
+    ) -> bool:
+        """
+        Rezervasyonu serbest bırak
+
+        Args:
+            item_id: Stok kartı ID
+            warehouse_id: Depo ID
+            quantity: Serbest bırakılacak miktar
+
+        Returns:
+            bool: Başarılı ise True
+        """
+        quantity = Decimal(str(quantity))
+
+        if quantity <= 0:
+            raise ValueError("Serbest bırakılacak miktar sıfırdan büyük olmalıdır!")
+
+        balance = self.get_balance(item_id, warehouse_id)
+        if not balance:
+            return False
+
+        # Rezerve miktarı azalt
+        if balance.reserved_quantity is None:
+            balance.reserved_quantity = Decimal(0)
+
+        balance.reserved_quantity = max(Decimal(0), balance.reserved_quantity - quantity)
+
+        self.session.commit()
+        return True

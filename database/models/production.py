@@ -37,6 +37,7 @@ class WorkOrderStatus(enum.Enum):
     PLANNED = "planned"
     RELEASED = "released"
     IN_PROGRESS = "in_progress"
+    QUALITY_CHECK = "quality_check"  # Yeni: Kalite kontrol aşaması
     COMPLETED = "completed"
     CLOSED = "closed"
     CANCELLED = "cancelled"
@@ -151,26 +152,31 @@ class BOMLine(BaseModel):
 
 class WorkStation(BaseModel):
     """İş istasyonları tablosu"""
-    
+
     __tablename__ = "work_stations"
-    
+
     code = Column(String(50), unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    
+
     station_type = Column(Enum(WorkStationType), default=WorkStationType.MACHINE)
-    
+
     capacity_per_hour = Column(Numeric(18, 4), nullable=True)
     efficiency_rate = Column(Numeric(5, 2), default=100)
-    
+
     hourly_rate = Column(Numeric(18, 4), default=0)
     setup_cost = Column(Numeric(18, 4), default=0)
-    
+
     working_hours_per_day = Column(Numeric(4, 2), default=8)
-    
+
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
     location = Column(String(100), nullable=True)
-    
+
+    # Varsayılan operasyon değerleri (otomatik doldurma için)
+    default_operation_name = Column(String(200), nullable=True)
+    default_setup_time = Column(Integer, default=0)  # dakika
+    default_run_time_per_unit = Column(Numeric(18, 4), default=0)  # dakika/birim
+
     warehouse = relationship("Warehouse")
 
 
@@ -247,7 +253,14 @@ class WorkOrder(BaseModel):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     released_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     released_at = Column(DateTime, nullable=True)
-    
+
+    # Kalite Kontrol Alanları
+    qc_approved_quantity = Column(Numeric(18, 4), default=0)  # Kalite onaylı miktar
+    qc_rejected_quantity = Column(Numeric(18, 4), default=0)  # Kalite red miktar
+    qc_notes = Column(Text, nullable=True)  # Kalite kontrol notları
+    qc_checked_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Kalite kontrol yapan
+    qc_checked_at = Column(DateTime, nullable=True)  # Kalite kontrol tarihi
+
     notes = Column(Text, nullable=True)
     
     # İlişkiler

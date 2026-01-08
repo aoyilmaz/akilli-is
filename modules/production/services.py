@@ -496,63 +496,101 @@ class WorkOrderService:
     # DURUM GEÇİŞLERİ - STOK ENTEGRASYONLU
     # ----------------------------------------------------------
     
-    def release(self, order_id: int) -> WorkOrder:
+    def release(self, order_id: int, warehouse_id: int = None) -> WorkOrder:
         """
         İş emrini serbest bırak (RELEASED)
-        Malzeme kontrolü yapar ama stok düşmez
+
+        Yeni Özellik: Malzemeleri rezerve eder (stoktan düşmeden)
+        - Kullanılabilir stok kontrolü yapar
+        - Malzemeleri rezerve eder
+        - İş emri iptal edilirse rezervasyon serbest bırakılır
         """
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         if order.status not in [WorkOrderStatus.DRAFT, WorkOrderStatus.PLANNED]:
             raise InvalidStatusTransitionError(order.status.value, "RELEASED")
-        
-        # NOT: Stok kontrolü burada yapılmaz, start_production'da yapılır
-        # self._check_material_availability(order)  # Kaldırıldı
-        
+
+        # Malzeme rezervasyonu yap
+        if warehouse_id:
+            from modules.inventory.services import StockMovementService
+            stock_service = StockMovementService()
+
+            try:
+                # Tüm malzemeleri rezerve et
+                for line in order.lines:
+                    if line.required_quantity > 0:
+                        stock_service.reserve_stock(
+                            item_id=line.item_id,
+                            warehouse_id=warehouse_id,
+                            quantity=line.required_quantity,
+                            reference_type="work_order",
+                            reference_id=order.id
+                        )
+                        # Rezerve edildiğini işaretle
+                        line.is_reserved = True
+
+            except Exception as e:
+                # Hata durumunda tüm rezervasyonları geri al
+                self.session.rollback()
+                raise ProductionError(f"Malzeme rezervasyonu başarısız: {str(e)}")
+
         order.status = WorkOrderStatus.RELEASED
         order.released_at = datetime.now()
-        
+
         self.session.commit()
         return order
     
     def start_production(self, order_id: int, warehouse_id: int) -> WorkOrder:
         """
         Üretimi başlat (IN_PROGRESS)
-        
-        KRİTİK: Malzemeleri stoktan düşer!
-        - Tüm malzeme satırları için URETIM_GIRIS hareketi oluşturur
-        - Yetersiz stok varsa hata fırlatır
+
+        Yeni Özellik: Rezervasyonu serbest bırakır ve malzemeleri stoktan düşer
+        - Rezerve edilen malzemeleri serbest bırakır
+        - Malzemeleri fiziksel olarak stoktan düşer
+        - URETIM_GIRIS hareketi oluşturur
         """
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         if order.status != WorkOrderStatus.RELEASED:
             raise InvalidStatusTransitionError(order.status.value, "IN_PROGRESS")
-        
+
         warehouse = self.session.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
         if not warehouse:
             raise ProductionError("Depo bulunamadı!")
-        
+
         try:
+            from modules.inventory.services import StockMovementService
+            stock_service = StockMovementService()
+
             # === TRANSACTION BAŞLANGICI ===
-            
+
             # Malzeme yeterliliği son kontrol
             self._check_material_availability(order, warehouse_id)
-            
+
             # Malzemeleri stoktan düş
             actual_material_cost = Decimal(0)
-            
+
             for line in order.lines:
                 if line.required_quantity <= 0:
                     continue
-                
+
+                # Eğer rezerve edilmişse, rezervasyonu serbest bırak
+                if line.is_reserved:
+                    stock_service.release_reservation(
+                        item_id=line.item_id,
+                        warehouse_id=warehouse_id,
+                        quantity=line.required_quantity
+                    )
+                    line.is_reserved = False
+
                 # Stok bakiyesini al
                 balance = self._get_balance(line.item_id, warehouse_id)
                 current_cost = balance.unit_cost if balance else (line.unit_cost or Decimal(0))
-                
+
                 # Stok hareketi oluştur (URETIM_GIRIS = üretim için malzeme çıkışı)
                 movement = StockMovement(
                     item_id=line.item_id,
@@ -567,13 +605,13 @@ class WorkOrderService:
                     movement_date=datetime.now(),
                 )
                 self.session.add(movement)
-                
+
                 # Bakiyeyi güncelle
                 if balance:
                     balance.quantity -= line.required_quantity
                     if balance.quantity < 0:
                         balance.quantity = Decimal(0)
-                
+
                 # İş emri satırını güncelle
                 line.issued_quantity = line.required_quantity
                 line.actual_unit_cost = current_cost
@@ -597,24 +635,26 @@ class WorkOrderService:
             raise e
     
     def complete_production(
-        self, 
-        order_id: int, 
+        self,
+        order_id: int,
         completed_quantity: Decimal,
         scrap_quantity: Decimal = Decimal(0),
-        target_warehouse_id: int = None
+        target_warehouse_id: int = None,
+        send_to_qc: bool = True
     ) -> WorkOrder:
         """
-        Üretimi tamamla (COMPLETED)
-        
-        KRİTİK: Mamülü stoka ekler!
-        - Üretilen mamül için URETIM_CIKIS hareketi oluşturur
-        - Fire varsa FIRE hareketi oluşturur
-        - Actual değerleri hesaplar
+        Üretimi tamamla
+
+        Yeni Özellik: Kalite kontrole gönderme seçeneği
+        - send_to_qc=True: QUALITY_CHECK durumuna geçer (varsayılan)
+        - send_to_qc=False: Direkt COMPLETED olur (kalite kontrolsüz)
+
+        Mamül stoka eklenmez, kalite onayından sonra eklenecek.
         """
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         if order.status != WorkOrderStatus.IN_PROGRESS:
             raise InvalidStatusTransitionError(order.status.value, "COMPLETED")
         
@@ -679,56 +719,206 @@ class WorkOrderService:
                 )
                 self.session.add(scrap_movement)
             
-            # İş emrini güncelle - DÜZELTMELER
-            order.status = WorkOrderStatus.COMPLETED
+            # İş emrini güncelle
+            if send_to_qc:
+                # Kalite kontrole gönder
+                order.status = WorkOrderStatus.QUALITY_CHECK
+                # Stok henüz eklenmez, kalite onayından sonra eklenecek
+            else:
+                # Direkt tamamla (kalite kontrolsüz)
+                order.status = WorkOrderStatus.COMPLETED
+
             order.actual_end = datetime.now()
-            order.completed_quantity = completed_quantity  # DÜZELTME: actual_quantity → completed_quantity
-            order.scrapped_quantity = scrap_quantity       # DÜZELTME: scrap_quantity → scrapped_quantity
+            order.completed_quantity = completed_quantity
+            order.scrapped_quantity = scrap_quantity
             order.actual_unit_cost = unit_cost
             order.target_warehouse_id = warehouse_id
-            
+
             # Verimlilik hesapla
             if order.planned_quantity > 0:
                 order.efficiency_rate = (completed_quantity / order.planned_quantity) * 100
-            
+
             # Transaction'ı tamamla
             self.session.commit()
-            
+
             return order
             
         except Exception as e:
             self.session.rollback()
             raise e
     
-    def cancel_production(self, order_id: int) -> WorkOrder:
+    def cancel_production(self, order_id: int, warehouse_id: int = None) -> WorkOrder:
         """
         Üretimi iptal et
-        
-        NOT: IN_PROGRESS durumundaysa stok geri yüklenmez!
-        Manuel düzeltme gerekir.
+
+        Yeni Özellik: RELEASED durumundaysa rezervasyonu serbest bırakır
+        - RELEASED ise: Rezervasyonları serbest bırakır (stok geri yüklenmez çünkü düşmemiş)
+        - IN_PROGRESS ise: Stok geri yüklenmez! Manuel düzeltme gerekir.
         """
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         if order.status in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED]:
             raise ProductionError("Tamamlanmış veya kapatılmış iş emri iptal edilemez!")
-        
+
+        # RELEASED durumundaysa rezervasyonları serbest bırak
+        if order.status == WorkOrderStatus.RELEASED and warehouse_id:
+            from modules.inventory.services import StockMovementService
+            stock_service = StockMovementService()
+
+            for line in order.lines:
+                if line.is_reserved and line.required_quantity > 0:
+                    stock_service.release_reservation(
+                        item_id=line.item_id,
+                        warehouse_id=warehouse_id,
+                        quantity=line.required_quantity
+                    )
+                    line.is_reserved = False
+
         order.status = WorkOrderStatus.CANCELLED
         order.actual_end = datetime.now()
-        
+
         self.session.commit()
         return order
     
+    def approve_quality_check(
+        self,
+        order_id: int,
+        approved_quantity: Decimal,
+        rejected_quantity: Decimal = Decimal(0),
+        notes: str = None,
+        checked_by: int = None
+    ) -> WorkOrder:
+        """
+        Kalite kontrolü onayla
+
+        - Onaylanan miktar stoğa eklenir (URETIM_CIKIS)
+        - Reddedilen miktar fire olarak kaydedilir (FIRE)
+        - İş emri COMPLETED durumuna geçer
+        """
+        order = self.get_by_id(order_id)
+        if not order:
+            raise ProductionError("İş emri bulunamadı!")
+
+        if order.status != WorkOrderStatus.QUALITY_CHECK:
+            raise InvalidStatusTransitionError(order.status.value, "QUALITY_CHECK_APPROVED")
+
+        if approved_quantity <= 0:
+            raise ProductionError("Onaylanan miktar sıfırdan büyük olmalı!")
+
+        warehouse_id = order.target_warehouse_id or order.source_warehouse_id
+        if not warehouse_id:
+            raise ProductionError("Hedef depo belirtilmeli!")
+
+        try:
+            # Birim maliyet hesapla
+            total_cost = (
+                (order.actual_material_cost or Decimal(0)) +
+                (order.actual_labor_cost or order.planned_labor_cost or Decimal(0)) +
+                (order.actual_overhead_cost or order.planned_overhead_cost or Decimal(0))
+            )
+            unit_cost = total_cost / order.completed_quantity if order.completed_quantity > 0 else Decimal(0)
+
+            # Onaylanan mamülü stoğa ekle
+            movement = StockMovement(
+                item_id=order.item_id,
+                movement_type=StockMovementType.URETIM_CIKIS,
+                quantity=approved_quantity,
+                unit_price=unit_cost,
+                total_price=approved_quantity * unit_cost,
+                to_warehouse_id=warehouse_id,
+                document_no=order.order_no,
+                document_type="work_order_qc",
+                description=f"İş Emri: {order.order_no} - Kalite Onaylı Mamül",
+                movement_date=datetime.now(),
+            )
+            self.session.add(movement)
+
+            # Bakiyeyi güncelle
+            balance = self._get_or_create_balance(order.item_id, warehouse_id)
+            old_qty = balance.quantity
+            old_cost = balance.unit_cost
+            new_qty = old_qty + approved_quantity
+
+            if new_qty > 0:
+                balance.unit_cost = ((old_qty * old_cost) + (approved_quantity * unit_cost)) / new_qty
+            balance.quantity = new_qty
+
+            # Reddedilen miktar varsa fire olarak kaydet
+            if rejected_quantity > 0:
+                scrap_movement = StockMovement(
+                    item_id=order.item_id,
+                    movement_type=StockMovementType.FIRE,
+                    quantity=rejected_quantity,
+                    unit_price=unit_cost,
+                    total_price=rejected_quantity * unit_cost,
+                    from_warehouse_id=warehouse_id,
+                    document_no=order.order_no,
+                    document_type="work_order_qc",
+                    description=f"İş Emri: {order.order_no} - Kalite Red (Fire)",
+                    movement_date=datetime.now(),
+                )
+                self.session.add(scrap_movement)
+
+            # Kalite kontrol bilgilerini kaydet
+            order.qc_approved_quantity = approved_quantity
+            order.qc_rejected_quantity = rejected_quantity
+            order.qc_notes = notes
+            order.qc_checked_by = checked_by
+            order.qc_checked_at = datetime.now()
+
+            # İş emrini tamamla
+            order.status = WorkOrderStatus.COMPLETED
+
+            self.session.commit()
+            return order
+
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def reject_quality_check(
+        self,
+        order_id: int,
+        notes: str = None,
+        checked_by: int = None
+    ) -> WorkOrder:
+        """
+        Kalite kontrolü reddet
+
+        - Tüm miktar fire olarak kaydedilir
+        - İş emri CANCELLED durumuna geçer
+        """
+        order = self.get_by_id(order_id)
+        if not order:
+            raise ProductionError("İş emri bulunamadı!")
+
+        if order.status != WorkOrderStatus.QUALITY_CHECK:
+            raise InvalidStatusTransitionError(order.status.value, "QUALITY_CHECK_REJECTED")
+
+        # Kalite kontrol bilgilerini kaydet
+        order.qc_approved_quantity = Decimal(0)
+        order.qc_rejected_quantity = order.completed_quantity
+        order.qc_notes = notes
+        order.qc_checked_by = checked_by
+        order.qc_checked_at = datetime.now()
+
+        # İş emrini iptal et
+        order.status = WorkOrderStatus.CANCELLED
+
+        self.session.commit()
+        return order
+
     def close_order(self, order_id: int) -> WorkOrder:
         """İş emrini kapat (CLOSED)"""
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         if order.status != WorkOrderStatus.COMPLETED:
             raise InvalidStatusTransitionError(order.status.value, "CLOSED")
-        
+
         order.status = WorkOrderStatus.CLOSED
         self.session.commit()
         return order

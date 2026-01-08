@@ -140,7 +140,7 @@ class OperationDialog(QDialog):
         station_id = self.station_combo.currentData()
         if not station_id:
             return
-        
+
         # Seçilen istasyonu bul
         for ws in self.work_stations:
             if ws.get("id") == station_id:
@@ -148,14 +148,27 @@ class OperationDialog(QDialog):
                 default_name = ws.get("default_operation_name", "")
                 default_setup = ws.get("default_setup_time", 0)
                 default_run = ws.get("default_run_time_per_unit", 0)
-                
+
+                # Debug log
+                print(f"\n=== İş İstasyonu Değişti ===")
+                print(f"Kod: {ws.get('code')}, Ad: {ws.get('name')}")
+                print(f"Varsayılan operasyon: '{default_name}'")
+                print(f"Varsayılan kurulum: {default_setup} dk")
+                print(f"Varsayılan birim süre: {default_run} dk")
+                print(f"Mevcut operasyon adı: '{self.name_input.text()}'")
+                print(f"Mevcut kurulum: {self.setup_time_input.value()} dk")
+                print(f"Mevcut birim süre: {self.run_time_input.value()} dk")
+
                 if default_name and not self.name_input.text():
+                    print(f"-> Operasyon adı dolduruldu: '{default_name}'")
                     self.name_input.setText(default_name)
                 if default_setup and self.setup_time_input.value() == 0:
+                    print(f"-> Kurulum süresi dolduruldu: {default_setup} dk")
                     self.setup_time_input.setValue(int(default_setup))
                 if default_run and self.run_time_input.value() == 0:
+                    print(f"-> Birim süre dolduruldu: {default_run} dk")
                     self.run_time_input.setValue(float(default_run))
-                
+
                 # Bilgi güncelle
                 self.info_label.setText(
                     f"✅ {ws.get('name', '')} seçildi\n"

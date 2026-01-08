@@ -104,6 +104,11 @@ except ImportError:
         PurchaseOrderModule
     ) = PlaceholderPage
 
+try:
+    from modules.development.views import DevelopmentModule
+except ImportError:
+    DevelopmentModule = PlaceholderPage
+
 
 # --- DASHBOARD BİLEŞENLERİ ---
 
@@ -449,6 +454,12 @@ MENU_DATA = {
             ("Takvim", "fa5s.calendar-day", "calendar"),
         ],
     },
+    "development": {
+        "title": "GELİŞTİRME",
+        "items": [
+            ("Hata Kayıtları", "fa5s.bug", "error-logs"),
+        ],
+    },
     "settings": {
         "title": "SİSTEM AYARLARI",
         "items": [
@@ -589,6 +600,7 @@ class ActivityBar(QFrame):
             ("inventory", "fa5s.boxes", "Stok"),
             ("purchasing", "fa5s.shopping-cart", "Satınalma"),
             ("production", "fa5s.industry", "Üretim"),
+            ("development", "fa5s.bug", "Geliştirme"),
             ("settings", "fa5s.cog", "Ayarlar"),
         ]:
             btn = QPushButton()
@@ -687,12 +699,33 @@ class MainWindow(QMainWindow):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
+        # Mock user for development (TODO: Replace with actual login)
+        self._setup_mock_user()
+
         self.setup_window()
         self.setup_pages_dict()
         self.setup_ui()
         self.connect_signals()
         self._apply_theme()
         ThemeManager.register_callback(self._on_theme_changed)
+
+    def _setup_mock_user(self):
+        """Setup mock user for ErrorHandler (geçici)"""
+        try:
+            from modules.development import ErrorHandler
+            from database.models.user import User
+            from database.base import get_session
+
+            # Admin kullanıcıyı al veya oluştur
+            session = get_session()
+            user = session.query(User).filter(User.username == 'admin').first()
+
+            if user:
+                ErrorHandler.set_current_user(user)
+
+            session.close()
+        except Exception as e:
+            print(f"Warning: Could not setup ErrorHandler user: {e}")
 
     def setup_window(self):
         self.setWindowTitle(f"{APP_NAME} - {APP_DESCRIPTION}")
@@ -721,6 +754,7 @@ class MainWindow(QMainWindow):
         self.pages["purchase-requests"] = PurchaseRequestModule()
         self.pages["goods-receipts"] = GoodsReceiptModule()
         self.pages["purchase-orders"] = PurchaseOrderModule()
+        self.pages["error-logs"] = DevelopmentModule()
         self.pages["sales"] = PlaceholderPage("Satış", "💰")
         self.pages["finance"] = PlaceholderPage("Finans", "💳")
         self.pages["hr"] = PlaceholderPage("İnsan Kaynakları", "👥")

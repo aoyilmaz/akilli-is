@@ -26,6 +26,7 @@ from .work_order_list import WorkOrderListPage
 from .work_order_form import WorkOrderFormPage
 
 from decimal import Decimal
+from modules.development import ErrorHandler
 
 
 class StartProductionDialog(QDialog):
@@ -460,10 +461,14 @@ class WorkOrderModule(QWidget):
                 self.item_service = ItemService()
                 self.warehouse_service = WarehouseService()
             except Exception as e:
-                print(f"Servis yükleme hatası: {e}")
-                import traceback
-
-                traceback.print_exc()
+                ErrorHandler.handle_error(
+                    e,
+                    module='production',
+                    screen='WorkOrderModule',
+                    function='_ensure_services',
+                    parent_widget=self,
+                    show_message=False
+                )
 
     def _load_data(self):
         """Verileri yükle"""
@@ -504,10 +509,13 @@ class WorkOrderModule(QWidget):
             self.list_page.load_data(wo_list)
 
         except Exception as e:
-            print(f"Veri yükleme hatası: {e}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_load_data',
+                parent_widget=self
+            )
             self.list_page.load_data([])
 
     def _show_new_form(self):
@@ -640,10 +648,14 @@ class WorkOrderModule(QWidget):
             form.set_work_stations(ws_list)
 
         except Exception as e:
-            print(f"Form veri yükleme hatası: {e}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_load_form_data',
+                parent_widget=self,
+                show_message=False
+            )
 
     def _load_boms_for_product(self, form: WorkOrderFormPage, item_id: int):
         """Mamule ait reçeteleri yükle"""
@@ -662,7 +674,14 @@ class WorkOrderModule(QWidget):
                             break
 
         except Exception as e:
-            print(f"Reçete yükleme hatası: {e}")
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_load_boms_for_product',
+                parent_widget=self,
+                show_message=False
+            )
 
     def _load_bom_details(self, form: WorkOrderFormPage, bom):
         """Reçete malzemelerini yükle"""
@@ -720,10 +739,14 @@ class WorkOrderModule(QWidget):
             form.set_bom_operations(operations)
 
         except Exception as e:
-            print(f"Reçete detay yükleme hatası: {e}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_load_bom_details',
+                parent_widget=self,
+                show_message=False
+            )
 
     def _load_work_order_operations(self, form: WorkOrderFormPage, wo):
         """Mevcut iş emri operasyonlarını yükle"""
@@ -746,7 +769,14 @@ class WorkOrderModule(QWidget):
             form.set_bom_operations(operations)
 
         except Exception as e:
-            print(f"İş emri operasyonları yükleme hatası: {e}")
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_load_work_order_operations',
+                parent_widget=self,
+                show_message=False
+            )
 
     def _generate_order_no(self, form: WorkOrderFormPage):
         """Otomatik iş emri numarası üret"""
@@ -754,7 +784,14 @@ class WorkOrderModule(QWidget):
             order_no = self.wo_service.generate_order_no()
             form.set_generated_order_no(order_no)
         except Exception as e:
-            print(f"Numara üretme hatası: {e}")
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_generate_order_no',
+                parent_widget=self,
+                show_message=False
+            )
 
     def _save_work_order(self, data: dict):
         """İş emrini kaydet"""
@@ -782,10 +819,13 @@ class WorkOrderModule(QWidget):
             self._load_data()
 
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Kayıt hatası: {str(e)}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_save_work_order',
+                parent_widget=self
+            )
 
     def _save_operations(self, wo, operations_data: list):
         """Operasyonları kaydet"""
@@ -810,10 +850,14 @@ class WorkOrderModule(QWidget):
             self.wo_service.session.commit()
 
         except Exception as e:
-            print(f"Operasyon kaydetme hatası: {e}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_save_operations',
+                parent_widget=self,
+                show_message=False
+            )
             self.wo_service.session.rollback()
 
     def _change_status(self, wo_id: int, new_status: str):
@@ -849,7 +893,13 @@ class WorkOrderModule(QWidget):
             self._load_data()
 
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Durum değişikliği hatası: {str(e)}")
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_change_status',
+                parent_widget=self
+            )
 
     def _start_production(self, wo_id: int):
         """Üretime başla - Depo seçimi ve stok kontrolü"""
@@ -915,10 +965,13 @@ class WorkOrderModule(QWidget):
                 self._load_data()
 
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Üretim başlatma hatası: {str(e)}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_start_production',
+                parent_widget=self
+            )
 
     def _complete_production(self, wo_id: int):
         """Üretimi tamamla - Mamul girişi"""
@@ -954,10 +1007,13 @@ class WorkOrderModule(QWidget):
                 self._load_data()
 
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Üretim tamamlama hatası: {str(e)}")
-            import traceback
-
-            traceback.print_exc()
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_complete_production',
+                parent_widget=self
+            )
 
     def _delete_work_order(self, wo_id: int):
         """İş emrini sil"""
@@ -972,7 +1028,13 @@ class WorkOrderModule(QWidget):
                     "İş emri silinemedi! Sadece taslak durumundaki emirler silinebilir.",
                 )
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Silme hatası: {str(e)}")
+            ErrorHandler.handle_error(
+                e,
+                module='production',
+                screen='WorkOrderModule',
+                function='_delete_work_order',
+                parent_widget=self
+            )
 
     def _show_list(self):
         """Liste sayfasına dön"""
