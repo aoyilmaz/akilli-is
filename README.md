@@ -1,7 +1,7 @@
 # Akıllı İş ERP
 
 <p align="center">
-  <img src="assets/favicon.svg" width="120" alt="Akıllı İş Logo">
+  <img src="ui/resources/icons/logo.svg" width="120" alt="Akıllı İş Logo">
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/PyQt6-6.0+-green.svg" alt="PyQt6">
+  <img src="https://img.shields.io/badge/PyQt6-6.4+-green.svg" alt="PyQt6">
   <img src="https://img.shields.io/badge/PostgreSQL-13+-orange.svg" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
 </p>
@@ -19,45 +19,46 @@
 
 ## 🚀 Özellikler
 
-- ✅ **Modern Arayüz** - Dark theme, kullanıcı dostu tasarım
-- ✅ **Modüler Yapı** - Esnek ve genişletilebilir mimari
+- ✅ **Modern Arayüz** - Dark theme, kullanıcı dostu ve hızlı PyQt6 arayüzü
+- ✅ **Modüler Mimari** - Genişletilebilir ve bakımı kolay yapı (Solid prensipleri)
+- ✅ **Merkezi Hata Yönetimi** - Veritabanı tabanlı loglama ve UI üzerinden hata takibi
 - ✅ **Türkçe** - Tam Türkçe dil desteği
-- ✅ **PostgreSQL** - Güçlü ve güvenilir veritabanı
+- ✅ **ORM Altyapısı** - SQLAlchemy 2.0+ ile güvenli veritabanı işlemleri
 
-## 📦 Mevcut Modüller
+## 📦 Modüller
 
-### Stok Yönetimi ✅
+### 🏭 Üretim Yönetimi (Production)
 
-- Stok Kartları (liste, form, CRUD)
-- Kategoriler (hiyerarşik yapı)
-- Birimler (dönüşüm desteği)
-- Depolar (lokasyon yönetimi)
-- Stok Hareketleri (giriş/çıkış/transfer)
-- Stok Sayımı (envanter)
-- Stok Raporları
+- **Reçete (BOM) Yönetimi:** Versiyonlama, revizyon takibi, alt reçete desteği.
+- **İş Emirleri:** Stok entegrasyonlu iş emri takibi, malzeme rezervasyonu.
+- **Planlama:** Makine bazlı Gantt şeması, kapasite doluluk takibi.
+- **Takvim & Vardiya:** Vardiya tanımları, tatil günleri ve net çalışma saati hesaplama.
 
-### Üretim ✅
+### 🛒 Satınalma (Purchasing)
 
-- Ürün Reçeteleri
-- İş Emirleri
-- Üretim Planlama
-- İş İstasyonları
-- Çalışma Takvimi
+- **Tedarikçi Yönetimi:** Cari kartlar, iletişim bilgileri.
+- **Talep Yönetimi:** Departman bazlı satınalma talepleri ve onay mekanizması.
+- **Sipariş Yönetimi:** Tekliften siparişe dönüşüm, parçalı teslimat desteği.
+- **Mal Kabul:** İrsaliye ile depoya giriş, kalite kontrol (planlanan).
 
+### 📦 Stok Yönetimi (Inventory)
 
-### Satınalma ✅
+- **Stok Kartları:** Barkod, birim çevrimleri, kritik stok seviyeleri.
+- **Hareketler:** Giriş, Çıkış, Transfer, Fire, Sayım Fazlası/Eksiği.
+- **Depo Yönetimi:** Çoklu depo ve lokasyon takibi.
+- **Maliyetlendirme:** Ağırlıklı Ortalama Maliyet (Moving Average) yöntemi.
 
-- Tedarikçiler
-- Talepler
-- Siparişler
-- Mal Kabul
+### 🛠 Geliştirme Araçları (Development)
 
-### Planlanan Modüller 🚧
+- **Error Handler:** Hataların detaylı traceback ile veritabanına kaydı.
+- **Log İzleme:** Hata kayıtlarını filtreleme, inceleme ve çözümleme ekranı.
+- **Migration:** Alembic ile veritabanı şema versiyonlama.
 
-- Satış
-- Finans
-- CRM
-- İK
+### 🚧 Planlanan Modüller
+
+- Satış Yönetimi (Teklif, Sipariş)
+- Finans & Muhasebe (Cari Hesap, Fatura, Kasa/Banka)
+- İK (Personel Takibi)
 
 ## 🛠 Kurulum
 
@@ -70,181 +71,31 @@
 ### Adımlar
 
 ```bash
-# 1. Repoyu klonla
-git clone https://github.com/kullanici/akilli-is.git
+# 1. Repoyu klonlayın
+git clone [https://github.com/kullanici/akilli-is.git](https://github.com/kullanici/akilli-is.git)
 cd akilli-is
 
-# 2. Virtual environment oluştur
+# 2. Virtual environment oluşturun
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 3. Bağımlılıkları yükle
+# 3. Bağımlılıkları yükleyin
 pip install -r requirements.txt
 
-# 4. Veritabanını oluştur
+# 4. Veritabanını oluşturun (PostgreSQL)
 createdb akilli_is
 
-# 5. .env dosyasını düzenle
+# 5. .env dosyasını ayarlayın
 cp .env.example .env
-# DATABASE_URL'i güncelle
+# .env dosyasındaki DATABASE_URL'i kendi ayarlarınıza göre güncelleyin
 
-# 6. Tabloları oluştur
+# 6. Tabloları oluşturun ve Migration'ları çalıştırın
+# Alembic tabloları güncel hale getirecektir
+python -m alembic upgrade head
+
+# (Alternatif) Temel verileri yüklemek için
 python init_db.py
 
-# 7. Uygulamayı başlat
+# 7. Uygulamayı başlatın
 python main.py
 ```
-
-## 📁 Proje Yapısı
-
-```
-
-├── alembic
-│   ├── env.py
-│   ├── script.py.mako
-│   └── versions
-│       └── 20260101_001_add_actual_fields.py
-├── alembic.ini
-├── config
-│   ├── __init__.py
-│   ├── settings.py
-│   └── themes.py
-├── data
-├── database
-│   ├── __init__.py
-│   ├── base.py
-│   └── models
-│       ├── __init__.py
-│       ├── calendar.py
-│       ├── common.py
-│       ├── inventory.py
-│       ├── production.py
-│       ├── purchasing.py
-│       └── user.py
-├── docs
-│   └── akilli-is-erp-dokumantasyon.docx
-├── init_db.py
-├── logs
-│   ├── akilli_is_2025-12-31_14-30-47_011255.log
-│   ├── akilli_is_2025-12-31_14-33-55_403321.log
-│   └── akilli_is_2025-12-31_14-43-35_235183.log
-├── main.py
-├── modules
-│   ├── __init__.py
-│   ├── inventory
-│   │   ├── __init__.py
-│   │   ├── module.py
-│   │   ├── services.py
-│   │   └── views
-│   │       ├── __init__.py
-│   │       ├── category_form.py
-│   │       ├── category_list.py
-│   │       ├── category_module.py
-│   │       ├── movement_form.py
-│   │       ├── movement_list.py
-│   │       ├── movement_module.py
-│   │       ├── reports_module.py
-│   │       ├── reports_page.py
-│   │       ├── stock_count_form.py
-│   │       ├── stock_count_list.py
-│   │       ├── stock_count_module.py
-│   │       ├── stock_form.py
-│   │       ├── stock_list.py
-│   │       ├── unit_management.py
-│   │       ├── unit_module.py
-│   │       ├── warehouse_form.py
-│   │       ├── warehouse_list.py
-│   │       └── warehouse_module.py
-│   ├── production
-│   │   ├── __init__.py
-│   │   ├── calendar_services.py
-│   │   ├── services.py
-│   │   └── views
-│   │       ├── __init__.py
-│   │       ├── bom_form.py
-│   │       ├── bom_list.py
-│   │       ├── bom_module.py
-│   │       ├── calendar_module.py
-│   │       ├── planning_module.py
-│   │       ├── planning_module_backup.py
-│   │       ├── planning_page.py
-│   │       ├── planning_page_backup.py
-│   │       ├── work_order_form.py
-│   │       ├── work_order_list.py
-│   │       ├── work_order_module.py
-│   │       ├── work_station_form.py
-│   │       ├── work_station_list.py
-│   │       └── work_station_module.py
-│   └── purchasing
-│       ├── __init__.py
-│       ├── services.py
-│       └── views
-│           ├── __init__.py
-│           ├── goods_receipt_form.py
-│           ├── goods_receipt_list.py
-│           ├── goods_receipt_module.py
-│           ├── purchase_order_form.py
-│           ├── purchase_order_list.py
-│           ├── purchase_order_module.py
-│           ├── purchase_request_form.py
-│           ├── purchase_request_list.py
-│           ├── purchase_request_module.py
-│           ├── supplier_form.py
-│           ├── supplier_list.py
-│           └── supplier_module.py
-├── requirements.txt
-├── scripts
-│   └── daily-commit.sh
-├── setup.sh
-├── ui
-│   ├── __init__.py
-│   ├── main_window.py
-│   ├── pages
-│   │   ├── __init__.py
-│   │   ├── dashboard.py
-│   │   └── placeholder.py
-│   ├── resources
-│   │   └── icons
-│   │       └── logo.svg
-│   ├── themes
-│   │   └── dark.qss
-│   └── widgets
-│       ├── __init__.py
-│       ├── header.py
-│       └── sidebar.py
-└── {assets,config,core
-    └── {auth,base},database
-        └── {models,repositories,migrations},modules
-            └── {inventory,production,purchasing,sales,finance,hr},ui
-                └── {widgets,dialogs,themes,resources},reports
-                    └── {designer,templates},ai,exports,utils,tests
-                        └── {unit,integration}}
-```
-
-## 📖 Dokümantasyon
-
-Detaylı dokümantasyon için `docs/` klasörüne bakın:
-
-- [Teknik Dokümantasyon](docs/akilli-is-erp-dokumantasyon.docx)
-
-## 📸 Ekran Görüntüleri
-
-_Yakında eklenecek_
-
-## 🤝 Katkıda Bulunma
-
-1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/yeni-ozellik`)
-3. Commit edin (`git commit -m 'Yeni özellik eklendi'`)
-4. Push edin (`git push origin feature/yeni-ozellik`)
-5. Pull Request açın
-
-## 📄 Lisans
-
-MIT License - Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
-## 👨‍💻 Geliştirici
-
-**Ahmet Okan YILMAZ** - [GitHub](https://github.com/aoyilmaz)
-
----
