@@ -28,6 +28,7 @@
 ## 📦 Modüller
 
 ### 🏭 Üretim Yönetimi (Production)
+<<<<<<< HEAD
 
 - **Reçete (BOM) Yönetimi:** Versiyonlama, revizyon takibi, alt reçete desteği.
 - **İş Emirleri:** Stok entegrasyonlu iş emri takibi, malzeme rezervasyonu.
@@ -56,6 +57,31 @@
 
 ### 🚧 Planlanan Modüller
 
+=======
+* **Reçete (BOM) Yönetimi:** Versiyonlama, revizyon takibi, alt reçete desteği.
+* **İş Emirleri:** Stok entegrasyonlu iş emri takibi, malzeme rezervasyonu.
+* **Planlama:** Makine bazlı Gantt şeması, kapasite doluluk takibi.
+* **Takvim & Vardiya:** Vardiya tanımları, tatil günleri ve net çalışma saati hesaplama.
+
+### 🛒 Satınalma (Purchasing)
+* **Tedarikçi Yönetimi:** Cari kartlar, iletişim bilgileri.
+* **Talep Yönetimi:** Departman bazlı satınalma talepleri ve onay mekanizması.
+* **Sipariş Yönetimi:** Tekliften siparişe dönüşüm, parçalı teslimat desteği.
+* **Mal Kabul:** İrsaliye ile depoya giriş, kalite kontrol (planlanan).
+
+### 📦 Stok Yönetimi (Inventory)
+* **Stok Kartları:** Barkod, birim çevrimleri, kritik stok seviyeleri.
+* **Hareketler:** Giriş, Çıkış, Transfer, Fire, Sayım Fazlası/Eksiği.
+* **Depo Yönetimi:** Çoklu depo ve lokasyon takibi.
+* **Maliyetlendirme:** Ağırlıklı Ortalama Maliyet (Moving Average) yöntemi.
+
+### 🛠 Geliştirme Araçları (Development)
+* **Error Handler:** Hataların detaylı traceback ile veritabanına kaydı.
+* **Log İzleme:** Hata kayıtlarını filtreleme, inceleme ve çözümleme ekranı.
+* **Migration:** Alembic ile veritabanı şema versiyonlama.
+
+### 🚧 Planlanan Modüller
+>>>>>>> 58b722c7025a9c037611346fbb380edaeeb3772c
 - Satış Yönetimi (Teklif, Sipariş)
 - Finans & Muhasebe (Cari Hesap, Fatura, Kasa/Banka)
 - İK (Personel Takibi)
@@ -63,7 +89,6 @@
 ## 🛠 Kurulum
 
 ### Gereksinimler
-
 - Python 3.9+
 - PostgreSQL 13+
 - PyQt6
@@ -98,4 +123,7 @@ python init_db.py
 
 # 7. Uygulamayı başlatın
 python main.py
+<<<<<<< HEAD
 ```
+=======
+>>>>>>> 58b722c7025a9c037611346fbb380edaeeb3772c
