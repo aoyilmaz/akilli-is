@@ -17,9 +17,12 @@ from database.models.purchasing import (
     PurchaseOrderItem,
     GoodsReceipt,
     GoodsReceiptItem,
+    PurchaseInvoice,
+    PurchaseInvoiceItem,
     PurchaseRequestStatus,
     PurchaseOrderStatus,
     GoodsReceiptStatus,
+    PurchaseInvoiceStatus,
     Currency,
 )
 from database.models.inventory import StockMovementType
@@ -624,3 +627,299 @@ class GoodsReceiptService:
             num = 1
 
         return f"{prefix}{num:04d}"
+
+
+class PurchaseInvoiceService:
+    """Satınalma faturası servisi"""
+
+    def __init__(self):
+        self.session = get_session()
+
+    def get_all(
+        self, status: PurchaseInvoiceStatus = None, supplier_id: int = None
+    ) -> List[PurchaseInvoice]:
+        """Tüm faturaları getir"""
+        query = self.session.query(PurchaseInvoice).options(
+            joinedload(PurchaseInvoice.supplier),
+            joinedload(PurchaseInvoice.items),
+        )
+        if status:
+            query = query.filter(PurchaseInvoice.status == status)
+        if supplier_id:
+            query = query.filter(PurchaseInvoice.supplier_id == supplier_id)
+        return query.order_by(desc(PurchaseInvoice.invoice_date)).all()
+
+    def get_by_id(self, invoice_id: int) -> Optional[PurchaseInvoice]:
+        """ID ile fatura getir"""
+        return (
+            self.session.query(PurchaseInvoice)
+            .options(
+                joinedload(PurchaseInvoice.supplier),
+                joinedload(PurchaseInvoice.goods_receipt),
+                joinedload(PurchaseInvoice.items).joinedload(PurchaseInvoiceItem.item),
+                joinedload(PurchaseInvoice.items).joinedload(PurchaseInvoiceItem.unit),
+            )
+            .filter(PurchaseInvoice.id == invoice_id)
+            .first()
+        )
+
+    def get_open_invoices(self) -> List[PurchaseInvoice]:
+        """Açık (ödenmemiş) faturaları getir"""
+        return (
+            self.session.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.status.in_(
+                    [
+                        PurchaseInvoiceStatus.RECEIVED,
+                        PurchaseInvoiceStatus.PARTIAL,
+                        PurchaseInvoiceStatus.OVERDUE,
+                    ]
+                )
+            )
+            .order_by(PurchaseInvoice.due_date)
+            .all()
+        )
+
+    def get_overdue_invoices(self) -> List[PurchaseInvoice]:
+        """Vadesi geçmiş faturaları getir"""
+        from datetime import date as dt_date
+
+        return (
+            self.session.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.status.in_(
+                    [
+                        PurchaseInvoiceStatus.RECEIVED,
+                        PurchaseInvoiceStatus.PARTIAL,
+                    ]
+                ),
+                PurchaseInvoice.due_date < dt_date.today(),
+            )
+            .order_by(PurchaseInvoice.due_date)
+            .all()
+        )
+
+    def create(self, items_data: List[Dict], **data) -> PurchaseInvoice:
+        """Yeni fatura oluştur"""
+        data["invoice_no"] = self.generate_invoice_no()
+
+        invoice = PurchaseInvoice(**data)
+        self.session.add(invoice)
+        self.session.flush()
+
+        for item_data in items_data:
+            item = PurchaseInvoiceItem(invoice_id=invoice.id, **item_data)
+            item.calculate_line_total()
+            self.session.add(item)
+
+        self.session.flush()
+        invoice.calculate_totals()
+        self.session.commit()
+
+        return invoice
+
+    def create_from_goods_receipt(
+        self, goods_receipt_id: int, **data
+    ) -> PurchaseInvoice:
+        """Mal kabulden fatura oluştur"""
+        gr_service = GoodsReceiptService()
+        receipt = gr_service.get_by_id(goods_receipt_id)
+
+        if not receipt:
+            raise ValueError("Mal kabul bulunamadı")
+
+        if receipt.status != GoodsReceiptStatus.COMPLETED:
+            raise ValueError("Fatura için mal kabul tamamlanmış olmalıdır")
+
+        data["goods_receipt_id"] = goods_receipt_id
+        data["supplier_id"] = receipt.supplier_id
+        data["purchase_order_id"] = receipt.purchase_order_id
+
+        if "invoice_date" not in data or data["invoice_date"] is None:
+            data["invoice_date"] = date.today()
+
+        # Kalemler
+        items_data = []
+        for grn_item in receipt.items:
+            if grn_item.accepted_quantity and grn_item.accepted_quantity > 0:
+                # Birim fiyatı varsa kullan
+                unit_price = 0
+                if grn_item.po_item_id:
+                    po_item = self.session.query(PurchaseOrderItem).get(
+                        grn_item.po_item_id
+                    )
+                    if po_item:
+                        unit_price = po_item.unit_price
+
+                items_data.append(
+                    {
+                        "item_id": grn_item.item_id,
+                        "quantity": grn_item.accepted_quantity,
+                        "unit_id": grn_item.unit_id,
+                        "unit_price": unit_price,
+                        "tax_rate": 18,
+                    }
+                )
+
+        return self.create(items_data, **data)
+
+    def update(
+        self, invoice_id: int, items_data: List[Dict] = None, **data
+    ) -> Optional[PurchaseInvoice]:
+        """Fatura güncelle"""
+        invoice = self.get_by_id(invoice_id)
+        if not invoice:
+            return None
+
+        if invoice.status != PurchaseInvoiceStatus.DRAFT:
+            raise ValueError("Sadece taslak faturalar güncellenebilir")
+
+        for key, value in data.items():
+            if hasattr(invoice, key):
+                setattr(invoice, key, value)
+
+        if items_data is not None:
+            for item in invoice.items:
+                self.session.delete(item)
+
+            for item_data in items_data:
+                item = PurchaseInvoiceItem(invoice_id=invoice.id, **item_data)
+                item.calculate_line_total()
+                self.session.add(item)
+
+            self.session.flush()
+            invoice.calculate_totals()
+
+        self.session.commit()
+        return invoice
+
+    def confirm(self, invoice_id: int) -> Optional[PurchaseInvoice]:
+        """Faturayı onayla/kaydet"""
+        invoice = self.get_by_id(invoice_id)
+        if invoice and invoice.status == PurchaseInvoiceStatus.DRAFT:
+            invoice.status = PurchaseInvoiceStatus.RECEIVED
+            self.session.commit()
+        return invoice
+
+    def record_payment(
+        self,
+        invoice_id: int,
+        amount: Decimal,
+        payment_method: str = None,
+        payment_notes: str = None,
+    ) -> Optional[PurchaseInvoice]:
+        """Ödeme kaydet"""
+        invoice = self.get_by_id(invoice_id)
+        if not invoice:
+            return None
+
+        if invoice.status in [
+            PurchaseInvoiceStatus.PAID,
+            PurchaseInvoiceStatus.CANCELLED,
+        ]:
+            raise ValueError("Bu faturaya ödeme kaydedilemez")
+
+        new_paid = Decimal(str(invoice.paid_amount or 0)) + amount
+        invoice.paid_amount = new_paid
+        invoice.balance = invoice.total - new_paid
+
+        if payment_method:
+            invoice.payment_method = payment_method
+        if payment_notes:
+            invoice.payment_notes = payment_notes
+
+        if invoice.balance <= 0:
+            invoice.status = PurchaseInvoiceStatus.PAID
+            invoice.paid_date = date.today()
+        else:
+            invoice.status = PurchaseInvoiceStatus.PARTIAL
+
+        self.session.commit()
+        return invoice
+
+    def cancel(self, invoice_id: int) -> Optional[PurchaseInvoice]:
+        """Fatura iptal"""
+        invoice = self.get_by_id(invoice_id)
+        if invoice and invoice.status in [
+            PurchaseInvoiceStatus.DRAFT,
+            PurchaseInvoiceStatus.RECEIVED,
+        ]:
+            invoice.status = PurchaseInvoiceStatus.CANCELLED
+            self.session.commit()
+        return invoice
+
+    def delete(self, invoice_id: int) -> bool:
+        """Fatura sil"""
+        invoice = self.get_by_id(invoice_id)
+        if invoice and invoice.status == PurchaseInvoiceStatus.DRAFT:
+            self.session.delete(invoice)
+            self.session.commit()
+            return True
+        return False
+
+    def mark_overdue(self):
+        """Vadesi geçmiş faturaları işaretle"""
+        from datetime import date as dt_date
+
+        overdue = (
+            self.session.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.status.in_(
+                    [
+                        PurchaseInvoiceStatus.RECEIVED,
+                        PurchaseInvoiceStatus.PARTIAL,
+                    ]
+                ),
+                PurchaseInvoice.due_date < dt_date.today(),
+            )
+            .all()
+        )
+
+        for inv in overdue:
+            inv.status = PurchaseInvoiceStatus.OVERDUE
+
+        self.session.commit()
+        return len(overdue)
+
+    def generate_invoice_no(self) -> str:
+        """Fatura numarası üret"""
+        today = date.today()
+        prefix = f"PI{today.strftime('%y%m')}"
+
+        last = (
+            self.session.query(PurchaseInvoice)
+            .filter(PurchaseInvoice.invoice_no.like(f"{prefix}%"))
+            .order_by(desc(PurchaseInvoice.invoice_no))
+            .first()
+        )
+
+        if last:
+            try:
+                num = int(last.invoice_no[-4:]) + 1
+            except ValueError:
+                num = 1
+        else:
+            num = 1
+
+        return f"{prefix}{num:04d}"
+
+    def get_supplier_balance(self, supplier_id: int) -> Decimal:
+        """Tedarikçi bakiyesi hesapla"""
+        total = (
+            self.session.query(
+                func.coalesce(func.sum(PurchaseInvoice.balance), Decimal(0))
+            )
+            .filter(
+                PurchaseInvoice.supplier_id == supplier_id,
+                PurchaseInvoice.status.in_(
+                    [
+                        PurchaseInvoiceStatus.RECEIVED,
+                        PurchaseInvoiceStatus.PARTIAL,
+                        PurchaseInvoiceStatus.OVERDUE,
+                    ]
+                ),
+            )
+            .scalar()
+        )
+
+        return total or Decimal(0)

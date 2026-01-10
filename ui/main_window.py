@@ -117,10 +117,45 @@ try:
         DeliveryNoteModule,
         InvoiceModule,
     )
+    from modules.sales.views.price_list_module import PriceListModule
 except ImportError:
     CustomerModule = SalesQuoteModule = SalesOrderModule = (
         DeliveryNoteModule
-    ) = InvoiceModule = PlaceholderPage
+    ) = InvoiceModule = PriceListModule = PlaceholderPage
+
+try:
+    from modules.purchasing.views.purchase_invoice_module import PurchaseInvoiceModule
+except ImportError:
+    PurchaseInvoiceModule = PlaceholderPage
+
+try:
+    from modules.accounting.views.account_module import AccountModule
+    from modules.accounting.views.journal_module import JournalModule
+    from modules.accounting.views.reports_module import AccountingReportsModule
+except ImportError:
+    AccountModule = JournalModule = AccountingReportsModule = PlaceholderPage
+
+try:
+    from modules.finance.views.receipt_module import ReceiptModule
+    from modules.finance.views.payment_module import PaymentModule
+    from modules.finance.views.reconciliation_module import ReconciliationModule
+    from modules.finance.views.account_statement_module import AccountStatementModule
+except ImportError:
+    ReceiptModule = PaymentModule = ReconciliationModule = AccountStatementModule = PlaceholderPage
+
+try:
+    from modules.mrp.views.mrp_module import MRPModule
+except ImportError:
+    MRPModule = PlaceholderPage
+
+try:
+    from modules.reports.views.sales_reports_module import SalesReportsModule
+    from modules.reports.views.stock_aging_module import StockAgingModule
+    from modules.reports.views.production_oee_module import ProductionOEEModule
+    from modules.reports.views.supplier_performance_module import SupplierPerformanceModule
+    from modules.reports.views.receivables_aging_module import ReceivablesAgingModule
+except ImportError:
+    SalesReportsModule = StockAgingModule = ProductionOEEModule = SupplierPerformanceModule = ReceivablesAgingModule = PlaceholderPage
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -455,6 +490,7 @@ MENU_DATA = {
             ("Talepler", "fa5s.file-signature", "purchase-requests"),
             ("Siparişler", "fa5s.file-invoice-dollar", "purchase-orders"),
             ("Mal Kabul", "fa5s.dolly", "goods-receipts"),
+            ("Faturalar", "fa5s.file-alt", "purchase-invoices"),
         ],
     },
     "production": {
@@ -465,6 +501,7 @@ MENU_DATA = {
             ("Planlama", "fa5s.calendar-alt", "planning"),
             ("İş İstasyonları", "fa5s.cogs", "work-stations"),
             ("Takvim", "fa5s.calendar-day", "calendar"),
+            ("MRP", "fa5s.project-diagram", "mrp"),
         ],
     },
     "sales": {
@@ -475,6 +512,34 @@ MENU_DATA = {
             ("Siparişler", "fa5s.shopping-cart", "sales-orders"),
             ("İrsaliyeler", "fa5s.truck", "delivery-notes"),
             ("Faturalar", "fa5s.file-invoice-dollar", "invoices"),
+            ("Fiyat Listeleri", "fa5s.list-alt", "price-lists"),
+        ],
+    },
+    "accounting": {
+        "title": "MUHASEBE",
+        "items": [
+            ("Hesap Planı", "fa5s.sitemap", "accounts"),
+            ("Yevmiye Fişleri", "fa5s.book", "journals"),
+            ("Muhasebe Raporları", "fa5s.file-alt", "accounting-reports"),
+        ],
+    },
+    "finance": {
+        "title": "FİNANS",
+        "items": [
+            ("Tahsilatlar", "fa5s.hand-holding-usd", "receipts"),
+            ("Ödemeler", "fa5s.money-check-alt", "payments"),
+            ("Mutabakat", "fa5s.balance-scale", "reconciliation"),
+            ("Cari Hesaplar", "fa5s.address-book", "account-statements"),
+        ],
+    },
+    "reports": {
+        "title": "RAPORLAR",
+        "items": [
+            ("Satış Raporları", "fa5s.chart-line", "sales-reports"),
+            ("Stok Yaşlandırma", "fa5s.boxes", "stock-aging"),
+            ("Üretim OEE", "fa5s.tachometer-alt", "production-oee"),
+            ("Tedarikçi Performans", "fa5s.industry", "supplier-performance"),
+            ("Alacak Yaşlandırma", "fa5s.credit-card", "receivables-aging"),
         ],
     },
     "development": {
@@ -488,8 +553,6 @@ MENU_DATA = {
         "items": [
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
             ("İnsan Kaynakları", "fa5s.users", "hr"),
-            ("Finans", "fa5s.wallet", "finance"),
-            ("Raporlar", "fa5s.chart-pie", "reports"),
         ],
     },
 }
@@ -623,6 +686,9 @@ class ActivityBar(QFrame):
             ("purchasing", "fa5s.shopping-cart", "Satınalma"),
             ("sales", "fa5s.cash-register", "Satış"),
             ("production", "fa5s.industry", "Üretim"),
+            ("accounting", "fa5s.calculator", "Muhasebe"),
+            ("finance", "fa5s.wallet", "Finans"),
+            ("reports", "fa5s.chart-pie", "Raporlar"),
             ("development", "fa5s.bug", "Geliştirme"),
             ("settings", "fa5s.cog", "Ayarlar"),
         ]:
@@ -761,6 +827,7 @@ class MainWindow(QMainWindow):
     def setup_pages_dict(self):
         self.pages = {}
         self.pages["dashboard"] = HomeDashboard()
+        # Stok modülü sayfaları
         self.pages["stock-cards"] = InventoryModule()
         self.pages["categories"] = CategoryModule()
         self.pages["units"] = UnitModule()
@@ -768,26 +835,46 @@ class MainWindow(QMainWindow):
         self.pages["movements"] = MovementModule()
         self.pages["stock-count"] = StockCountModule()
         self.pages["stock-reports"] = StockReportsModule()
+        # Üretim modülü sayfaları
         self.pages["work-orders"] = WorkOrderModule()
         self.pages["bom"] = BOMModule()
         self.pages["planning"] = PlanningModule()
         self.pages["work-stations"] = WorkStationModule()
         self.pages["calendar"] = CalendarModule()
+        self.pages["mrp"] = MRPModule()
+        # Satınalma modülü sayfaları
         self.pages["suppliers"] = SupplierModule()
         self.pages["purchase-requests"] = PurchaseRequestModule()
         self.pages["goods-receipts"] = GoodsReceiptModule()
         self.pages["purchase-orders"] = PurchaseOrderModule()
-        self.pages["error-logs"] = DevelopmentModule()
+        self.pages["purchase-invoices"] = PurchaseInvoiceModule()
         # Satış modülü sayfaları
         self.pages["customers"] = CustomerModule()
         self.pages["sales-quotes"] = SalesQuoteModule()
         self.pages["sales-orders"] = SalesOrderModule()
         self.pages["delivery-notes"] = DeliveryNoteModule()
         self.pages["invoices"] = InvoiceModule()
-        self.pages["finance"] = PlaceholderPage("Finans", "💳")
-        self.pages["hr"] = PlaceholderPage("İnsan Kaynakları", "👥")
-        self.pages["reports"] = PlaceholderPage("Genel Raporlar", "📊")
-        self.pages["settings"] = PlaceholderPage("Ayarlar", "⚙️")
+        self.pages["price-lists"] = PriceListModule()
+        # Muhasebe modülü sayfaları
+        self.pages["accounts"] = AccountModule()
+        self.pages["journals"] = JournalModule()
+        self.pages["accounting-reports"] = AccountingReportsModule()
+        # Finans modülü sayfaları
+        self.pages["receipts"] = ReceiptModule()
+        self.pages["payments"] = PaymentModule()
+        self.pages["reconciliation"] = ReconciliationModule()
+        self.pages["account-statements"] = AccountStatementModule()
+        # Raporlar modulu sayfalari
+        self.pages["sales-reports"] = SalesReportsModule()
+        self.pages["stock-aging"] = StockAgingModule()
+        self.pages["production-oee"] = ProductionOEEModule()
+        self.pages["supplier-performance"] = SupplierPerformanceModule()
+        self.pages["receivables-aging"] = ReceivablesAgingModule()
+        # Geliştirme modülü
+        self.pages["error-logs"] = DevelopmentModule()
+        # Sistem ayarları
+        self.pages["hr"] = PlaceholderPage("Insan Kaynaklari", "")
+        self.pages["settings"] = PlaceholderPage("Ayarlar", "")
 
     def setup_ui(self):
         central_widget = QWidget()

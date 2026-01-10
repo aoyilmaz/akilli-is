@@ -22,6 +22,10 @@ from .invoice_module import InvoiceModule
 from .invoice_list import InvoiceListPage
 from .invoice_form import InvoiceFormPage
 
+from .price_list_module import PriceListModule
+from .price_list_list import PriceListListPage
+from .price_list_form import PriceListFormPage
+
 __all__ = [
     # Customer
     "CustomerModule",
@@ -43,4 +47,8 @@ __all__ = [
     "InvoiceModule",
     "InvoiceListPage",
     "InvoiceFormPage",
+    # Price List
+    "PriceListModule",
+    "PriceListListPage",
+    "PriceListFormPage",
 ]

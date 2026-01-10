@@ -11,6 +11,9 @@ from sqlalchemy.orm import joinedload
 from database.base import get_session
 from database.models.sales import (
     Customer,
+    PriceList,
+    PriceListItem,
+    PriceListType,
     SalesQuote,
     SalesQuoteItem,
     SalesQuoteStatus,
@@ -25,6 +28,251 @@ from database.models.sales import (
     InvoiceStatus,
 )
 from database.models.inventory import StockMovementType
+
+
+class PriceListService:
+    """Fiyat listesi servisi"""
+
+    def __init__(self):
+        self.session = get_session()
+
+    def get_all(
+        self,
+        list_type: PriceListType = None,
+        active_only: bool = True
+    ) -> List[PriceList]:
+        """Tüm fiyat listelerini getir"""
+        query = self.session.query(PriceList)
+        if active_only:
+            query = query.filter(PriceList.is_active == True)
+        if list_type:
+            query = query.filter(PriceList.list_type == list_type)
+        return query.order_by(PriceList.priority, PriceList.name).all()
+
+    def get_by_id(self, price_list_id: int) -> Optional[PriceList]:
+        """ID ile fiyat listesi getir"""
+        return (
+            self.session.query(PriceList)
+            .options(joinedload(PriceList.items).joinedload(PriceListItem.item))
+            .filter(PriceList.id == price_list_id)
+            .first()
+        )
+
+    def get_by_code(self, code: str) -> Optional[PriceList]:
+        """Kod ile fiyat listesi getir"""
+        return (
+            self.session.query(PriceList)
+            .filter(PriceList.code == code)
+            .first()
+        )
+
+    def get_default(
+        self, list_type: PriceListType = PriceListType.SALES
+    ) -> Optional[PriceList]:
+        """Varsayılan fiyat listesini getir"""
+        return (
+            self.session.query(PriceList)
+            .filter(
+                PriceList.is_active == True,
+                PriceList.is_default == True,
+                PriceList.list_type == list_type
+            )
+            .first()
+        )
+
+    def create(self, items_data: List[Dict] = None, **kwargs) -> PriceList:
+        """Yeni fiyat listesi oluştur"""
+        price_list = PriceList(**kwargs)
+
+        # Varsayılan olarak işaretleniyorsa diğerlerini kaldır
+        if kwargs.get("is_default"):
+            self._clear_default(kwargs.get("list_type", PriceListType.SALES))
+
+        self.session.add(price_list)
+        self.session.flush()
+
+        # Kalemleri ekle
+        if items_data:
+            for item_data in items_data:
+                item = PriceListItem(
+                    price_list_id=price_list.id,
+                    **item_data
+                )
+                self.session.add(item)
+
+        self.session.commit()
+        return price_list
+
+    def update(
+        self,
+        price_list_id: int,
+        items_data: List[Dict] = None,
+        **kwargs
+    ) -> Optional[PriceList]:
+        """Fiyat listesi güncelle"""
+        price_list = self.get_by_id(price_list_id)
+        if not price_list:
+            return None
+
+        # Varsayılan olarak işaretleniyorsa diğerlerini kaldır
+        if kwargs.get("is_default") and not price_list.is_default:
+            self._clear_default(price_list.list_type)
+
+        for key, value in kwargs.items():
+            if hasattr(price_list, key):
+                setattr(price_list, key, value)
+
+        # Kalemleri güncelle
+        if items_data is not None:
+            # Mevcut kalemleri temizle
+            for item in price_list.items:
+                self.session.delete(item)
+
+            # Yeni kalemleri ekle
+            for item_data in items_data:
+                item = PriceListItem(
+                    price_list_id=price_list.id,
+                    **item_data
+                )
+                self.session.add(item)
+
+        self.session.commit()
+        return price_list
+
+    def delete(self, price_list_id: int) -> bool:
+        """Fiyat listesi sil (soft delete)"""
+        price_list = self.get_by_id(price_list_id)
+        if price_list:
+            price_list.is_active = False
+            self.session.commit()
+            return True
+        return False
+
+    def add_item(
+        self,
+        price_list_id: int,
+        item_id: int,
+        unit_price: Decimal,
+        min_quantity: Decimal = Decimal("0"),
+        discount_rate: Decimal = Decimal("0"),
+        notes: str = None
+    ) -> Optional[PriceListItem]:
+        """Fiyat listesine kalem ekle"""
+        price_list = self.get_by_id(price_list_id)
+        if not price_list:
+            return None
+
+        item = PriceListItem(
+            price_list_id=price_list_id,
+            item_id=item_id,
+            unit_price=unit_price,
+            min_quantity=min_quantity,
+            discount_rate=discount_rate,
+            notes=notes
+        )
+        self.session.add(item)
+        self.session.commit()
+        return item
+
+    def remove_item(self, price_list_item_id: int) -> bool:
+        """Fiyat listesinden kalem kaldır"""
+        item = (
+            self.session.query(PriceListItem)
+            .filter(PriceListItem.id == price_list_item_id)
+            .first()
+        )
+        if item:
+            self.session.delete(item)
+            self.session.commit()
+            return True
+        return False
+
+    def get_price(
+        self,
+        price_list_id: int,
+        item_id: int,
+        quantity: Decimal = Decimal("1")
+    ) -> Optional[Decimal]:
+        """Fiyat listesinden ürün fiyatı getir (miktar bazlı)"""
+        items = (
+            self.session.query(PriceListItem)
+            .filter(
+                PriceListItem.price_list_id == price_list_id,
+                PriceListItem.item_id == item_id,
+                PriceListItem.min_quantity <= quantity
+            )
+            .order_by(desc(PriceListItem.min_quantity))
+            .all()
+        )
+
+        if items:
+            item = items[0]  # En yüksek min_quantity eşleşmesi
+            price = item.unit_price
+            if item.discount_rate:
+                discount = price * item.discount_rate / 100
+                price = price - discount
+            return price
+        return None
+
+    def get_customer_price(
+        self,
+        customer_id: int,
+        item_id: int,
+        quantity: Decimal = Decimal("1")
+    ) -> Optional[Decimal]:
+        """Müşteriye özel fiyat getir"""
+        # Müşterinin fiyat listesini bul
+        customer = (
+            self.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+        if customer and customer.price_list_id:
+            price = self.get_price(customer.price_list_id, item_id, quantity)
+            if price:
+                return price
+
+        # Müşteri fiyat listesi yoksa varsayılan fiyat listesini kontrol et
+        default_list = self.get_default(PriceListType.SALES)
+        if default_list:
+            price = self.get_price(default_list.id, item_id, quantity)
+            if price:
+                return price
+
+        # Hiç fiyat listesi yoksa stok kartındaki satış fiyatını döndür
+        from database.models.inventory import Item
+        item = self.session.query(Item).filter(Item.id == item_id).first()
+        if item:
+            return item.sale_price
+
+        return None
+
+    def generate_code(self) -> str:
+        """Fiyat listesi kodu üret"""
+        last = (
+            self.session.query(PriceList)
+            .filter(PriceList.code.like("FL%"))
+            .order_by(desc(PriceList.code))
+            .first()
+        )
+
+        if last:
+            try:
+                num = int(last.code[2:]) + 1
+            except ValueError:
+                num = 1
+        else:
+            num = 1
+
+        return f"FL{num:04d}"
+
+    def _clear_default(self, list_type: PriceListType):
+        """Varsayılan fiyat listesi işaretini kaldır"""
+        self.session.query(PriceList).filter(
+            PriceList.list_type == list_type,
+            PriceList.is_default == True
+        ).update({"is_default": False})
 
 
 class CustomerService:
@@ -409,13 +657,66 @@ class SalesOrderService:
         self.session.commit()
         return order
 
-    def confirm(self, order_id: int) -> Optional[SalesOrder]:
+    def confirm(self, order_id: int, skip_credit_check: bool = False) -> Optional[SalesOrder]:
         """Siparişi onayla"""
         order = self.get_by_id(order_id)
-        if order and order.status == SalesOrderStatus.DRAFT:
-            order.status = SalesOrderStatus.CONFIRMED
-            self.session.commit()
+        if not order or order.status != SalesOrderStatus.DRAFT:
+            return order
+
+        # Müşteri kredi limiti kontrolü
+        if not skip_credit_check and order.customer:
+            customer = order.customer
+            credit_limit = float(customer.credit_limit or 0)
+
+            if credit_limit > 0:
+                # Müşterinin açık bakiyesini hesapla
+                open_balance = self._get_customer_open_balance(customer.id)
+                order_total = float(order.total or 0)
+
+                if open_balance + order_total > credit_limit:
+                    raise ValueError(
+                        f"Müşteri kredi limiti aşılıyor!\n"
+                        f"Kredi Limiti: {credit_limit:,.2f} TL\n"
+                        f"Mevcut Bakiye: {open_balance:,.2f} TL\n"
+                        f"Sipariş Tutarı: {order_total:,.2f} TL\n"
+                        f"Toplam: {open_balance + order_total:,.2f} TL"
+                    )
+
+        order.status = SalesOrderStatus.CONFIRMED
+        self.session.commit()
         return order
+
+    def _get_customer_open_balance(self, customer_id: int) -> float:
+        """Müşterinin açık bakiyesini hesapla"""
+        # Onaylı/bekleyen siparişlerin toplamı
+        from sqlalchemy import func
+        orders_total = (
+            self.session.query(func.coalesce(func.sum(SalesOrder.total), 0))
+            .filter(
+                SalesOrder.customer_id == customer_id,
+                SalesOrder.status.in_([
+                    SalesOrderStatus.CONFIRMED,
+                    SalesOrderStatus.PARTIAL
+                ])
+            )
+            .scalar()
+        )
+
+        # Ödenmemiş faturaların bakiyesi
+        invoices_balance = (
+            self.session.query(func.coalesce(func.sum(Invoice.balance), 0))
+            .filter(
+                Invoice.customer_id == customer_id,
+                Invoice.status.in_([
+                    InvoiceStatus.ISSUED,
+                    InvoiceStatus.PARTIAL,
+                    InvoiceStatus.OVERDUE
+                ])
+            )
+            .scalar()
+        )
+
+        return float(orders_total) + float(invoices_balance)
 
     def cancel(self, order_id: int) -> Optional[SalesOrder]:
         """Sipariş iptal"""
@@ -533,6 +834,43 @@ class DeliveryNoteService:
         for item_data in items_data:
             item = DeliveryNoteItem(delivery_note_id=delivery.id, **item_data)
             self.session.add(item)
+
+        self.session.commit()
+        return delivery
+
+    def update(
+        self,
+        delivery_id: int,
+        items_data: List[Dict] = None,
+        **data
+    ) -> Optional[DeliveryNote]:
+        """İrsaliye güncelle (sadece taslak durumunda)"""
+        delivery = self.get_by_id(delivery_id)
+        if not delivery:
+            return None
+
+        if delivery.status != DeliveryNoteStatus.DRAFT:
+            raise ValueError("Sadece taslak irsaliyeler düzenlenebilir")
+
+        # Alanları güncelle
+        for key, value in data.items():
+            if hasattr(delivery, key) and key not in (
+                "id", "delivery_no", "status"
+            ):
+                setattr(delivery, key, value)
+
+        # Kalemleri güncelle
+        if items_data is not None:
+            # Mevcut kalemleri sil
+            for item in delivery.items:
+                self.session.delete(item)
+
+            # Yeni kalemleri ekle
+            for item_data in items_data:
+                item = DeliveryNoteItem(
+                    delivery_note_id=delivery.id, **item_data
+                )
+                self.session.add(item)
 
         self.session.commit()
         return delivery
@@ -742,6 +1080,45 @@ class InvoiceService:
 
         return invoice
 
+    def update(
+        self,
+        invoice_id: int,
+        items_data: List[Dict] = None,
+        **data
+    ) -> Optional[Invoice]:
+        """Fatura güncelle (sadece taslak durumunda)"""
+        invoice = self.get_by_id(invoice_id)
+        if not invoice:
+            return None
+
+        if invoice.status != InvoiceStatus.DRAFT:
+            raise ValueError("Sadece taslak faturalar düzenlenebilir")
+
+        # Alanları güncelle
+        for key, value in data.items():
+            if hasattr(invoice, key) and key not in (
+                "id", "invoice_no", "status", "paid_amount", "balance"
+            ):
+                setattr(invoice, key, value)
+
+        # Kalemleri güncelle
+        if items_data is not None:
+            # Mevcut kalemleri sil
+            for item in invoice.items:
+                self.session.delete(item)
+
+            # Yeni kalemleri ekle
+            for item_data in items_data:
+                item = InvoiceItem(invoice_id=invoice.id, **item_data)
+                item.calculate_line_total()
+                self.session.add(item)
+
+            self.session.flush()
+            invoice.calculate_totals()
+
+        self.session.commit()
+        return invoice
+
     def create_from_delivery(self, delivery_id: int, **data) -> Invoice:
         """İrsaliyeden fatura oluştur"""
         delivery_service = DeliveryNoteService()
@@ -749,6 +1126,21 @@ class InvoiceService:
 
         if not delivery:
             raise ValueError("İrsaliye bulunamadı")
+
+        # Bu irsaliye için zaten fatura oluşturulmuş mu kontrol et
+        existing_invoice = (
+            self.session.query(Invoice)
+            .filter(
+                Invoice.delivery_note_id == delivery_id,
+                Invoice.status != InvoiceStatus.CANCELLED
+            )
+            .first()
+        )
+        if existing_invoice:
+            raise ValueError(
+                f"Bu irsaliye için zaten fatura oluşturulmuş: "
+                f"{existing_invoice.invoice_no}"
+            )
 
         # Sipariş bilgilerini al
         order = delivery.sales_order
@@ -801,6 +1193,16 @@ class InvoiceService:
         if invoice and invoice.status == InvoiceStatus.DRAFT:
             invoice.status = InvoiceStatus.ISSUED
             self.session.commit()
+
+            # Cari hesap hareketi oluştur
+            try:
+                from modules.finance.services import AccountTransactionService
+                transaction_service = AccountTransactionService()
+                transaction_service.create_from_invoice(invoice)
+            except Exception as e:
+                # Finans modülü yüklü değilse veya hata olursa sessizce devam et
+                print(f"Cari hesap hareketi oluşturulamadı: {e}")
+
         return invoice
 
     def record_payment(self, invoice_id: int, amount: Decimal, method: str = None, notes: str = None) -> Optional[Invoice]:

@@ -187,6 +187,11 @@ class Item(BaseModel):
     lead_time_days = Column(Integer, default=0)
     safety_stock = Column(Numeric(18, 4), default=0)
 
+    # === MRP Özellikleri ===
+    min_order_qty = Column(Numeric(18, 4), default=1)  # Minimum sipariş miktarı
+    order_multiple = Column(Numeric(18, 4), default=1)  # Sipariş katı
+    procurement_type = Column(String(20), default="purchase")  # purchase/manufacture
+
     # === Takip Özellikleri ===
     track_lot = Column(Boolean, default=False)
     track_serial = Column(Boolean, default=False)

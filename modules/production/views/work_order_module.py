@@ -22,6 +22,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
+from config.styles import (
+    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
+    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
+    get_table_style, get_button_style, get_input_style
+)
+
 from .work_order_list import WorkOrderListPage
 from .work_order_form import WorkOrderFormPage
 
@@ -46,9 +52,9 @@ class StartProductionDialog(QDialog):
 
     def setup_ui(self):
         self.setStyleSheet(
-            """
-            QDialog { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
+            f"""
+            QDialog {{ background-color: {BG_PRIMARY}; }}
+            QLabel {{ color: {TEXT_PRIMARY}; }}
         """
         )
 
@@ -58,7 +64,7 @@ class StartProductionDialog(QDialog):
 
         # Başlık
         title = QLabel(f"🔄 İş Emri: {self.work_order.order_no}")
-        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #f8fafc;")
+        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {TEXT_PRIMARY};")
         layout.addWidget(title)
 
         # Ürün bilgisi

@@ -4,6 +4,7 @@ Akıllı İş - Satış Modülü
 
 from .services import (
     CustomerService,
+    PriceListService,
     SalesQuoteService,
     SalesOrderService,
     DeliveryNoteService,
@@ -12,6 +13,7 @@ from .services import (
 
 from .views import (
     CustomerModule,
+    PriceListModule,
     SalesQuoteModule,
     SalesOrderModule,
     DeliveryNoteModule,
@@ -21,12 +23,14 @@ from .views import (
 __all__ = [
     # Services
     "CustomerService",
+    "PriceListService",
     "SalesQuoteService",
     "SalesOrderService",
     "DeliveryNoteService",
     "InvoiceService",
     # Modules
     "CustomerModule",
+    "PriceListModule",
     "SalesQuoteModule",
     "SalesOrderModule",
     "DeliveryNoteModule",

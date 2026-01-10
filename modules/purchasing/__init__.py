@@ -7,13 +7,15 @@ from .services import (
     PurchaseRequestService,
     PurchaseOrderService,
     GoodsReceiptService,
+    PurchaseInvoiceService,
 )
 
 from .views import (
-    SupplierModule, 
+    SupplierModule,
     PurchaseRequestModule,
     PurchaseOrderModule,
     GoodsReceiptModule,
+    PurchaseInvoiceModule,
 )
 
 __all__ = [
@@ -21,8 +23,10 @@ __all__ = [
     "PurchaseRequestService",
     "PurchaseOrderService",
     "GoodsReceiptService",
+    "PurchaseInvoiceService",
     "SupplierModule",
     "PurchaseRequestModule",
     "PurchaseOrderModule",
     "GoodsReceiptModule",
+    "PurchaseInvoiceModule",
 ]

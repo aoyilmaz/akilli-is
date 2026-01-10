@@ -124,6 +124,8 @@ class SalesQuoteModule(QWidget):
                 "name": i.name,
                 "unit_id": i.unit_id,
                 "unit_name": i.unit.name if i.unit else "",
+                "sale_price": float(i.sale_price or 0),
+                "vat_rate": float(i.vat_rate or 0),
                 "stock": 0,
             } for i in items]
         except Exception as e:

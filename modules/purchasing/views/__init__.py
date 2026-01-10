@@ -18,6 +18,10 @@ from .goods_receipt_list import GoodsReceiptListPage
 from .goods_receipt_form import GoodsReceiptFormPage
 from .goods_receipt_module import GoodsReceiptModule
 
+from .purchase_invoice_list import PurchaseInvoiceListPage
+from .purchase_invoice_form import PurchaseInvoiceFormPage
+from .purchase_invoice_module import PurchaseInvoiceModule
+
 __all__ = [
     "SupplierListPage",
     "SupplierFormPage",
@@ -31,4 +35,7 @@ __all__ = [
     "GoodsReceiptListPage",
     "GoodsReceiptFormPage",
     "GoodsReceiptModule",
+    "PurchaseInvoiceListPage",
+    "PurchaseInvoiceFormPage",
+    "PurchaseInvoiceModule",
 ]

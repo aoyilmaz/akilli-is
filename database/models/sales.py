@@ -61,6 +61,91 @@ class Currency(str, Enum):
     GBP = "GBP"
 
 
+class PriceListType(str, Enum):
+    """Fiyat listesi türleri"""
+    SALES = "sales"          # Satış fiyat listesi
+    PURCHASE = "purchase"    # Alış fiyat listesi
+
+
+# === FİYAT LİSTESİ ===
+
+class PriceList(BaseModel):
+    """Fiyat listeleri tablosu"""
+
+    __tablename__ = "price_lists"
+
+    # Temel bilgiler
+    code = Column(String(20), unique=True, nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+
+    # Tür
+    list_type = Column(
+        SQLEnum(PriceListType, values_callable=lambda x: [e.value for e in x]),
+        default=PriceListType.SALES
+    )
+
+    # Para birimi
+    currency = Column(String(10), default="TRY")
+
+    # Geçerlilik
+    valid_from = Column(Date)
+    valid_until = Column(Date)
+
+    # Varsayılan fiyat listesi mi?
+    is_default = Column(Boolean, default=False)
+
+    # Öncelik (düşük değer = yüksek öncelik)
+    priority = Column(Integer, default=10)
+
+    # İlişkiler
+    items = relationship("PriceListItem", back_populates="price_list",
+                         cascade="all, delete-orphan")
+    customers = relationship("Customer", back_populates="price_list")
+
+    def __repr__(self):
+        return f"<PriceList {self.code}: {self.name}>"
+
+
+class PriceListItem(BaseModel):
+    """Fiyat listesi kalemleri"""
+
+    __tablename__ = "price_list_items"
+
+    # İlişkiler
+    price_list_id = Column(
+        Integer, ForeignKey("price_lists.id"), nullable=False
+    )
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+
+    # Fiyat
+    unit_price = Column(Numeric(18, 4), nullable=False)
+
+    # Minimum miktar (miktar bazlı fiyatlandırma için)
+    min_quantity = Column(Numeric(18, 4), default=0)
+
+    # İndirim oranı (opsiyonel)
+    discount_rate = Column(Numeric(5, 2), default=0)
+
+    # Notlar
+    notes = Column(String(200))
+
+    # İlişkiler
+    price_list = relationship("PriceList", back_populates="items")
+    item = relationship("Item")
+
+    __table_args__ = (
+        Index(
+            "idx_price_list_item_unique",
+            "price_list_id", "item_id", "min_quantity",
+            unique=True
+        ),
+    )
+
+    def __repr__(self):
+        return f"<PriceListItem list={self.price_list_id} item={self.item_id}>"
+
+
 # === MÜŞTERİ ===
 
 class Customer(BaseModel):
@@ -94,6 +179,7 @@ class Customer(BaseModel):
     payment_term_days = Column(Integer, default=30)
     credit_limit = Column(Numeric(15, 2), default=0)
     currency = Column(String(10), default="TRY")
+    price_list_id = Column(Integer, ForeignKey("price_lists.id"), nullable=True)
 
     # Banka bilgileri
     bank_name = Column(String(100))
@@ -108,6 +194,7 @@ class Customer(BaseModel):
     notes = Column(Text)
 
     # İlişkiler
+    price_list = relationship("PriceList", back_populates="customers")
     sales_quotes = relationship("SalesQuote", back_populates="customer")
     sales_orders = relationship("SalesOrder", back_populates="customer")
     delivery_notes = relationship("DeliveryNote", back_populates="customer")
