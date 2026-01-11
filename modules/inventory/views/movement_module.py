@@ -10,7 +10,6 @@ from modules.inventory.services import StockMovementService, ItemService, Wareho
 from modules.inventory.views.movement_list import MovementListPage
 from modules.inventory.views.movement_form import MovementFormPage
 
-
 class MovementModule(QWidget):
     """Stok hareketleri modülü"""
     

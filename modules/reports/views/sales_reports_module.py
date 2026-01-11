@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.reports.services import ReportsService
 from modules.reports.views.sales_reports import SalesReportsPage
 
-
 class SalesReportsModule(QWidget):
     """Satis raporlari modulu - bagimsiz calisir"""
 

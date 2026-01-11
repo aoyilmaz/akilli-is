@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QMessageBox
 from .work_station_list import WorkStationListPage
 from .work_station_form import WorkStationFormPage
 
-
 class WorkStationModule(QWidget):
     """İş İstasyonları modülü"""
     

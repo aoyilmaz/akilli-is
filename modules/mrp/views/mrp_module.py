@@ -13,11 +13,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from config.styles import get_tab_style
 from .mrp_run import MRPRunPage
 from .requirements import RequirementsPage
 from .suggestions import SuggestionsPage
-
 
 class MRPModule(QWidget):
     """MRP ana modulu - ic menu yok, tab yapisi"""
@@ -36,8 +34,6 @@ class MRPModule(QWidget):
 
         # Tab widget
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(get_tab_style())
-
         # Sayfalar
         self.run_page = MRPRunPage()
         self.run_page.mrp_completed.connect(self._on_mrp_completed)

@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.reports.services import ReportsService
 from modules.reports.views.production_oee import ProductionOEEPage
 
-
 class ProductionOEEModule(QWidget):
     """Uretim OEE raporu modulu - bagimsiz calisir"""
 

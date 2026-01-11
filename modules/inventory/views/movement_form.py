@@ -29,7 +29,6 @@ from PyQt6.QtCore import Qt, pyqtSignal, QDateTime, QStringListModel
 
 from database.models import StockMovementType
 
-
 class MovementFormPage(QWidget):
     """Stok hareket formu"""
 
@@ -66,43 +65,15 @@ class MovementFormPage(QWidget):
         header_layout = QHBoxLayout()
 
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid #334155;
-                color: #94a3b8;
-                padding: 8px 16px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """
-        )
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
         title = QLabel(title_text)
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; color: {title_color}; margin-left: 16px;"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
 
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: {title_color};
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 32px;
-                border-radius: 12px;
-            }}
-            QPushButton:hover {{ opacity: 0.9; }}
-        """
-        )
         save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
 
@@ -128,7 +99,6 @@ class MovementFormPage(QWidget):
         doc_layout.addWidget(QLabel("Belge No"))
         self.document_no_input = QLineEdit()
         self.document_no_input.setPlaceholderText("Otomatik")
-        self._style_input(self.document_no_input)
         doc_layout.addWidget(self.document_no_input)
         info_layout.addLayout(doc_layout)
 
@@ -138,7 +108,6 @@ class MovementFormPage(QWidget):
         self.datetime_input = QDateTimeEdit()
         self.datetime_input.setDateTime(QDateTime.currentDateTime())
         self.datetime_input.setCalendarPopup(True)
-        self._style_datetime(self.datetime_input)
         date_layout.addWidget(self.datetime_input)
         info_layout.addLayout(date_layout)
 
@@ -147,7 +116,6 @@ class MovementFormPage(QWidget):
             from_layout = QVBoxLayout()
             from_layout.addWidget(QLabel("Kaynak Depo *"))
             self.from_warehouse_combo = QComboBox()
-            self._style_combo(self.from_warehouse_combo)
             from_layout.addWidget(self.from_warehouse_combo)
             info_layout.addLayout(from_layout)
 
@@ -156,7 +124,6 @@ class MovementFormPage(QWidget):
             to_layout = QVBoxLayout()
             to_layout.addWidget(QLabel("Hedef Depo *"))
             self.to_warehouse_combo = QComboBox()
-            self._style_combo(self.to_warehouse_combo)
             to_layout.addWidget(self.to_warehouse_combo)
             info_layout.addLayout(to_layout)
 
@@ -165,7 +132,6 @@ class MovementFormPage(QWidget):
         ref_layout.addWidget(QLabel("Referans No"))
         self.reference_input = QLineEdit()
         self.reference_input.setPlaceholderText("Fatura no, sipariş no vb.")
-        self._style_input(self.reference_input)
         ref_layout.addWidget(self.reference_input)
         info_layout.addLayout(ref_layout)
 
@@ -193,7 +159,6 @@ class MovementFormPage(QWidget):
         self.item_combo = QComboBox()
         self.item_combo.setEditable(True)
         self.item_combo.setMinimumWidth(300)
-        self._style_combo(self.item_combo)
         add_layout.addWidget(self.item_combo)
 
         # Miktar
@@ -202,7 +167,6 @@ class MovementFormPage(QWidget):
         self.qty_input.setRange(0.0001, 999999999)
         self.qty_input.setDecimals(4)
         self.qty_input.setValue(1)
-        self._style_spinbox(self.qty_input)
         add_layout.addWidget(self.qty_input)
 
         # Birim Fiyat
@@ -211,7 +175,6 @@ class MovementFormPage(QWidget):
         self.price_input.setRange(0, 999999999)
         self.price_input.setDecimals(4)
         self.price_input.setPrefix("₺ ")
-        self._style_spinbox(self.price_input)
         add_layout.addWidget(self.price_input)
 
         # Lot No
@@ -219,24 +182,10 @@ class MovementFormPage(QWidget):
         self.lot_input = QLineEdit()
         self.lot_input.setPlaceholderText("Lot no")
         self.lot_input.setMaximumWidth(100)
-        self._style_input(self.lot_input)
         add_layout.addWidget(self.lot_input)
 
         # Ekle butonu
         add_btn = QPushButton("➕ Ekle")
-        add_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         add_btn.clicked.connect(self._add_line)
         add_layout.addWidget(add_btn)
 
@@ -267,7 +216,6 @@ class MovementFormPage(QWidget):
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(60)
         self.description_input.setPlaceholderText("Hareket açıklaması...")
-        self._style_textedit(self.description_input)
         desc_layout.addWidget(self.description_input)
         footer_layout.addLayout(desc_layout, 2)
 
@@ -278,13 +226,9 @@ class MovementFormPage(QWidget):
         total_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.line_count_label = QLabel("Satır: 0")
-        self.line_count_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
         total_layout.addWidget(self.line_count_label)
 
         self.total_label = QLabel("Toplam: ₺0,00")
-        self.total_label.setStyleSheet(
-            "color: #f8fafc; font-size: 20px; font-weight: bold;"
-        )
         total_layout.addWidget(self.total_label)
 
         footer_layout.addLayout(total_layout)
@@ -448,17 +392,6 @@ class MovementFormPage(QWidget):
 
             # Sil butonu
             del_btn = QPushButton("🗑")
-            del_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background: transparent;
-                    border: none;
-                    color: #ef4444;
-                    font-size: 16px;
-                }
-                QPushButton:hover { color: #dc2626; }
-            """
-            )
             del_btn.clicked.connect(lambda checked, r=row: self._delete_line(r))
             self.table.setCellWidget(row, 7, del_btn)
 
@@ -527,72 +460,3 @@ class MovementFormPage(QWidget):
             data["to_warehouse_id"] = self.to_warehouse_combo.currentData()
 
         return data
-
-    def _style_input(self, widget):
-        widget.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """
-        )
-
-    def _style_combo(self, widget):
-        widget.setStyleSheet(
-            """
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                min-width: 150px;
-            }
-            QComboBox:focus { border-color: #6366f1; }
-        """
-        )
-
-    def _style_spinbox(self, widget):
-        widget.setStyleSheet(
-            """
-            QDoubleSpinBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                min-width: 120px;
-            }
-        """
-        )
-
-    def _style_datetime(self, widget):
-        widget.setStyleSheet(
-            """
-            QDateTimeEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-            }
-        """
-        )
-
-    def _style_textedit(self, widget):
-        widget.setStyleSheet(
-            """
-            QTextEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px;
-                color: #f8fafc;
-            }
-        """
-        )

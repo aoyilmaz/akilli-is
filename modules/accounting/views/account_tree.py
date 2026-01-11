@@ -24,7 +24,6 @@ from config.styles import (
 )
 from database.models.accounting import Account, AccountType
 
-
 class AccountTreeWidget(QWidget):
     """Hiyerarşik hesap planı ağacı"""
 
@@ -46,20 +45,6 @@ class AccountTreeWidget(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Hesap ara...")
         self.search_input.textChanged.connect(self._filter_tree)
-        self.search_input.setStyleSheet(
-            f"""
-            QLineEdit {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 4px;
-                padding: 8px 12px;
-                color: {TEXT_PRIMARY};
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {ACCENT};
-            }}
-        """
-        )
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
 
@@ -74,8 +59,6 @@ class AccountTreeWidget(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
         self.tree.setAlternatingRowColors(True)
-        self.tree.setStyleSheet(get_tree_style())
-
         self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -188,24 +171,6 @@ class AccountTreeWidget(QWidget):
             return
 
         menu = QMenu()
-        menu.setStyleSheet(
-            f"""
-            QMenu {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-            QMenu::item {{
-                padding: 8px 20px;
-                color: {TEXT_PRIMARY};
-            }}
-            QMenu::item:selected {{
-                background-color: {BORDER};
-            }}
-        """
-        )
-
         edit_action = QAction("✏️ Düzenle", self)
         edit_action.triggered.connect(
             lambda: self.account_double_clicked.emit(

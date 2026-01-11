@@ -32,7 +32,6 @@ from config.styles import (
     get_table_style, get_button_style, get_input_style, get_card_style
 )
 
-
 class MRPWorker(QThread):
     """MRP hesaplama thread'i"""
 
@@ -70,7 +69,6 @@ class MRPWorker(QThread):
         except Exception as e:
             self.error.emit(str(e))
 
-
 class MRPRunPage(QWidget):
     """MRP çalıştırma sayfası"""
 
@@ -89,21 +87,10 @@ class MRPRunPage(QWidget):
 
         # Başlık
         title = QLabel("MRP Calistir")
-        title.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {TEXT_PRIMARY};")
         layout.addWidget(title)
 
         # Parametreler
         params_frame = QFrame()
-        params_frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 12px;
-                padding: 16px;
-            }}
-        """
-        )
         params_layout = QVBoxLayout(params_frame)
 
         # Planlama ufku
@@ -113,21 +100,6 @@ class MRPRunPage(QWidget):
         self.horizon_spin.setRange(7, 365)
         self.horizon_spin.setValue(30)
         self.horizon_spin.setSuffix(" gün")
-        self.horizon_spin.setStyleSheet(
-            f"""
-            QSpinBox {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 6px;
-                padding: 8px;
-                color: {TEXT_PRIMARY};
-                min-width: 100px;
-            }}
-            QSpinBox:focus {{
-                border: 1px solid {INPUT_FOCUS};
-            }}
-        """
-        )
         horizon_row.addWidget(self.horizon_spin)
         horizon_row.addStretch()
         params_layout.addLayout(horizon_row)
@@ -135,37 +107,19 @@ class MRPRunPage(QWidget):
         # Checkboxlar
         self.safety_check = QCheckBox("Emniyet stoğunu dahil et")
         self.safety_check.setChecked(True)
-        self.safety_check.setStyleSheet(f"color: {TEXT_PRIMARY};")
         params_layout.addWidget(self.safety_check)
 
         self.wo_check = QCheckBox("İş emirlerini dahil et")
         self.wo_check.setChecked(True)
-        self.wo_check.setStyleSheet(f"color: {TEXT_PRIMARY};")
         params_layout.addWidget(self.wo_check)
 
         self.so_check = QCheckBox("Satış siparişlerini dahil et")
         self.so_check.setChecked(True)
-        self.so_check.setStyleSheet(f"color: {TEXT_PRIMARY};")
         params_layout.addWidget(self.so_check)
 
         # Çalıştır butonu
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("MRP Calistir")
-        self.run_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: {ACCENT};
-                border: none;
-                color: white;
-                padding: 14px 28px;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: #1177bb; }}
-            QPushButton:disabled {{ background-color: {BG_HOVER}; color: {TEXT_MUTED}; }}
-        """
-        )
         self.run_btn.clicked.connect(self._run_mrp)
         btn_row.addWidget(self.run_btn)
         btn_row.addStretch()
@@ -175,29 +129,12 @@ class MRPRunPage(QWidget):
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
-        self.progress.setStyleSheet(
-            f"""
-            QProgressBar {{
-                border: none;
-                background-color: {BG_TERTIARY};
-                border-radius: 4px;
-                height: 8px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {ACCENT};
-                border-radius: 4px;
-            }}
-        """
-        )
         params_layout.addWidget(self.progress)
 
         layout.addWidget(params_frame)
 
         # Geçmiş çalışmalar
         history_label = QLabel("Gecmis Calismalar")
-        history_label.setStyleSheet(
-            f"font-size: 16px; font-weight: bold; color: {TEXT_PRIMARY};"
-        )
         layout.addWidget(history_label)
 
         self.history_table = QTableWidget()
@@ -218,8 +155,6 @@ class MRPRunPage(QWidget):
             QAbstractItemView.SelectionBehavior.SelectRows
         )
         self.history_table.verticalHeader().setVisible(False)
-        self.history_table.setStyleSheet(get_table_style())
-
         self.history_table.doubleClicked.connect(self._on_history_double_click)
         layout.addWidget(self.history_table)
 

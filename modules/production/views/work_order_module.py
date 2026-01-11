@@ -34,7 +34,6 @@ from .work_order_form import WorkOrderFormPage
 from decimal import Decimal
 from modules.development import ErrorHandler
 
-
 class StartProductionDialog(QDialog):
     """Üretime başlama dialogu - Depo seçimi ve malzeme kontrolü"""
 
@@ -51,20 +50,12 @@ class StartProductionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setStyleSheet(
-            f"""
-            QDialog {{ background-color: {BG_PRIMARY}; }}
-            QLabel {{ color: {TEXT_PRIMARY}; }}
-        """
-        )
-
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
         # Başlık
         title = QLabel(f"🔄 İş Emri: {self.work_order.order_no}")
-        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {TEXT_PRIMARY};")
         layout.addWidget(title)
 
         # Ürün bilgisi
@@ -72,7 +63,6 @@ class StartProductionDialog(QDialog):
         info = QLabel(
             f"Ürün: {product_name} | Miktar: {self.work_order.planned_quantity}"
         )
-        info.setStyleSheet("color: #94a3b8;")
         layout.addWidget(info)
 
         # Depo seçimi
@@ -90,16 +80,6 @@ class StartProductionDialog(QDialog):
 
         self.warehouse_combo = QComboBox()
         self.warehouse_combo.setMinimumWidth(250)
-        self.warehouse_combo.setStyleSheet(
-            """
-            QComboBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 6px; padding: 8px 12px; color: #f8fafc; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView { background-color: #1e293b; 
-                border: 1px solid #334155; color: #f8fafc; selection-background-color: #334155; }
-        """
-        )
-
         # İş emrinde kaynak depo seçilmişse onu varsayılan yap
         default_index = 0
         for i, w in enumerate(self.warehouses):
@@ -121,7 +101,6 @@ class StartProductionDialog(QDialog):
 
         # Malzeme tablosu
         table_label = QLabel("📦 Kullanılacak Malzemeler:")
-        table_label.setStyleSheet("font-weight: 600; margin-top: 8px;")
         layout.addWidget(table_label)
 
         self.materials_table = QTableWidget()
@@ -146,12 +125,10 @@ class StartProductionDialog(QDialog):
 
         # Özet
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("color: #94a3b8; margin-top: 8px;")
         layout.addWidget(self.summary_label)
 
         # Uyarı
         self.warning_label = QLabel("")
-        self.warning_label.setStyleSheet("color: #ef4444; font-weight: 600;")
         self.warning_label.setVisible(False)
         layout.addWidget(self.warning_label)
 
@@ -160,25 +137,10 @@ class StartProductionDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet(
-            """
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """
-        )
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         self.start_btn = QPushButton("🔄 Üretime Başla")
-        self.start_btn.setStyleSheet(
-            """
-            QPushButton { background-color: #f59e0b; border: none; color: white;
-                font-weight: 600; padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #d97706; }
-            QPushButton:disabled { background-color: #475569; color: #94a3b8; }
-        """
-        )
         self.start_btn.clicked.connect(self._on_start)
         btn_layout.addWidget(self.start_btn)
 
@@ -271,7 +233,6 @@ class StartProductionDialog(QDialog):
     def get_warehouse_id(self) -> int:
         return self.selected_warehouse_id
 
-
 class CompleteProductionDialog(QDialog):
     """Üretim tamamlama dialogu"""
 
@@ -285,20 +246,12 @@ class CompleteProductionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setStyleSheet(
-            """
-            QDialog { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
-        """
-        )
-
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
         # Başlık
         title = QLabel(f"✅ Üretimi Tamamla: {self.work_order.order_no}")
-        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #f8fafc;")
         layout.addWidget(title)
 
         # Form
@@ -308,7 +261,6 @@ class CompleteProductionDialog(QDialog):
         # Planlanan miktar
         form.addWidget(QLabel("Planlanan Miktar:"), 0, 0)
         planned_label = QLabel(f"{self.work_order.planned_quantity:,.4f}")
-        planned_label.setStyleSheet("color: #818cf8; font-weight: 600;")
         form.addWidget(planned_label, 0, 1)
 
         # Tamamlanan miktar
@@ -319,12 +271,6 @@ class CompleteProductionDialog(QDialog):
         self.completed_input.setRange(0, float(self.work_order.planned_quantity) * 2)
         self.completed_input.setDecimals(4)
         self.completed_input.setValue(float(self.work_order.planned_quantity))
-        self.completed_input.setStyleSheet(
-            """
-            QDoubleSpinBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 6px; padding: 8px; color: #f8fafc; }
-        """
-        )
         form.addWidget(self.completed_input, 1, 1)
 
         # Fire miktarı
@@ -333,27 +279,11 @@ class CompleteProductionDialog(QDialog):
         self.scrap_input.setRange(0, float(self.work_order.planned_quantity))
         self.scrap_input.setDecimals(4)
         self.scrap_input.setValue(0)
-        self.scrap_input.setStyleSheet(
-            """
-            QDoubleSpinBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 6px; padding: 8px; color: #f8fafc; }
-        """
-        )
         form.addWidget(self.scrap_input, 2, 1)
 
         # Hedef depo
         form.addWidget(QLabel("Mamul Deposu:"), 3, 0)
         self.warehouse_combo = QComboBox()
-        self.warehouse_combo.setStyleSheet(
-            """
-            QComboBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 6px; padding: 8px; color: #f8fafc; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView { background-color: #1e293b; 
-                border: 1px solid #334155; color: #f8fafc; }
-        """
-        )
-
         default_index = 0
         for i, w in enumerate(self.warehouses):
             self.warehouse_combo.addItem(f"{w.code} - {w.name}", w.id)
@@ -372,7 +302,6 @@ class CompleteProductionDialog(QDialog):
 
         # Bilgi
         info = QLabel("ℹ️ Tamamlanan miktar mamul deposuna giriş yapılacak")
-        info.setStyleSheet("color: #64748b; margin-top: 8px;")
         layout.addWidget(info)
 
         layout.addStretch()
@@ -382,24 +311,10 @@ class CompleteProductionDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet(
-            """
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """
-        )
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         complete_btn = QPushButton("✅ Tamamla")
-        complete_btn.setStyleSheet(
-            """
-            QPushButton { background-color: #10b981; border: none; color: white;
-                font-weight: 600; padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         complete_btn.clicked.connect(self.accept)
         btn_layout.addWidget(complete_btn)
 
@@ -411,7 +326,6 @@ class CompleteProductionDialog(QDialog):
             "scrap_quantity": self.scrap_input.value(),
             "warehouse_id": self.warehouse_combo.currentData(),
         }
-
 
 class WorkOrderModule(QWidget):
     """İş Emirleri modülü"""

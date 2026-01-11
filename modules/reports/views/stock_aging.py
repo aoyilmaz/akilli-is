@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
     BG_SECONDARY,
@@ -32,7 +33,6 @@ from config.styles import (
     get_button_style,
     get_input_style,
 )
-
 
 class StockAgingPage(QWidget):
     """Stok yaşlandırma raporu sayfası"""
@@ -50,23 +50,12 @@ class StockAgingPage(QWidget):
 
         # Filtre
         filter_frame = QFrame()
-        filter_frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
         filter_layout = QHBoxLayout(filter_frame)
 
         lbl = QLabel("Depo:")
-        lbl.setStyleSheet(f"color: {TEXT_PRIMARY};")
         filter_layout.addWidget(lbl)
         self.warehouse_combo = QComboBox()
         self.warehouse_combo.addItem("Tüm Depolar", None)
-        self.warehouse_combo.setStyleSheet(get_input_style())
         self.warehouse_combo.setMinimumWidth(150)
         filter_layout.addWidget(self.warehouse_combo)
 
@@ -74,7 +63,6 @@ class StockAgingPage(QWidget):
 
         refresh_btn = QPushButton("Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        refresh_btn.setStyleSheet(get_button_style())
         filter_layout.addWidget(refresh_btn)
 
         layout.addWidget(filter_frame)
@@ -119,38 +107,9 @@ class StockAgingPage(QWidget):
         )
         layout.addWidget(self.table)
 
-    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {color}40;
-                border-radius: 8px;
-            }}
-        """
-        )
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 16, 20, 16)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 24px; font-weight: bold;"
-        )
-        layout.addWidget(value_label)
-
-        count_label = QLabel("0 ürün")
-        count_label.setObjectName("count")
-        count_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
-        layout.addWidget(count_label)
-
-        return card
+    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
 
     def _setup_table(self, table: QTableWidget, columns: list):
         table.setColumnCount(len(columns))
@@ -167,9 +126,6 @@ class StockAgingPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-
-        table.setStyleSheet(get_table_style())
-
     def load_data(self, data: dict):
         groups = data.get("groups", {})
 

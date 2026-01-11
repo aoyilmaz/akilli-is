@@ -12,7 +12,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class ReceiptModule(QWidget):
     """Tahsilat modulu"""
 

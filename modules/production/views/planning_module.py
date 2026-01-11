@@ -11,7 +11,6 @@ from PyQt6.QtCore import pyqtSignal
 
 from .planning_page import ProductionPlanningPage
 
-
 class PlanningModule(QWidget):
     """Üretim Planlama Modülü"""
     
@@ -206,25 +205,6 @@ class PlanningModule(QWidget):
                 msg.setWindowTitle("İş Emri Detayı")
                 msg.setTextFormat(Qt.TextFormat.RichText)
                 msg.setText(info)
-                msg.setStyleSheet("""
-                    QMessageBox {
-                        background-color: #1e293b;
-                    }
-                    QMessageBox QLabel {
-                        color: #f8fafc;
-                        font-size: 13px;
-                    }
-                    QPushButton {
-                        background-color: #334155;
-                        color: #f8fafc;
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 6px;
-                    }
-                    QPushButton:hover {
-                        background-color: #475569;
-                    }
-                """)
                 msg.exec()
                 
         except Exception as e:

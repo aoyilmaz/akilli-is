@@ -18,7 +18,6 @@ from config.styles import (
     get_table_style, get_button_style
 )
 
-
 class PaymentListPage(QWidget):
     """Odeme listesi sayfasi"""
 
@@ -42,9 +41,6 @@ class PaymentListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("Odemeler")
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; color: {TEXT_PRIMARY};"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -53,43 +49,17 @@ class PaymentListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Ara... (no, tedarikci)")
         self.search_input.setFixedWidth(250)
-        self.search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: {TEXT_PRIMARY};
-                font-size: 14px;
-            }}
-            QLineEdit:focus {{ border-color: {ACCENT}; }}
-        """)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
         refresh_btn = QPushButton("Yenile")
         refresh_btn.setFixedHeight(42)
-        refresh_btn.setStyleSheet(get_button_style("secondary"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
         add_btn = QPushButton("+ Yeni Odeme")
-        add_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {ERROR};
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: #d73a3a;
-            }}
-        """)
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -101,7 +71,6 @@ class PaymentListPage(QWidget):
 
         # Tarih araligi
         date_from_label = QLabel("Baslangic:")
-        date_from_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(date_from_label)
 
         self.date_from = QDateEdit()
@@ -112,7 +81,6 @@ class PaymentListPage(QWidget):
         filter_layout.addWidget(self.date_from)
 
         date_to_label = QLabel("Bitis:")
-        date_to_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(date_to_label)
 
         self.date_to = QDateEdit()
@@ -124,7 +92,6 @@ class PaymentListPage(QWidget):
 
         # Durum filtresi
         status_label = QLabel("Durum:")
-        status_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(status_label)
 
         self.status_combo = QComboBox()
@@ -162,9 +129,6 @@ class PaymentListPage(QWidget):
             "Odeme No", "Tarih", "Tedarikci", "Tutar",
             "Odeme Yontemi", "Durum", "Aciklama", "Islemler"
         ])
-
-        self.table.setStyleSheet(get_table_style())
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -228,30 +192,15 @@ class PaymentListPage(QWidget):
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
         card.setFixedSize(160, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
-
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 12, 16, 12)
         card_layout.setSpacing(4)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 12px; background: transparent;"
-        )
         card_layout.addWidget(title_label)
 
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 20px; "
-            f"font-weight: bold; background: transparent;"
-        )
         card_layout.addWidget(value_label)
 
         return card
@@ -346,7 +295,6 @@ class PaymentListPage(QWidget):
 
             view_btn = QPushButton("Gor")
             view_btn.setFixedSize(40, 28)
-            view_btn.setStyleSheet(self._action_btn_style(ACCENT))
             view_btn.clicked.connect(
                 lambda checked, id=pmt.get("id"): self.view_clicked.emit(id)
             )
@@ -355,7 +303,6 @@ class PaymentListPage(QWidget):
             if pmt.get("status") != "cancelled":
                 cancel_btn = QPushButton("Iptal")
                 cancel_btn.setFixedSize(45, 28)
-                cancel_btn.setStyleSheet(self._action_btn_style(ERROR))
                 cancel_btn.clicked.connect(
                     lambda checked, id=pmt.get("id"): self._confirm_cancel(id)
                 )

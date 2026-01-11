@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
     BG_SECONDARY,
@@ -31,7 +32,6 @@ from config.styles import (
     get_table_style,
     get_button_style,
 )
-
 
 class SupplierPerformancePage(QWidget):
     """Tedarikçi performans raporu sayfası"""
@@ -53,14 +53,12 @@ class SupplierPerformancePage(QWidget):
         info = QLabel(
             "Tedarikçi performansları mal kabul verilerine göre hesaplanır"
         )
-        info.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
         header_layout.addWidget(info)
 
         header_layout.addStretch()
 
         refresh_btn = QPushButton("Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        refresh_btn.setStyleSheet(get_button_style())
         header_layout.addWidget(refresh_btn)
 
         layout.addLayout(header_layout)
@@ -107,33 +105,9 @@ class SupplierPerformancePage(QWidget):
         )
         layout.addWidget(self.table)
 
-    def _create_card(self, title: str, value: str, color: str) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {color}40;
-                border-radius: 8px;
-            }}
-        """
-        )
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 16, 20, 16)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 24px; font-weight: bold;"
-        )
-        layout.addWidget(value_label)
-
-        return card
+    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
 
     def _setup_table(self, table: QTableWidget, columns: list):
         table.setColumnCount(len(columns))
@@ -150,9 +124,6 @@ class SupplierPerformancePage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-
-        table.setStyleSheet(get_table_style())
-
     def load_data(self, data: list):
         # Özet kartları güncelle
         total = len(data)
@@ -232,24 +203,9 @@ class SupplierPerformancePage(QWidget):
                 bar_color = WARNING
             else:
                 bar_color = ERROR
-
-            bar.setStyleSheet(
-                f"""
-                QProgressBar {{
-                    background-color: {BG_TERTIARY};
-                    border-radius: 6px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {bar_color};
-                    border-radius: 6px;
-                }}
-            """
-            )
             bar_layout.addWidget(bar)
 
             self.table.setCellWidget(row, 6, bar_widget)
 
-    def _update_card(self, card: QFrame, value: str):
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        card.update_value(value)

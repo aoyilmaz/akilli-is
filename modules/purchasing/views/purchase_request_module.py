@@ -13,7 +13,6 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from .purchase_request_list import PurchaseRequestListPage
 from .purchase_request_form import PurchaseRequestFormPage
 
-
 class CreateOrderDialog(QDialog):
     """Talepten sipariş oluşturma dialogu"""
 
@@ -23,8 +22,6 @@ class CreateOrderDialog(QDialog):
         self.suppliers = suppliers
         self.setWindowTitle(f"Sipariş Oluştur - {request_data.get('request_no', '')}")
         self.setMinimumSize(800, 600)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -34,13 +31,11 @@ class CreateOrderDialog(QDialog):
 
         # Başlık
         title = QLabel("📦 Sipariş Oluştur")
-        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
 
         # Tedarikçi seçimi
         supplier_layout = QHBoxLayout()
         supplier_label = QLabel("Tedarikçi:")
-        supplier_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
         supplier_layout.addWidget(supplier_label)
 
         self.supplier_combo = QComboBox()
@@ -55,7 +50,6 @@ class CreateOrderDialog(QDialog):
 
         # Kalemler tablosu
         items_label = QLabel("Sipariş Kalemleri:")
-        items_label.setStyleSheet("color: #f8fafc; font-size: 14px; margin-top: 10px;")
         layout.addWidget(items_label)
 
         self.items_table = QTableWidget()
@@ -170,7 +164,6 @@ class CreateOrderDialog(QDialog):
             QPushButton:hover {{ background-color: {hover_color}; }}
         """
 
-
 class RejectReasonDialog(QDialog):
     """Red nedeni dialogu"""
 
@@ -178,58 +171,26 @@ class RejectReasonDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Red Nedeni")
         self.setMinimumWidth(400)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
-
         layout = QVBox(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
         label = QLabel("Lütfen red nedenini belirtin:")
-        label.setStyleSheet("color: #f8fafc; font-size: 14px;")
         layout.addWidget(label)
 
         self.reason_input = QTextEdit()
         self.reason_input.setPlaceholderText("Red nedeni...")
         self.reason_input.setMinimumHeight(100)
-        self.reason_input.setStyleSheet("""
-            QTextEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f8fafc;
-            }
-        """)
         layout.addWidget(self.reason_input)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #334155;
-                color: #f8fafc;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #475569; }
-        """)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         confirm_btn = QPushButton("Reddet")
-        confirm_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ef4444;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #dc2626; }
-        """)
         confirm_btn.clicked.connect(self.accept)
         btn_layout.addWidget(confirm_btn)
 
@@ -237,7 +198,6 @@ class RejectReasonDialog(QDialog):
 
     def get_reason(self) -> str:
         return self.reason_input.toPlainText().strip()
-
 
 class PurchaseRequestModule(QWidget):
     """Satın alma talep modülü"""

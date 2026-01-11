@@ -17,7 +17,6 @@ from config.styles import (
     get_button_style
 )
 
-
 class PaymentFormPage(QWidget):
     """Odeme form sayfasi"""
 
@@ -42,13 +41,6 @@ class PaymentFormPage(QWidget):
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-        """)
-
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -58,24 +50,11 @@ class PaymentFormPage(QWidget):
         header_layout = QHBoxLayout()
 
         back_btn = QPushButton("<- Geri")
-        back_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                color: {ACCENT};
-                font-size: 14px;
-                padding: 8px 16px;
-            }}
-            QPushButton:hover {{ color: #1177bb; }}
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
         title_text = "Yeni Odeme" if not self.is_edit else "Odeme Detayi"
         title = QLabel(title_text)
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; color: {TEXT_PRIMARY};"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -94,7 +73,6 @@ class PaymentFormPage(QWidget):
         # Odeme no
         no_layout = QVBoxLayout()
         no_label = QLabel("Odeme No")
-        no_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         no_layout.addWidget(no_label)
         self.payment_no = QLineEdit()
         self.payment_no.setReadOnly(True)
@@ -107,7 +85,6 @@ class PaymentFormPage(QWidget):
         # Tarih
         date_layout = QVBoxLayout()
         date_label = QLabel("Tarih *")
-        date_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         date_layout.addWidget(date_label)
         self.payment_date = QDateEdit()
         self.payment_date.setCalendarPopup(True)
@@ -119,7 +96,6 @@ class PaymentFormPage(QWidget):
         # Tedarikci
         supplier_layout = QVBoxLayout()
         supplier_label = QLabel("Tedarikci *")
-        supplier_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         supplier_layout.addWidget(supplier_label)
         self.supplier_combo = QComboBox()
         self.supplier_combo.setStyleSheet(self._combo_style())
@@ -133,29 +109,13 @@ class PaymentFormPage(QWidget):
 
         # Tedarikci borc bilgisi karti
         self.balance_card = QFrame()
-        self.balance_card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {ERROR}20;
-                border: 1px solid {ERROR}50;
-                border-radius: 8px;
-                padding: 12px;
-            }}
-        """)
         balance_card_layout = QHBoxLayout(self.balance_card)
         balance_card_layout.setContentsMargins(16, 12, 16, 12)
 
         balance_icon = QLabel("Tedarikci Borcu:")
-        balance_icon.setStyleSheet(
-            f"color: {ERROR}; font-size: 14px; "
-            f"font-weight: bold; background: transparent;"
-        )
         balance_card_layout.addWidget(balance_icon)
 
         self.balance_label = QLabel("0.00 TL")
-        self.balance_label.setStyleSheet(
-            f"color: {ERROR}; font-size: 18px; "
-            f"font-weight: bold; background: transparent;"
-        )
         balance_card_layout.addWidget(self.balance_label)
 
         balance_card_layout.addStretch()
@@ -169,7 +129,6 @@ class PaymentFormPage(QWidget):
         # Tutar
         amount_layout = QVBoxLayout()
         amount_label = QLabel("Tutar *")
-        amount_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         amount_layout.addWidget(amount_label)
         self.amount_input = QDoubleSpinBox()
         self.amount_input.setRange(0, 999999999)
@@ -182,7 +141,6 @@ class PaymentFormPage(QWidget):
         # Odeme yontemi
         method_layout = QVBoxLayout()
         method_label = QLabel("Odeme Yontemi *")
-        method_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         method_layout.addWidget(method_label)
         self.method_combo = QComboBox()
         self.method_combo.addItem("Nakit", "cash")
@@ -198,7 +156,6 @@ class PaymentFormPage(QWidget):
         # Banka adi
         bank_layout = QVBoxLayout()
         bank_label = QLabel("Banka")
-        bank_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         bank_layout.addWidget(bank_label)
         self.bank_input = QLineEdit()
         self.bank_input.setStyleSheet(self._input_style())
@@ -214,7 +171,6 @@ class PaymentFormPage(QWidget):
         # Cek/Senet No
         check_no_layout = QVBoxLayout()
         check_no_label = QLabel("Cek/Senet No")
-        check_no_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         check_no_layout.addWidget(check_no_label)
         self.check_no_input = QLineEdit()
         self.check_no_input.setStyleSheet(self._input_style())
@@ -224,7 +180,6 @@ class PaymentFormPage(QWidget):
         # Vade tarihi
         check_date_layout = QVBoxLayout()
         check_date_label = QLabel("Vade Tarihi")
-        check_date_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         check_date_layout.addWidget(check_date_label)
         self.check_date = QDateEdit()
         self.check_date.setCalendarPopup(True)
@@ -239,7 +194,6 @@ class PaymentFormPage(QWidget):
         # Aciklama
         desc_layout = QVBoxLayout()
         desc_label = QLabel("Aciklama")
-        desc_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         desc_layout.addWidget(desc_label)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(80)
@@ -255,13 +209,11 @@ class PaymentFormPage(QWidget):
 
         cancel_btn = QPushButton("Iptal")
         cancel_btn.setFixedSize(120, 44)
-        cancel_btn.setStyleSheet(get_button_style("secondary"))
         cancel_btn.clicked.connect(self.cancelled.emit)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
         save_btn.setFixedSize(120, 44)
-        save_btn.setStyleSheet(get_button_style("danger"))
         save_btn.clicked.connect(self._save)
         btn_layout.addWidget(save_btn)
 

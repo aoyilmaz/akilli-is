@@ -10,11 +10,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
 )
-from config.styles import get_button_style, get_title_style
 from modules.accounting.services import AccountingService
 from modules.accounting.views.journal_list import JournalListWidget
 from modules.accounting.views.journal_form import JournalFormDialog
-
 
 class JournalModule(QWidget):
     """Yevmiye fişi modülü"""
@@ -36,14 +34,12 @@ class JournalModule(QWidget):
         header = QHBoxLayout()
 
         title = QLabel("Yevmiye Fisleri")
-        title.setStyleSheet(get_title_style())
         header.addWidget(title)
 
         header.addStretch()
 
         # Yeni fis
         new_btn = QPushButton("Yeni Yevmiye")
-        new_btn.setStyleSheet(get_button_style("primary"))
         new_btn.clicked.connect(self._new_journal)
         header.addWidget(new_btn)
 
@@ -59,12 +55,10 @@ class JournalModule(QWidget):
         footer = QHBoxLayout()
 
         post_btn = QPushButton("Deftere Isle")
-        post_btn.setStyleSheet(get_button_style("success"))
         post_btn.clicked.connect(self._post_journal)
         footer.addWidget(post_btn)
 
         cancel_btn = QPushButton("Iptal Et")
-        cancel_btn.setStyleSheet(get_button_style("danger"))
         cancel_btn.clicked.connect(self._cancel_journal)
         footer.addWidget(cancel_btn)
 

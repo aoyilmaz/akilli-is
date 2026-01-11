@@ -17,7 +17,6 @@ from config.styles import (
     get_table_style, get_button_style
 )
 
-
 class ReconciliationPage(QWidget):
     """Mutabakat sayfasi"""
 
@@ -39,9 +38,6 @@ class ReconciliationPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("Mutabakat")
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; color: {TEXT_PRIMARY};"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -49,7 +45,6 @@ class ReconciliationPage(QWidget):
         # Yazdir butonu
         print_btn = QPushButton("Yazdir")
         print_btn.setFixedHeight(42)
-        print_btn.setStyleSheet(get_button_style())
         print_btn.clicked.connect(self._on_print)
         header_layout.addWidget(print_btn)
 
@@ -65,9 +60,6 @@ class ReconciliationPage(QWidget):
         # Cari tipi
         type_layout = QVBoxLayout()
         type_label = QLabel("Cari Tipi")
-        type_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         type_layout.addWidget(type_label)
 
         self.type_combo = QComboBox()
@@ -82,9 +74,6 @@ class ReconciliationPage(QWidget):
         # Cari secimi
         entity_layout = QVBoxLayout()
         entity_label = QLabel("Cari Hesap")
-        entity_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         entity_layout.addWidget(entity_label)
 
         self.entity_combo = QComboBox()
@@ -97,7 +86,6 @@ class ReconciliationPage(QWidget):
         # Sorgula butonu
         query_btn = QPushButton("Sorgula")
         query_btn.setFixedSize(100, 42)
-        query_btn.setStyleSheet(get_button_style())
         query_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(
             query_btn, alignment=Qt.AlignmentFlag.AlignBottom
@@ -137,9 +125,6 @@ class ReconciliationPage(QWidget):
         self.open_table.setHorizontalHeaderLabels([
             "Fatura No", "Tarih", "Vade", "Toplam", "Odenen", "Kalan"
         ])
-
-        self.open_table.setStyleSheet(get_table_style())
-
         self.open_table.setAlternatingRowColors(True)
         self.open_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -204,30 +189,15 @@ class ReconciliationPage(QWidget):
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
         card.setFixedSize(180, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
-
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(4)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 12px; background: transparent;"
-        )
         layout.addWidget(title_label)
 
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 18px; "
-            f"font-weight: bold; background: transparent;"
-        )
         layout.addWidget(value_label)
 
         return card

@@ -279,8 +279,55 @@ AURORA_NOVA_THEME = Theme(
 )
 
 
-# Tema koleksiyonu - PyERP Pro varsayılan
+# === VS CODE DARK TEMA (Global tema ile uyumlu) ===
+VSCODE_DARK_THEME = Theme(
+    name="vscode_dark",
+    display_name="VS Code Dark",
+    # VS Code Dark colors
+    bg_primary="#1e1e1e",
+    bg_secondary="#252526",
+    bg_tertiary="#2d2d2d",
+    bg_hover="#3e3e42",
+    bg_selected="#094771",
+    # Borders
+    border="#3e3e42",
+    border_light="#5a5a5a",
+    # Text
+    text_primary="#cccccc",
+    text_secondary="#d4d4d4",
+    text_muted="#969696",
+    text_accent="#007acc",
+    # Accent - VS Code blue
+    accent_primary="#007acc",
+    accent_secondary="#4ec9b0",
+    accent_gradient_start="#007acc",
+    accent_gradient_end="#4ec9b0",
+    # Status colors
+    success="#4ec9b0",
+    warning="#dcdcaa",
+    error="#f14c4c",
+    info="#007acc",
+    # Areas
+    sidebar_bg="#252526",
+    header_bg="#1e1e1e",
+    card_bg="#252526",
+    input_bg="#3c3c3c",
+    # Font
+    font_family="Inter, Segoe UI, Arial, sans-serif",
+    font_size=13,
+    font_size_small=11,
+    font_size_large=15,
+    font_size_title=22,
+    # Radius
+    radius_small=4,
+    radius_medium=6,
+    radius_large=8,
+)
+
+
+# Tema koleksiyonu - VS Code Dark varsayılan
 THEMES: Dict[str, Theme] = {
+    "vscode_dark": VSCODE_DARK_THEME,
     "pyerp_pro": PYERP_PRO_THEME,
     "one_dark_pro": ONE_DARK_PRO_THEME,
     "dark": DARK_THEME,
@@ -293,7 +340,7 @@ class ThemeManager:
     """Tema yöneticisi"""
 
     _instance = None
-    _current_theme: Theme = PYERP_PRO_THEME  # Varsayılan PyERP Pro
+    _current_theme: Theme = VSCODE_DARK_THEME  # VS Code Dark varsayılan
     _callbacks = []
 
     def __new__(cls):

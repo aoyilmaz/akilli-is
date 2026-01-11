@@ -18,7 +18,6 @@ from config.styles import (
     get_table_style, get_button_style
 )
 
-
 class AccountStatementListPage(QWidget):
     """Cari hesap ekstresi liste sayfasi"""
 
@@ -41,9 +40,6 @@ class AccountStatementListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("Cari Hesap Ekstresi")
-        title.setStyleSheet(
-            f"font-size: 24px; font-weight: bold; color: {TEXT_PRIMARY};"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -51,14 +47,12 @@ class AccountStatementListPage(QWidget):
         # Yenile butonu
         refresh_btn = QPushButton("Yenile")
         refresh_btn.setFixedHeight(42)
-        refresh_btn.setStyleSheet(get_button_style("secondary"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Excel'e aktar
         export_btn = QPushButton("Excel'e Aktar")
         export_btn.setFixedHeight(42)
-        export_btn.setStyleSheet(get_button_style("success"))
         export_btn.clicked.connect(self._on_export)
         header_layout.addWidget(export_btn)
 
@@ -74,9 +68,6 @@ class AccountStatementListPage(QWidget):
         # Cari tipi
         type_layout = QVBoxLayout()
         type_label = QLabel("Cari Tipi")
-        type_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         type_layout.addWidget(type_label)
 
         self.type_combo = QComboBox()
@@ -91,9 +82,6 @@ class AccountStatementListPage(QWidget):
         # Cari secimi
         entity_layout = QVBoxLayout()
         entity_label = QLabel("Cari Hesap")
-        entity_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         entity_layout.addWidget(entity_label)
 
         self.entity_combo = QComboBox()
@@ -106,9 +94,6 @@ class AccountStatementListPage(QWidget):
         # Tarih araligi
         date_from_layout = QVBoxLayout()
         date_from_label = QLabel("Baslangic Tarihi")
-        date_from_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         date_from_layout.addWidget(date_from_label)
 
         self.date_from = QDateEdit()
@@ -121,9 +106,6 @@ class AccountStatementListPage(QWidget):
 
         date_to_layout = QVBoxLayout()
         date_to_label = QLabel("Bitis Tarihi")
-        date_to_label.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 12px; font-weight: normal;"
-        )
         date_to_layout.addWidget(date_to_label)
 
         self.date_to = QDateEdit()
@@ -137,7 +119,6 @@ class AccountStatementListPage(QWidget):
         # Filtrele butonu
         filter_btn = QPushButton("Filtrele")
         filter_btn.setFixedSize(100, 42)
-        filter_btn.setStyleSheet(get_button_style())
         filter_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(
             filter_btn, alignment=Qt.AlignmentFlag.AlignBottom
@@ -178,9 +159,6 @@ class AccountStatementListPage(QWidget):
             "Tarih", "Hareket No", "Tur", "Aciklama",
             "Borc", "Alacak", "Bakiye"
         ])
-
-        self.table.setStyleSheet(get_table_style())
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -275,30 +253,15 @@ class AccountStatementListPage(QWidget):
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
         card.setFixedSize(180, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
-
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(4)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 12px; background: transparent;"
-        )
         layout.addWidget(title_label)
 
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 18px; "
-            f"font-weight: bold; background: transparent;"
-        )
         layout.addWidget(value_label)
 
         return card

@@ -16,7 +16,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class PaymentDialog(QDialog):
     """Ödeme kayıt dialogu"""
 
@@ -64,7 +63,6 @@ class PaymentDialog(QDialog):
             "payment_date": self.date_edit.date().toPyDate(),
             "notes": self.notes_edit.toPlainText(),
         }
-
 
 class InvoiceModule(QWidget):
     """Fatura modülü"""

@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.inventory.services import UnitService
 from modules.inventory.views.unit_management import UnitManagementPage
 
-
 class UnitModule(QWidget):
     """Birim yönetimi modülü"""
     

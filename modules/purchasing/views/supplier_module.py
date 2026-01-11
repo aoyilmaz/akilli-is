@@ -8,7 +8,6 @@ from PyQt6.QtCore import pyqtSignal
 from .supplier_list import SupplierListPage
 from .supplier_form import SupplierFormPage
 
-
 class SupplierModule(QWidget):
     """Tedarikçi yönetimi modülü"""
     

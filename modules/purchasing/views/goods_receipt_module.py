@@ -14,7 +14,6 @@ from .goods_receipt_list import GoodsReceiptListPage
 from .goods_receipt_form import GoodsReceiptFormPage
 from .purchase_order_module import CreateReceiptDialog
 
-
 class OrderSelectorDialog(QDialog):
     """Sipariş seçim dialogu"""
 
@@ -24,8 +23,6 @@ class OrderSelectorDialog(QDialog):
         self.selected_order_id = None
         self.setWindowTitle("Sipariş Seç")
         self.setMinimumSize(800, 600)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -35,11 +32,9 @@ class OrderSelectorDialog(QDialog):
 
         # Başlık
         title = QLabel("📦 Sipariş Seçin")
-        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
 
         info_label = QLabel("Mal kabul oluşturmak için bir sipariş seçin:")
-        info_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
         layout.addWidget(info_label)
 
         # Siparişler tablosu
@@ -168,7 +163,6 @@ class OrderSelectorDialog(QDialog):
             }}
             QPushButton:hover {{ background-color: {hover_color}; }}
         """
-
 
 class GoodsReceiptModule(QWidget):
     """Mal kabul modülü"""

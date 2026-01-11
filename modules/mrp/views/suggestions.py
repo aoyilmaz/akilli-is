@@ -28,7 +28,6 @@ from config.styles import (
     get_table_style, get_button_style, get_input_style
 )
 
-
 class SuggestionsPage(QWidget):
     """Tedarik önerileri sayfası"""
 
@@ -46,26 +45,12 @@ class SuggestionsPage(QWidget):
         header = QHBoxLayout()
 
         title = QLabel("Tedarik Onerileri")
-        title.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {TEXT_PRIMARY};")
         header.addWidget(title)
 
         header.addStretch()
 
         # Tümünü uygula
         apply_all_btn = QPushButton("Tumunu Uygula")
-        apply_all_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: {BTN_SUCCESS_BG};
-                border: none;
-                color: white;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {BTN_SUCCESS_HOVER}; }}
-        """
-        )
         apply_all_btn.clicked.connect(self._apply_all)
         header.addWidget(apply_all_btn)
 
@@ -79,33 +64,12 @@ class SuggestionsPage(QWidget):
         self.type_filter.addItem("Tümü", None)
         self.type_filter.addItem("🛒 Satınalma", SuggestionType.PURCHASE)
         self.type_filter.addItem("🏭 Üretim", SuggestionType.MANUFACTURE)
-        self.type_filter.setStyleSheet(
-            f"""
-            QComboBox {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 6px;
-                padding: 8px;
-                color: {TEXT_PRIMARY};
-                min-width: 150px;
-            }}
-            QComboBox:focus {{
-                border: 1px solid {INPUT_FOCUS};
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {BG_HOVER};
-            }}
-        """
-        )
         self.type_filter.currentIndexChanged.connect(self._filter_changed)
         filter_row.addWidget(self.type_filter)
 
         filter_row.addStretch()
 
         self.count_label = QLabel("0 oneri")
-        self.count_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_row.addWidget(self.count_label)
 
         layout.addLayout(filter_row)
@@ -136,8 +100,6 @@ class SuggestionsPage(QWidget):
 
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.verticalHeader().setVisible(False)
-        self.table.setStyleSheet(get_table_style())
-
         layout.addWidget(self.table)
 
     def load_suggestions(self, run_id: int):
@@ -200,18 +162,6 @@ class SuggestionsPage(QWidget):
 
             # Aksiyon butonu
             apply_btn = QPushButton("Uygula")
-            apply_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background-color: {BG_TERTIARY};
-                    border: 1px solid {BORDER};
-                    color: {TEXT_PRIMARY};
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                }}
-                QPushButton:hover {{ background-color: {BG_HOVER}; }}
-            """
-            )
             apply_btn.clicked.connect(
                 lambda checked, lid=sug.id: self._apply_single(lid)
             )

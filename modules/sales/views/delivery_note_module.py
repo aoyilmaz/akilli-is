@@ -14,7 +14,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class DeliveryNoteModule(QWidget):
     """Teslimat irsaliyesi modülü"""
 

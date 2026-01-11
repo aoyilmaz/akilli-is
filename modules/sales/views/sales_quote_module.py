@@ -15,7 +15,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class SalesQuoteModule(QWidget):
     """Satış teklif modülü"""
 

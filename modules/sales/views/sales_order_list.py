@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-
+from ui.components.stat_cards import MiniStatCard
 
 class SalesOrderListPage(QWidget):
     """Satış siparişleri listesi"""
@@ -37,9 +37,6 @@ class SalesOrderListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("🛒 Satış Siparişleri")
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: bold; color: #f8fafc;"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -62,57 +59,17 @@ class SalesOrderListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Ara... (sipariş no, müşteri)")
         self.search_input.setFixedWidth(250)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("🔄")
+        refresh_btn = QPushButton("Yen")
         refresh_btn.setFixedSize(42, 42)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                font-size: 18px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
         add_btn = QPushButton("➕ Yeni Sipariş")
-        add_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6366f1, stop:1 #a855f7
-                );
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #4f46e5, stop:1 #9333ea
-                );
-            }
-        """)
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -155,31 +112,6 @@ class SalesOrderListPage(QWidget):
         ])
 
         # Tablo stili
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                gridline-color: #1e293b;
-            }
-            QTableWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #1e293b;
-                color: #f8fafc;
-            }
-            QTableWidget::item:selected {
-                background-color: #6366f120;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 12px;
-                border: none;
-                font-weight: 600;
-                font-size: 12px;
-            }
-        """)
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -211,48 +143,13 @@ class SalesOrderListPage(QWidget):
 
     def _create_stat_card(
         self, icon: str, title: str, value: str, color: str
-    ) -> QFrame:
-        card = QFrame()
-        card.setFixedSize(140, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
+    ) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(f"{icon} {title}", value, color)
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
-
-        header = QHBoxLayout()
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 14px; background: transparent;")
-        header.addWidget(icon_label)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 11px; background: transparent;"
-        )
-        header.addWidget(title_label)
-        header.addStretch()
-        layout.addLayout(header)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 22px; "
-            f"font-weight: bold; background: transparent;"
-        )
-        layout.addWidget(value_label)
-
-        return card
-
-    def _update_card(self, card: QFrame, value: str):
-        label = card.findChild(QLabel, "value")
-        if label:
-            label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        """Kart değerini güncelle"""
+        card.update_value(value)
 
     def _combo_style(self):
         return """
@@ -376,9 +273,8 @@ class SalesOrderListPage(QWidget):
             order_status = order.get("status", "draft")
 
             # Görüntüle
-            view_btn = QPushButton("👁")
-            view_btn.setFixedSize(32, 32)
-            view_btn.setStyleSheet(self._action_btn_style("#3b82f6"))
+            view_btn = QPushButton("Gör")
+            view_btn.setFixedSize(40, 28)
             view_btn.setToolTip("Görüntüle")
             view_btn.clicked.connect(
                 lambda checked, id=order_id: self.view_clicked.emit(id)
@@ -387,9 +283,8 @@ class SalesOrderListPage(QWidget):
 
             # Düzenle (sadece taslak)
             if order_status == "draft":
-                edit_btn = QPushButton("✏️")
-                edit_btn.setFixedSize(32, 32)
-                edit_btn.setStyleSheet(self._action_btn_style("#f59e0b"))
+                edit_btn = QPushButton("Düz")
+                edit_btn.setFixedSize(40, 28)
                 edit_btn.setToolTip("Düzenle")
                 edit_btn.clicked.connect(
                     lambda checked, id=order_id: self.edit_clicked.emit(id)
@@ -397,9 +292,8 @@ class SalesOrderListPage(QWidget):
                 btn_layout.addWidget(edit_btn)
 
                 # Onayla
-                confirm_btn = QPushButton("✅")
-                confirm_btn.setFixedSize(32, 32)
-                confirm_btn.setStyleSheet(self._action_btn_style("#10b981"))
+                confirm_btn = QPushButton("On")
+                confirm_btn.setFixedSize(40, 28)
                 confirm_btn.setToolTip("Onayla")
                 confirm_btn.clicked.connect(
                     lambda checked, id=order_id: self.confirm_clicked.emit(id)
@@ -408,9 +302,8 @@ class SalesOrderListPage(QWidget):
 
             # İrsaliye Oluştur (confirmed veya partial_delivered)
             if order_status in ["confirmed", "partial_delivered"]:
-                delivery_btn = QPushButton("🚚")
-                delivery_btn.setFixedSize(32, 32)
-                delivery_btn.setStyleSheet(self._action_btn_style("#8b5cf6"))
+                delivery_btn = QPushButton("Sev")
+                delivery_btn.setFixedSize(40, 28)
                 delivery_btn.setToolTip("İrsaliye Oluştur")
                 delivery_btn.clicked.connect(
                     lambda checked, id=order_id: (
@@ -421,9 +314,8 @@ class SalesOrderListPage(QWidget):
 
             # İptal (sadece taslak veya onaylanmış)
             if order_status in ["draft", "confirmed"]:
-                cancel_btn = QPushButton("❌")
-                cancel_btn.setFixedSize(32, 32)
-                cancel_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+                cancel_btn = QPushButton("İpt")
+                cancel_btn.setFixedSize(40, 28)
                 cancel_btn.setToolTip("İptal Et")
                 cancel_btn.clicked.connect(
                     lambda checked, id=order_id: self.cancel_clicked.emit(id)
@@ -432,9 +324,8 @@ class SalesOrderListPage(QWidget):
 
             # Sil (sadece taslak)
             if order_status == "draft":
-                del_btn = QPushButton("🗑")
-                del_btn.setFixedSize(32, 32)
-                del_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+                del_btn = QPushButton("Sil")
+                del_btn.setFixedSize(40, 28)
                 del_btn.setToolTip("Sil")
                 del_btn.clicked.connect(
                     lambda checked, id=order_id: self._confirm_delete(id)

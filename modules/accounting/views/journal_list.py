@@ -28,7 +28,6 @@ from config.styles import (
 )
 from database.models.accounting import JournalEntryStatus
 
-
 class JournalListWidget(QWidget):
     """Yevmiye listesi"""
 
@@ -50,41 +49,34 @@ class JournalListWidget(QWidget):
 
         # Başlangıç tarihi
         start_label = QLabel("Başlangıç:")
-        start_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(start_label)
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        self._style_date(self.start_date)
         filter_layout.addWidget(self.start_date)
 
         # Bitiş tarihi
         end_label = QLabel("Bitiş:")
-        end_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(end_label)
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        self._style_date(self.end_date)
         filter_layout.addWidget(self.end_date)
 
         # Durum
         status_label = QLabel("Durum:")
-        status_label.setStyleSheet(f"color: {TEXT_MUTED};")
         filter_layout.addWidget(status_label)
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
         self.status_combo.addItem("Taslak", JournalEntryStatus.DRAFT)
         self.status_combo.addItem("İşlenmiş", JournalEntryStatus.POSTED)
         self.status_combo.addItem("İptal", JournalEntryStatus.CANCELLED)
-        self._style_combo(self.status_combo)
         filter_layout.addWidget(self.status_combo)
 
         filter_layout.addStretch()
 
         # Filtrele butonu
         filter_btn = QPushButton("Filtrele")
-        filter_btn.setStyleSheet(get_button_style("secondary"))
         filter_btn.clicked.connect(lambda: self.refresh_requested.emit())
         filter_layout.addWidget(filter_btn)
 
@@ -111,43 +103,9 @@ class JournalListWidget(QWidget):
         )
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
-
-        self.table.setStyleSheet(get_table_style())
-
         self.table.itemDoubleClicked.connect(self._on_double_click)
 
         layout.addWidget(self.table)
-
-    def _style_date(self, widget):
-        widget.setStyleSheet(f"""
-            QDateEdit {{
-                background-color: {BG_PRIMARY};
-                border: 1px solid {BORDER};
-                border-radius: 6px;
-                padding: 6px 10px;
-                color: {TEXT_PRIMARY};
-            }}
-            QDateEdit:focus {{ border-color: {ACCENT}; }}
-        """)
-
-    def _style_combo(self, widget):
-        widget.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {BG_PRIMARY};
-                border: 1px solid {BORDER};
-                border-radius: 6px;
-                padding: 6px 10px;
-                color: {TEXT_PRIMARY};
-                min-width: 100px;
-            }}
-            QComboBox:focus {{ border-color: {ACCENT}; }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {ACCENT};
-                color: {TEXT_PRIMARY};
-            }}
-        """)
 
     def load_journals(self, journals: list):
         """Yevmiyeleri yükle"""

@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 
-
 class ItemSelectDialog(QDialog):
     """Stok karti secim dialogu"""
 
@@ -26,29 +25,11 @@ class ItemSelectDialog(QDialog):
     def setup_ui(self):
         self.setWindowTitle("Stok Karti Sec")
         self.setMinimumSize(600, 400)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #0f172a;
-            }
-            QLabel {
-                color: #f8fafc;
-            }
-        """)
-
         layout = QVBoxLayout(self)
 
         # Arama
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Ara... (kod, ad)")
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-            }
-        """)
         self.search_input.textChanged.connect(self._on_search)
         layout.addWidget(self.search_input)
 
@@ -58,20 +39,6 @@ class ItemSelectDialog(QDialog):
         self.table.setHorizontalHeaderLabels([
             "Kod", "Stok Adi", "Birim", "Satis Fiyati"
         ])
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QHeaderView::section {
-                background-color: #0f172a;
-                color: #94a3b8;
-                padding: 8px;
-                border: none;
-            }
-        """)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -142,7 +109,6 @@ class ItemSelectDialog(QDialog):
     def get_selected(self):
         return self.selected_item
 
-
 class PriceListFormPage(QWidget):
     """Fiyat listesi form sayfasi"""
 
@@ -177,47 +143,15 @@ class PriceListFormPage(QWidget):
             if self.is_edit else "Yeni Fiyat Listesi"
         )
         title = QLabel(title_text)
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: bold; color: #f8fafc;"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
 
         cancel_btn = QPushButton("Iptal")
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 12px 24px;
-                color: #f8fafc;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
         cancel_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6366f1, stop:1 #a855f7
-                );
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #4f46e5, stop:1 #9333ea
-                );
-            }
-        """)
         save_btn.clicked.connect(self._save)
         header_layout.addWidget(save_btn)
 
@@ -226,13 +160,6 @@ class PriceListFormPage(QWidget):
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-        """)
-
         content = QWidget()
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(16)
@@ -280,7 +207,6 @@ class PriceListFormPage(QWidget):
 
         # Varsayilan
         self.default_check = QCheckBox("Varsayilan liste olarak ayarla")
-        self.default_check.setStyleSheet("color: #f8fafc;")
         basic_layout.addRow("", self.default_check)
 
         basic_frame.layout().addLayout(basic_layout)
@@ -314,16 +240,6 @@ class PriceListFormPage(QWidget):
         # Kalem ekleme butonu
         item_btn_layout = QHBoxLayout()
         add_item_btn = QPushButton("+ Kalem Ekle")
-        add_item_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """)
         add_item_btn.clicked.connect(self._add_item)
         item_btn_layout.addWidget(add_item_btn)
         item_btn_layout.addStretch()
@@ -336,20 +252,6 @@ class PriceListFormPage(QWidget):
             "Stok Kodu", "Stok Adi", "Birim Fiyat",
             "Min. Miktar", "Iskonto %", "Sil"
         ])
-        self.items_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QHeaderView::section {
-                background-color: #0f172a;
-                color: #94a3b8;
-                padding: 8px;
-                border: none;
-            }
-        """)
         self.items_table.setMinimumHeight(200)
         self.items_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch
@@ -369,26 +271,11 @@ class PriceListFormPage(QWidget):
 
     def _create_section(self, title: str) -> QFrame:
         frame = QFrame()
-        frame.setStyleSheet("""
-            QFrame {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QLabel {
-                color: #f8fafc;
-                background: transparent;
-            }
-        """)
-
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #f8fafc;"
-        )
         layout.addWidget(title_label)
 
         return frame
@@ -492,15 +379,6 @@ class PriceListFormPage(QWidget):
         price_spin.setRange(0, 999999999)
         price_spin.setDecimals(4)
         price_spin.setValue(float(item_data.get("unit_price", 0) or 0))
-        price_spin.setStyleSheet("""
-            QDoubleSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px;
-                color: #f8fafc;
-            }
-        """)
         self.items_table.setCellWidget(row, 2, price_spin)
 
         # Min miktar
@@ -508,15 +386,6 @@ class PriceListFormPage(QWidget):
         min_spin.setRange(0, 999999999)
         min_spin.setDecimals(2)
         min_spin.setValue(float(item_data.get("min_quantity", 0) or 0))
-        min_spin.setStyleSheet("""
-            QDoubleSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px;
-                color: #f8fafc;
-            }
-        """)
         self.items_table.setCellWidget(row, 3, min_spin)
 
         # Iskonto
@@ -524,29 +393,10 @@ class PriceListFormPage(QWidget):
         disc_spin.setRange(0, 100)
         disc_spin.setDecimals(2)
         disc_spin.setValue(float(item_data.get("discount_rate", 0) or 0))
-        disc_spin.setStyleSheet("""
-            QDoubleSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px;
-                color: #f8fafc;
-            }
-        """)
         self.items_table.setCellWidget(row, 4, disc_spin)
 
         # Sil butonu
         del_btn = QPushButton("X")
-        del_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ef444420;
-                border: 1px solid #ef444450;
-                border-radius: 4px;
-                color: #ef4444;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #ef444440; }
-        """)
         del_btn.clicked.connect(lambda: self._remove_item_row(row))
         self.items_table.setCellWidget(row, 5, del_btn)
 

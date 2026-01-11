@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-
+from ui.components.stat_cards import MiniStatCard
 
 class DeliveryNoteListPage(QWidget):
     """Teslimat irsaliyeleri listesi"""
@@ -38,9 +38,6 @@ class DeliveryNoteListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("🚚 Teslimat İrsaliyeleri")
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: bold; color: #f8fafc;"
-        )
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -61,57 +58,17 @@ class DeliveryNoteListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Ara... (irsaliye no, müşteri)")
         self.search_input.setFixedWidth(250)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("🔄")
+        refresh_btn = QPushButton("Yen")
         refresh_btn.setFixedSize(42, 42)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                font-size: 18px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
         add_btn = QPushButton("➕ Yeni İrsaliye")
-        add_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6366f1, stop:1 #a855f7
-                );
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #4f46e5, stop:1 #9333ea
-                );
-            }
-        """)
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -149,31 +106,6 @@ class DeliveryNoteListPage(QWidget):
         ])
 
         # Tablo stili
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                gridline-color: #1e293b;
-            }
-            QTableWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #1e293b;
-                color: #f8fafc;
-            }
-            QTableWidget::item:selected {
-                background-color: #6366f120;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 12px;
-                border: none;
-                font-weight: 600;
-                font-size: 12px;
-            }
-        """)
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -204,48 +136,13 @@ class DeliveryNoteListPage(QWidget):
 
     def _create_stat_card(
         self, icon: str, title: str, value: str, color: str
-    ) -> QFrame:
-        card = QFrame()
-        card.setFixedSize(140, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
+    ) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(f"{icon} {title}", value, color)
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
-
-        header = QHBoxLayout()
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 14px; background: transparent;")
-        header.addWidget(icon_label)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 11px; background: transparent;"
-        )
-        header.addWidget(title_label)
-        header.addStretch()
-        layout.addLayout(header)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 22px; "
-            f"font-weight: bold; background: transparent;"
-        )
-        layout.addWidget(value_label)
-
-        return card
-
-    def _update_card(self, card: QFrame, value: str):
-        label = card.findChild(QLabel, "value")
-        if label:
-            label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        """Kart değerini güncelle"""
+        card.update_value(value)
 
     def _combo_style(self):
         return """
@@ -363,9 +260,8 @@ class DeliveryNoteListPage(QWidget):
             note_status = note.get("status", "draft")
 
             # Görüntüle
-            view_btn = QPushButton("👁")
-            view_btn.setFixedSize(32, 32)
-            view_btn.setStyleSheet(self._action_btn_style("#3b82f6"))
+            view_btn = QPushButton("Gör")
+            view_btn.setFixedSize(40, 28)
             view_btn.setToolTip("Görüntüle")
             view_btn.clicked.connect(
                 lambda checked, id=note_id: self.view_clicked.emit(id)
@@ -374,9 +270,8 @@ class DeliveryNoteListPage(QWidget):
 
             # Düzenle (sadece taslak)
             if note_status == "draft":
-                edit_btn = QPushButton("✏️")
-                edit_btn.setFixedSize(32, 32)
-                edit_btn.setStyleSheet(self._action_btn_style("#f59e0b"))
+                edit_btn = QPushButton("Düz")
+                edit_btn.setFixedSize(40, 28)
                 edit_btn.setToolTip("Düzenle")
                 edit_btn.clicked.connect(
                     lambda checked, id=note_id: self.edit_clicked.emit(id)
@@ -385,8 +280,7 @@ class DeliveryNoteListPage(QWidget):
 
                 # Sevk Et
                 ship_btn = QPushButton("📦")
-                ship_btn.setFixedSize(32, 32)
-                ship_btn.setStyleSheet(self._action_btn_style("#f59e0b"))
+                ship_btn.setFixedSize(40, 28)
                 ship_btn.setToolTip("Sevk Et")
                 ship_btn.clicked.connect(
                     lambda checked, id=note_id: self.ship_clicked.emit(id)
@@ -395,9 +289,8 @@ class DeliveryNoteListPage(QWidget):
 
             # Teslim Et (sadece shipped)
             if note_status == "shipped":
-                complete_btn = QPushButton("✅")
-                complete_btn.setFixedSize(32, 32)
-                complete_btn.setStyleSheet(self._action_btn_style("#10b981"))
+                complete_btn = QPushButton("On")
+                complete_btn.setFixedSize(40, 28)
                 complete_btn.setToolTip("Teslim Et")
                 complete_btn.clicked.connect(
                     lambda checked, id=note_id: self.complete_clicked.emit(id)
@@ -407,8 +300,7 @@ class DeliveryNoteListPage(QWidget):
             # Fatura Oluştur (delivered)
             if note_status == "delivered":
                 invoice_btn = QPushButton("📄")
-                invoice_btn.setFixedSize(32, 32)
-                invoice_btn.setStyleSheet(self._action_btn_style("#8b5cf6"))
+                invoice_btn.setFixedSize(40, 28)
                 invoice_btn.setToolTip("Fatura Oluştur")
                 invoice_btn.clicked.connect(
                     lambda checked, id=note_id: (
@@ -419,9 +311,8 @@ class DeliveryNoteListPage(QWidget):
 
             # İptal (sadece taslak veya shipped)
             if note_status in ["draft", "shipped"]:
-                cancel_btn = QPushButton("❌")
-                cancel_btn.setFixedSize(32, 32)
-                cancel_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+                cancel_btn = QPushButton("İpt")
+                cancel_btn.setFixedSize(40, 28)
                 cancel_btn.setToolTip("İptal Et")
                 cancel_btn.clicked.connect(
                     lambda checked, id=note_id: self.cancel_clicked.emit(id)
@@ -430,9 +321,8 @@ class DeliveryNoteListPage(QWidget):
 
             # Sil (sadece taslak)
             if note_status == "draft":
-                del_btn = QPushButton("🗑")
-                del_btn.setFixedSize(32, 32)
-                del_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+                del_btn = QPushButton("Sil")
+                del_btn.setFixedSize(40, 28)
                 del_btn.setToolTip("Sil")
                 del_btn.clicked.connect(
                     lambda checked, id=note_id: self._confirm_delete(id)

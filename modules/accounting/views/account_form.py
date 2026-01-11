@@ -27,7 +27,6 @@ from config.styles import (
 from database.models.accounting import Account, AccountType
 from modules.accounting.services import AccountingService
 
-
 class AccountFormDialog(QDialog):
     """Hesap kartı formu"""
 
@@ -44,49 +43,6 @@ class AccountFormDialog(QDialog):
     def setup_ui(self):
         self.setWindowTitle("Hesap Duzenle" if self.account_id else "Yeni Hesap")
         self.setMinimumWidth(500)
-        self.setStyleSheet(
-            f"""
-            QDialog {{
-                background-color: {BG_PRIMARY};
-            }}
-            QLabel {{
-                color: {TEXT_MUTED};
-                font-size: 13px;
-            }}
-            QLineEdit, QComboBox, QTextEdit {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 4px;
-                padding: 10px;
-                color: {TEXT_PRIMARY};
-                font-size: 14px;
-            }}
-            QLineEdit:focus, QComboBox:focus, QTextEdit:focus {{
-                border-color: {ACCENT};
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {BG_HOVER};
-            }}
-            QCheckBox {{
-                color: {TEXT_PRIMARY};
-                spacing: 8px;
-            }}
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-                border-radius: 4px;
-                border: 1px solid {INPUT_BORDER};
-                background-color: {INPUT_BG};
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: {ACCENT};
-                border-color: {ACCENT};
-            }}
-        """
-        )
-
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -152,12 +108,10 @@ class AccountFormDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("Iptal")
-        cancel_btn.setStyleSheet(get_button_style("secondary"))
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
-        save_btn.setStyleSheet(get_button_style("primary"))
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 

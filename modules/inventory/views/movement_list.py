@@ -16,7 +16,6 @@ from PyQt6.QtGui import QColor, QAction
 from config import COLORS
 from database.models import StockMovementType
 
-
 class MovementListPage(QWidget):
     """Stok hareketleri listesi"""
     
@@ -40,9 +39,7 @@ class MovementListPage(QWidget):
         
         title_layout = QVBoxLayout()
         title = QLabel("Stok Hareketleri")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         subtitle = QLabel("Stok giriş, çıkış ve transfer işlemlerini yönetin")
-        subtitle.setStyleSheet("font-size: 14px; color: #94a3b8;")
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
         header_layout.addLayout(title_layout)
@@ -51,52 +48,18 @@ class MovementListPage(QWidget):
         
         # Butonlar
         refresh_btn = QPushButton("🔄 Yenile")
-        self._style_button(refresh_btn)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
         
         entry_btn = QPushButton("📥 Giriş Fişi")
-        entry_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 20px;
-                border-radius: 12px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """)
         entry_btn.clicked.connect(self.add_entry_clicked.emit)
         header_layout.addWidget(entry_btn)
         
         exit_btn = QPushButton("📤 Çıkış Fişi")
-        exit_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ef4444;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 20px;
-                border-radius: 12px;
-            }
-            QPushButton:hover { background-color: #dc2626; }
-        """)
         exit_btn.clicked.connect(self.add_exit_clicked.emit)
         header_layout.addWidget(exit_btn)
         
         transfer_btn = QPushButton("🔄 Transfer")
-        transfer_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6366f1;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 20px;
-                border-radius: 12px;
-            }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         transfer_btn.clicked.connect(self.add_transfer_clicked.emit)
         header_layout.addWidget(transfer_btn)
         
@@ -104,13 +67,6 @@ class MovementListPage(QWidget):
         
         # === Filtreler ===
         filter_frame = QFrame()
-        filter_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """)
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setContentsMargins(16, 12, 16, 12)
         filter_layout.setSpacing(16)
@@ -118,7 +74,6 @@ class MovementListPage(QWidget):
         # Arama
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Stok kodu, belge no ile ara...")
-        self._style_input(self.search_input)
         self.search_input.setMinimumWidth(250)
         filter_layout.addWidget(self.search_input)
         
@@ -131,7 +86,6 @@ class MovementListPage(QWidget):
         self.type_combo.addItem("🔄 Transfer", "transfer")
         self.type_combo.addItem("🛒 Satın Alma", "satin_alma")
         self.type_combo.addItem("💰 Satış", "satis")
-        self._style_combo(self.type_combo)
         filter_layout.addWidget(self.type_combo)
         
         # Tarih aralığı
@@ -140,7 +94,6 @@ class MovementListPage(QWidget):
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addDays(-30))
         self.start_date.setCalendarPopup(True)
-        self._style_date(self.start_date)
         filter_layout.addWidget(self.start_date)
         
         filter_layout.addWidget(QLabel("-"))
@@ -148,12 +101,10 @@ class MovementListPage(QWidget):
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        self._style_date(self.end_date)
         filter_layout.addWidget(self.end_date)
         
         # Filtrele butonu
         filter_btn = QPushButton("Filtrele")
-        self._style_button(filter_btn)
         filter_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(filter_btn)
         
@@ -169,13 +120,11 @@ class MovementListPage(QWidget):
         # === Alt Bilgi ===
         footer_layout = QHBoxLayout()
         self.count_label = QLabel("Toplam: 0 hareket")
-        self.count_label.setStyleSheet("color: #64748b;")
         footer_layout.addWidget(self.count_label)
         
         footer_layout.addStretch()
         
         self.total_label = QLabel("Giriş: ₺0 | Çıkış: ₺0")
-        self.total_label.setStyleSheet("color: #64748b;")
         footer_layout.addWidget(self.total_label)
         
         layout.addLayout(footer_layout)
@@ -209,30 +158,6 @@ class MovementListPage(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
-        
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QTableWidget::item {
-                padding: 10px 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QTableWidget::item:selected {
-                background-color: rgba(99, 102, 241, 0.2);
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 10px 8px;
-                border: none;
-                border-bottom: 1px solid #334155;
-            }
-        """)
-        
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         
@@ -338,65 +263,9 @@ class MovementListPage(QWidget):
         mov_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-            }
-            QMenu::item { padding: 8px 16px; }
-            QMenu::item:selected { background-color: #334155; }
-        """)
-        
         view_action = QAction("👁 Detay Görüntüle", self)
         view_action.triggered.connect(lambda: self.view_clicked.emit(mov_id))
         menu.addAction(view_action)
         
         menu.exec(self.table.viewport().mapToGlobal(position))
     
-    def _style_button(self, btn):
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
-        
-    def _style_input(self, widget):
-        widget.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 16px;
-                color: #f8fafc;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
-        
-    def _style_combo(self, widget):
-        widget.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 12px;
-                color: #f8fafc;
-                min-width: 130px;
-            }
-        """)
-        
-    def _style_date(self, widget):
-        widget.setStyleSheet("""
-            QDateEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 12px;
-                color: #f8fafc;
-            }
-        """)

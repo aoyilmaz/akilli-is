@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-
 class WorkStationFormPage(QWidget):
     """İş istasyonu formu"""
     
@@ -36,26 +35,15 @@ class WorkStationFormPage(QWidget):
         header_layout = QHBoxLayout()
         
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet("""
-            QPushButton { background-color: transparent; border: 1px solid #334155;
-                color: #94a3b8; padding: 8px 16px; border-radius: 8px; }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
         
         title_text = "İstasyon Düzenle" if self.is_edit_mode else "Yeni İş İstasyonu"
         title = QLabel(f"🏭 {title_text}")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;")
         header_layout.addWidget(title)
         header_layout.addStretch()
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none; color: white; font-weight: 600; padding: 12px 24px; border-radius: 12px; }
-            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea); }
-        """)
         save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
         
@@ -65,8 +53,6 @@ class WorkStationFormPage(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
@@ -74,13 +60,6 @@ class WorkStationFormPage(QWidget):
         
         # Form Frame
         form_frame = QFrame()
-        form_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """)
         form_layout = QGridLayout(form_frame)
         form_layout.setContentsMargins(24, 24, 24, 24)
         form_layout.setSpacing(16)
@@ -90,7 +69,6 @@ class WorkStationFormPage(QWidget):
         
         # === TEMEL BİLGİLER ===
         section1 = QLabel("📋 Temel Bilgiler")
-        section1.setStyleSheet("color: #818cf8; font-size: 16px; font-weight: bold; background: transparent;")
         form_layout.addWidget(section1, row, 0, 1, 2)
         row += 1
         
@@ -98,7 +76,6 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("İstasyon Kodu *"), row, 0)
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("Örn: MCH001, WS001")
-        self._style_input(self.code_input)
         form_layout.addWidget(self.code_input, row, 1)
         row += 1
         
@@ -106,7 +83,6 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("İstasyon Adı *"), row, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Örn: Ekstrüzyon Makinesi 1")
-        self._style_input(self.name_input)
         form_layout.addWidget(self.name_input, row, 1)
         row += 1
         
@@ -117,7 +93,6 @@ class WorkStationFormPage(QWidget):
         self.type_combo.addItem("🔧 İş İstasyonu", "workstation")
         self.type_combo.addItem("🔩 Montaj Hattı", "assembly")
         self.type_combo.addItem("✋ Manuel İşlem", "manual")
-        self._style_combo(self.type_combo)
         form_layout.addWidget(self.type_combo, row, 1)
         row += 1
         
@@ -127,19 +102,16 @@ class WorkStationFormPage(QWidget):
         self.description_input.setMinimumHeight(80)
         self.description_input.setMaximumHeight(100)
         self.description_input.setPlaceholderText("İstasyon hakkında notlar...")
-        self._style_textedit(self.description_input)
         form_layout.addWidget(self.description_input, row, 1)
         row += 1
         
         # === VARSAYILAN OPERASYON DEĞERLERİ (YENİ) ===
         section_op = QLabel("⚡ Varsayılan Operasyon Değerleri")
-        section_op.setStyleSheet("color: #f59e0b; font-size: 16px; font-weight: bold; background: transparent; margin-top: 16px;")
         form_layout.addWidget(section_op, row, 0, 1, 2)
         row += 1
         
         # Bilgi notu
         op_info = QLabel("ℹ️ Bu değerler, iş emrine operasyon eklerken otomatik doldurulur")
-        op_info.setStyleSheet("color: #64748b; font-size: 12px; background: transparent; margin-bottom: 8px;")
         form_layout.addWidget(op_info, row, 0, 1, 2)
         row += 1
         
@@ -147,7 +119,6 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("Varsayılan Operasyon Adı"), row, 0)
         self.default_op_name_input = QLineEdit()
         self.default_op_name_input.setPlaceholderText("Örn: Ekstrüzyon, Kesim, Montaj")
-        self._style_input(self.default_op_name_input)
         form_layout.addWidget(self.default_op_name_input, row, 1)
         row += 1
         
@@ -159,13 +130,10 @@ class WorkStationFormPage(QWidget):
         self.default_setup_time_input.setRange(0, 9999)
         self.default_setup_time_input.setValue(0)
         self.default_setup_time_input.setMinimumWidth(150)
-        self._style_spinbox(self.default_setup_time_input)
         setup_time_layout.addWidget(self.default_setup_time_input)
         setup_label = QLabel("dakika")
-        setup_label.setStyleSheet("color: #94a3b8; background: transparent;")
         setup_time_layout.addWidget(setup_label)
         setup_info = QLabel("(Makineyi hazırlama süresi)")
-        setup_info.setStyleSheet("color: #64748b; font-size: 11px; background: transparent;")
         setup_time_layout.addWidget(setup_info)
         setup_time_layout.addStretch()
         form_layout.addLayout(setup_time_layout, row, 1)
@@ -180,13 +148,10 @@ class WorkStationFormPage(QWidget):
         self.default_run_time_input.setDecimals(4)
         self.default_run_time_input.setValue(0)
         self.default_run_time_input.setMinimumWidth(150)
-        self._style_spinbox(self.default_run_time_input)
         run_time_layout.addWidget(self.default_run_time_input)
         run_label = QLabel("dk/birim")
-        run_label.setStyleSheet("color: #94a3b8; background: transparent;")
         run_time_layout.addWidget(run_label)
         run_info = QLabel("(1 birim üretmek için gereken süre)")
-        run_info.setStyleSheet("color: #64748b; font-size: 11px; background: transparent;")
         run_time_layout.addWidget(run_info)
         run_time_layout.addStretch()
         form_layout.addLayout(run_time_layout, row, 1)
@@ -194,23 +159,14 @@ class WorkStationFormPage(QWidget):
         
         # Hesaplama örneği
         calc_example = QFrame()
-        calc_example.setStyleSheet("""
-            QFrame {
-                background-color: rgba(99, 102, 241, 0.1);
-                border: 1px solid #6366f130;
-                border-radius: 8px;
-            }
-        """)
         calc_layout = QVBoxLayout(calc_example)
         calc_layout.setContentsMargins(12, 8, 12, 8)
         calc_layout.setSpacing(4)
         
         calc_title = QLabel("📊 Süre Hesaplama Örneği:")
-        calc_title.setStyleSheet("color: #818cf8; font-weight: 600; font-size: 12px; background: transparent;")
         calc_layout.addWidget(calc_title)
         
         calc_text = QLabel("Kurulum: 60 dk + (Birim Süre: 0.27 dk × Miktar: 1000) = 330 dk = 5.5 saat")
-        calc_text.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
         calc_layout.addWidget(calc_text)
         
         form_layout.addWidget(calc_example, row, 0, 1, 2)
@@ -218,7 +174,6 @@ class WorkStationFormPage(QWidget):
         
         # === KAPASİTE BİLGİLERİ ===
         section2 = QLabel("📊 Kapasite Bilgileri")
-        section2.setStyleSheet("color: #818cf8; font-size: 16px; font-weight: bold; background: transparent; margin-top: 16px;")
         form_layout.addWidget(section2, row, 0, 1, 2)
         row += 1
         
@@ -230,10 +185,8 @@ class WorkStationFormPage(QWidget):
         self.capacity_input.setRange(0, 999999)
         self.capacity_input.setDecimals(2)
         self.capacity_input.setMinimumWidth(150)
-        self._style_spinbox(self.capacity_input)
         capacity_layout.addWidget(self.capacity_input)
         unit_label = QLabel("birim/saat")
-        unit_label.setStyleSheet("color: #94a3b8; background: transparent;")
         capacity_layout.addWidget(unit_label)
         capacity_layout.addStretch()
         form_layout.addLayout(capacity_layout, row, 1)
@@ -249,7 +202,6 @@ class WorkStationFormPage(QWidget):
         self.efficiency_input.setValue(100)
         self.efficiency_input.setSuffix(" %")
         self.efficiency_input.setMinimumWidth(150)
-        self._style_spinbox(self.efficiency_input)
         efficiency_layout.addWidget(self.efficiency_input)
         efficiency_layout.addStretch()
         form_layout.addLayout(efficiency_layout, row, 1)
@@ -265,7 +217,6 @@ class WorkStationFormPage(QWidget):
         self.working_hours_input.setValue(8)
         self.working_hours_input.setSuffix(" saat")
         self.working_hours_input.setMinimumWidth(150)
-        self._style_spinbox(self.working_hours_input)
         hours_layout.addWidget(self.working_hours_input)
         hours_layout.addStretch()
         form_layout.addLayout(hours_layout, row, 1)
@@ -273,7 +224,6 @@ class WorkStationFormPage(QWidget):
         
         # === MALİYET BİLGİLERİ ===
         section3 = QLabel("💰 Maliyet Bilgileri")
-        section3.setStyleSheet("color: #818cf8; font-size: 16px; font-weight: bold; background: transparent; margin-top: 16px;")
         form_layout.addWidget(section3, row, 0, 1, 2)
         row += 1
         
@@ -286,7 +236,6 @@ class WorkStationFormPage(QWidget):
         self.hourly_rate_input.setDecimals(2)
         self.hourly_rate_input.setPrefix("₺ ")
         self.hourly_rate_input.setMinimumWidth(150)
-        self._style_spinbox(self.hourly_rate_input)
         hourly_layout.addWidget(self.hourly_rate_input)
         hourly_layout.addStretch()
         form_layout.addLayout(hourly_layout, row, 1)
@@ -301,7 +250,6 @@ class WorkStationFormPage(QWidget):
         self.setup_cost_input.setDecimals(2)
         self.setup_cost_input.setPrefix("₺ ")
         self.setup_cost_input.setMinimumWidth(150)
-        self._style_spinbox(self.setup_cost_input)
         setup_layout.addWidget(self.setup_cost_input)
         setup_layout.addStretch()
         form_layout.addLayout(setup_layout, row, 1)
@@ -309,14 +257,12 @@ class WorkStationFormPage(QWidget):
         
         # === KONUM BİLGİLERİ ===
         section4 = QLabel("📍 Konum Bilgileri")
-        section4.setStyleSheet("color: #818cf8; font-size: 16px; font-weight: bold; background: transparent; margin-top: 16px;")
         form_layout.addWidget(section4, row, 0, 1, 2)
         row += 1
         
         # Depo
         form_layout.addWidget(self._create_label("Depo/Tesis"), row, 0)
         self.warehouse_combo = QComboBox()
-        self._style_combo(self.warehouse_combo)
         form_layout.addWidget(self.warehouse_combo, row, 1)
         row += 1
         
@@ -324,7 +270,6 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("Konum Detayı"), row, 0)
         self.location_input = QLineEdit()
         self.location_input.setPlaceholderText("Örn: A Blok, 2. Kat, Hücre 15")
-        self._style_input(self.location_input)
         form_layout.addWidget(self.location_input, row, 1)
         row += 1
         
@@ -332,25 +277,6 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("Durum"), row, 0)
         self.active_check = QCheckBox("Aktif")
         self.active_check.setChecked(True)
-        self.active_check.setStyleSheet("""
-            QCheckBox { 
-                color: #f8fafc; 
-                background: transparent; 
-                spacing: 8px;
-                font-size: 14px;
-            }
-            QCheckBox::indicator {
-                width: 20px;
-                height: 20px;
-                border-radius: 4px;
-                border: 2px solid #334155;
-                background-color: #1e293b;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #6366f1;
-                border-color: #6366f1;
-            }
-        """)
         form_layout.addWidget(self.active_check, row, 1)
         row += 1
         
@@ -362,7 +288,6 @@ class WorkStationFormPage(QWidget):
         
     def _create_label(self, text: str) -> QLabel:
         label = QLabel(text)
-        label.setStyleSheet("color: #e2e8f0; background: transparent; font-size: 14px;")
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return label
         
@@ -459,112 +384,3 @@ class WorkStationFormPage(QWidget):
         
         self.saved.emit(data)
         
-    def _style_input(self, w):
-        w.setMinimumHeight(42)
-        w.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b; 
-                border: 1px solid #334155;
-                border-radius: 8px; 
-                padding: 10px 12px; 
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-            QLineEdit::placeholder { color: #64748b; }
-        """)
-        
-    def _style_combo(self, c):
-        c.setMinimumHeight(42)
-        c.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b; 
-                border: 1px solid #334155;
-                border-radius: 8px; 
-                padding: 10px 12px; 
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { 
-                border: none; 
-                width: 30px;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b; 
-                border: 1px solid #334155;
-                color: #f8fafc; 
-                selection-background-color: #334155;
-                padding: 4px;
-            }
-            QComboBox QAbstractItemView::item {
-                padding: 8px 12px;
-                min-height: 32px;
-            }
-        """)
-        
-    def _style_spinbox(self, s):
-        s.setMinimumHeight(42)
-        s.setStyleSheet("""
-            QDoubleSpinBox, QSpinBox {
-                background-color: #1e293b; 
-                border: 1px solid #334155;
-                border-radius: 8px; 
-                padding: 10px 12px; 
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QDoubleSpinBox:focus, QSpinBox:focus { border-color: #6366f1; }
-            QDoubleSpinBox::up-button, QSpinBox::up-button {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 24px;
-                border-left: 1px solid #334155;
-                border-top-right-radius: 7px;
-                background-color: #334155;
-            }
-            QDoubleSpinBox::down-button, QSpinBox::down-button {
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 24px;
-                border-left: 1px solid #334155;
-                border-bottom-right-radius: 7px;
-                background-color: #334155;
-            }
-            QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover,
-            QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover {
-                background-color: #475569;
-            }
-            QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-bottom: 5px solid #94a3b8;
-                width: 0; height: 0;
-            }
-            QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid #94a3b8;
-                width: 0; height: 0;
-            }
-        """)
-        
-    def _style_textedit(self, t):
-        t.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e293b; 
-                border: 1px solid #334155;
-                border-radius: 8px; 
-                padding: 10px 12px; 
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QTextEdit:focus { border-color: #6366f1; }
-        """)

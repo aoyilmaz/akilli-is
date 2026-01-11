@@ -25,7 +25,6 @@ from config.styles import (
     get_table_style, get_input_style
 )
 
-
 class RequirementsPage(QWidget):
     """İhtiyaç listesi sayfası"""
 
@@ -41,34 +40,17 @@ class RequirementsPage(QWidget):
 
         # Başlık
         title = QLabel("Net Ihtiyac Listesi")
-        title.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {TEXT_PRIMARY};")
         layout.addWidget(title)
 
         # Arama
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Urun ara...")
-        self.search_input.setStyleSheet(
-            f"""
-            QLineEdit {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 6px;
-                padding: 10px 14px;
-                color: {TEXT_PRIMARY};
-                min-width: 300px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {INPUT_FOCUS};
-            }}
-        """
-        )
         self.search_input.textChanged.connect(self._filter_table)
         search_row.addWidget(self.search_input)
         search_row.addStretch()
 
         self.count_label = QLabel("0 satir")
-        self.count_label.setStyleSheet(f"color: {TEXT_MUTED};")
         search_row.addWidget(self.count_label)
 
         layout.addLayout(search_row)
@@ -102,8 +84,6 @@ class RequirementsPage(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet(get_table_style())
-
         layout.addWidget(self.table)
 
     def load_requirements(self, run_id: int):

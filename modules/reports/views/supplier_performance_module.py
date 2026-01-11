@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.reports.services import ReportsService
 from modules.reports.views.supplier_performance import SupplierPerformancePage
 
-
 class SupplierPerformanceModule(QWidget):
     """Tedarikci performans raporu modulu - bagimsiz calisir"""
 

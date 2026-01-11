@@ -3,11 +3,23 @@ Akıllı İş - Müşteri Liste Sayfası
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QStyle,
+    QApplication,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from ui.components.stat_cards import MiniStatCard
 
 
 class CustomerListPage(QWidget):
@@ -33,7 +45,6 @@ class CustomerListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("👥 Müşteriler")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -42,51 +53,17 @@ class CustomerListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Ara... (kod, ad, vergi no)")
         self.search_input.setFixedWidth(300)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("🔄")
+        refresh_btn = QPushButton("Yen")
         refresh_btn.setFixedSize(42, 42)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                font-size: 18px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
         add_btn = QPushButton("➕ Yeni Müşteri")
-        add_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea);
-            }
-        """)
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -102,7 +79,9 @@ class CustomerListPage(QWidget):
         self.active_card = self._create_stat_card("✅", "Aktif", "0", "#10b981")
         stats_layout.addWidget(self.active_card)
 
-        self.with_orders_card = self._create_stat_card("🛒", "Siparişli", "0", "#f59e0b")
+        self.with_orders_card = self._create_stat_card(
+            "🛒", "Siparişli", "0", "#f59e0b"
+        )
         stats_layout.addWidget(self.with_orders_card)
 
         self.credit_card = self._create_stat_card("💳", "Toplam Limit", "₺0", "#3b82f6")
@@ -114,37 +93,20 @@ class CustomerListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "Kod", "Müşteri Adı", "Telefon", "E-posta",
-            "Şehir", "Vade (Gün)", "Puan", "İşlemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Kod",
+                "Müşteri Adı",
+                "Telefon",
+                "E-posta",
+                "Şehir",
+                "Vade (Gün)",
+                "Puan",
+                "İşlemler",
+            ]
+        )
 
         # Tablo stili
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                gridline-color: #1e293b;
-            }
-            QTableWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #1e293b;
-                color: #f8fafc;
-            }
-            QTableWidget::item:selected {
-                background-color: #6366f120;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 12px;
-                border: none;
-                font-weight: 600;
-                font-size: 12px;
-            }
-        """)
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -169,43 +131,15 @@ class CustomerListPage(QWidget):
 
         layout.addWidget(self.table)
 
-    def _create_stat_card(self, icon: str, title: str, value: str, color: str) -> QFrame:
-        card = QFrame()
-        card.setFixedSize(160, 80)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """)
+    def _create_stat_card(
+        self, icon: str, title: str, value: str, color: str
+    ) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(f"{icon} {title}", value, color)
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
-
-        header = QHBoxLayout()
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 16px; background: transparent;")
-        header.addWidget(icon_label)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {color}; font-size: 12px; background: transparent;")
-        header.addWidget(title_label)
-        header.addStretch()
-        layout.addLayout(header)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 22px; font-weight: bold; background: transparent;")
-        layout.addWidget(value_label)
-
-        return card
-
-    def _update_card(self, card: QFrame, value: str):
-        label = card.findChild(QLabel, "value")
-        if label:
-            label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        """Kart değerini güncelle"""
+        card.update_value(value)
 
     def load_data(self, customers: list):
         """Verileri yükle"""
@@ -260,25 +194,40 @@ class CustomerListPage(QWidget):
             btn_layout.setContentsMargins(4, 4, 4, 4)
             btn_layout.setSpacing(4)
 
-            view_btn = QPushButton("👁")
-            view_btn.setFixedSize(32, 32)
-            view_btn.setStyleSheet(self._action_btn_style("#3b82f6"))
+            style = QApplication.style()
+
+            view_btn = QPushButton()
+            view_btn.setIcon(
+                style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
+            )
+            view_btn.setIconSize(QSize(16, 16))
+            view_btn.setFixedSize(32, 28)
             view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(lambda checked, id=cust.get("id"): self.view_clicked.emit(id))
+            view_btn.clicked.connect(
+                lambda checked, id=cust.get("id"): self.view_clicked.emit(id)
+            )
             btn_layout.addWidget(view_btn)
 
-            edit_btn = QPushButton("✏️")
-            edit_btn.setFixedSize(32, 32)
-            edit_btn.setStyleSheet(self._action_btn_style("#f59e0b"))
+            edit_btn = QPushButton()
+            edit_btn.setIcon(
+                style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+            )
+            edit_btn.setIconSize(QSize(16, 16))
+            edit_btn.setFixedSize(32, 28)
             edit_btn.setToolTip("Düzenle")
-            edit_btn.clicked.connect(lambda checked, id=cust.get("id"): self.edit_clicked.emit(id))
+            edit_btn.clicked.connect(
+                lambda checked, id=cust.get("id"): self.edit_clicked.emit(id)
+            )
             btn_layout.addWidget(edit_btn)
 
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(32, 32)
-            del_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+            del_btn = QPushButton()
+            del_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+            del_btn.setIconSize(QSize(16, 16))
+            del_btn.setFixedSize(32, 28)
             del_btn.setToolTip("Sil")
-            del_btn.clicked.connect(lambda checked, id=cust.get("id"): self._confirm_delete(id))
+            del_btn.clicked.connect(
+                lambda checked, id=cust.get("id"): self._confirm_delete(id)
+            )
             btn_layout.addWidget(del_btn)
 
             self.table.setCellWidget(row, 7, btn_widget)
@@ -321,9 +270,10 @@ class CustomerListPage(QWidget):
     def _confirm_delete(self, customer_id: int):
         """Silme onayı"""
         reply = QMessageBox.question(
-            self, "Silme Onayı",
+            self,
+            "Silme Onayı",
             "Bu müşteriyi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(customer_id)

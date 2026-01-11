@@ -18,7 +18,6 @@ from config.styles import (
     get_table_style, get_button_style, get_input_style
 )
 
-
 class ReceiptFormPage(QWidget):
     """Tahsilat form sayfasi"""
 
@@ -42,13 +41,6 @@ class ReceiptFormPage(QWidget):
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-        """)
-
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -58,21 +50,10 @@ class ReceiptFormPage(QWidget):
         header_layout = QHBoxLayout()
 
         back_btn = QPushButton("<- Geri")
-        back_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                color: {ACCENT};
-                font-size: 14px;
-                padding: 8px 16px;
-            }}
-            QPushButton:hover {{ color: #1177bb; }}
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
         title = QLabel("Yeni Tahsilat" if not self.is_edit else "Tahsilat Detayi")
-        title.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {TEXT_PRIMARY};")
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -91,7 +72,6 @@ class ReceiptFormPage(QWidget):
         # Tahsilat no
         no_layout = QVBoxLayout()
         no_label = QLabel("Tahsilat No")
-        no_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         no_layout.addWidget(no_label)
         self.receipt_no = QLineEdit()
         self.receipt_no.setReadOnly(True)
@@ -102,7 +82,6 @@ class ReceiptFormPage(QWidget):
         # Tarih
         date_layout = QVBoxLayout()
         date_label = QLabel("Tarih *")
-        date_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         date_layout.addWidget(date_label)
         self.receipt_date = QDateEdit()
         self.receipt_date.setCalendarPopup(True)
@@ -114,7 +93,6 @@ class ReceiptFormPage(QWidget):
         # Musteri
         customer_layout = QVBoxLayout()
         customer_label = QLabel("Musteri *")
-        customer_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         customer_layout.addWidget(customer_label)
         self.customer_combo = QComboBox()
         self.customer_combo.setStyleSheet(self._combo_style())
@@ -131,7 +109,6 @@ class ReceiptFormPage(QWidget):
         # Tutar
         amount_layout = QVBoxLayout()
         amount_label = QLabel("Tutar *")
-        amount_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         amount_layout.addWidget(amount_label)
         self.amount_input = QDoubleSpinBox()
         self.amount_input.setRange(0, 999999999)
@@ -144,7 +121,6 @@ class ReceiptFormPage(QWidget):
         # Odeme yontemi
         method_layout = QVBoxLayout()
         method_label = QLabel("Odeme Yontemi *")
-        method_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         method_layout.addWidget(method_label)
         self.method_combo = QComboBox()
         self.method_combo.addItem("Nakit", "cash")
@@ -160,7 +136,6 @@ class ReceiptFormPage(QWidget):
         # Banka adi
         bank_layout = QVBoxLayout()
         bank_label = QLabel("Banka")
-        bank_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         bank_layout.addWidget(bank_label)
         self.bank_input = QLineEdit()
         self.bank_input.setStyleSheet(self._input_style())
@@ -176,7 +151,6 @@ class ReceiptFormPage(QWidget):
         # Cek/Senet No
         check_no_layout = QVBoxLayout()
         check_no_label = QLabel("Cek/Senet No")
-        check_no_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         check_no_layout.addWidget(check_no_label)
         self.check_no_input = QLineEdit()
         self.check_no_input.setStyleSheet(self._input_style())
@@ -186,7 +160,6 @@ class ReceiptFormPage(QWidget):
         # Vade tarihi
         check_date_layout = QVBoxLayout()
         check_date_label = QLabel("Vade Tarihi")
-        check_date_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         check_date_layout.addWidget(check_date_label)
         self.check_date = QDateEdit()
         self.check_date.setCalendarPopup(True)
@@ -201,7 +174,6 @@ class ReceiptFormPage(QWidget):
         # Aciklama
         desc_layout = QVBoxLayout()
         desc_label = QLabel("Aciklama")
-        desc_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         desc_layout.addWidget(desc_label)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(80)
@@ -222,7 +194,6 @@ class ReceiptFormPage(QWidget):
         self.invoice_table.setHorizontalHeaderLabels([
             "Sec", "Fatura No", "Tarih", "Toplam", "Kalan", "Bu Tahsilat"
         ])
-        self.invoice_table.setStyleSheet(get_table_style())
         self.invoice_table.setAlternatingRowColors(True)
         self.invoice_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.invoice_table.verticalHeader().setVisible(False)
@@ -247,12 +218,10 @@ class ReceiptFormPage(QWidget):
         # Otomatik dagitim
         auto_layout = QHBoxLayout()
         auto_btn = QPushButton("Otomatik Dagit")
-        auto_btn.setStyleSheet(get_button_style("secondary"))
         auto_btn.clicked.connect(self._auto_allocate)
         auto_layout.addWidget(auto_btn)
 
         self.allocated_label = QLabel("Dagitilan: 0.00 TL")
-        self.allocated_label.setStyleSheet(f"color: {TEXT_MUTED};")
         auto_layout.addWidget(self.allocated_label)
 
         auto_layout.addStretch()
@@ -266,13 +235,11 @@ class ReceiptFormPage(QWidget):
 
         cancel_btn = QPushButton("Iptal")
         cancel_btn.setFixedSize(120, 44)
-        cancel_btn.setStyleSheet(get_button_style("secondary"))
         cancel_btn.clicked.connect(self.cancelled.emit)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
         save_btn.setFixedSize(120, 44)
-        save_btn.setStyleSheet(get_button_style("success"))
         save_btn.clicked.connect(self._save)
         btn_layout.addWidget(save_btn)
 
@@ -438,15 +405,6 @@ class ReceiptFormPage(QWidget):
             alloc_spin = QDoubleSpinBox()
             alloc_spin.setRange(0, remaining)
             alloc_spin.setDecimals(2)
-            alloc_spin.setStyleSheet(f"""
-                QDoubleSpinBox {{
-                    background-color: {BG_PRIMARY};
-                    border: 1px solid {BORDER};
-                    border-radius: 4px;
-                    padding: 4px;
-                    color: {TEXT_PRIMARY};
-                }}
-            """)
             alloc_spin.valueChanged.connect(self._update_allocated)
             self.invoice_table.setCellWidget(row, 5, alloc_spin)
 

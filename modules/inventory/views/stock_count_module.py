@@ -11,7 +11,6 @@ from modules.inventory.views.stock_count_list import StockCountListPage
 from modules.inventory.views.stock_count_form import StockCountFormPage
 from database.models import StockMovementType
 
-
 class StockCountModule(QWidget):
     """Stok sayımı modülü"""
     

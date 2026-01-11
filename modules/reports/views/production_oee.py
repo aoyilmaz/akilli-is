@@ -35,7 +35,6 @@ from config.styles import (
     get_input_style,
 )
 
-
 class ProductionOEEPage(QWidget):
     """Üretim performans (OEE) raporu sayfası"""
 
@@ -52,40 +51,26 @@ class ProductionOEEPage(QWidget):
 
         # Filtreler
         filter_frame = QFrame()
-        filter_frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
         filter_layout = QHBoxLayout(filter_frame)
 
         lbl1 = QLabel("Başlangıç:")
-        lbl1.setStyleSheet(f"color: {TEXT_PRIMARY};")
         filter_layout.addWidget(lbl1)
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        self.start_date.setStyleSheet(get_input_style())
         filter_layout.addWidget(self.start_date)
 
         lbl2 = QLabel("Bitiş:")
-        lbl2.setStyleSheet(f"color: {TEXT_PRIMARY};")
         filter_layout.addWidget(lbl2)
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        self.end_date.setStyleSheet(get_input_style())
         filter_layout.addWidget(self.end_date)
 
         filter_layout.addStretch()
 
         refresh_btn = QPushButton("Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        refresh_btn.setStyleSheet(get_button_style())
         filter_layout.addWidget(refresh_btn)
 
         layout.addWidget(filter_frame)
@@ -151,34 +136,19 @@ class ProductionOEEPage(QWidget):
 
     def _create_oee_card(self) -> QFrame:
         card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_TERTIARY};
-                border: 2px solid {ACCENT}80;
-                border-radius: 12px;
-            }}
-        """
-        )
-
         layout = QVBoxLayout(card)
         layout.setContentsMargins(30, 24, 30, 24)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel("OEE (Overall Equipment Effectiveness)")
-        title.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 14px; font-weight: 500;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         self.oee_value = QLabel("0%")
-        self.oee_value.setStyleSheet(
-            f"color: {ACCENT}; font-size: 64px; font-weight: bold;"
-        )
         self.oee_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.oee_value)
 
         formula = QLabel("= Kullanılabilirlik × Performans × Kalite")
-        formula.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         formula.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(formula)
 
@@ -186,28 +156,16 @@ class ProductionOEEPage(QWidget):
 
     def _create_metric_bar(self, title: str, color: str) -> QFrame:
         frame = QFrame()
-        frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
-
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(8)
 
         header = QHBoxLayout()
         label = QLabel(title)
-        label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
         header.addWidget(label)
 
         value = QLabel("0%")
         value.setObjectName("value")
-        value.setStyleSheet(f"color: {color}; font-size: 18px; font-weight: bold;")
         header.addWidget(value)
         layout.addLayout(header)
 
@@ -217,44 +175,20 @@ class ProductionOEEPage(QWidget):
         bar.setValue(0)
         bar.setTextVisible(False)
         bar.setFixedHeight(8)
-        bar.setStyleSheet(
-            f"""
-            QProgressBar {{
-                background-color: {BG_TERTIARY};
-                border-radius: 4px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {color};
-                border-radius: 4px;
-            }}
-        """
-        )
         layout.addWidget(bar)
 
         return frame
 
     def _create_mini_card(self, title: str, value: str) -> QFrame:
         card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
-
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 12, 16, 12)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         layout.addWidget(title_label)
 
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 24px; font-weight: bold;")
         layout.addWidget(value_label)
 
         return card
@@ -274,9 +208,6 @@ class ProductionOEEPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-
-        table.setStyleSheet(get_table_style())
-
     def load_data(self, data: dict):
         # OEE değeri
         oee = data.get("oee", 0)
@@ -289,10 +220,6 @@ class ProductionOEEPage(QWidget):
             color = WARNING
         else:
             color = ERROR
-        self.oee_value.setStyleSheet(
-            f"color: {color}; font-size: 64px; font-weight: bold;"
-        )
-
         # Bileşenler
         self._update_metric_bar(self.availability_bar, data.get("availability", 0))
         self._update_metric_bar(self.performance_bar, data.get("performance", 0))

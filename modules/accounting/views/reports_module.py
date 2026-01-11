@@ -31,7 +31,6 @@ from config.styles import (
 )
 from modules.accounting.services import AccountingService
 
-
 class AccountingReportsModule(QWidget):
     """Muhasebe raporlari modulu - ic menu yok, tab yapisi"""
 
@@ -49,8 +48,6 @@ class AccountingReportsModule(QWidget):
 
         # Tab widget
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(get_tab_style())
-
         # Buyuk Defter
         self.ledger_page = self._create_ledger_page()
         self.tabs.addTab(self.ledger_page, "Buyuk Defter")
@@ -81,25 +78,21 @@ class AccountingReportsModule(QWidget):
         filter_layout.addWidget(QLabel("Hesap:"))
         self.ledger_account = QComboBox()
         self.ledger_account.setMinimumWidth(250)
-        self._style_combo(self.ledger_account)
         filter_layout.addWidget(self.ledger_account)
 
         filter_layout.addWidget(QLabel("Başlangıç:"))
         self.ledger_start = QDateEdit()
         self.ledger_start.setDate(QDate.currentDate().addMonths(-1))
         self.ledger_start.setCalendarPopup(True)
-        self._style_date(self.ledger_start)
         filter_layout.addWidget(self.ledger_start)
 
         filter_layout.addWidget(QLabel("Bitiş:"))
         self.ledger_end = QDateEdit()
         self.ledger_end.setDate(QDate.currentDate())
         self.ledger_end.setCalendarPopup(True)
-        self._style_date(self.ledger_end)
         filter_layout.addWidget(self.ledger_end)
 
         gen_btn = QPushButton("Rapor Olustur")
-        gen_btn.setStyleSheet(get_button_style("primary"))
         gen_btn.clicked.connect(self._generate_ledger)
         filter_layout.addWidget(gen_btn)
 
@@ -108,7 +101,6 @@ class AccountingReportsModule(QWidget):
 
         # Ozet
         self.ledger_summary = QLabel()
-        self.ledger_summary.setStyleSheet(f"color: {TEXT_MUTED}; padding: 10px 0;")
         layout.addWidget(self.ledger_summary)
 
         # Tablo
@@ -117,7 +109,6 @@ class AccountingReportsModule(QWidget):
         self.ledger_table.setHorizontalHeaderLabels(
             ["Tarih", "Fiş No", "Açıklama", "Borç", "Alacak"]
         )
-        self._style_table(self.ledger_table)
         layout.addWidget(self.ledger_table)
 
         return page
@@ -135,11 +126,9 @@ class AccountingReportsModule(QWidget):
         self.trial_date = QDateEdit()
         self.trial_date.setDate(QDate.currentDate())
         self.trial_date.setCalendarPopup(True)
-        self._style_date(self.trial_date)
         filter_layout.addWidget(self.trial_date)
 
         gen_btn = QPushButton("Mizan Olustur")
-        gen_btn.setStyleSheet(get_button_style("primary"))
         gen_btn.clicked.connect(self._generate_trial_balance)
         filter_layout.addWidget(gen_btn)
 
@@ -148,9 +137,6 @@ class AccountingReportsModule(QWidget):
 
         # Toplam
         self.trial_summary = QLabel()
-        self.trial_summary.setStyleSheet(
-            f"color: {TEXT_MUTED}; padding: 10px 0; font-size: 14px;"
-        )
         layout.addWidget(self.trial_summary)
 
         # Tablo
@@ -166,7 +152,6 @@ class AccountingReportsModule(QWidget):
                 "Alacak (Bakiye)",
             ]
         )
-        self._style_table(self.trial_table)
         layout.addWidget(self.trial_table)
 
         return page
@@ -184,11 +169,9 @@ class AccountingReportsModule(QWidget):
         self.balance_date = QDateEdit()
         self.balance_date.setDate(QDate.currentDate())
         self.balance_date.setCalendarPopup(True)
-        self._style_date(self.balance_date)
         filter_layout.addWidget(self.balance_date)
 
         gen_btn = QPushButton("Bilanco Olustur")
-        gen_btn.setStyleSheet(get_button_style("primary"))
         gen_btn.clicked.connect(self._generate_balance_sheet)
         filter_layout.addWidget(gen_btn)
 
@@ -215,14 +198,6 @@ class AccountingReportsModule(QWidget):
         # Denge durumu
         self.balance_status = QLabel()
         self.balance_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.balance_status.setStyleSheet(
-            """
-            padding: 16px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-        """
-        )
         layout.addWidget(self.balance_status)
 
         layout.addStretch()
@@ -231,29 +206,13 @@ class AccountingReportsModule(QWidget):
 
     def _create_summary_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {color}40;
-                border-radius: 8px;
-                border-left: 3px solid {color};
-                padding: 16px;
-            }}
-        """
-        )
-
         layout = QVBoxLayout(card)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
         layout.addWidget(title_label)
 
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 28px; font-weight: bold;"
-        )
         layout.addWidget(value_label)
 
         return card
@@ -264,50 +223,6 @@ class AccountingReportsModule(QWidget):
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
         return f"{r}, {g}, {b}"
-
-    def _style_combo(self, widget):
-        widget.setStyleSheet(
-            f"""
-            QComboBox {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 4px;
-                padding: 8px 12px;
-                color: {TEXT_PRIMARY};
-            }}
-            QComboBox:focus {{
-                border: 1px solid {ACCENT};
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {BG_HOVER};
-            }}
-        """
-        )
-
-    def _style_date(self, widget):
-        widget.setStyleSheet(
-            f"""
-            QDateEdit {{
-                background-color: {INPUT_BG};
-                border: 1px solid {INPUT_BORDER};
-                border-radius: 4px;
-                padding: 8px 12px;
-                color: {TEXT_PRIMARY};
-            }}
-            QDateEdit:focus {{
-                border: 1px solid {ACCENT};
-            }}
-        """
-        )
-
-    def _style_table(self, table):
-        table.setStyleSheet(get_table_style())
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.verticalHeader().setVisible(False)
-        header = table.horizontalHeader()
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
     def _get_service(self):
         if self.service is None:
@@ -455,34 +370,11 @@ class AccountingReportsModule(QWidget):
             # Denge durumu
             if data.get("balanced"):
                 self.balance_status.setText("Bilanco Dengeli")
-                self.balance_status.setStyleSheet(
-                    f"""
-                    padding: 16px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    border-radius: 8px;
-                    background-color: {BG_SECONDARY};
-                    color: {SUCCESS};
-                    border: 1px solid {SUCCESS}40;
-                """
-                )
             else:
                 diff = assets.get("total", 0) - data.get("total_liabilities_equity", 0)
                 self.balance_status.setText(
                     f"Bilanco Dengesiz (Fark: {abs(diff):,.2f})"
                 )
-                self.balance_status.setStyleSheet(
-                    f"""
-                    padding: 16px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    border-radius: 8px;
-                    background-color: {BG_SECONDARY};
-                    color: {ERROR};
-                    border: 1px solid {ERROR}40;
-                """
-                )
-
         except Exception as e:
             QMessageBox.warning(self, "Uyarı", str(e))
         finally:

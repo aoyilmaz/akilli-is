@@ -11,7 +11,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class AccountStatementModule(QWidget):
     """Cari hesap ekstresi modulu"""
 

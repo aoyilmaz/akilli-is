@@ -15,7 +15,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class WarehouseSelectDialog(QDialog):
     """Depo seçim dialogu"""
 
@@ -47,7 +46,6 @@ class WarehouseSelectDialog(QDialog):
 
     def get_warehouse_id(self) -> int:
         return self.warehouse_combo.currentData()
-
 
 class SalesOrderModule(QWidget):
     """Satış sipariş modülü"""

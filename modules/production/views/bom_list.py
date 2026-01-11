@@ -9,9 +9,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
+from ui.components.stat_cards import MiniStatCard
 
 from config import COLORS
-
 
 class BOMListPage(QWidget):
     """Ürün reçeteleri listesi"""
@@ -38,9 +38,7 @@ class BOMListPage(QWidget):
         
         title_layout = QVBoxLayout()
         title = QLabel("📋 Ürün Reçeteleri (BOM)")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         subtitle = QLabel("Mamul üretimi için malzeme listelerini yönetin")
-        subtitle.setStyleSheet("font-size: 14px; color: #94a3b8;")
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
         header_layout.addLayout(title_layout)
@@ -55,7 +53,6 @@ class BOMListPage(QWidget):
         self.status_combo.addItem("✅ Aktif", "active")
         self.status_combo.addItem("🔄 Revizyon", "revision")
         self.status_combo.addItem("❌ Geçersiz", "obsolete")
-        self._style_combo(self.status_combo)
         self.status_combo.currentIndexChanged.connect(lambda: self.refresh_requested.emit())
         header_layout.addWidget(self.status_combo)
         
@@ -63,31 +60,16 @@ class BOMListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Reçete ara...")
         self.search_input.setFixedWidth(200)
-        self._style_input(self.search_input)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
         
         # Yenile
         refresh_btn = QPushButton("🔄 Yenile")
-        self._style_button(refresh_btn)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
         
         # Yeni Reçete
         new_btn = QPushButton("➕ Yeni Reçete")
-        new_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 12px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea);
-            }
-        """)
         new_btn.clicked.connect(self.new_clicked.emit)
         header_layout.addWidget(new_btn)
         
@@ -118,32 +100,11 @@ class BOMListPage(QWidget):
         
         # === Alt Bilgi ===
         self.count_label = QLabel("Toplam: 0 reçete")
-        self.count_label.setStyleSheet("color: #64748b;")
         layout.addWidget(self.count_label)
         
-    def _create_card(self, title: str, value: str, color: str) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}40;
-                border-radius: 12px;
-            }}
-        """)
-        
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 12, 16, 12)
-        
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #94a3b8; font-size: 13px; background: transparent;")
-        layout.addWidget(title_label)
-        
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold; background: transparent;")
-        layout.addWidget(value_label)
-        
-        return card
+    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
         
     def _setup_table(self):
         columns = [
@@ -170,32 +131,6 @@ class BOMListPage(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
-        
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QTableWidget::item {
-                padding: 10px 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QTableWidget::item:selected {
-                background-color: rgba(99, 102, 241, 0.2);
-            }
-            QTableWidget::item:hover {
-                background-color: rgba(51, 65, 85, 0.5);
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 10px 8px;
-                border: none;
-            }
-        """)
-        
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.doubleClicked.connect(self._on_double_click)
@@ -270,10 +205,8 @@ class BOMListPage(QWidget):
         
         self.count_label.setText(f"Toplam: {len(boms)} reçete")
         
-    def _update_card(self, card: QFrame, value: str):
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        card.update_value(value)
             
     def get_status_filter(self) -> str:
         return self.status_combo.currentData()
@@ -298,16 +231,6 @@ class BOMListPage(QWidget):
         status_text = self.table.item(row, 6).text()
         
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-            }
-            QMenu::item { padding: 8px 16px; color: #f8fafc; }
-            QMenu::item:selected { background-color: #334155; }
-        """)
-        
         view_action = QAction("👁 Görüntüle", self)
         view_action.triggered.connect(lambda: self.view_clicked.emit(bom_id))
         menu.addAction(view_action)
@@ -348,46 +271,3 @@ class BOMListPage(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(bom_id)
     
-    def _style_button(self, btn):
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
-        
-    def _style_combo(self, combo):
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 12px;
-                color: #f8fafc;
-                min-width: 120px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """)
-        
-    def _style_input(self, widget):
-        widget.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 12px;
-                color: #f8fafc;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)

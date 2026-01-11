@@ -16,7 +16,6 @@ from PyQt6.QtGui import QColor
 
 from config import COLORS
 
-
 class StockCountFormPage(QWidget):
     """Stok sayımı formu"""
     
@@ -43,45 +42,22 @@ class StockCountFormPage(QWidget):
         header_layout = QHBoxLayout()
         
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid #334155;
-                color: #94a3b8;
-                padding: 8px 16px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
         
         title_text = "Sayım Düzenle" if self.is_edit_mode else "Yeni Stok Sayımı"
         title = QLabel(f"📋 {title_text}")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;")
         header_layout.addWidget(title)
         
         header_layout.addStretch()
         
         # Taslak kaydet
         draft_btn = QPushButton("💾 Taslak Kaydet")
-        self._style_button(draft_btn)
         draft_btn.clicked.connect(lambda: self._on_save("draft"))
         header_layout.addWidget(draft_btn)
         
         # Tamamla
         complete_btn = QPushButton("✅ Sayımı Tamamla")
-        complete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 12px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """)
         complete_btn.clicked.connect(lambda: self._on_save("completed"))
         header_layout.addWidget(complete_btn)
         
@@ -89,13 +65,6 @@ class StockCountFormPage(QWidget):
         
         # === Sayım Bilgileri ===
         info_frame = QFrame()
-        info_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """)
         info_layout = QHBoxLayout(info_frame)
         info_layout.setContentsMargins(16, 16, 16, 16)
         info_layout.setSpacing(24)
@@ -105,7 +74,6 @@ class StockCountFormPage(QWidget):
         no_layout.addWidget(QLabel("Sayım No"))
         self.count_no_input = QLineEdit()
         self.count_no_input.setPlaceholderText("Otomatik")
-        self._style_input(self.count_no_input)
         no_layout.addWidget(self.count_no_input)
         info_layout.addLayout(no_layout)
         
@@ -115,7 +83,6 @@ class StockCountFormPage(QWidget):
         self.datetime_input = QDateTimeEdit()
         self.datetime_input.setDateTime(QDateTime.currentDateTime())
         self.datetime_input.setCalendarPopup(True)
-        self._style_datetime(self.datetime_input)
         date_layout.addWidget(self.datetime_input)
         info_layout.addLayout(date_layout)
         
@@ -123,7 +90,6 @@ class StockCountFormPage(QWidget):
         wh_layout = QVBoxLayout()
         wh_layout.addWidget(QLabel("Depo *"))
         self.warehouse_combo = QComboBox()
-        self._style_combo(self.warehouse_combo)
         self.warehouse_combo.currentIndexChanged.connect(self._on_warehouse_changed)
         wh_layout.addWidget(self.warehouse_combo)
         info_layout.addLayout(wh_layout)
@@ -133,7 +99,6 @@ class StockCountFormPage(QWidget):
         cat_layout.addWidget(QLabel("Kategori (Opsiyonel)"))
         self.category_combo = QComboBox()
         self.category_combo.addItem("Tüm Kategoriler", None)
-        self._style_combo(self.category_combo)
         cat_layout.addWidget(self.category_combo)
         info_layout.addLayout(cat_layout)
         
@@ -143,30 +108,12 @@ class StockCountFormPage(QWidget):
         
         # === Ürün Yükleme ===
         load_frame = QFrame()
-        load_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """)
         load_layout = QHBoxLayout(load_frame)
         load_layout.setContentsMargins(16, 12, 16, 12)
         
         load_layout.addWidget(QLabel("Ürünleri depodan yükle:"))
         
         load_btn = QPushButton("📦 Ürünleri Yükle")
-        load_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6366f1;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         load_btn.clicked.connect(self._load_items_from_warehouse)
         load_layout.addWidget(load_btn)
         
@@ -174,7 +121,6 @@ class StockCountFormPage(QWidget):
         
         # Sıfır stokları dahil et
         self.include_zero_check = QCheckBox("Sıfır stokları dahil et")
-        self.include_zero_check.setStyleSheet("color: #f8fafc;")
         load_layout.addWidget(self.include_zero_check)
         
         layout.addWidget(load_frame)
@@ -186,13 +132,6 @@ class StockCountFormPage(QWidget):
         
         # === Alt Bilgi ===
         footer_frame = QFrame()
-        footer_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """)
         footer_layout = QHBoxLayout(footer_frame)
         footer_layout.setContentsMargins(16, 12, 16, 12)
         
@@ -202,7 +141,6 @@ class StockCountFormPage(QWidget):
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(60)
         self.description_input.setPlaceholderText("Sayım notu...")
-        self._style_textedit(self.description_input)
         desc_layout.addWidget(self.description_input)
         footer_layout.addLayout(desc_layout, 2)
         
@@ -213,15 +151,12 @@ class StockCountFormPage(QWidget):
         summary_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         
         self.item_count_label = QLabel("Toplam Ürün: 0")
-        self.item_count_label.setStyleSheet("color: #94a3b8;")
         summary_layout.addWidget(self.item_count_label)
         
         self.counted_label = QLabel("Sayılan: 0")
-        self.counted_label.setStyleSheet("color: #94a3b8;")
         summary_layout.addWidget(self.counted_label)
         
         self.diff_label = QLabel("Fark: ₺0,00")
-        self.diff_label.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         summary_layout.addWidget(self.diff_label)
         
         footer_layout.addLayout(summary_layout)
@@ -254,26 +189,6 @@ class StockCountFormPage(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
-        
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 10px 8px;
-                border: none;
-            }
-        """)
-        
     def load_warehouses(self, warehouses: list):
         """Depoları yükle"""
         self.warehouse_combo.clear()
@@ -370,15 +285,6 @@ class StockCountFormPage(QWidget):
             counted_spin = QDoubleSpinBox()
             counted_spin.setRange(0, 999999999)
             counted_spin.setDecimals(4)
-            counted_spin.setStyleSheet("""
-                QDoubleSpinBox {
-                    background-color: #1e293b;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    padding: 4px;
-                    color: #f8fafc;
-                }
-            """)
             if line["counted_quantity"] is not None:
                 counted_spin.setValue(float(line["counted_quantity"]))
                 counted_items += 1
@@ -419,15 +325,6 @@ class StockCountFormPage(QWidget):
             note_input = QLineEdit()
             note_input.setText(line.get("note", ""))
             note_input.setPlaceholderText("Not...")
-            note_input.setStyleSheet("""
-                QLineEdit {
-                    background-color: #1e293b;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    padding: 4px;
-                    color: #f8fafc;
-                }
-            """)
             note_input.textChanged.connect(lambda text, r=row: self._on_note_changed(r, text))
             self.table.setCellWidget(row, 8, note_input)
         
@@ -437,8 +334,6 @@ class StockCountFormPage(QWidget):
         
         diff_color = COLORS["error"] if total_diff_amount < 0 else COLORS["success"] if total_diff_amount > 0 else "#f8fafc"
         self.diff_label.setText(f"Fark: ₺{total_diff_amount:+,.2f}")
-        self.diff_label.setStyleSheet(f"color: {diff_color}; font-size: 18px; font-weight: bold;")
-        
     def _on_counted_changed(self, row: int, value: float):
         """Sayılan miktar değiştiğinde"""
         if 0 <= row < len(self.count_lines):
@@ -490,60 +385,3 @@ class StockCountFormPage(QWidget):
             "lines": self.count_lines,
         }
     
-    def _style_input(self, widget):
-        widget.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
-        
-    def _style_combo(self, widget):
-        widget.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                min-width: 180px;
-            }
-        """)
-        
-    def _style_datetime(self, widget):
-        widget.setStyleSheet("""
-            QDateTimeEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-            }
-        """)
-        
-    def _style_textedit(self, widget):
-        widget.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px;
-                color: #f8fafc;
-            }
-        """)
-        
-    def _style_button(self, btn):
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)

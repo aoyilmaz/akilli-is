@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from modules.development.services import ErrorLogService
 from database.models.development import ErrorSeverity
 
-
 class ErrorDetailDialog(QDialog):
     """Hata detayı göster dialog"""
 
@@ -62,7 +61,6 @@ class ErrorDetailDialog(QDialog):
         traceback_text = QTextEdit()
         traceback_text.setReadOnly(True)
         traceback_text.setPlainText(self.error_log.error_traceback or "N/A")
-        traceback_text.setStyleSheet("font-family: monospace; font-size: 10pt;")
         layout.addWidget(traceback_text)
 
         # Dosya bilgisi
@@ -76,7 +74,6 @@ class ErrorDetailDialog(QDialog):
         close_btn = QPushButton("Kapat")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
-
 
 class DevelopmentModule(QWidget):
     """Geliştirme modülü - Hata kayıtları"""

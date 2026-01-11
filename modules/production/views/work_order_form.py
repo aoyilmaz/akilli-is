@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QDateTime
 from PyQt6.QtGui import QColor
 
-
 class OperationDialog(QDialog):
     """Operasyon ekleme/düzenleme dialogu"""
     
@@ -31,11 +30,6 @@ class OperationDialog(QDialog):
             self.load_data()
         
     def setup_ui(self):
-        self.setStyleSheet("""
-            QDialog { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
-        """)
-        
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -52,7 +46,6 @@ class OperationDialog(QDialog):
             type_icons = {"machine": "⚙️", "workstation": "🔧", "assembly": "🏭", "manual": "👷"}
             icon = type_icons.get(ws.get("station_type", "machine"), "⚙️")
             self.station_combo.addItem(f"{icon} {ws.get('code', '')} - {ws.get('name', '')}", ws.get("id"))
-        self._style_combo(self.station_combo)
         self.station_combo.currentIndexChanged.connect(self._on_station_changed)
         form_layout.addWidget(self.station_combo, 0, 1)
         
@@ -61,14 +54,12 @@ class OperationDialog(QDialog):
         self.op_no_input = QSpinBox()
         self.op_no_input.setRange(1, 999)
         self.op_no_input.setValue(10)
-        self._style_spinbox(self.op_no_input)
         form_layout.addWidget(self.op_no_input, 1, 1)
         
         # Operasyon Adı
         form_layout.addWidget(QLabel("Operasyon Adı *"), 2, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Makine seçilince otomatik dolar")
-        self._style_input(self.name_input)
         form_layout.addWidget(self.name_input, 2, 1)
         
         # Kurulum Süresi
@@ -76,7 +67,6 @@ class OperationDialog(QDialog):
         self.setup_time_input = QSpinBox()
         self.setup_time_input.setRange(0, 9999)
         self.setup_time_input.setValue(0)
-        self._style_spinbox(self.setup_time_input)
         form_layout.addWidget(self.setup_time_input, 3, 1)
         
         # Birim Çalışma Süresi
@@ -85,28 +75,21 @@ class OperationDialog(QDialog):
         self.run_time_input.setRange(0, 9999)
         self.run_time_input.setDecimals(4)
         self.run_time_input.setValue(0)
-        self._style_double_spinbox(self.run_time_input)
         form_layout.addWidget(self.run_time_input, 4, 1)
         
         # Açıklama
         form_layout.addWidget(QLabel("Açıklama"), 5, 0)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(60)
-        self._style_textedit(self.description_input)
         form_layout.addWidget(self.description_input, 5, 1)
         
         layout.addLayout(form_layout)
         
         # Bilgi kutusu
         info_frame = QFrame()
-        info_frame.setStyleSheet("""
-            QFrame { background-color: rgba(99, 102, 241, 0.1); 
-                border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; }
-        """)
         info_layout = QVBoxLayout(info_frame)
         info_layout.setContentsMargins(12, 8, 12, 8)
         self.info_label = QLabel("ℹ️ İş istasyonu seçildiğinde varsayılan değerler otomatik doldurulur")
-        self.info_label.setStyleSheet("color: #94a3b8; font-size: 12px; background: transparent;")
         self.info_label.setWordWrap(True)
         info_layout.addWidget(self.info_label)
         layout.addWidget(info_frame)
@@ -116,20 +99,10 @@ class OperationDialog(QDialog):
         button_layout.addStretch()
         
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc; 
-                padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white; 
-                font-weight: 600; padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         save_btn.clicked.connect(self._on_save)
         button_layout.addWidget(save_btn)
         
@@ -221,45 +194,6 @@ class OperationDialog(QDialog):
             "description": self.description_input.toPlainText().strip(),
         }
     
-    def _style_input(self, w):
-        w.setStyleSheet("""
-            QLineEdit { background-color: #1e293b; border: 1px solid #334155; 
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
-        
-    def _style_combo(self, c):
-        c.setStyleSheet("""
-            QComboBox { background-color: #1e293b; border: 1px solid #334155; 
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView { background-color: #1e293b; border: 1px solid #334155; 
-                color: #f8fafc; selection-background-color: #334155; }
-        """)
-        
-    def _style_spinbox(self, s):
-        s.setStyleSheet("""
-            QSpinBox { background-color: #1e293b; border: 1px solid #334155; 
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QSpinBox:focus { border-color: #6366f1; }
-        """)
-    
-    def _style_double_spinbox(self, s):
-        s.setStyleSheet("""
-            QDoubleSpinBox { background-color: #1e293b; border: 1px solid #334155; 
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QDoubleSpinBox:focus { border-color: #6366f1; }
-        """)
-        
-    def _style_textedit(self, t):
-        t.setStyleSheet("""
-            QTextEdit { background-color: #1e293b; border: 1px solid #334155; 
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QTextEdit:focus { border-color: #6366f1; }
-        """)
-
-
 class WorkOrderFormPage(QWidget):
     """İş emri formu"""
     
@@ -288,26 +222,15 @@ class WorkOrderFormPage(QWidget):
         header_layout = QHBoxLayout()
         
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet("""
-            QPushButton { background-color: transparent; border: 1px solid #334155;
-                color: #94a3b8; padding: 8px 16px; border-radius: 8px; }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
         
         title_text = "İş Emri Düzenle" if self.is_edit_mode else "Yeni İş Emri"
         title = QLabel(f"📋 {title_text}")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;")
         header_layout.addWidget(title)
         header_layout.addStretch()
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none; color: white; font-weight: 600; padding: 12px 24px; border-radius: 12px; }
-            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea); }
-        """)
         save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
         
@@ -315,13 +238,6 @@ class WorkOrderFormPage(QWidget):
         
         # Tab Widget
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #334155; border-radius: 12px; background-color: rgba(30, 41, 59, 0.5); }
-            QTabBar::tab { background-color: #1e293b; color: #94a3b8; padding: 12px 24px; margin-right: 4px;
-                border-top-left-radius: 8px; border-top-right-radius: 8px; }
-            QTabBar::tab:selected { background-color: #334155; color: #f8fafc; }
-        """)
-        
         tabs.addTab(self._create_general_tab(), "📝 Genel Bilgiler")
         tabs.addTab(self._create_materials_tab(), "📦 Malzemeler")
         tabs.addTab(self._create_operations_tab(), "⚙️ Operasyonlar")
@@ -345,12 +261,10 @@ class WorkOrderFormPage(QWidget):
         no_layout = QHBoxLayout()
         self.order_no_input = QLineEdit()
         self.order_no_input.setPlaceholderText("WO202501001")
-        self._style_input(self.order_no_input)
         no_layout.addWidget(self.order_no_input)
         
         auto_btn = QPushButton("🔄")
         auto_btn.setFixedSize(40, 40)
-        auto_btn.setStyleSheet("QPushButton { background-color: #334155; border: none; border-radius: 8px; } QPushButton:hover { background-color: #475569; }")
         auto_btn.clicked.connect(self.order_no_requested.emit)
         no_layout.addWidget(auto_btn)
         form_layout.addLayout(no_layout, 0, 1)
@@ -358,14 +272,12 @@ class WorkOrderFormPage(QWidget):
         # Mamul Seçimi
         form_layout.addWidget(QLabel("Mamul *"), 1, 0)
         self.product_combo = QComboBox()
-        self._style_combo(self.product_combo)
         self.product_combo.currentIndexChanged.connect(self._on_product_changed)
         form_layout.addWidget(self.product_combo, 1, 1)
         
         # Reçete Seçimi
         form_layout.addWidget(QLabel("Reçete *"), 2, 0)
         self.bom_combo = QComboBox()
-        self._style_combo(self.bom_combo)
         self.bom_combo.currentIndexChanged.connect(self._on_bom_changed)
         form_layout.addWidget(self.bom_combo, 2, 1)
         
@@ -376,13 +288,11 @@ class WorkOrderFormPage(QWidget):
         self.quantity_input.setRange(0.0001, 999999999)
         self.quantity_input.setDecimals(4)
         self.quantity_input.setValue(1)
-        self._style_spinbox(self.quantity_input)
         self.quantity_input.valueChanged.connect(self._update_materials)
         self.quantity_input.valueChanged.connect(self._update_operations_table)
         qty_layout.addWidget(self.quantity_input)
         
         self.unit_label = QLabel("ADET")
-        self.unit_label.setStyleSheet("color: #94a3b8; min-width: 60px;")
         qty_layout.addWidget(self.unit_label)
         form_layout.addLayout(qty_layout, 3, 1)
         
@@ -394,26 +304,22 @@ class WorkOrderFormPage(QWidget):
         self.priority_combo.addItem("Yüksek", "high")
         self.priority_combo.addItem("Acil", "urgent")
         self.priority_combo.setCurrentIndex(1)
-        self._style_combo(self.priority_combo)
         form_layout.addWidget(self.priority_combo, 4, 1)
         
         # Kaynak Depo
         form_layout.addWidget(QLabel("Hammadde Deposu"), 5, 0)
         self.source_warehouse_combo = QComboBox()
-        self._style_combo(self.source_warehouse_combo)
         form_layout.addWidget(self.source_warehouse_combo, 5, 1)
         
         # Hedef Depo
         form_layout.addWidget(QLabel("Mamul Deposu"), 6, 0)
         self.target_warehouse_combo = QComboBox()
-        self._style_combo(self.target_warehouse_combo)
         form_layout.addWidget(self.target_warehouse_combo, 6, 1)
         
         # Açıklama
         form_layout.addWidget(QLabel("Açıklama"), 7, 0)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(80)
-        self._style_textedit(self.description_input)
         form_layout.addWidget(self.description_input, 7, 1)
         
         layout.addWidget(form_frame)
@@ -425,13 +331,11 @@ class WorkOrderFormPage(QWidget):
         cost_layout.setContentsMargins(20, 16, 20, 16)
         
         self.material_cost_label = QLabel("Malzeme: ₺0")
-        self.material_cost_label.setStyleSheet("color: #10b981; font-weight: 600; background: transparent;")
         cost_layout.addWidget(self.material_cost_label)
         
         cost_layout.addStretch()
         
         self.total_cost_label = QLabel("Toplam Tahmini Maliyet: ₺0")
-        self.total_cost_label.setStyleSheet("color: #10b981; font-size: 16px; font-weight: bold; background: transparent;")
         cost_layout.addWidget(self.total_cost_label)
         
         layout.addWidget(cost_frame)
@@ -447,7 +351,6 @@ class WorkOrderFormPage(QWidget):
         
         # Bilgi
         info_label = QLabel("ℹ️ Malzemeler seçilen reçeteye göre otomatik hesaplanır")
-        info_label.setStyleSheet("color: #94a3b8; background-color: #1e293b; padding: 12px; border-radius: 8px;")
         layout.addWidget(info_label)
         
         # Tablo
@@ -475,25 +378,17 @@ class WorkOrderFormPage(QWidget):
         
         self.materials_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.materials_table.verticalHeader().setVisible(False)
-        self.materials_table.setStyleSheet("""
-            QTableWidget { background-color: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QTableWidget::item:selected { background-color: rgba(99, 102, 241, 0.2); }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; font-weight: 600; padding: 8px; border: none; }
-        """)
         layout.addWidget(self.materials_table)
         
         # Özet
         summary_layout = QHBoxLayout()
         
         self.materials_count_label = QLabel("Toplam: 0 malzeme")
-        self.materials_count_label.setStyleSheet("color: #94a3b8;")
         summary_layout.addWidget(self.materials_count_label)
         
         summary_layout.addStretch()
         
         self.shortage_label = QLabel("")
-        self.shortage_label.setStyleSheet("color: #ef4444; font-weight: 600;")
         summary_layout.addWidget(self.shortage_label)
         
         layout.addLayout(summary_layout)
@@ -511,18 +406,12 @@ class WorkOrderFormPage(QWidget):
         toolbar_layout = QHBoxLayout()
         
         info_label = QLabel("⚙️ Üretim operasyonlarını ve makineleri tanımlayın")
-        info_label.setStyleSheet("color: #94a3b8;")
         toolbar_layout.addWidget(info_label)
         
         toolbar_layout.addStretch()
         
         # Operasyon Ekle butonu
         add_op_btn = QPushButton("➕ Operasyon Ekle")
-        add_op_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white; 
-                font-weight: 600; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         add_op_btn.clicked.connect(self._add_operation)
         toolbar_layout.addWidget(add_op_btn)
         
@@ -552,25 +441,17 @@ class WorkOrderFormPage(QWidget):
         
         self.operations_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.operations_table.verticalHeader().setVisible(False)
-        self.operations_table.setStyleSheet("""
-            QTableWidget { background-color: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QTableWidget::item:selected { background-color: rgba(99, 102, 241, 0.2); }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; font-weight: 600; padding: 8px; border: none; }
-        """)
         layout.addWidget(self.operations_table)
         
         # Özet
         summary_layout = QHBoxLayout()
         
         self.operations_count_label = QLabel("Toplam: 0 operasyon")
-        self.operations_count_label.setStyleSheet("color: #94a3b8;")
         summary_layout.addWidget(self.operations_count_label)
         
         summary_layout.addStretch()
         
         self.total_time_label = QLabel("Toplam Süre: 0 dakika")
-        self.total_time_label.setStyleSheet("color: #6366f1; font-weight: 600;")
         summary_layout.addWidget(self.total_time_label)
         
         layout.addLayout(summary_layout)
@@ -593,7 +474,6 @@ class WorkOrderFormPage(QWidget):
         self.planned_start_input = QDateTimeEdit()
         self.planned_start_input.setDateTime(QDateTime.currentDateTime())
         self.planned_start_input.setCalendarPopup(True)
-        self._style_datetime(self.planned_start_input)
         form_layout.addWidget(self.planned_start_input, 0, 1)
         
         # Planlanan Bitiş
@@ -601,22 +481,15 @@ class WorkOrderFormPage(QWidget):
         self.planned_end_input = QDateTimeEdit()
         self.planned_end_input.setDateTime(QDateTime.currentDateTime().addDays(1))
         self.planned_end_input.setCalendarPopup(True)
-        self._style_datetime(self.planned_end_input)
         form_layout.addWidget(self.planned_end_input, 1, 1)
         
         # Tahmini Süre (bilgi)
         form_layout.addWidget(QLabel("Tahmini Süre"), 2, 0)
         self.estimated_time_label = QLabel("Operasyonlardan hesaplanacak")
-        self.estimated_time_label.setStyleSheet("color: #94a3b8;")
         form_layout.addWidget(self.estimated_time_label, 2, 1)
         
         # Otomatik hesapla butonu
         auto_calc_btn = QPushButton("🔄 Bitiş Tarihini Otomatik Hesapla")
-        auto_calc_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc; 
-                padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         auto_calc_btn.clicked.connect(self._auto_calculate_end_time)
         form_layout.addWidget(auto_calc_btn, 3, 1)
         
@@ -870,20 +743,12 @@ class WorkOrderFormPage(QWidget):
             edit_btn = QPushButton("✏️")
             edit_btn.setFixedSize(28, 28)
             edit_btn.setToolTip("Düzenle")
-            edit_btn.setStyleSheet("""
-                QPushButton { background-color: #334155; border: none; border-radius: 4px; }
-                QPushButton:hover { background-color: #475569; }
-            """)
             edit_btn.clicked.connect(lambda checked, r=row: self._edit_operation(r))
             btn_layout.addWidget(edit_btn)
             
             del_btn = QPushButton("🗑")
             del_btn.setFixedSize(28, 28)
             del_btn.setToolTip("Sil")
-            del_btn.setStyleSheet("""
-                QPushButton { background-color: #7f1d1d; border: none; border-radius: 4px; }
-                QPushButton:hover { background-color: #991b1b; }
-            """)
             del_btn.clicked.connect(lambda checked, r=row: self._delete_operation(r))
             btn_layout.addWidget(del_btn)
             
@@ -987,22 +852,3 @@ class WorkOrderFormPage(QWidget):
         
         self.saved.emit(data)
         
-    def _style_input(self, w):
-        w.setStyleSheet("QLineEdit { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QLineEdit:focus { border-color: #6366f1; }")
-        
-    def _style_combo(self, c):
-        c.setStyleSheet("QComboBox { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QComboBox::drop-down { border: none; } QComboBox QAbstractItemView { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; selection-background-color: #334155; }")
-        
-    def _style_spinbox(self, s):
-        s.setStyleSheet("QDoubleSpinBox, QSpinBox { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QDoubleSpinBox:focus, QSpinBox:focus { border-color: #6366f1; }")
-        
-    def _style_textedit(self, t):
-        t.setStyleSheet("QTextEdit { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QTextEdit:focus { border-color: #6366f1; }")
-        
-    def _style_datetime(self, dt):
-        dt.setStyleSheet("""
-            QDateTimeEdit { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QDateTimeEdit:focus { border-color: #6366f1; }
-            QDateTimeEdit::drop-down { border: none; }
-            QCalendarWidget { background-color: #1e293b; color: #f8fafc; }
-        """)

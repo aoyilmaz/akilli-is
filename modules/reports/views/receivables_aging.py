@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
     BG_SECONDARY,
@@ -30,7 +31,6 @@ from config.styles import (
     get_table_style,
     get_button_style,
 )
-
 
 class ReceivablesAgingPage(QWidget):
     """Alacak yaşlandırma raporu sayfası"""
@@ -52,14 +52,12 @@ class ReceivablesAgingPage(QWidget):
         info = QLabel(
             "Vadesi geçmiş ve açık faturalar müşteri bazında gruplandırılmıştır"
         )
-        info.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
         header_layout.addWidget(info)
 
         header_layout.addStretch()
 
         refresh_btn = QPushButton("Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        refresh_btn.setStyleSheet(get_button_style())
         header_layout.addWidget(refresh_btn)
 
         layout.addLayout(header_layout)
@@ -84,27 +82,14 @@ class ReceivablesAgingPage(QWidget):
 
         # Toplam özet
         summary_frame = QFrame()
-        summary_frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
         summary_layout = QHBoxLayout(summary_frame)
 
         self.total_label = QLabel("Toplam Alacak: ₺0")
-        self.total_label.setStyleSheet(
-            f"color: {TEXT_PRIMARY}; font-size: 18px; font-weight: bold;"
-        )
         summary_layout.addWidget(self.total_label)
 
         summary_layout.addStretch()
 
         self.customer_count_label = QLabel("0 müşteri")
-        self.customer_count_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 14px;")
         summary_layout.addWidget(self.customer_count_label)
 
         layout.addWidget(summary_frame)
@@ -124,38 +109,9 @@ class ReceivablesAgingPage(QWidget):
         )
         layout.addWidget(self.table)
 
-    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {color}40;
-                border-radius: 8px;
-            }}
-        """
-        )
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 16, 20, 16)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 13px;")
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 24px; font-weight: bold;"
-        )
-        layout.addWidget(value_label)
-
-        count_label = QLabel("0 müşteri")
-        count_label.setObjectName("count")
-        count_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
-        layout.addWidget(count_label)
-
-        return card
+    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
 
     def _setup_table(self, table: QTableWidget, columns: list):
         table.setColumnCount(len(columns))
@@ -172,9 +128,6 @@ class ReceivablesAgingPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-
-        table.setStyleSheet(get_table_style())
-
     def load_data(self, data: dict):
         groups = data.get("groups", {})
 

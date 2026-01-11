@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.inventory.services import ItemService, CategoryService, WarehouseService
 from modules.inventory.views.reports_page import StockReportsPage
 
-
 class StockReportsModule(QWidget):
     """Stok raporları modülü"""
     

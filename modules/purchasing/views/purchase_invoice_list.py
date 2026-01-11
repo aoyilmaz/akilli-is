@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-
+from ui.components.stat_cards import MiniStatCard
 
 class PurchaseInvoiceListPage(QWidget):
     """Satınalma faturası listesi"""
@@ -48,7 +48,6 @@ class PurchaseInvoiceListPage(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("📄 Satınalma Faturaları")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -71,55 +70,17 @@ class PurchaseInvoiceListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Ara... (fatura no, tedarikçi)")
         self.search_input.setFixedWidth(250)
-        self.search_input.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-        """
-        )
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
 
         # Yenile
-        refresh_btn = QPushButton("🔄")
+        refresh_btn = QPushButton("Yen")
         refresh_btn.setFixedSize(42, 42)
-        refresh_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                font-size: 18px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """
-        )
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Mal Kabulden Fatura
         from_receipt_btn = QPushButton("📦 Mal Kabulden")
-        from_receipt_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 20px;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         from_receipt_btn.clicked.connect(self.add_from_receipt_clicked.emit)
         header_layout.addWidget(from_receipt_btn)
 
@@ -190,34 +151,6 @@ class PurchaseInvoiceListPage(QWidget):
                 "İşlemler",
             ]
         )
-
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 12px;
-                gridline-color: #1e293b;
-            }
-            QTableWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #1e293b;
-                color: #f8fafc;
-            }
-            QTableWidget::item:selected {
-                background-color: #6366f120;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 12px;
-                border: none;
-                font-weight: 600;
-                font-size: 12px;
-            }
-        """
-        )
-
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -243,50 +176,13 @@ class PurchaseInvoiceListPage(QWidget):
 
     def _create_stat_card(
         self, icon: str, title: str, value: str, color: str
-    ) -> QFrame:
-        card = QFrame()
-        card.setFixedSize(140, 80)
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}30;
-                border-radius: 12px;
-            }}
-        """
-        )
+    ) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(f"{icon} {title}", value, color)
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
-
-        header = QHBoxLayout()
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 14px; background: transparent;")
-        header.addWidget(icon_label)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color: {color}; font-size: 11px; background: transparent;"
-        )
-        header.addWidget(title_label)
-        header.addStretch()
-        layout.addLayout(header)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 22px; "
-            "font-weight: bold; background: transparent;"
-        )
-        layout.addWidget(value_label)
-
-        return card
-
-    def _update_card(self, card: QFrame, value: str):
-        label = card.findChild(QLabel, "value")
-        if label:
-            label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        """Kart değerini güncelle"""
+        card.update_value(value)
 
     def _combo_style(self):
         return """
@@ -406,9 +302,8 @@ class PurchaseInvoiceListPage(QWidget):
             inv_status = inv.get("status", "draft")
 
             # Görüntüle
-            view_btn = QPushButton("👁")
-            view_btn.setFixedSize(32, 32)
-            view_btn.setStyleSheet(self._action_btn_style("#3b82f6"))
+            view_btn = QPushButton("Gör")
+            view_btn.setFixedSize(40, 28)
             view_btn.setToolTip("Görüntüle")
             view_btn.clicked.connect(
                 lambda checked, id=inv_id: self.view_clicked.emit(id)
@@ -417,9 +312,8 @@ class PurchaseInvoiceListPage(QWidget):
 
             if inv_status == "draft":
                 # Düzenle
-                edit_btn = QPushButton("✏️")
-                edit_btn.setFixedSize(32, 32)
-                edit_btn.setStyleSheet(self._action_btn_style("#f59e0b"))
+                edit_btn = QPushButton("Düz")
+                edit_btn.setFixedSize(40, 28)
                 edit_btn.setToolTip("Düzenle")
                 edit_btn.clicked.connect(
                     lambda checked, id=inv_id: self.edit_clicked.emit(id)
@@ -427,9 +321,8 @@ class PurchaseInvoiceListPage(QWidget):
                 btn_layout.addWidget(edit_btn)
 
                 # Onayla
-                confirm_btn = QPushButton("✅")
-                confirm_btn.setFixedSize(32, 32)
-                confirm_btn.setStyleSheet(self._action_btn_style("#10b981"))
+                confirm_btn = QPushButton("On")
+                confirm_btn.setFixedSize(40, 28)
                 confirm_btn.setToolTip("Onayla")
                 confirm_btn.clicked.connect(
                     lambda checked, id=inv_id: self.confirm_clicked.emit(id)
@@ -437,9 +330,8 @@ class PurchaseInvoiceListPage(QWidget):
                 btn_layout.addWidget(confirm_btn)
 
                 # Sil
-                del_btn = QPushButton("🗑")
-                del_btn.setFixedSize(32, 32)
-                del_btn.setStyleSheet(self._action_btn_style("#ef4444"))
+                del_btn = QPushButton("Sil")
+                del_btn.setFixedSize(40, 28)
                 del_btn.setToolTip("Sil")
                 del_btn.clicked.connect(
                     lambda checked, id=inv_id: self._confirm_delete(id)
@@ -449,8 +341,7 @@ class PurchaseInvoiceListPage(QWidget):
             elif inv_status in ["received", "partial", "overdue"]:
                 # Ödeme Kaydet
                 pay_btn = QPushButton("💳")
-                pay_btn.setFixedSize(32, 32)
-                pay_btn.setStyleSheet(self._action_btn_style("#8b5cf6"))
+                pay_btn.setFixedSize(40, 28)
                 pay_btn.setToolTip("Ödeme Kaydet")
                 pay_btn.clicked.connect(
                     lambda checked, id=inv_id: self.pay_clicked.emit(id)

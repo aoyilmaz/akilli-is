@@ -14,7 +14,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class PriceListModule(QWidget):
     """Fiyat listesi modulu"""
 

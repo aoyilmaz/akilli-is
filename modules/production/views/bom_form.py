@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
-
 class MaterialSelectDialog(QDialog):
     """Malzeme seçim dialogu"""
     
@@ -26,8 +25,6 @@ class MaterialSelectDialog(QDialog):
     def setup_ui(self):
         self.setWindowTitle("Malzeme Seç")
         self.setMinimumSize(600, 400)
-        self.setStyleSheet("QDialog { background-color: #1e293b; } QLabel { color: #f8fafc; }")
-        
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         
@@ -36,10 +33,6 @@ class MaterialSelectDialog(QDialog):
         search_layout.addWidget(QLabel("🔍"))
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Malzeme ara...")
-        self.search_input.setStyleSheet("""
-            QLineEdit { background-color: #0f172a; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-        """)
         self.search_input.textChanged.connect(self._filter_items)
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
@@ -50,12 +43,6 @@ class MaterialSelectDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["Kod", "Malzeme Adı", "Birim", "Stok"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setStyleSheet("""
-            QTableWidget { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QTableWidget::item:selected { background-color: rgba(99, 102, 241, 0.3); }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; padding: 8px; border: none; }
-        """)
         self.table.doubleClicked.connect(self._on_select)
         self._load_items()
         layout.addWidget(self.table)
@@ -65,12 +52,10 @@ class MaterialSelectDialog(QDialog):
         btn_layout.addStretch()
         
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet("QPushButton { background-color: #334155; border: none; color: #f8fafc; padding: 10px 24px; border-radius: 8px; }")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         
         select_btn = QPushButton("Seç")
-        select_btn.setStyleSheet("QPushButton { background-color: #6366f1; border: none; color: white; padding: 10px 24px; border-radius: 8px; }")
         select_btn.clicked.connect(self._on_select)
         btn_layout.addWidget(select_btn)
         
@@ -104,7 +89,6 @@ class MaterialSelectDialog(QDialog):
     def get_selected(self) -> Optional[dict]:
         return self.selected_item
 
-
 class BOMFormPage(QWidget):
     """Ürün reçetesi formu"""
     
@@ -132,26 +116,15 @@ class BOMFormPage(QWidget):
         header_layout = QHBoxLayout()
         
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet("""
-            QPushButton { background-color: transparent; border: 1px solid #334155;
-                color: #94a3b8; padding: 8px 16px; border-radius: 8px; }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """)
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
         
         title_text = "Reçete Düzenle" if self.is_edit_mode else "Yeni Ürün Reçetesi"
         title = QLabel(f"📋 {title_text}")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;")
         header_layout.addWidget(title)
         header_layout.addStretch()
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none; color: white; font-weight: 600; padding: 12px 24px; border-radius: 12px; }
-            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea); }
-        """)
         save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
         
@@ -159,13 +132,6 @@ class BOMFormPage(QWidget):
         
         # Tab Widget
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #334155; border-radius: 12px; background-color: rgba(30, 41, 59, 0.5); }
-            QTabBar::tab { background-color: #1e293b; color: #94a3b8; padding: 12px 24px; margin-right: 4px;
-                border-top-left-radius: 8px; border-top-right-radius: 8px; }
-            QTabBar::tab:selected { background-color: #334155; color: #f8fafc; }
-        """)
-        
         tabs.addTab(self._create_general_tab(), "📝 Genel Bilgiler")
         tabs.addTab(self._create_materials_tab(), "📦 Malzemeler")
         tabs.addTab(self._create_cost_tab(), "💰 Maliyet")
@@ -188,12 +154,10 @@ class BOMFormPage(QWidget):
         code_layout = QHBoxLayout()
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("BOM000001")
-        self._style_input(self.code_input)
         code_layout.addWidget(self.code_input)
         
         auto_btn = QPushButton("🔄")
         auto_btn.setFixedSize(40, 40)
-        auto_btn.setStyleSheet("QPushButton { background-color: #334155; border: none; border-radius: 8px; } QPushButton:hover { background-color: #475569; }")
         auto_btn.clicked.connect(self.code_requested.emit)
         code_layout.addWidget(auto_btn)
         form_layout.addLayout(code_layout, 0, 1)
@@ -202,13 +166,11 @@ class BOMFormPage(QWidget):
         form_layout.addWidget(QLabel("Reçete Adı *"), 1, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Örn: PVC Film 500mm Standart")
-        self._style_input(self.name_input)
         form_layout.addWidget(self.name_input, 1, 1)
         
         # Mamul
         form_layout.addWidget(QLabel("Mamul *"), 2, 0)
         self.product_combo = QComboBox()
-        self._style_combo(self.product_combo)
         form_layout.addWidget(self.product_combo, 2, 1)
         
         # Temel Üretim Miktarı
@@ -218,11 +180,9 @@ class BOMFormPage(QWidget):
         self.base_qty_input.setRange(0.0001, 999999999)
         self.base_qty_input.setDecimals(4)
         self.base_qty_input.setValue(1)
-        self._style_spinbox(self.base_qty_input)
         qty_layout.addWidget(self.base_qty_input)
         
         self.unit_combo = QComboBox()
-        self._style_combo(self.unit_combo)
         self.unit_combo.setFixedWidth(100)
         qty_layout.addWidget(self.unit_combo)
         form_layout.addLayout(qty_layout, 3, 1)
@@ -233,12 +193,10 @@ class BOMFormPage(QWidget):
         self.version_input = QSpinBox()
         self.version_input.setRange(1, 999)
         self.version_input.setValue(1)
-        self._style_spinbox(self.version_input)
         version_layout.addWidget(self.version_input)
         version_layout.addWidget(QLabel("Rev:"))
         self.revision_input = QLineEdit("A")
         self.revision_input.setMaximumWidth(60)
-        self._style_input(self.revision_input)
         version_layout.addWidget(self.revision_input)
         version_layout.addStretch()
         form_layout.addLayout(version_layout, 4, 1)
@@ -248,14 +206,12 @@ class BOMFormPage(QWidget):
         self.status_combo = QComboBox()
         self.status_combo.addItem("🟡 Taslak", "draft")
         self.status_combo.addItem("✅ Aktif", "active")
-        self._style_combo(self.status_combo)
         form_layout.addWidget(self.status_combo, 5, 1)
         
         # Açıklama
         form_layout.addWidget(QLabel("Açıklama"), 6, 0)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(80)
-        self._style_textedit(self.description_input)
         form_layout.addWidget(self.description_input, 6, 1)
         
         layout.addWidget(form_frame)
@@ -272,18 +228,15 @@ class BOMFormPage(QWidget):
         toolbar = QHBoxLayout()
         
         add_btn = QPushButton("➕ Malzeme Ekle")
-        add_btn.setStyleSheet("QPushButton { background-color: #10b981; border: none; color: white; font-weight: 600; padding: 10px 20px; border-radius: 8px; } QPushButton:hover { background-color: #059669; }")
         add_btn.clicked.connect(self._add_material)
         toolbar.addWidget(add_btn)
         
         remove_btn = QPushButton("🗑 Seçileni Kaldır")
-        remove_btn.setStyleSheet("QPushButton { background-color: #ef4444; border: none; color: white; padding: 10px 20px; border-radius: 8px; } QPushButton:hover { background-color: #dc2626; }")
         remove_btn.clicked.connect(self._remove_material)
         toolbar.addWidget(remove_btn)
         toolbar.addStretch()
         
         self.total_label = QLabel("Toplam: 0 malzeme")
-        self.total_label.setStyleSheet("color: #94a3b8;")
         toolbar.addWidget(self.total_label)
         layout.addLayout(toolbar)
         
@@ -310,13 +263,6 @@ class BOMFormPage(QWidget):
         
         self.materials_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.materials_table.verticalHeader().setVisible(False)
-        self.materials_table.setStyleSheet("""
-            QTableWidget { background-color: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QTableWidget::item:selected { background-color: rgba(99, 102, 241, 0.2); }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; font-weight: 600; padding: 8px; border: none; }
-        """)
-        
     def _create_cost_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -330,7 +276,6 @@ class BOMFormPage(QWidget):
         
         cost_layout.addWidget(QLabel("Malzeme Maliyeti"), 0, 0)
         self.material_cost_label = QLabel("₺0,00")
-        self.material_cost_label.setStyleSheet("color: #818cf8; font-size: 18px; font-weight: bold;")
         cost_layout.addWidget(self.material_cost_label, 0, 1)
         
         cost_layout.addWidget(QLabel("İşçilik Maliyeti"), 1, 0)
@@ -338,7 +283,6 @@ class BOMFormPage(QWidget):
         self.labor_cost_input.setRange(0, 999999999)
         self.labor_cost_input.setDecimals(2)
         self.labor_cost_input.setPrefix("₺")
-        self._style_spinbox(self.labor_cost_input)
         self.labor_cost_input.valueChanged.connect(self._update_total_cost)
         cost_layout.addWidget(self.labor_cost_input, 1, 1)
         
@@ -347,23 +291,19 @@ class BOMFormPage(QWidget):
         self.overhead_cost_input.setRange(0, 999999999)
         self.overhead_cost_input.setDecimals(2)
         self.overhead_cost_input.setPrefix("₺")
-        self._style_spinbox(self.overhead_cost_input)
         self.overhead_cost_input.valueChanged.connect(self._update_total_cost)
         cost_layout.addWidget(self.overhead_cost_input, 2, 1)
         
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("background-color: #334155;")
         cost_layout.addWidget(separator, 3, 0, 1, 2)
         
         cost_layout.addWidget(QLabel("TOPLAM MALİYET"), 4, 0)
         self.total_cost_label = QLabel("₺0,00")
-        self.total_cost_label.setStyleSheet("color: #10b981; font-size: 24px; font-weight: bold;")
         cost_layout.addWidget(self.total_cost_label, 4, 1)
         
         cost_layout.addWidget(QLabel("Birim Başı Maliyet"), 5, 0)
         self.unit_cost_label = QLabel("₺0,00")
-        self.unit_cost_label.setStyleSheet("color: #f59e0b; font-size: 16px;")
         cost_layout.addWidget(self.unit_cost_label, 5, 1)
         
         layout.addWidget(cost_frame)
@@ -434,7 +374,6 @@ class BOMFormPage(QWidget):
             qty_spin.setRange(0.0001, 999999999)
             qty_spin.setDecimals(4)
             qty_spin.setValue(float(line["quantity"]))
-            qty_spin.setStyleSheet("background-color: #1e293b; border: none; color: #f8fafc; padding: 4px;")
             qty_spin.valueChanged.connect(lambda val, r=row: self._on_qty_changed(r, val))
             self.materials_table.setCellWidget(row, 3, qty_spin)
             
@@ -445,7 +384,6 @@ class BOMFormPage(QWidget):
             scrap_spin.setDecimals(2)
             scrap_spin.setSuffix("%")
             scrap_spin.setValue(float(line.get("scrap_rate", 0)))
-            scrap_spin.setStyleSheet("background-color: #1e293b; border: none; color: #f8fafc; padding: 4px;")
             scrap_spin.valueChanged.connect(lambda val, r=row: self._on_scrap_changed(r, val))
             self.materials_table.setCellWidget(row, 5, scrap_spin)
             
@@ -536,14 +474,3 @@ class BOMFormPage(QWidget):
             data["id"] = self.bom_data.get("id")
         self.saved.emit(data)
         
-    def _style_input(self, w):
-        w.setStyleSheet("QLineEdit { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QLineEdit:focus { border-color: #6366f1; }")
-        
-    def _style_combo(self, c):
-        c.setStyleSheet("QComboBox { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QComboBox::drop-down { border: none; } QComboBox QAbstractItemView { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; selection-background-color: #334155; }")
-        
-    def _style_spinbox(self, s):
-        s.setStyleSheet("QDoubleSpinBox, QSpinBox { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QDoubleSpinBox:focus, QSpinBox:focus { border-color: #6366f1; }")
-        
-    def _style_textedit(self, t):
-        t.setStyleSheet("QTextEdit { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #f8fafc; } QTextEdit:focus { border-color: #6366f1; }")

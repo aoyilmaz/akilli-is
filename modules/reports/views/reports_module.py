@@ -31,7 +31,6 @@ try:
 except ImportError:
     WarehouseService = None
 
-
 class ReportsModule(QWidget):
     """Ana raporlama modülü"""
 
@@ -51,51 +50,16 @@ class ReportsModule(QWidget):
         # Sol menü
         menu_frame = QFrame()
         menu_frame.setFixedWidth(240)
-        menu_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border-right: 1px solid {BORDER};
-            }}
-        """)
         menu_layout = QVBoxLayout(menu_frame)
         menu_layout.setContentsMargins(0, 0, 0, 0)
         menu_layout.setSpacing(0)
 
         # Başlık
         title = QLabel("Raporlar")
-        title.setStyleSheet(f"""
-            padding: 20px 16px;
-            font-size: 18px;
-            font-weight: bold;
-            color: {TEXT_PRIMARY};
-            border-bottom: 1px solid {BORDER};
-        """)
         menu_layout.addWidget(title)
 
         # Rapor listesi
         self.report_list = QListWidget()
-        self.report_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: transparent;
-                border: none;
-                outline: none;
-            }}
-            QListWidget::item {{
-                padding: 14px 16px;
-                color: {TEXT_MUTED};
-                border-bottom: 1px solid {BG_PRIMARY};
-            }}
-            QListWidget::item:hover {{
-                background-color: {ACCENT}20;
-                color: {TEXT_PRIMARY};
-            }}
-            QListWidget::item:selected {{
-                background-color: {ACCENT}30;
-                color: {ACCENT};
-                border-left: 3px solid {ACCENT};
-            }}
-        """)
-
         reports = [
             ("Satış Raporları", "sales"),
             ("Stok Yaşlandırma", "stock_aging"),
@@ -117,11 +81,6 @@ class ReportsModule(QWidget):
 
         # İçerik alanı
         content_frame = QFrame()
-        content_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {BG_PRIMARY};
-            }}
-        """)
         content_layout = QVBoxLayout(content_frame)
         content_layout.setContentsMargins(24, 24, 24, 24)
 

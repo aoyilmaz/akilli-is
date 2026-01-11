@@ -12,23 +12,9 @@ ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QFile, QTextStream
 from PyQt6.QtGui import QFont, QIcon
 
-from config import APP_NAME, APP_VERSION, UI, THEMES_DIR, ICONS_DIR
-
-
-def load_stylesheet(theme: str = "dark") -> str:
-    """Tema still dosyasını yükle"""
-    theme_file = THEMES_DIR / f"{theme}.qss"
-    if theme_file.exists():
-        file = QFile(str(theme_file))
-        if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
-            stream = QTextStream(file)
-            stylesheet = stream.readAll()
-            file.close()
-            return stylesheet
-    return ""
+from config import APP_NAME, APP_VERSION, UI, ICONS_DIR
 
 
 def main():
@@ -52,16 +38,16 @@ def main():
     font = QFont(UI["FONT_FAMILY"], UI["FONT_SIZE"])
     app.setFont(font)
 
-    # Tema yükle
-    stylesheet = load_stylesheet(UI["THEME"])
-    if stylesheet:
-        app.setStyleSheet(stylesheet)
+    # Global tema uygula (config/theme.qss)
+    from config.theme_manager import apply_global_theme
 
-    # Ana pencereyi oluştur ve göster
+    apply_global_theme(app)
+
+    # Ana pencereyi oluştur ve tam ekran göster
     from ui.main_window import MainWindow
 
     window = MainWindow()
-    window.show()
+    window.showMaximized()
 
     print("Uygulama başlatıldı!")
 

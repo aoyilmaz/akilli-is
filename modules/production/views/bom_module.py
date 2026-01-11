@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QMessageBox
 from .bom_list import BOMListPage
 from .bom_form import BOMFormPage
 
-
 class BOMModule(QWidget):
     """Ürün Reçeteleri modülü"""
     

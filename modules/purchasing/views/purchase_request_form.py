@@ -30,7 +30,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 
-
 class ItemSelectorDialog(QDialog):
     """Stok kartı seçim dialogu"""
 
@@ -43,14 +42,6 @@ class ItemSelectorDialog(QDialog):
     def setup_ui(self):
         self.setWindowTitle("Stok Kartı Seç")
         self.setMinimumSize(600, 400)
-        self.setStyleSheet(
-            """
-            QDialog {
-                background-color: #1e293b;
-            }
-        """
-        )
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -58,17 +49,6 @@ class ItemSelectorDialog(QDialog):
         # Arama
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Ara... (kod, ad)")
-        self.search_input.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f8fafc;
-            }
-        """
-        )
         self.search_input.textChanged.connect(self._on_search)
         layout.addWidget(self.search_input)
 
@@ -76,24 +56,6 @@ class ItemSelectorDialog(QDialog):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Kod", "Ad", "Birim", "Stok"])
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QTableWidget::item { padding: 8px; }
-            QTableWidget::item:selected { background-color: #6366f140; }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 10px;
-                border: none;
-            }
-        """
-        )
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
@@ -108,18 +70,6 @@ class ItemSelectorDialog(QDialog):
         # Butonlar
         btn_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        btn_box.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #334155;
-                color: #f8fafc;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #475569; }
-        """
         )
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
@@ -160,7 +110,6 @@ class ItemSelectorDialog(QDialog):
                 self.selected_item = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
 
-
 class PurchaseRequestFormPage(QWidget):
     """Satın alma talep formu"""
 
@@ -196,45 +145,17 @@ class PurchaseRequestFormPage(QWidget):
         header_layout = QHBoxLayout()
 
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid #334155;
-                color: #94a3b8;
-                padding: 8px 16px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; color: #f8fafc; }
-        """
-        )
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
         title_text = "Talep Düzenle" if self.is_edit_mode else "Yeni Satın Alma Talebi"
         title = QLabel(f"📋 {title_text}")
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: bold; color: #f8fafc; margin-left: 16px;"
-        )
         header_layout.addWidget(title)
         header_layout.addStretch()
 
         # Onaya Gönder butonu (sadece düzenlemede ve taslak ise)
         if self.is_edit_mode and self.request_data.get("status") == "draft":
             submit_btn = QPushButton("📤 Onaya Gönder")
-            submit_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #f59e0b;
-                    border: none;
-                    color: white;
-                    font-weight: 600;
-                    padding: 12px 24px;
-                    border-radius: 12px;
-                }
-                QPushButton:hover { background-color: #d97706; }
-            """
-            )
             submit_btn.clicked.connect(self._on_submit_for_approval)
             header_layout.addWidget(submit_btn)
 
@@ -262,8 +183,6 @@ class PurchaseRequestFormPage(QWidget):
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setSpacing(16)
@@ -281,7 +200,6 @@ class PurchaseRequestFormPage(QWidget):
         self.request_no_input = QLineEdit()
         self.request_no_input.setPlaceholderText("Otomatik oluşturulacak")
         self.request_no_input.setReadOnly(True)
-        self._style_input(self.request_no_input)
         general_layout.addWidget(self.request_no_input, row, 1)
         row += 1
 
@@ -290,7 +208,6 @@ class PurchaseRequestFormPage(QWidget):
         self.request_date_input = QDateEdit()
         self.request_date_input.setDate(QDate.currentDate())
         self.request_date_input.setCalendarPopup(True)
-        self._style_date(self.request_date_input)
         general_layout.addWidget(self.request_date_input, row, 1)
         row += 1
 
@@ -298,7 +215,6 @@ class PurchaseRequestFormPage(QWidget):
         general_layout.addWidget(self._create_label("Talep Eden"), row, 0)
         self.requested_by_input = QLineEdit()
         self.requested_by_input.setPlaceholderText("Ad Soyad")
-        self._style_input(self.requested_by_input)
         general_layout.addWidget(self.requested_by_input, row, 1)
         row += 1
 
@@ -309,7 +225,6 @@ class PurchaseRequestFormPage(QWidget):
         self.department_input.addItems(
             ["", "Üretim", "Satış", "Satın Alma", "Depo", "Kalite", "Bakım", "İdari"]
         )
-        self._style_combo(self.department_input)
         general_layout.addWidget(self.department_input, row, 1)
         row += 1
 
@@ -321,7 +236,6 @@ class PurchaseRequestFormPage(QWidget):
         self.priority_input.addItem("⬆️ Yüksek", 3)
         self.priority_input.addItem("🔥 Acil", 4)
         self.priority_input.setCurrentIndex(1)  # Normal
-        self._style_combo(self.priority_input)
         general_layout.addWidget(self.priority_input, row, 1)
         row += 1
 
@@ -330,7 +244,6 @@ class PurchaseRequestFormPage(QWidget):
         self.required_date_input = QDateEdit()
         self.required_date_input.setDate(QDate.currentDate().addDays(7))
         self.required_date_input.setCalendarPopup(True)
-        self._style_date(self.required_date_input)
         general_layout.addWidget(self.required_date_input, row, 1)
         row += 1
 
@@ -339,7 +252,6 @@ class PurchaseRequestFormPage(QWidget):
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("Ek açıklamalar...")
-        self._style_textedit(self.notes_input)
         general_layout.addWidget(self.notes_input, row, 1)
 
         general_frame.layout().addLayout(general_layout)
@@ -351,19 +263,6 @@ class PurchaseRequestFormPage(QWidget):
 
         # Kalem ekleme butonu
         add_item_btn = QPushButton("➕ Kalem Ekle")
-        add_item_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         add_item_btn.clicked.connect(self._add_item_row)
         items_layout.addWidget(add_item_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -380,24 +279,6 @@ class PurchaseRequestFormPage(QWidget):
                 "Önerilen Tedarikçi",
                 "İşlem",
             ]
-        )
-        self.items_table.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QTableWidget::item { padding: 8px; }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 10px;
-                border: none;
-                font-weight: 600;
-            }
-        """
         )
         self.items_table.setMinimumHeight(200)
         self.items_table.verticalHeader().setVisible(False)
@@ -437,18 +318,12 @@ class PurchaseRequestFormPage(QWidget):
         layout.setSpacing(12)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #f8fafc; background: transparent; border: none;"
-        )
         layout.addWidget(title_label)
 
         return frame
 
     def _create_label(self, text: str) -> QLabel:
         label = QLabel(text)
-        label.setStyleSheet(
-            "color: #e2e8f0; background: transparent; font-size: 14px; border: none;"
-        )
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return label
 
@@ -532,16 +407,6 @@ class PurchaseRequestFormPage(QWidget):
         # Sil butonu
         del_btn = QPushButton("🗑")
         del_btn.setFixedSize(32, 32)
-        del_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #ef444420;
-                border: 1px solid #ef444450;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #ef444440; }
-        """
-        )
         del_btn.clicked.connect(lambda: self._remove_item_row(row))
         self.items_table.setCellWidget(row, 6, del_btn)
 
@@ -674,102 +539,6 @@ class PurchaseRequestFormPage(QWidget):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.submit_for_approval.emit(self.request_data.get("id"))
-
-    def _style_input(self, w):
-        w.setMinimumHeight(42)
-        w.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-            QLineEdit:read-only { background-color: #1e293b; color: #94a3b8; }
-        """
-        )
-
-    def _style_combo(self, c):
-        c.setMinimumHeight(42)
-        c.setStyleSheet(
-            """
-            QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; width: 30px; }
-            QComboBox::down-arrow {
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """
-        )
-
-    def _style_combo_small(self):
-        return """
-            QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px 8px;
-                color: #f8fafc;
-                font-size: 12px;
-            }
-            QComboBox::drop-down { border: none; width: 20px; }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-            }
-        """
-
-    def _style_date(self, d):
-        d.setMinimumHeight(42)
-        d.setStyleSheet(
-            """
-            QDateEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QDateEdit:focus { border-color: #6366f1; }
-            QDateEdit::drop-down { border: none; width: 30px; }
-        """
-        )
-
-    def _style_textedit(self, t):
-        t.setStyleSheet(
-            """
-            QTextEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QTextEdit:focus { border-color: #6366f1; }
-        """
-        )
 
     def _spin_style(self):
         return """

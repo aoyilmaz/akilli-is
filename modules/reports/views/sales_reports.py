@@ -21,13 +21,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor
+from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
     BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
     TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
     get_table_style, get_tab_style, get_input_style, get_button_style,
 )
-
 
 class SalesReportsPage(QWidget):
     """Satis raporlari sayfasi"""
@@ -45,36 +45,24 @@ class SalesReportsPage(QWidget):
 
         # Filtreler
         filter_frame = QFrame()
-        filter_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 4px;
-                padding: 8px;
-            }}
-            QLabel {{ color: {TEXT_PRIMARY}; }}
-        """)
         filter_layout = QHBoxLayout(filter_frame)
 
         filter_layout.addWidget(QLabel("Baslangic:"))
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        self._style_date_edit(self.start_date)
         filter_layout.addWidget(self.start_date)
 
         filter_layout.addWidget(QLabel("Bitis:"))
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        self._style_date_edit(self.end_date)
         filter_layout.addWidget(self.end_date)
 
         filter_layout.addStretch()
 
         refresh_btn = QPushButton("Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        refresh_btn.setStyleSheet(get_button_style("primary"))
         filter_layout.addWidget(refresh_btn)
 
         layout.addWidget(filter_frame)
@@ -99,38 +87,15 @@ class SalesReportsPage(QWidget):
 
         # Tab Widget
         tabs = QTabWidget()
-        tabs.setStyleSheet(get_tab_style())
-
         tabs.addTab(self._create_customer_tab(), "Musteri Bazli")
         tabs.addTab(self._create_product_tab(), "Urun Bazli")
         tabs.addTab(self._create_period_tab(), "Donemsel")
 
         layout.addWidget(tabs)
 
-    def _create_card(self, title: str, value: str, color: str) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-left: 3px solid {color};
-                border-radius: 4px;
-            }}
-        """)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 12, 16, 12)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold;")
-        layout.addWidget(value_label)
-
-        return card
+    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
 
     def _create_customer_tab(self) -> QWidget:
         widget = QWidget()
@@ -180,14 +145,12 @@ class SalesReportsPage(QWidget):
         # Periyod secimi
         period_layout = QHBoxLayout()
         lbl = QLabel("Periyod:")
-        lbl.setStyleSheet(f"color: {TEXT_PRIMARY};")
         period_layout.addWidget(lbl)
         self.period_combo = QComboBox()
         self.period_combo.addItem("Gunluk", "daily")
         self.period_combo.addItem("Haftalik", "weekly")
         self.period_combo.addItem("Aylik", "monthly")
         self.period_combo.setCurrentIndex(2)
-        self._style_combo(self.period_combo)
         period_layout.addWidget(self.period_combo)
         period_layout.addStretch()
         layout.addLayout(period_layout)
@@ -220,8 +183,6 @@ class SalesReportsPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-        table.setStyleSheet(get_table_style())
-
     def load_customer_data(self, data: list):
         self.customer_table.setRowCount(len(data))
         for row, item in enumerate(data):
@@ -295,50 +256,11 @@ class SalesReportsPage(QWidget):
         self._update_card(self.customer_count_card, str(customers))
         self._update_card(self.avg_order_card, f"{avg:,.2f}")
 
-    def _update_card(self, card: QFrame, value: str):
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(value)
+    def _update_card(self, card: MiniStatCard, value: str):
+        card.update_value(value)
 
     def get_date_range(self):
         return (self.start_date.date().toPyDate(), self.end_date.date().toPyDate())
 
     def get_period(self):
         return self.period_combo.currentData()
-
-    def _style_date_edit(self, edit):
-        edit.setStyleSheet(f"""
-            QDateEdit {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {BORDER};
-                border-radius: 4px;
-                padding: 6px 10px;
-                color: {TEXT_PRIMARY};
-            }}
-            QDateEdit:focus {{
-                border: 1px solid {ACCENT};
-            }}
-        """)
-
-    def _style_combo(self, combo):
-        combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {BG_TERTIARY};
-                border: 1px solid {BORDER};
-                border-radius: 4px;
-                padding: 6px 10px;
-                color: {TEXT_PRIMARY};
-                min-width: 100px;
-            }}
-            QComboBox:focus {{
-                border: 1px solid {ACCENT};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {BG_HOVER};
-            }}
-        """)

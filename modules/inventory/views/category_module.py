@@ -8,7 +8,6 @@ from modules.inventory.services import CategoryService
 from modules.inventory.views.category_list import CategoryListPage
 from modules.inventory.views.category_form import CategoryFormPage
 
-
 class CategoryModule(QWidget):
     """Kategori modülü"""
     

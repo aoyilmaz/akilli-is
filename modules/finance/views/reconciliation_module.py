@@ -11,7 +11,6 @@ try:
 except ImportError:
     ErrorHandler = None
 
-
 class ReconciliationModule(QWidget):
     """Mutabakat modulu"""
 

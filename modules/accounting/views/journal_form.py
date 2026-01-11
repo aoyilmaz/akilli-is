@@ -32,7 +32,6 @@ from config.styles import (
 from database.models.accounting import JournalEntryStatus
 from modules.accounting.services import AccountingService
 
-
 class JournalFormDialog(QDialog):
     """Yevmiye fişi formu"""
 
@@ -53,25 +52,6 @@ class JournalFormDialog(QDialog):
             "Yevmiye Düzenle" if self.journal_id else "Yeni Yevmiye Fişi"
         )
         self.setMinimumSize(900, 600)
-        self.setStyleSheet(f"""
-            QDialog {{
-                background-color: {BG_PRIMARY};
-            }}
-            QLabel {{
-                color: {TEXT_MUTED};
-            }}
-            QLineEdit, QTextEdit, QDateEdit, QComboBox {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 6px;
-                padding: 8px;
-                color: {TEXT_PRIMARY};
-            }}
-            QLineEdit:focus, QDateEdit:focus, QComboBox:focus {{
-                border-color: {ACCENT};
-            }}
-        """)
-
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -100,9 +80,6 @@ class JournalFormDialog(QDialog):
 
         # Satırlar tablosu
         table_label = QLabel("Yevmiye Satırları")
-        table_label.setStyleSheet(
-            f"font-weight: bold; font-size: 14px; color: {TEXT_PRIMARY};"
-        )
         layout.addWidget(table_label)
 
         self.table = QTableWidget()
@@ -120,20 +97,16 @@ class JournalFormDialog(QDialog):
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        self.table.setStyleSheet(get_table_style())
-
         layout.addWidget(self.table)
 
         # Satır ekleme butonları
         btn_row = QHBoxLayout()
 
         add_btn = QPushButton("Satır Ekle")
-        add_btn.setStyleSheet(get_button_style("secondary"))
         add_btn.clicked.connect(self._add_row)
         btn_row.addWidget(add_btn)
 
         remove_btn = QPushButton("Satır Sil")
-        remove_btn.setStyleSheet(get_button_style("danger"))
         remove_btn.clicked.connect(self._remove_row)
         btn_row.addWidget(remove_btn)
 
@@ -141,21 +114,12 @@ class JournalFormDialog(QDialog):
 
         # Toplamlar
         self.debit_total = QLabel("Borç: ₺0,00")
-        self.debit_total.setStyleSheet(
-            f"color: {SUCCESS}; font-weight: bold; font-size: 14px;"
-        )
         btn_row.addWidget(self.debit_total)
 
         self.credit_total = QLabel("Alacak: ₺0,00")
-        self.credit_total.setStyleSheet(
-            f"color: {ERROR}; font-weight: bold; font-size: 14px;"
-        )
         btn_row.addWidget(self.credit_total)
 
         self.balance_label = QLabel("Fark: ₺0,00")
-        self.balance_label.setStyleSheet(
-            f"color: {TEXT_PRIMARY}; font-weight: bold; font-size: 14px;"
-        )
         btn_row.addWidget(self.balance_label)
 
         layout.addLayout(btn_row)
@@ -165,12 +129,10 @@ class JournalFormDialog(QDialog):
         footer.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet(get_button_style("secondary"))
         cancel_btn.clicked.connect(self.reject)
         footer.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
-        save_btn.setStyleSheet(get_button_style())
         save_btn.clicked.connect(self.save)
         footer.addWidget(save_btn)
 
@@ -191,22 +153,6 @@ class JournalFormDialog(QDialog):
 
         # Hesap combo
         account_combo = QComboBox()
-        account_combo.setStyleSheet(f"""
-            QComboBox {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 4px;
-                padding: 6px;
-                color: {TEXT_PRIMARY};
-            }}
-            QComboBox:focus {{ border-color: {ACCENT}; }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {ACCENT};
-                color: {TEXT_PRIMARY};
-            }}
-        """)
         account_combo.addItem("-- Hesap Seçin --", None)
         for acc in self.accounts:
             if acc.is_detail:
@@ -267,15 +213,8 @@ class JournalFormDialog(QDialog):
         diff = total_debit - total_credit
         if diff == 0:
             self.balance_label.setText("Dengeli")
-            self.balance_label.setStyleSheet(
-                f"color: {SUCCESS}; font-weight: bold; font-size: 14px;"
-            )
         else:
             self.balance_label.setText(f"Fark: ₺{abs(diff):,.2f}")
-            self.balance_label.setStyleSheet(
-                f"color: {ERROR}; font-weight: bold; font-size: 14px;"
-            )
-
     def load_journal(self):
         """Mevcut yevmiyeyi yükle"""
         self.journal = self.service.get_journal_by_id(self.journal_id)

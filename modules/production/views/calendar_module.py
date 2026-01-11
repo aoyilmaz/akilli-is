@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTime, QDate
 from PyQt6.QtGui import QColor
 
-
 class ShiftDialog(QDialog):
     """Vardiya ekleme/düzenleme dialogu"""
     
@@ -27,11 +26,6 @@ class ShiftDialog(QDialog):
             self.load_data()
     
     def setup_ui(self):
-        self.setStyleSheet("""
-            QDialog { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
-        """)
-        
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -43,14 +37,12 @@ class ShiftDialog(QDialog):
         form.addWidget(QLabel("Kod *"), 0, 0)
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("SABAH")
-        self._style_input(self.code_input)
         form.addWidget(self.code_input, 0, 1)
         
         # Ad
         form.addWidget(QLabel("Ad *"), 1, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Sabah Vardiyası")
-        self._style_input(self.name_input)
         form.addWidget(self.name_input, 1, 1)
         
         # Başlangıç
@@ -58,7 +50,6 @@ class ShiftDialog(QDialog):
         self.start_time_input = QTimeEdit()
         self.start_time_input.setDisplayFormat("HH:mm")
         self.start_time_input.setTime(QTime(8, 0))
-        self._style_time(self.start_time_input)
         form.addWidget(self.start_time_input, 2, 1)
         
         # Bitiş
@@ -66,7 +57,6 @@ class ShiftDialog(QDialog):
         self.end_time_input = QTimeEdit()
         self.end_time_input.setDisplayFormat("HH:mm")
         self.end_time_input.setTime(QTime(17, 0))
-        self._style_time(self.end_time_input)
         form.addWidget(self.end_time_input, 3, 1)
         
         # Mola
@@ -74,7 +64,6 @@ class ShiftDialog(QDialog):
         self.break_input = QSpinBox()
         self.break_input.setRange(0, 120)
         self.break_input.setValue(60)
-        self._style_spin(self.break_input)
         form.addWidget(self.break_input, 4, 1)
         
         layout.addLayout(form)
@@ -84,20 +73,10 @@ class ShiftDialog(QDialog):
         btn_layout.addStretch()
         
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white;
-                font-weight: 600; padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
         
@@ -136,28 +115,6 @@ class ShiftDialog(QDialog):
             "break_minutes": self.break_input.value(),
         }
     
-    def _style_input(self, w):
-        w.setStyleSheet("""
-            QLineEdit { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
-    
-    def _style_time(self, w):
-        w.setStyleSheet("""
-            QTimeEdit { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QTimeEdit:focus { border-color: #6366f1; }
-        """)
-    
-    def _style_spin(self, w):
-        w.setStyleSheet("""
-            QSpinBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QSpinBox:focus { border-color: #6366f1; }
-        """)
-
-
 class HolidayDialog(QDialog):
     """Tatil ekleme/düzenleme dialogu"""
     
@@ -171,11 +128,6 @@ class HolidayDialog(QDialog):
             self.load_data()
     
     def setup_ui(self):
-        self.setStyleSheet("""
-            QDialog { background-color: #0f172a; }
-            QLabel { color: #e2e8f0; }
-        """)
-        
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -188,20 +140,17 @@ class HolidayDialog(QDialog):
         self.date_input = QDateEdit()
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDate.currentDate())
-        self._style_date(self.date_input)
         form.addWidget(self.date_input, 0, 1)
         
         # Ad
         form.addWidget(QLabel("Tatil Adı *"), 1, 0)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Yılbaşı")
-        self._style_input(self.name_input)
         form.addWidget(self.name_input, 1, 1)
         
         # Yarım gün mü?
         form.addWidget(QLabel("Yarım Gün"), 2, 0)
         self.half_day_check = QCheckBox()
-        self.half_day_check.setStyleSheet("QCheckBox { color: #f8fafc; }")
         form.addWidget(self.half_day_check, 2, 1)
         
         layout.addLayout(form)
@@ -211,20 +160,10 @@ class HolidayDialog(QDialog):
         btn_layout.addStretch()
         
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white;
-                font-weight: 600; padding: 10px 24px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
         
@@ -253,21 +192,6 @@ class HolidayDialog(QDialog):
             "applies_to_all": True,
         }
     
-    def _style_input(self, w):
-        w.setStyleSheet("""
-            QLineEdit { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QLineEdit:focus { border-color: #6366f1; }
-        """)
-    
-    def _style_date(self, w):
-        w.setStyleSheet("""
-            QDateEdit { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 10px; color: #f8fafc; }
-            QDateEdit:focus { border-color: #6366f1; }
-        """)
-
-
 class CalendarModule(QWidget):
     """Üretim Takvimi Modülü"""
     
@@ -288,21 +212,12 @@ class CalendarModule(QWidget):
         # Başlık
         header = QHBoxLayout()
         title = QLabel("📅 Üretim Takvimi")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         header.addWidget(title)
         header.addStretch()
         layout.addLayout(header)
         
         # Tabs
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #334155; border-radius: 12px; 
-                background-color: rgba(30, 41, 59, 0.5); }
-            QTabBar::tab { background-color: #1e293b; color: #94a3b8; padding: 12px 24px; 
-                margin-right: 4px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-            QTabBar::tab:selected { background-color: #334155; color: #f8fafc; }
-        """)
-        
         tabs.addTab(self._create_shifts_tab(), "⏰ Vardiyalar")
         tabs.addTab(self._create_holidays_tab(), "🎉 Tatiller")
         tabs.addTab(self._create_schedule_tab(), "📋 İstasyon Takvimi")
@@ -319,22 +234,12 @@ class CalendarModule(QWidget):
         toolbar = QHBoxLayout()
         
         add_btn = QPushButton("➕ Vardiya Ekle")
-        add_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white;
-                font-weight: 600; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         add_btn.clicked.connect(self._add_shift)
         toolbar.addWidget(add_btn)
         
         toolbar.addStretch()
         
         refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         refresh_btn.clicked.connect(self._load_shifts)
         toolbar.addWidget(refresh_btn)
         
@@ -349,11 +254,6 @@ class CalendarModule(QWidget):
         self.shifts_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.shifts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.shifts_table.verticalHeader().setVisible(False)
-        self.shifts_table.setStyleSheet("""
-            QTableWidget { background-color: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; font-weight: 600; padding: 8px; border: none; }
-        """)
         layout.addWidget(self.shifts_table)
         
         return tab
@@ -368,11 +268,6 @@ class CalendarModule(QWidget):
         toolbar = QHBoxLayout()
         
         add_btn = QPushButton("➕ Tatil Ekle")
-        add_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white;
-                font-weight: 600; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         add_btn.clicked.connect(self._add_holiday)
         toolbar.addWidget(add_btn)
         
@@ -384,22 +279,10 @@ class CalendarModule(QWidget):
         for y in range(current_year - 1, current_year + 3):
             self.year_combo.addItem(str(y), y)
         self.year_combo.setCurrentText(str(current_year))
-        self.year_combo.setStyleSheet("""
-            QComboBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 8px 12px; color: #f8fafc; min-width: 100px; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView { background-color: #1e293b; border: 1px solid #334155;
-                color: #f8fafc; selection-background-color: #334155; }
-        """)
         self.year_combo.currentIndexChanged.connect(self._load_holidays)
         toolbar.addWidget(self.year_combo)
         
         refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setStyleSheet("""
-            QPushButton { background-color: #334155; border: none; color: #f8fafc;
-                padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #475569; }
-        """)
         refresh_btn.clicked.connect(self._load_holidays)
         toolbar.addWidget(refresh_btn)
         
@@ -414,11 +297,6 @@ class CalendarModule(QWidget):
         self.holidays_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.holidays_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.holidays_table.verticalHeader().setVisible(False)
-        self.holidays_table.setStyleSheet("""
-            QTableWidget { background-color: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 8px; }
-            QTableWidget::item { padding: 8px; border-bottom: 1px solid #334155; }
-            QHeaderView::section { background-color: #1e293b; color: #94a3b8; font-weight: 600; padding: 8px; border: none; }
-        """)
         layout.addWidget(self.holidays_table)
         
         return tab
@@ -435,24 +313,12 @@ class CalendarModule(QWidget):
         toolbar.addWidget(QLabel("İş İstasyonu:"))
         self.station_combo = QComboBox()
         self.station_combo.setMinimumWidth(200)
-        self.station_combo.setStyleSheet("""
-            QComboBox { background-color: #1e293b; border: 1px solid #334155;
-                border-radius: 8px; padding: 8px 12px; color: #f8fafc; }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView { background-color: #1e293b; border: 1px solid #334155;
-                color: #f8fafc; selection-background-color: #334155; }
-        """)
         self.station_combo.currentIndexChanged.connect(self._load_station_schedule)
         toolbar.addWidget(self.station_combo)
         
         toolbar.addStretch()
         
         save_btn = QPushButton("💾 Takvimi Kaydet")
-        save_btn.setStyleSheet("""
-            QPushButton { background-color: #6366f1; border: none; color: white;
-                font-weight: 600; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #4f46e5; }
-        """)
         save_btn.clicked.connect(self._save_station_schedule)
         toolbar.addWidget(save_btn)
         
@@ -460,9 +326,6 @@ class CalendarModule(QWidget):
         
         # Haftalık takvim grid
         schedule_frame = QFrame()
-        schedule_frame.setStyleSheet("""
-            QFrame { background-color: rgba(30, 41, 59, 0.3); border: 1px solid #334155; border-radius: 12px; }
-        """)
         schedule_layout = QGridLayout(schedule_frame)
         schedule_layout.setContentsMargins(16, 16, 16, 16)
         schedule_layout.setSpacing(12)
@@ -478,7 +341,6 @@ class CalendarModule(QWidget):
         # Gün satırları
         for i, day in enumerate(days):
             day_label = QLabel(day)
-            day_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
             schedule_layout.addWidget(day_label, i + 1, 0)
             self.day_checkboxes[i] = {}
         
@@ -488,7 +350,6 @@ class CalendarModule(QWidget):
         
         # Bilgi
         info = QLabel("ℹ️ Her gün için çalışılacak vardiyaları işaretleyin")
-        info.setStyleSheet("color: #64748b; margin-top: 8px;")
         layout.addWidget(info)
         
         layout.addStretch()
@@ -557,13 +418,11 @@ class CalendarModule(QWidget):
                 
                 edit_btn = QPushButton("✏️")
                 edit_btn.setFixedSize(28, 28)
-                edit_btn.setStyleSheet("QPushButton { background-color: #334155; border: none; border-radius: 4px; } QPushButton:hover { background-color: #475569; }")
                 edit_btn.clicked.connect(lambda checked, s=shift: self._edit_shift(s))
                 btn_layout.addWidget(edit_btn)
                 
                 del_btn = QPushButton("🗑")
                 del_btn.setFixedSize(28, 28)
-                del_btn.setStyleSheet("QPushButton { background-color: #7f1d1d; border: none; border-radius: 4px; } QPushButton:hover { background-color: #991b1b; }")
                 del_btn.clicked.connect(lambda checked, s=shift: self._delete_shift(s))
                 btn_layout.addWidget(del_btn)
                 
@@ -592,7 +451,6 @@ class CalendarModule(QWidget):
         for col, shift in enumerate(shifts):
             # Başlık
             header = QLabel(f"{shift.code}\n{shift.start_time.strftime('%H:%M')}-{shift.end_time.strftime('%H:%M')}")
-            header.setStyleSheet("color: #94a3b8; font-size: 11px;")
             header.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.schedule_layout.addWidget(header, 0, col + 1)
             self.shift_headers.append(header)
@@ -600,7 +458,6 @@ class CalendarModule(QWidget):
             # Her gün için checkbox
             for day in range(7):
                 cb = QCheckBox()
-                cb.setStyleSheet("QCheckBox { color: #f8fafc; }")
                 cb.setProperty("shift_id", shift.id)
                 cb.setProperty("day", day)
                 self.schedule_layout.addWidget(cb, day + 1, col + 1, Qt.AlignmentFlag.AlignCenter)
@@ -645,13 +502,11 @@ class CalendarModule(QWidget):
                 
                 edit_btn = QPushButton("✏️")
                 edit_btn.setFixedSize(28, 28)
-                edit_btn.setStyleSheet("QPushButton { background-color: #334155; border: none; border-radius: 4px; } QPushButton:hover { background-color: #475569; }")
                 edit_btn.clicked.connect(lambda checked, h=holiday: self._edit_holiday(h))
                 btn_layout.addWidget(edit_btn)
                 
                 del_btn = QPushButton("🗑")
                 del_btn.setFixedSize(28, 28)
-                del_btn.setStyleSheet("QPushButton { background-color: #7f1d1d; border: none; border-radius: 4px; } QPushButton:hover { background-color: #991b1b; }")
                 del_btn.clicked.connect(lambda checked, h=holiday: self._delete_holiday(h))
                 btn_layout.addWidget(del_btn)
                 

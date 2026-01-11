@@ -12,7 +12,6 @@ try:
 except ImportError:
     WarehouseService = None
 
-
 class StockAgingModule(QWidget):
     """Stok yaslandirma raporu modulu - bagimsiz calisir"""
 

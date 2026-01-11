@@ -9,7 +9,6 @@ from modules.inventory.services import WarehouseService
 from modules.inventory.views.warehouse_list import WarehouseListPage
 from modules.inventory.views.warehouse_form import WarehouseFormPage
 
-
 class WarehouseModule(QWidget):
     """Depo modülü ana widget'ı"""
     

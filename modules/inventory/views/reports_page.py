@@ -10,9 +10,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from ui.components.stat_cards import MiniStatCard
 
 from config import COLORS
-
 
 class StockReportsPage(QWidget):
     """Stok raporları sayfası"""
@@ -33,25 +33,21 @@ class StockReportsPage(QWidget):
         header_layout = QHBoxLayout()
         
         title = QLabel("📊 Stok Raporları")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
         header_layout.addWidget(title)
         
         header_layout.addStretch()
         
         # Dışa aktar
         export_btn = QPushButton("📤 Excel'e Aktar")
-        self._style_button(export_btn)
         header_layout.addWidget(export_btn)
         
         # Yazdır
         print_btn = QPushButton("🖨️ Yazdır")
-        self._style_button(print_btn)
         header_layout.addWidget(print_btn)
         
         # Yenile
         refresh_btn = QPushButton("🔄 Yenile")
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        self._style_button(refresh_btn)
         header_layout.addWidget(refresh_btn)
         
         layout.addLayout(header_layout)
@@ -76,24 +72,6 @@ class StockReportsPage(QWidget):
         
         # === Tab Widget ===
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #334155;
-                border-radius: 12px;
-                background-color: rgba(30, 41, 59, 0.5);
-            }
-            QTabBar::tab {
-                background-color: transparent;
-                color: #94a3b8;
-                padding: 12px 24px;
-                margin-right: 4px;
-            }
-            QTabBar::tab:selected {
-                color: #818cf8;
-                border-bottom: 2px solid #6366f1;
-            }
-        """)
-        
         # Stok Durum Raporu
         tabs.addTab(self._create_stock_status_tab(), "📋 Stok Durumu")
         
@@ -108,32 +86,9 @@ class StockReportsPage(QWidget):
         
         layout.addWidget(tabs)
         
-    def _create_card(self, title: str, value: str, color: str) -> QFrame:
-        """Özet kartı oluştur"""
-        card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
-                    stop:0 rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.2),
-                    stop:1 rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.1));
-                border: 1px solid {color}40;
-                border-radius: 16px;
-            }}
-        """)
-        
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 16, 20, 16)
-        
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #94a3b8; font-size: 13px;")
-        layout.addWidget(title_label)
-        
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 28px; font-weight: bold;")
-        layout.addWidget(value_label)
-        
-        return card
+    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
+        """Dashboard tarzı istatistik kartı"""
+        return MiniStatCard(title, value, color)
         
     def _create_stock_status_tab(self) -> QWidget:
         """Stok durum raporu"""
@@ -147,13 +102,11 @@ class StockReportsPage(QWidget):
         filter_layout.addWidget(QLabel("Kategori:"))
         self.status_category_combo = QComboBox()
         self.status_category_combo.addItem("Tümü", None)
-        self._style_combo(self.status_category_combo)
         filter_layout.addWidget(self.status_category_combo)
         
         filter_layout.addWidget(QLabel("Depo:"))
         self.status_warehouse_combo = QComboBox()
         self.status_warehouse_combo.addItem("Tümü", None)
-        self._style_combo(self.status_warehouse_combo)
         filter_layout.addWidget(self.status_warehouse_combo)
         
         filter_layout.addStretch()
@@ -183,7 +136,6 @@ class StockReportsPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         
         info_label = QLabel("⚠️ Minimum stok seviyesinin altında veya stokta olmayan ürünler")
-        info_label.setStyleSheet("color: #f59e0b; font-size: 14px; padding: 8px;")
         layout.addWidget(info_label)
         
         self.critical_table = QTableWidget()
@@ -248,7 +200,6 @@ class StockReportsPage(QWidget):
         filter_layout.addWidget(QLabel("Depo:"))
         self.wh_report_combo = QComboBox()
         self.wh_report_combo.addItem("Tüm Depolar", None)
-        self._style_combo(self.wh_report_combo)
         filter_layout.addWidget(self.wh_report_combo)
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
@@ -272,14 +223,6 @@ class StockReportsPage(QWidget):
     def _create_mini_card(self, title: str, value: str, color: str) -> QFrame:
         """Mini özet kartı"""
         card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color}15;
-                border: 1px solid {color}40;
-                border-radius: 12px;
-                padding: 8px;
-            }}
-        """)
         card.setFixedWidth(180)
         
         layout = QVBoxLayout(card)
@@ -287,12 +230,10 @@ class StockReportsPage(QWidget):
         layout.setSpacing(4)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
         layout.addWidget(title_label)
         
         value_label = QLabel(value)
         value_label.setObjectName("value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: bold;")
         layout.addWidget(value_label)
         
         return card
@@ -313,29 +254,6 @@ class StockReportsPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-        
-        table.setStyleSheet("""
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 8px;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QTableWidget::item:selected {
-                background-color: rgba(99, 102, 241, 0.2);
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 10px 8px;
-                border: none;
-            }
-        """)
-        
     def load_data(self, data: dict):
         """Rapor verilerini yükle"""
         # Özet kartları güncelle
@@ -350,11 +268,9 @@ class StockReportsPage(QWidget):
         # Kritik stok tablosu
         self._load_critical_table(data.get("critical_items", []))
         
-    def _update_card(self, card: QFrame, value: str):
+    def _update_card(self, card: MiniStatCard, value: str):
         """Kart değerini güncelle"""
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(value)
+        card.update_value(value)
             
     def _load_status_table(self, items: list):
         """Stok durum tablosunu yükle"""
@@ -441,26 +357,3 @@ class StockReportsPage(QWidget):
             self.status_warehouse_combo.addItem(wh.name, wh.id)
             self.wh_report_combo.addItem(wh.name, wh.id)
     
-    def _style_button(self, btn):
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #334155; }
-        """)
-        
-    def _style_combo(self, combo):
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 12px;
-                color: #f8fafc;
-                min-width: 150px;
-            }
-        """)

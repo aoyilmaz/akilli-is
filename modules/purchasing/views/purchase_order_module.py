@@ -13,7 +13,6 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from .purchase_order_list import PurchaseOrderListPage
 from .purchase_order_form import PurchaseOrderFormPage
 
-
 class CreateReceiptDialog(QDialog):
     """Siparişten mal kabul oluşturma dialogu"""
 
@@ -23,8 +22,6 @@ class CreateReceiptDialog(QDialog):
         self.warehouses = warehouses
         self.setWindowTitle(f"Mal Kabul Oluştur - {order_data.get('order_no', '')}")
         self.setMinimumSize(900, 700)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -34,7 +31,6 @@ class CreateReceiptDialog(QDialog):
 
         # Başlık
         title = QLabel("📥 Mal Kabul Oluştur")
-        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
 
         # Sipariş bilgileri
@@ -42,13 +38,11 @@ class CreateReceiptDialog(QDialog):
             f"Sipariş: {self.order_data.get('order_no', '')} | "
             f"Tedarikçi: {self.order_data.get('supplier_name', '')}"
         )
-        info_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
         layout.addWidget(info_label)
 
         # Depo seçimi
         warehouse_layout = QHBoxLayout()
         warehouse_label = QLabel("Hedef Depo:")
-        warehouse_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
         warehouse_layout.addWidget(warehouse_label)
 
         self.warehouse_combo = QComboBox()
@@ -63,7 +57,6 @@ class CreateReceiptDialog(QDialog):
 
         # Kalemler tablosu
         items_label = QLabel("Sipariş Kalemleri:")
-        items_label.setStyleSheet("color: #f8fafc; font-size: 14px; margin-top: 10px;")
         layout.addWidget(items_label)
 
         self.items_table = QTableWidget()
@@ -129,15 +122,6 @@ class CreateReceiptDialog(QDialog):
                 item.get('received_quantity', 0)
             )
             qty_input = QLineEdit(str(remaining if remaining > 0 else 0))
-            qty_input.setStyleSheet("""
-                QLineEdit {
-                    background-color: #0f172a;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    padding: 4px;
-                    color: #f8fafc;
-                }
-            """)
             self.items_table.setCellWidget(row, 5, qty_input)
 
             self.items_table.setItem(row, 6, QTableWidgetItem(item.get('unit_name', '')))
@@ -214,7 +198,6 @@ class CreateReceiptDialog(QDialog):
             }}
             QPushButton:hover {{ background-color: {hover_color}; }}
         """
-
 
 class PurchaseOrderModule(QWidget):
     """Satın alma sipariş modülü"""

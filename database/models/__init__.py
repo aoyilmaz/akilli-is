@@ -160,3 +160,37 @@ from database.models.mrp import (
     MRPRun,
     MRPLine,
 )
+
+# İnsan Kaynakları modülü
+from database.models.hr import (
+    Department,
+    Position,
+    Employee,
+    Leave,
+    Attendance,
+    EmploymentType,
+    Gender,
+    LeaveType,
+    LeaveStatus,
+    AttendanceStatus,
+)
+
+# Kalite modülü
+from database.models.quality import (
+    InspectionTemplate,
+    InspectionCriteria,
+    Inspection,
+    InspectionResult,
+    NonConformance,
+    CustomerComplaint,
+    CAPA,
+    Audit,
+    InspectionType,
+    InspectionStatus,
+    NCRSeverity,
+    NCRStatus,
+    ComplaintCategory,
+    ComplaintStatus,
+    CAPAType,
+    CAPAStatus,
+)

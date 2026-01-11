@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 
-
 class PurchaseInvoiceFormPage(QWidget):
     """Satınalma faturası formu"""
 
@@ -58,20 +57,6 @@ class PurchaseInvoiceFormPage(QWidget):
         header_layout = QHBoxLayout()
 
         back_btn = QPushButton("← Geri")
-        back_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid #334155;
-                color: #94a3b8;
-                padding: 8px 16px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #334155; color: #f8fafc;
-            }
-        """
-        )
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
@@ -79,9 +64,6 @@ class PurchaseInvoiceFormPage(QWidget):
             "Fatura Düzenle" if self.is_edit_mode else "Yeni Satınalma Faturası"
         )
         title = QLabel(f"📄 {title_text}")
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: bold; " "color: #f8fafc; margin-left: 16px;"
-        )
         header_layout.addWidget(title)
         header_layout.addStretch()
 
@@ -115,8 +97,6 @@ class PurchaseInvoiceFormPage(QWidget):
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setSpacing(16)
@@ -134,7 +114,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.invoice_no_input = QLineEdit()
         self.invoice_no_input.setPlaceholderText("Otomatik oluşturulacak")
         self.invoice_no_input.setReadOnly(True)
-        self._style_input(self.invoice_no_input)
         general_layout.addWidget(self.invoice_no_input, row, 1)
         row += 1
 
@@ -143,7 +122,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.invoice_date_input = QDateEdit()
         self.invoice_date_input.setDate(QDate.currentDate())
         self.invoice_date_input.setCalendarPopup(True)
-        self._style_date(self.invoice_date_input)
         general_layout.addWidget(self.invoice_date_input, row, 1)
         row += 1
 
@@ -152,7 +130,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.due_date_input = QDateEdit()
         self.due_date_input.setDate(QDate.currentDate().addDays(30))
         self.due_date_input.setCalendarPopup(True)
-        self._style_date(self.due_date_input)
         general_layout.addWidget(self.due_date_input, row, 1)
         row += 1
 
@@ -164,7 +141,6 @@ class PurchaseInvoiceFormPage(QWidget):
             self.supplier_combo.addItem(
                 f"{s.get('code', '')} - {s.get('name', '')}", s.get("id")
             )
-        self._style_combo(self.supplier_combo)
         general_layout.addWidget(self.supplier_combo, row, 1)
         row += 1
 
@@ -174,7 +150,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.supplier_invoice_no_input.setPlaceholderText(
             "Tedarikçiden gelen fatura numarası"
         )
-        self._style_input(self.supplier_invoice_no_input)
         general_layout.addWidget(self.supplier_invoice_no_input, row, 1)
         row += 1
 
@@ -183,7 +158,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.supplier_invoice_date_input = QDateEdit()
         self.supplier_invoice_date_input.setDate(QDate.currentDate())
         self.supplier_invoice_date_input.setCalendarPopup(True)
-        self._style_date(self.supplier_invoice_date_input)
         general_layout.addWidget(self.supplier_invoice_date_input, row, 1)
         row += 1
 
@@ -192,7 +166,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
         self.notes_input.setPlaceholderText("Ek açıklamalar...")
-        self._style_textedit(self.notes_input)
         general_layout.addWidget(self.notes_input, row, 1)
 
         general_frame.layout().addLayout(general_layout)
@@ -212,7 +185,6 @@ class PurchaseInvoiceFormPage(QWidget):
                 f"{item.get('code', '')} - {item.get('name', '')}", item
             )
         self.item_combo.setMinimumWidth(300)
-        self._style_combo(self.item_combo)
         add_row.addWidget(self.item_combo)
 
         self.qty_input = QDoubleSpinBox()
@@ -221,7 +193,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.qty_input.setValue(1)
         self.qty_input.setPrefix("Miktar: ")
         self.qty_input.setMinimumWidth(130)
-        self._style_spin(self.qty_input)
         add_row.addWidget(self.qty_input)
 
         self.price_input = QDoubleSpinBox()
@@ -230,7 +201,6 @@ class PurchaseInvoiceFormPage(QWidget):
         self.price_input.setValue(0)
         self.price_input.setPrefix("Fiyat: ₺")
         self.price_input.setMinimumWidth(140)
-        self._style_spin(self.price_input)
         add_row.addWidget(self.price_input)
 
         self.tax_input = QDoubleSpinBox()
@@ -239,23 +209,9 @@ class PurchaseInvoiceFormPage(QWidget):
         self.tax_input.setValue(18)
         self.tax_input.setPrefix("KDV: %")
         self.tax_input.setMinimumWidth(100)
-        self._style_spin(self.tax_input)
         add_row.addWidget(self.tax_input)
 
         add_item_btn = QPushButton("➕ Ekle")
-        add_item_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         add_item_btn.clicked.connect(self._add_item_row)
         add_row.addWidget(add_item_btn)
 
@@ -277,24 +233,6 @@ class PurchaseInvoiceFormPage(QWidget):
                 "İşlem",
             ]
         )
-        self.items_table.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QTableWidget::item { padding: 8px; }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                padding: 10px;
-                border: none;
-                font-weight: 600;
-            }
-        """
-        )
         self.items_table.setMinimumHeight(200)
         self.items_table.verticalHeader().setVisible(False)
 
@@ -315,23 +253,12 @@ class PurchaseInvoiceFormPage(QWidget):
         totals_row.addStretch()
 
         self.subtotal_label = QLabel("Ara Toplam: ₺0.00")
-        self.subtotal_label.setStyleSheet(
-            "color: #94a3b8; font-size: 14px; background: transparent;"
-        )
         totals_row.addWidget(self.subtotal_label)
 
         self.tax_total_label = QLabel("KDV: ₺0.00")
-        self.tax_total_label.setStyleSheet(
-            "color: #f59e0b; font-size: 14px; "
-            "background: transparent; margin-left: 20px;"
-        )
         totals_row.addWidget(self.tax_total_label)
 
         self.total_label = QLabel("Genel Toplam: ₺0.00")
-        self.total_label.setStyleSheet(
-            "color: #10b981; font-size: 18px; font-weight: bold; "
-            "background: transparent; margin-left: 20px;"
-        )
         totals_row.addWidget(self.total_label)
 
         items_layout.addLayout(totals_row)
@@ -360,19 +287,12 @@ class PurchaseInvoiceFormPage(QWidget):
         layout.setSpacing(12)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; "
-            "color: #f8fafc; background: transparent; border: none;"
-        )
         layout.addWidget(title_label)
 
         return frame
 
     def _create_label(self, text: str) -> QLabel:
         label = QLabel(text)
-        label.setStyleSheet(
-            "color: #e2e8f0; background: transparent; " "font-size: 14px; border: none;"
-        )
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return label
 
@@ -446,16 +366,6 @@ class PurchaseInvoiceFormPage(QWidget):
         # Sil butonu
         del_btn = QPushButton("🗑")
         del_btn.setFixedSize(32, 32)
-        del_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #ef444420;
-                border: 1px solid #ef444450;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #ef444440; }
-        """
-        )
         del_btn.clicked.connect(lambda: self._remove_row(row))
         self.items_table.setCellWidget(row, 7, del_btn)
 
@@ -608,99 +518,3 @@ class PurchaseInvoiceFormPage(QWidget):
             data["id"] = self.invoice_data.get("id")
 
         self.saved.emit(data)
-
-    def _style_input(self, w):
-        w.setMinimumHeight(42)
-        w.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus { border-color: #6366f1; }
-            QLineEdit:read-only {
-                background-color: #1e293b; color: #94a3b8;
-            }
-        """
-        )
-
-    def _style_combo(self, c):
-        c.setMinimumHeight(42)
-        c.setStyleSheet(
-            """
-            QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; width: 30px; }
-            QComboBox::down-arrow {
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """
-        )
-
-    def _style_date(self, d):
-        d.setMinimumHeight(42)
-        d.setStyleSheet(
-            """
-            QDateEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QDateEdit:focus { border-color: #6366f1; }
-            QDateEdit::drop-down { border: none; width: 30px; }
-        """
-        )
-
-    def _style_textedit(self, t):
-        t.setStyleSheet(
-            """
-            QTextEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QTextEdit:focus { border-color: #6366f1; }
-        """
-        )
-
-    def _style_spin(self, s):
-        s.setMinimumHeight(42)
-        s.setStyleSheet(
-            """
-            QDoubleSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QDoubleSpinBox:focus { border-color: #6366f1; }
-        """
-        )

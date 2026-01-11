@@ -22,7 +22,6 @@ from modules.accounting.services import AccountingService
 from modules.accounting.views.account_tree import AccountTreeWidget
 from modules.accounting.views.account_form import AccountFormDialog
 
-
 class AccountModule(QWidget):
     """Hesap planı yönetim modülü"""
 
@@ -43,20 +42,17 @@ class AccountModule(QWidget):
         header = QHBoxLayout()
 
         title = QLabel("Hesap Plani")
-        title.setStyleSheet(get_title_style())
         header.addWidget(title)
 
         header.addStretch()
 
         # Seed butonu
         seed_btn = QPushButton("Tekduzen Hesap Plani Yukle")
-        seed_btn.setStyleSheet(get_button_style("success"))
         seed_btn.clicked.connect(self._seed_accounts)
         header.addWidget(seed_btn)
 
         # Yeni hesap
         new_btn = QPushButton("Yeni Hesap")
-        new_btn.setStyleSheet(get_button_style("primary"))
         new_btn.clicked.connect(self._new_account)
         header.addWidget(new_btn)
 

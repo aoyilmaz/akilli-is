@@ -26,7 +26,6 @@ from PyQt6.QtCore import Qt
 from .purchase_invoice_list import PurchaseInvoiceListPage
 from .purchase_invoice_form import PurchaseInvoiceFormPage
 
-
 class ReceiptSelectorDialog(QDialog):
     """Mal kabul seçim dialogu"""
 
@@ -36,7 +35,6 @@ class ReceiptSelectorDialog(QDialog):
         self.selected_receipt_id = None
         self.setWindowTitle("Mal Kabul Seç")
         self.setMinimumSize(800, 500)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
         self.setup_ui()
 
     def setup_ui(self):
@@ -45,11 +43,9 @@ class ReceiptSelectorDialog(QDialog):
         layout.setSpacing(16)
 
         title = QLabel("📦 Mal Kabul Seçin")
-        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
 
         info_label = QLabel("Fatura oluşturmak için tamamlanmış bir mal kabul seçin:")
-        info_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
         layout.addWidget(info_label)
 
         self.table = QTableWidget()
@@ -150,7 +146,6 @@ class ReceiptSelectorDialog(QDialog):
             QPushButton:hover {{ background-color: {hover_color}; }}
         """
 
-
 class PaymentDialog(QDialog):
     """Ödeme kaydetme dialogu"""
 
@@ -162,7 +157,6 @@ class PaymentDialog(QDialog):
         self.payment_notes = None
         self.setWindowTitle("Ödeme Kaydet")
         self.setMinimumSize(400, 300)
-        self.setStyleSheet("QDialog { background-color: #1e293b; }")
         self.setup_ui()
 
     def setup_ui(self):
@@ -171,20 +165,17 @@ class PaymentDialog(QDialog):
         layout.setSpacing(16)
 
         title = QLabel("💳 Ödeme Kaydet")
-        title.setStyleSheet("color: #f8fafc; font-size: 18px; font-weight: bold;")
         layout.addWidget(title)
 
         # Fatura bilgisi
         inv_no = self.invoice_data.get("invoice_no", "")
         balance = float(self.invoice_data.get("balance", 0) or 0)
         info = QLabel(f"Fatura: {inv_no}\nKalan Borç: ₺{balance:,.2f}")
-        info.setStyleSheet("color: #94a3b8; font-size: 14px;")
         layout.addWidget(info)
 
         # Ödeme tutarı
         amount_row = QHBoxLayout()
         amount_label = QLabel("Ödeme Tutarı:")
-        amount_label.setStyleSheet("color: #f8fafc;")
         amount_row.addWidget(amount_label)
 
         self.amount_input = QDoubleSpinBox()
@@ -192,63 +183,27 @@ class PaymentDialog(QDialog):
         self.amount_input.setDecimals(2)
         self.amount_input.setValue(balance)
         self.amount_input.setPrefix("₺")
-        self.amount_input.setStyleSheet(
-            """
-            QDoubleSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f8fafc;
-                font-size: 16px;
-            }
-        """
-        )
         amount_row.addWidget(self.amount_input)
         layout.addLayout(amount_row)
 
         # Ödeme yöntemi
         method_row = QHBoxLayout()
         method_label = QLabel("Ödeme Yöntemi:")
-        method_label.setStyleSheet("color: #f8fafc;")
         method_row.addWidget(method_label)
 
         self.method_combo = QComboBox()
         self.method_combo.addItems(
             ["Nakit", "Banka Transferi", "Kredi Kartı", "Çek", "Senet"]
         )
-        self.method_combo.setStyleSheet(
-            """
-            QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f8fafc;
-            }
-        """
-        )
         method_row.addWidget(self.method_combo)
         layout.addLayout(method_row)
 
         # Not
         notes_label = QLabel("Açıklama:")
-        notes_label.setStyleSheet("color: #f8fafc;")
         layout.addWidget(notes_label)
 
         self.notes_input = QLineEdit()
         self.notes_input.setPlaceholderText("Ödeme açıklaması (opsiyonel)")
-        self.notes_input.setStyleSheet(
-            """
-            QLineEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                color: #f8fafc;
-            }
-        """
-        )
         layout.addWidget(self.notes_input)
 
         layout.addStretch()
@@ -258,35 +213,10 @@ class PaymentDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #334155;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover { background-color: #475569; }
-        """
-        )
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Ödemeyi Kaydet")
-        save_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #10b981;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-weight: 600;
-            }
-            QPushButton:hover { background-color: #059669; }
-        """
-        )
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -304,7 +234,6 @@ class PaymentDialog(QDialog):
             "method": self.payment_method,
             "notes": self.payment_notes,
         }
-
 
 class PurchaseInvoiceModule(QWidget):
     """Satınalma faturası modülü"""

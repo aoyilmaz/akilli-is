@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from modules.reports.services import ReportsService
 from modules.reports.views.receivables_aging import ReceivablesAgingPage
 
-
 class ReceivablesAgingModule(QWidget):
     """Alacak yaslandirma raporu modulu - bagimsiz calisir"""
 

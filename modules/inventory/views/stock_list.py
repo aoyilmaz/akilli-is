@@ -15,7 +15,6 @@ from PyQt6.QtGui import QColor, QAction
 from config import COLORS
 from database.models import ItemType
 
-
 class StockListPage(QWidget):
     """Stok kartları liste sayfası"""
     
@@ -43,11 +42,7 @@ class StockListPage(QWidget):
         title_layout.setSpacing(4)
         
         title = QLabel("Stok Kartları")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #f8fafc;")
-        
         subtitle = QLabel("Tüm stok kartlarını görüntüle ve yönet")
-        subtitle.setStyleSheet("font-size: 14px; color: #94a3b8;")
-        
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
         header_layout.addLayout(title_layout)
@@ -65,19 +60,6 @@ class StockListPage(QWidget):
         
         # Yeni ekle butonu
         add_btn = QPushButton("➕ Yeni Stok Kartı")
-        add_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 12px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea);
-            }
-        """)
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
         
@@ -85,14 +67,6 @@ class StockListPage(QWidget):
         
         # === Filtre Alanı ===
         filter_frame = QFrame()
-        filter_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 16px;
-                padding: 8px;
-            }
-        """)
         filter_layout = QHBoxLayout(filter_frame)
         filter_layout.setContentsMargins(16, 12, 16, 12)
         filter_layout.setSpacing(16)
@@ -101,20 +75,6 @@ class StockListPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Stok kodu, adı veya barkod ile ara...")
         self.search_input.setMinimumWidth(300)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 16px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border-color: #6366f1;
-            }
-        """)
-        
         # Arama için debounce timer
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
@@ -125,7 +85,6 @@ class StockListPage(QWidget):
         
         # Tür filtresi
         type_label = QLabel("Tür:")
-        type_label.setStyleSheet("color: #94a3b8;")
         filter_layout.addWidget(type_label)
         
         self.type_combo = QComboBox()
@@ -136,22 +95,11 @@ class StockListPage(QWidget):
         self.type_combo.addItem("🎁 Ambalaj", ItemType.AMBALAJ)
         self.type_combo.addItem("🔧 Sarf", ItemType.SARF)
         self.type_combo.addItem("🏷️ Ticari", ItemType.TICARI)
-        self.type_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 16px;
-                color: #f8fafc;
-                min-width: 140px;
-            }
-        """)
         self.type_combo.currentIndexChanged.connect(self._do_search)
         filter_layout.addWidget(self.type_combo)
         
         # Durum filtresi
         status_label = QLabel("Durum:")
-        status_label.setStyleSheet("color: #94a3b8;")
         filter_layout.addWidget(status_label)
         
         self.status_combo = QComboBox()
@@ -160,16 +108,6 @@ class StockListPage(QWidget):
         self.status_combo.addItem("⚠️ Düşük Stok", "low")
         self.status_combo.addItem("🔴 Kritik", "critical")
         self.status_combo.addItem("❌ Stok Yok", "out_of_stock")
-        self.status_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 8px 16px;
-                color: #f8fafc;
-                min-width: 140px;
-            }
-        """)
         self.status_combo.currentIndexChanged.connect(self._do_search)
         filter_layout.addWidget(self.status_combo)
         
@@ -186,14 +124,12 @@ class StockListPage(QWidget):
         footer_layout = QHBoxLayout()
         
         self.count_label = QLabel("Toplam: 0 kayıt")
-        self.count_label.setStyleSheet("color: #64748b; font-size: 13px;")
         footer_layout.addWidget(self.count_label)
         
         footer_layout.addStretch()
         
         # Stok değeri
         self.value_label = QLabel("Toplam Değer: ₺0,00")
-        self.value_label.setStyleSheet("color: #64748b; font-size: 13px;")
         footer_layout.addWidget(self.value_label)
         
         layout.addLayout(footer_layout)
@@ -232,33 +168,6 @@ class StockListPage(QWidget):
         self.table.setShowGrid(False)
         
         # Stil
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-                gridline-color: transparent;
-            }
-            QTableWidget::item {
-                padding: 12px 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QTableWidget::item:selected {
-                background-color: rgba(99, 102, 241, 0.2);
-            }
-            QTableWidget::item:hover {
-                background-color: rgba(51, 65, 85, 0.5);
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 12px 8px;
-                border: none;
-                border-bottom: 1px solid #334155;
-            }
-        """)
-        
         # Sağ tık menüsü
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
@@ -379,22 +288,6 @@ class StockListPage(QWidget):
         item_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 8px 16px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #334155;
-            }
-        """)
-        
         view_action = QAction("👁 Görüntüle", self)
         view_action.triggered.connect(lambda: self.item_selected.emit(item_id))
         menu.addAction(view_action)

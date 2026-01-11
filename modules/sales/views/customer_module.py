@@ -8,7 +8,6 @@ from .customer_list import CustomerListPage
 from .customer_form import CustomerFormPage
 from modules.development import ErrorHandler
 
-
 class CustomerModule(QWidget):
     """Müşteri yönetimi modülü"""
 
