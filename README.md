@@ -24,8 +24,15 @@
 - ✅ **Merkezi Hata Yönetimi** - Veritabanı tabanlı loglama ve UI üzerinden hata takibi
 - ✅ **Türkçe** - Tam Türkçe dil desteği
 - ✅ **ORM Altyapısı** - SQLAlchemy 2.0+ ile güvenli veritabanı işlemleri
+- ✅ **Rol Bazlı Yetkilendirme (RBAC)** - Gelişmiş kullanıcı ve yetki yönetimi
 
 ## 📦 Modüller
+
+### 🔑 Kullanıcı ve Yetki Yönetimi (System)
+
+- **Kullanıcı Yönetimi:** Kullanıcı ekleme, düzenleme, pasife alma.
+- **Rol Yönetimi:** Detaylı rol ve izin tanımları.
+- **Güvenlik:** Bcrypt şifreleme ve güvenli oturum yönetimi.
 
 ### 🏭 Üretim Yönetimi (Production)
 
@@ -73,7 +80,6 @@
 
 - İK (Personel Takibi)
 - E-Fatura Entegrasyonu
-- Kullanıcı Yönetimi & Yetkilendirme
 
 ## 🛠 Kurulum
 
@@ -107,9 +113,14 @@ cp .env.example .env
 # Alembic tabloları güncel hale getirecektir
 python -m alembic upgrade head
 
+# 7. Admin Kullanıcısını Oluşturun
+python scripts/create_admin.py
+# Kullanıcı: admin
+# Şifre: admin123
+
 # (Alternatif) Temel verileri yüklemek için
 python init_db.py
 
-# 7. Uygulamayı başlatın
+# 8. Uygulamayı başlatın
 python main.py
 ```
