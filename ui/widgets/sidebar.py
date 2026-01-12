@@ -538,6 +538,36 @@ class Sidebar(QFrame):
             self.theme_changed.emit(name)
 
     def add_menu_items(self, layout: QVBoxLayout):
+        # İzin kontrolü için AuthService import
+        try:
+            from core.auth_service import AuthService
+            from core.permission_map import get_menu_permission
+
+            has_auth = True
+        except ImportError:
+            has_auth = False
+
+        def can_access_menu(menu_id: str) -> bool:
+            """Menüye erişim izni var mı?"""
+            if not has_auth:
+                return True  # Auth yoksa hepsini göster
+            if not AuthService.is_authenticated():
+                return True  # Development mode
+            if AuthService.is_superuser():
+                return True
+            perm = get_menu_permission(menu_id)
+            if perm is None:
+                return True
+            return AuthService.has_permission(perm)
+
+        def can_access_page(page_id: str) -> bool:
+            """Sayfaya erişim izni var mı?"""
+            if not has_auth:
+                return True
+            if not AuthService.is_authenticated():
+                return True
+            return AuthService.can_access_page(page_id)
+
         # Badge'li menü yapısı
         menu_structure = [
             ("dashboard", "Dashboard", "dashboard", 0, []),
@@ -598,10 +628,23 @@ class Sidebar(QFrame):
                 ],
             ),
             ("reports", "Raporlar", "reports", 0, []),
-            ("settings", "Ayarlar", "settings", 0, []),
+            (
+                "settings",
+                "Ayarlar",
+                "settings",
+                0,
+                [
+                    ("users", "Kullanıcı Yönetimi"),
+                    ("settings", "Genel Ayarlar"),
+                ],
+            ),
         ]
 
         for menu_id, title, icon_name, badge, submenus in menu_structure:
+            # Ana menü için izin kontrolü
+            if not can_access_menu(menu_id):
+                continue
+
             btn = MenuButton(title, icon_name, menu_id, badge)
             btn.set_has_children(len(submenus) > 0)
             btn.clicked.connect(
@@ -618,16 +661,27 @@ class Sidebar(QFrame):
                 sub_layout.setContentsMargins(0, 4, 0, 4)
                 sub_layout.setSpacing(2)
 
+                visible_submenus = 0
                 for sub_id, sub_title in submenus:
+                    # Alt menü için izin kontrolü
+                    if not can_access_page(sub_id):
+                        continue
+
                     sub_btn = SubMenuButton(sub_title, sub_id)
                     sub_btn.clicked.connect(
                         lambda checked, p=sub_id: self.select_page(p)
                     )
                     self.submenu_buttons[sub_id] = sub_btn
                     sub_layout.addWidget(sub_btn)
+                    visible_submenus += 1
 
-                layout.addWidget(container)
-                self.submenu_containers[menu_id] = container
+                # Alt menü yoksa parent'ı da gösterme
+                if visible_submenus > 0:
+                    layout.addWidget(container)
+                    self.submenu_containers[menu_id] = container
+                else:
+                    # Alt menüsü olmayan menüyü gizle
+                    btn.setVisible(False)
 
         self.menu_buttons["dashboard"].set_selected(True)
 

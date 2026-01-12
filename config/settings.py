@@ -1,6 +1,7 @@
 """
 Akıllı İş ERP - Uygulama Ayarları
 """
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -30,6 +31,7 @@ DB_NAME = os.getenv("DB_NAME", "akilli_is")
 DB_USER = os.getenv("DB_USER", "akilli_user")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "akilli123")
 
+
 def get_database_url() -> str:
     """Veritabanı bağlantı URL'i"""
     if DB_ENGINE == "postgresql":
@@ -41,6 +43,7 @@ def get_database_url() -> str:
         return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
     else:
         raise ValueError(f"Desteklenmeyen veritabanı: {DB_ENGINE}")
+
 
 # Uygulama ayarları
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
@@ -54,7 +57,7 @@ AI_MODEL = "claude-sonnet-4-20250514"
 UI = {
     "THEME": os.getenv("UI_THEME", "dark"),
     "LANGUAGE": os.getenv("UI_LANGUAGE", "tr"),
-    "FONT_FAMILY": "SF Pro Display",
+    "FONT_FAMILY": "Helvetica Neue",
     "FONT_SIZE": 13,
     "WINDOW_WIDTH": 1400,
     "WINDOW_HEIGHT": 900,
@@ -68,28 +71,23 @@ COLORS = {
     "primary": "#6366f1",
     "primary_light": "#818cf8",
     "primary_dark": "#4f46e5",
-    
     # Secondary
     "secondary": "#8b5cf6",
     "secondary_light": "#a78bfa",
     "secondary_dark": "#7c3aed",
-    
     # Accent
     "accent": "#a855f7",
-    
     # Status
     "success": "#10b981",
     "warning": "#f59e0b",
     "error": "#ef4444",
     "info": "#3b82f6",
-    
     # Dark theme
     "dark_bg": "#0f172a",
     "dark_surface": "#1e293b",
     "dark_border": "#334155",
     "dark_text": "#f8fafc",
     "dark_text_secondary": "#94a3b8",
-    
     # Light theme
     "light_bg": "#f8fafc",
     "light_surface": "#ffffff",

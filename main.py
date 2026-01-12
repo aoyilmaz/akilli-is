@@ -17,6 +17,87 @@ from PyQt6.QtGui import QFont, QIcon
 from config import APP_NAME, APP_VERSION, UI, ICONS_DIR
 
 
+class ApplicationController:
+    """Uygulama akış kontrolcüsü"""
+
+    def __init__(self, app: QApplication):
+        self.app = app
+        self.splash = None
+        self.login = None
+        self.main_window = None
+        self.current_user = None
+
+    def start(self):
+        """Uygulama akışını başlat: Splash -> Login -> MainWindow"""
+        self._show_splash()
+
+    def _show_splash(self):
+        """Splash screen göster"""
+        from ui.screens import SplashScreen
+
+        self.splash = SplashScreen()
+        self.splash.finished.connect(self._on_splash_finished)
+        self.splash.start()
+
+    def _on_splash_finished(self):
+        """Splash tamamlandığında login göster"""
+        self.splash = None
+        self._show_login()
+
+    def _show_login(self):
+        """Login ekranını göster"""
+        from ui.screens import LoginScreen
+
+        self.login = LoginScreen()
+        self.login.login_successful.connect(self._on_login_success)
+        self.login.forgot_password.connect(self._on_forgot_password)
+        self.login.show()
+
+    def _on_login_success(self, user):
+        """Başarılı giriş sonrası ana pencereyi göster"""
+        self.current_user = user
+
+        if self.login:
+            self.login.close()
+            self.login = None
+
+        self._show_main_window()
+
+    def _on_forgot_password(self):
+        """Şifremi unuttum işlemi"""
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self.login,
+            "Şifre Sıfırlama",
+            "Şifre sıfırlama talebi için sistem yöneticinize başvurun."
+        )
+
+    def _show_main_window(self):
+        """Ana pencereyi göster"""
+        from ui.main_window import MainWindow
+
+        self.main_window = MainWindow()
+
+        # Kullanıcı bilgisini ayarla (varsa)
+        if self.current_user:
+            try:
+                # Status bar'da kullanıcı bilgisini güncelle
+                if hasattr(self.main_window, 'status_user_name'):
+                    name = getattr(self.current_user, 'full_name', None) or \
+                           getattr(self.current_user, 'username', 'Kullanıcı')
+                    self.main_window.status_user_name.setText(name)
+                if hasattr(self.main_window, 'status_role_badge'):
+                    role = getattr(self.current_user, 'role', None)
+                    if role:
+                        role_name = getattr(role, 'name', 'Kullanıcı')
+                        self.main_window.status_role_badge.setText(role_name)
+            except Exception:
+                pass
+
+        self.main_window.showMaximized()
+        print("Uygulama başlatıldı!")
+
+
 def main():
     """Ana uygulama fonksiyonu"""
     print("=" * 50)
@@ -33,6 +114,11 @@ def main():
     icon_path = ICONS_DIR / "logo.svg"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
+    else:
+        # PNG alternatifi
+        png_path = ICONS_DIR / "logo.png"
+        if png_path.exists():
+            app.setWindowIcon(QIcon(str(png_path)))
 
     # Varsayılan font
     font = QFont(UI["FONT_FAMILY"], UI["FONT_SIZE"])
@@ -40,20 +126,48 @@ def main():
 
     # Global tema uygula (config/theme.qss)
     from config.theme_manager import apply_global_theme
-
     apply_global_theme(app)
 
-    # Ana pencereyi oluştur ve tam ekran göster
-    from ui.main_window import MainWindow
-
-    window = MainWindow()
-    window.showMaximized()
-
-    print("Uygulama başlatıldı!")
+    # Uygulama kontrolcüsünü başlat
+    controller = ApplicationController(app)
+    controller.start()
 
     # Uygulama döngüsünü başlat
     sys.exit(app.exec())
 
 
+def main_direct():
+    """Login olmadan direkt ana pencereyi aç (geliştirme için)"""
+    print("=" * 50)
+    print(f"{APP_NAME} v{APP_VERSION} başlatılıyor (DIRECT MODE)...")
+    print("=" * 50)
+
+    app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    app.setOrganizationName("Akıllı İş")
+
+    icon_path = ICONS_DIR / "logo.png"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
+
+    font = QFont(UI["FONT_FAMILY"], UI["FONT_SIZE"])
+    app.setFont(font)
+
+    from config.theme_manager import apply_global_theme
+    apply_global_theme(app)
+
+    from ui.main_window import MainWindow
+    window = MainWindow()
+    window.showMaximized()
+
+    print("Uygulama başlatıldı!")
+    sys.exit(app.exec())
+
+
 if __name__ == "__main__":
+    # Normal başlatma (Splash -> Login -> Main)
     main()
+
+    # Geliştirme modu için (direkt ana pencere):
+    # main_direct()

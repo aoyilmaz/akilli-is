@@ -110,6 +110,11 @@ except ImportError:
     DevelopmentModule = PlaceholderPage
 
 try:
+    from modules.system import UserManagement
+except ImportError:
+    UserManagement = PlaceholderPage
+
+try:
     from modules.sales import (
         CustomerModule,
         SalesQuoteModule,
@@ -568,6 +573,7 @@ MENU_DATA = {
     "settings": {
         "title": "SİSTEM AYARLARI",
         "items": [
+            ("Kullanıcı Yönetimi", "fa5s.users-cog", "users"),
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
         ],
     },
@@ -989,6 +995,7 @@ class MainWindow(QMainWindow):
         self.pages["shift-teams"] = ShiftTeamOverview()
         # Sistem ayarları
         self.pages["settings"] = PlaceholderPage("Ayarlar", "")
+        self.pages["users"] = UserManagement()
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -1253,6 +1260,19 @@ class MainWindow(QMainWindow):
             self.anim.start()
 
     def open_tab(self, page_id):
+        # İzin kontrolü
+        try:
+            from core.auth_service import AuthService
+
+            if AuthService.is_authenticated():
+                if not AuthService.can_access_page(page_id):
+                    self.show_notification(
+                        f"'{page_id}' sayfasına erişim izniniz yok", "WARNING"
+                    )
+                    return
+        except ImportError:
+            pass  # Development mode
+
         page_widget = self.pages.get(page_id)
         if not page_widget:
             return
