@@ -3,19 +3,47 @@ Akilli Is - Birim Yonetimi Sayfasi
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QAbstractItemView, QMenu, QMessageBox, QDialog,
-    QFormLayout, QCheckBox, QDoubleSpinBox, QComboBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QFrame,
+    QAbstractItemView,
+    QMenu,
+    QMessageBox,
+    QDialog,
+    QFormLayout,
+    QCheckBox,
+    QDoubleSpinBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style, get_input_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    get_input_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
+
 
 class UnitDialog(QDialog):
     """Birim ekleme/duzenleme dialogu"""
@@ -98,6 +126,7 @@ class UnitDialog(QDialog):
             "is_active": self.is_active_check.isChecked(),
         }
 
+
 class UnitConversionDialog(QDialog):
     """Birim donusumu dialogu"""
 
@@ -126,13 +155,13 @@ class UnitConversionDialog(QDialog):
         # Kaynak birim
         self.from_combo = QComboBox()
         for unit in self.units:
-            self.from_combo.addItem(f"{unit['code']} - {unit['name']}", unit['id'])
+            self.from_combo.addItem(f"{unit['code']} - {unit['name']}", unit["id"])
         form.addRow("Kaynak Birim", self.from_combo)
 
         # Hedef birim
         self.to_combo = QComboBox()
         for unit in self.units:
-            self.to_combo.addItem(f"{unit['code']} - {unit['name']}", unit['id'])
+            self.to_combo.addItem(f"{unit['code']} - {unit['name']}", unit["id"])
         form.addRow("Hedef Birim", self.to_combo)
 
         # Carpan
@@ -176,6 +205,7 @@ class UnitConversionDialog(QDialog):
             "factor": self.factor_input.value(),
         }
 
+
 class UnitManagementPage(QWidget):
     """Birim yonetimi sayfasi"""
 
@@ -202,12 +232,16 @@ class UnitManagementPage(QWidget):
         header_layout.addStretch()
 
         # Yenile
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni birim
-        add_btn = QPushButton("Yeni Birim")
+        add_btn = QPushButton(f"{ICONS['add']} Yeni Birim")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self._add_unit)
         header_layout.addWidget(add_btn)
 
@@ -269,7 +303,9 @@ class UnitManagementPage(QWidget):
             if i != 1:
                 self.units_table.setColumnWidth(i, w)
 
-        self.units_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.units_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.units_table.verticalHeader().setVisible(False)
         self.units_table.setShowGrid(False)
         self.units_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -284,9 +320,12 @@ class UnitManagementPage(QWidget):
         header = self.conv_table.horizontalHeader()
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
-        self.conv_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.conv_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.conv_table.verticalHeader().setVisible(False)
         self.conv_table.setShowGrid(False)
+
     def load_units(self, units: list):
         """Birimleri yukle"""
         self.units_data = []
@@ -326,7 +365,9 @@ class UnitManagementPage(QWidget):
 
             factor = conv.get("factor", 1)
             factor_item = QTableWidgetItem(f"{factor:,.6f}")
-            factor_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            factor_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             self.conv_table.setItem(row, 2, factor_item)
 
     def _add_unit(self):

@@ -4,18 +4,37 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QComboBox,
-    QHeaderView, QAbstractItemView, QGroupBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QComboBox,
+    QHeaderView,
+    QAbstractItemView,
+    QGroupBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
 )
+
 
 class ReconciliationPage(QWidget):
     """Mutabakat sayfasi"""
@@ -43,8 +62,9 @@ class ReconciliationPage(QWidget):
         header_layout.addStretch()
 
         # Yazdir butonu
-        print_btn = QPushButton("Yazdir")
+        print_btn = QPushButton("🖨️ Yazdir")
         print_btn.setFixedHeight(42)
+        print_btn.setStyleSheet(get_button_style("print"))
         print_btn.clicked.connect(self._on_print)
         header_layout.addWidget(print_btn)
 
@@ -84,12 +104,11 @@ class ReconciliationPage(QWidget):
         filter_layout.addLayout(entity_layout)
 
         # Sorgula butonu
-        query_btn = QPushButton("Sorgula")
-        query_btn.setFixedSize(100, 42)
+        query_btn = QPushButton("🔍 Sorgula")
+        query_btn.setFixedSize(110, 42)
+        query_btn.setStyleSheet(get_button_style("search"))
         query_btn.clicked.connect(self.refresh_requested.emit)
-        filter_layout.addWidget(
-            query_btn, alignment=Qt.AlignmentFlag.AlignBottom
-        )
+        filter_layout.addWidget(query_btn, alignment=Qt.AlignmentFlag.AlignBottom)
 
         filter_layout.addStretch()
         layout.addWidget(filter_group)
@@ -101,14 +120,10 @@ class ReconciliationPage(QWidget):
         self.balance_card = self._create_stat_card("Bakiye", "0.00 TL", ACCENT)
         summary_layout.addWidget(self.balance_card)
 
-        self.open_count_card = self._create_stat_card(
-            "Acik Kalem", "0", WARNING
-        )
+        self.open_count_card = self._create_stat_card("Acik Kalem", "0", WARNING)
         summary_layout.addWidget(self.open_count_card)
 
-        self.open_amount_card = self._create_stat_card(
-            "Acik Tutar", "0.00 TL", ERROR
-        )
+        self.open_amount_card = self._create_stat_card("Acik Tutar", "0.00 TL", ERROR)
         summary_layout.addWidget(self.open_amount_card)
 
         summary_layout.addStretch()
@@ -122,9 +137,9 @@ class ReconciliationPage(QWidget):
 
         self.open_table = QTableWidget()
         self.open_table.setColumnCount(6)
-        self.open_table.setHorizontalHeaderLabels([
-            "Fatura No", "Tarih", "Vade", "Toplam", "Odenen", "Kalan"
-        ])
+        self.open_table.setHorizontalHeaderLabels(
+            ["Fatura No", "Tarih", "Vade", "Toplam", "Odenen", "Kalan"]
+        )
         self.open_table.setAlternatingRowColors(True)
         self.open_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -235,9 +250,7 @@ class ReconciliationPage(QWidget):
             self.open_table.insertRow(row)
 
             # Fatura no
-            self.open_table.setItem(
-                row, 0, QTableWidgetItem(inv.get("invoice_no", ""))
-            )
+            self.open_table.setItem(row, 0, QTableWidgetItem(inv.get("invoice_no", "")))
 
             # Tarih
             date_val = inv.get("invoice_date")
@@ -293,10 +306,12 @@ class ReconciliationPage(QWidget):
 
     def _on_print(self):
         """Yazdir"""
-        self.print_requested.emit({
-            "entity_type": self.current_entity_type,
-            "entity_id": self.current_entity_id,
-        })
+        self.print_requested.emit(
+            {
+                "entity_type": self.current_entity_type,
+                "entity_id": self.current_entity_id,
+            }
+        )
 
     def get_filter_data(self) -> dict:
         """Filtre verilerini getir"""

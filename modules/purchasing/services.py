@@ -794,11 +794,22 @@ class PurchaseInvoiceService:
         return invoice
 
     def confirm(self, invoice_id: int) -> Optional[PurchaseInvoice]:
-        """Faturayı onayla/kaydet"""
+        """Faturayı onayla ve cari hareket oluştur"""
         invoice = self.get_by_id(invoice_id)
         if invoice and invoice.status == PurchaseInvoiceStatus.DRAFT:
             invoice.status = PurchaseInvoiceStatus.RECEIVED
             self.session.commit()
+
+            # FİNANS ENTEGRASYONU: Tedarikçi cari hareketi oluştur
+            try:
+                from modules.finance.services import AccountTransactionService
+
+                transaction_service = AccountTransactionService()
+                transaction_service.create_from_purchase_invoice(invoice)
+            except Exception as e:
+                # Finans modülü yüklü değilse veya hata olursa sessizce devam et
+                print(f"Cari hesap hareketi oluşturulamadı: {e}")
+
         return invoice
 
     def record_payment(

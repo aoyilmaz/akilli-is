@@ -277,9 +277,18 @@ class MRPService:
     # =====================
 
     def _get_current_stock(self, item_id: int) -> Decimal:
-        """Mevcut toplam stok"""
+        """
+        Mevcut kullanılabilir stok (rezervasyonlar hariç)
+
+        Formül: quantity - reserved_quantity
+        """
         result = (
-            self.session.query(func.sum(StockBalance.quantity))
+            self.session.query(
+                func.sum(
+                    StockBalance.quantity
+                    - func.coalesce(StockBalance.reserved_quantity, 0)
+                )
+            )
             .filter(StockBalance.item_id == item_id)
             .scalar()
         )

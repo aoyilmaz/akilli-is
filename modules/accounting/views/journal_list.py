@@ -22,11 +22,22 @@ from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from database.models.accounting import JournalEntryStatus
+
 
 class JournalListWidget(QWidget):
     """Yevmiye listesi"""
@@ -76,7 +87,9 @@ class JournalListWidget(QWidget):
         filter_layout.addStretch()
 
         # Filtrele butonu
-        filter_btn = QPushButton("Filtrele")
+        filter_btn = QPushButton(f"{ICONS['filter']} Filtrele")
+        filter_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        filter_btn.setStyleSheet(get_button_style("filter"))
         filter_btn.clicked.connect(lambda: self.refresh_requested.emit())
         filter_layout.addWidget(filter_btn)
 
@@ -98,9 +111,7 @@ class JournalListWidget(QWidget):
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.itemDoubleClicked.connect(self._on_double_click)
@@ -122,9 +133,7 @@ class JournalListWidget(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(date_str))
 
             # Açıklama
-            self.table.setItem(
-                row, 2, QTableWidgetItem(journal.description or "")
-            )
+            self.table.setItem(row, 2, QTableWidgetItem(journal.description or ""))
 
             # Borç
             debit = sum(line.debit or 0 for line in journal.lines)
@@ -143,12 +152,8 @@ class JournalListWidget(QWidget):
             self.table.setItem(row, 4, credit_item)
 
             # Durum
-            status_item = QTableWidgetItem(
-                self._get_status_label(journal.status)
-            )
-            status_item.setForeground(
-                QColor(self._get_status_color(journal.status))
-            )
+            status_item = QTableWidgetItem(self._get_status_label(journal.status))
+            status_item.setForeground(QColor(self._get_status_color(journal.status)))
             self.table.setItem(row, 5, status_item)
 
     def _get_status_label(self, status: JournalEntryStatus) -> str:

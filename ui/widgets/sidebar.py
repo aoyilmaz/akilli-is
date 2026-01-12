@@ -583,7 +583,20 @@ class Sidebar(QFrame):
             ),
             ("sales", "Satış", "sales", 5, []),
             ("finance", "Finans", "finance", 0, []),
-            ("hr", "İnsan Kaynakları", "hr", 0, []),
+            (
+                "hr",
+                "İnsan Kaynakları",
+                "hr",
+                0,
+                [
+                    ("employees", "Çalışanlar"),
+                    ("departments", "Departmanlar"),
+                    ("positions", "Pozisyonlar"),
+                    ("leaves", "İzin Yönetimi"),
+                    ("org-chart", "Organizasyon Şeması"),
+                    ("shift-teams", "Vardiya Ekipleri"),
+                ],
+            ),
             ("reports", "Raporlar", "reports", 0, []),
             ("settings", "Ayarlar", "settings", 0, []),
         ]

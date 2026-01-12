@@ -31,6 +31,8 @@ from config.styles import (
     WARNING,
     get_button_style,
     get_title_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from modules.hr.services import HRService
 from modules.hr.views.employee_form import EmployeeFormDialog
@@ -61,8 +63,9 @@ class EmployeeModule(QWidget):
         header.addStretch()
 
         # Yeni çalışan
-        new_btn = QPushButton("Yeni Çalışan")
-        new_btn.setProperty("class", "primary")
+        new_btn = QPushButton(f"{ICONS['add']} Yeni Çalışan")
+        new_btn.setStyleSheet(get_button_style("add"))
+        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         new_btn.clicked.connect(self._new_employee)
         header.addWidget(new_btn)
 
@@ -87,7 +90,9 @@ class EmployeeModule(QWidget):
         filter_row.addStretch()
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         refresh_btn.clicked.connect(self.load_data)
         filter_row.addWidget(refresh_btn)
 

@@ -19,13 +19,25 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER,
-    BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    INPUT_BG, INPUT_BORDER,
-    get_button_style, get_input_style, get_dialog_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    INPUT_BG,
+    INPUT_BORDER,
+    get_button_style,
+    get_input_style,
+    get_dialog_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from database.models.accounting import Account, AccountType
 from modules.accounting.services import AccountingService
+
 
 class AccountFormDialog(QDialog):
     """Hesap kartı formu"""
@@ -107,11 +119,15 @@ class AccountFormDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        cancel_btn = QPushButton("Iptal")
+        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
+        cancel_btn.setStyleSheet(get_button_style("cancel"))
+        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("Kaydet")
+        save_btn = QPushButton(f"{ICONS['save']} Kaydet")
+        save_btn.setStyleSheet(get_button_style("save"))
+        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 

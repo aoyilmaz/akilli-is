@@ -10,9 +10,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
 )
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 from modules.accounting.services import AccountingService
 from modules.accounting.views.journal_list import JournalListWidget
 from modules.accounting.views.journal_form import JournalFormDialog
+
 
 class JournalModule(QWidget):
     """Yevmiye fişi modülü"""
@@ -39,7 +41,9 @@ class JournalModule(QWidget):
         header.addStretch()
 
         # Yeni fis
-        new_btn = QPushButton("Yeni Yevmiye")
+        new_btn = QPushButton(f"{ICONS['add']} Yeni Yevmiye")
+        new_btn.setStyleSheet(get_button_style("add"))
+        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         new_btn.clicked.connect(self._new_journal)
         header.addWidget(new_btn)
 
@@ -54,11 +58,15 @@ class JournalModule(QWidget):
         # Alt butonlar
         footer = QHBoxLayout()
 
-        post_btn = QPushButton("Deftere Isle")
+        post_btn = QPushButton(f"{ICONS['confirm']} Deftere İşle")
+        post_btn.setStyleSheet(get_button_style("confirm"))
+        post_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         post_btn.clicked.connect(self._post_journal)
         footer.addWidget(post_btn)
 
-        cancel_btn = QPushButton("Iptal Et")
+        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal Et")
+        cancel_btn.setStyleSheet(get_button_style("danger"))
+        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         cancel_btn.clicked.connect(self._cancel_journal)
         footer.addWidget(cancel_btn)
 

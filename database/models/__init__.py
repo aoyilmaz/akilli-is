@@ -86,6 +86,7 @@ from .production import (
     WorkOrderPriority,
 )
 from .calendar import ProductionShift, ProductionHoliday, WorkstationSchedule
+from .shift_teams import ShiftTeam, RotationPattern, RotationSchedule
 
 from .purchasing import (
     Supplier,

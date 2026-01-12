@@ -4,12 +4,24 @@ Akıllı İş - Teslimat İrsaliyeleri Liste Sayfası
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.stat_cards import MiniStatCard
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
 
 class DeliveryNoteListPage(QWidget):
     """Teslimat irsaliyeleri listesi"""
@@ -62,13 +74,16 @@ class DeliveryNoteListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yen")
-        refresh_btn.setFixedSize(42, 42)
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
-        add_btn = QPushButton("➕ Yeni İrsaliye")
+        add_btn = QPushButton(f"{ICONS['add']} Yeni İrsaliye")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -84,9 +99,7 @@ class DeliveryNoteListPage(QWidget):
         self.draft_card = self._create_stat_card("🔵", "Taslak", "0", "#64748b")
         stats_layout.addWidget(self.draft_card)
 
-        self.shipped_card = self._create_stat_card(
-            "📦", "Sevk Edildi", "0", "#f59e0b"
-        )
+        self.shipped_card = self._create_stat_card("📦", "Sevk Edildi", "0", "#f59e0b")
         stats_layout.addWidget(self.shipped_card)
 
         self.delivered_card = self._create_stat_card(
@@ -100,19 +113,23 @@ class DeliveryNoteListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "İrsaliye No", "Tarih", "Müşteri", "Sipariş No",
-            "Kalem", "Sevk Tarihi", "Durum", "İşlemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "İrsaliye No",
+                "Tarih",
+                "Müşteri",
+                "Sipariş No",
+                "Kalem",
+                "Sevk Tarihi",
+                "Durum",
+                "İşlemler",
+            ]
+        )
 
         # Tablo stili
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
 
@@ -182,9 +199,7 @@ class DeliveryNoteListPage(QWidget):
 
         filtered = self.notes
         if status_filter:
-            filtered = [
-                n for n in self.notes if n.get("status") == status_filter
-            ]
+            filtered = [n for n in self.notes if n.get("status") == status_filter]
 
         self._display_data(filtered)
         self._update_stats()
@@ -303,9 +318,7 @@ class DeliveryNoteListPage(QWidget):
                 invoice_btn.setFixedSize(40, 28)
                 invoice_btn.setToolTip("Fatura Oluştur")
                 invoice_btn.clicked.connect(
-                    lambda checked, id=note_id: (
-                        self.create_invoice_clicked.emit(id)
-                    )
+                    lambda checked, id=note_id: (self.create_invoice_clicked.emit(id))
                 )
                 btn_layout.addWidget(invoice_btn)
 
@@ -385,9 +398,10 @@ class DeliveryNoteListPage(QWidget):
     def _confirm_delete(self, note_id: int):
         """Silme onayı"""
         reply = QMessageBox.question(
-            self, "Silme Onayı",
+            self,
+            "Silme Onayı",
             "Bu irsaliyeyi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(note_id)

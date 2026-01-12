@@ -28,6 +28,8 @@ from config.styles import (
     ACCENT,
     get_button_style,
     get_title_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from modules.hr.services import HRService
 
@@ -71,12 +73,15 @@ class DepartmentFormDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        cancel_btn = QPushButton("İptal")
+        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
+        cancel_btn.setStyleSheet(get_button_style("cancel"))
+        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("Kaydet")
-        save_btn.setProperty("class", "primary")
+        save_btn = QPushButton(f"{ICONS['save']} Kaydet")
+        save_btn.setStyleSheet(get_button_style("save"))
+        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 
@@ -155,8 +160,9 @@ class DepartmentModule(QWidget):
         header.addWidget(title)
         header.addStretch()
 
-        new_btn = QPushButton("Yeni Departman")
-        new_btn.setProperty("class", "primary")
+        new_btn = QPushButton(f"{ICONS['add']} Yeni Departman")
+        new_btn.setStyleSheet(get_button_style("add"))
+        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         new_btn.clicked.connect(self._new_department)
         header.addWidget(new_btn)
 

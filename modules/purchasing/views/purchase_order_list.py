@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.stat_cards import MiniStatCard
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 
 
 class PurchaseOrderListPage(QWidget):
@@ -78,13 +79,16 @@ class PurchaseOrderListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile
-        refresh_btn = QPushButton("Yen")
-        refresh_btn.setFixedSize(42, 42)
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni sipariş
-        add_btn = QPushButton("➕ Yeni Sipariş")
+        add_btn = QPushButton(f"{ICONS['add']} Yeni Sipariş")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 

@@ -34,6 +34,7 @@ from config.styles import (
     get_input_style,
 )
 
+
 class StockAgingPage(QWidget):
     """Stok yaşlandırma raporu sayfası"""
 
@@ -61,7 +62,8 @@ class StockAgingPage(QWidget):
 
         filter_layout.addStretch()
 
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(refresh_btn)
 
@@ -82,9 +84,7 @@ class StockAgingPage(QWidget):
         )
         cards_layout.addWidget(self.slow_card)
 
-        self.dead_card = self._create_card(
-            "90+ Gün", "₺0", ERROR, "Ölü Stok Riski"
-        )
+        self.dead_card = self._create_card("90+ Gün", "₺0", ERROR, "Ölü Stok Riski")
         cards_layout.addWidget(self.dead_card)
 
         layout.addLayout(cards_layout)
@@ -107,7 +107,9 @@ class StockAgingPage(QWidget):
         )
         layout.addWidget(self.table)
 
-    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> MiniStatCard:
+    def _create_card(
+        self, title: str, value: str, color: str, subtitle: str
+    ) -> MiniStatCard:
         """Dashboard tarzı istatistik kartı"""
         return MiniStatCard(title, value, color)
 
@@ -126,6 +128,7 @@ class StockAgingPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
+
     def load_data(self, data: dict):
         groups = data.get("groups", {})
 

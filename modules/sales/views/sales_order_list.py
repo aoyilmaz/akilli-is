@@ -4,12 +4,24 @@ Akıllı İş - Satış Siparişleri Liste Sayfası
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.stat_cards import MiniStatCard
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
 
 class SalesOrderListPage(QWidget):
     """Satış siparişleri listesi"""
@@ -63,13 +75,16 @@ class SalesOrderListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yen")
-        refresh_btn.setFixedSize(42, 42)
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
-        add_btn = QPushButton("➕ Yeni Sipariş")
+        add_btn = QPushButton(f"{ICONS['add']} Yeni Sipariş")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -85,14 +100,10 @@ class SalesOrderListPage(QWidget):
         self.draft_card = self._create_stat_card("🔵", "Taslak", "0", "#64748b")
         stats_layout.addWidget(self.draft_card)
 
-        self.confirmed_card = self._create_stat_card(
-            "🟢", "Onaylandı", "0", "#10b981"
-        )
+        self.confirmed_card = self._create_stat_card("🟢", "Onaylandı", "0", "#10b981")
         stats_layout.addWidget(self.confirmed_card)
 
-        self.partial_card = self._create_stat_card(
-            "🟡", "Kısmi Teslim", "0", "#f59e0b"
-        )
+        self.partial_card = self._create_stat_card("🟡", "Kısmi Teslim", "0", "#f59e0b")
         stats_layout.addWidget(self.partial_card)
 
         self.delivered_card = self._create_stat_card(
@@ -106,19 +117,24 @@ class SalesOrderListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(9)
-        self.table.setHorizontalHeaderLabels([
-            "Sipariş No", "Tarih", "Müşteri", "Toplam Tutar",
-            "Kalem", "Teslim Tarihi", "Durum", "Para Birimi", "İşlemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Sipariş No",
+                "Tarih",
+                "Müşteri",
+                "Toplam Tutar",
+                "Kalem",
+                "Teslim Tarihi",
+                "Durum",
+                "Para Birimi",
+                "İşlemler",
+            ]
+        )
 
         # Tablo stili
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
 
@@ -189,9 +205,7 @@ class SalesOrderListPage(QWidget):
 
         filtered = self.orders
         if status_filter:
-            filtered = [
-                o for o in self.orders if o.get("status") == status_filter
-            ]
+            filtered = [o for o in self.orders if o.get("status") == status_filter]
 
         self._display_data(filtered)
         self._update_stats()
@@ -306,9 +320,7 @@ class SalesOrderListPage(QWidget):
                 delivery_btn.setFixedSize(40, 28)
                 delivery_btn.setToolTip("İrsaliye Oluştur")
                 delivery_btn.clicked.connect(
-                    lambda checked, id=order_id: (
-                        self.create_delivery_clicked.emit(id)
-                    )
+                    lambda checked, id=order_id: (self.create_delivery_clicked.emit(id))
                 )
                 btn_layout.addWidget(delivery_btn)
 
@@ -339,15 +351,9 @@ class SalesOrderListPage(QWidget):
         """İstatistikleri güncelle"""
         total = len(self.orders)
         draft = sum(1 for o in self.orders if o.get("status") == "draft")
-        confirmed = sum(
-            1 for o in self.orders if o.get("status") == "confirmed"
-        )
-        partial = sum(
-            1 for o in self.orders if o.get("status") == "partial_delivered"
-        )
-        delivered = sum(
-            1 for o in self.orders if o.get("status") == "delivered"
-        )
+        confirmed = sum(1 for o in self.orders if o.get("status") == "confirmed")
+        partial = sum(1 for o in self.orders if o.get("status") == "partial_delivered")
+        delivered = sum(1 for o in self.orders if o.get("status") == "delivered")
 
         self._update_card(self.total_card, str(total))
         self._update_card(self.draft_card, str(draft))
@@ -396,9 +402,10 @@ class SalesOrderListPage(QWidget):
     def _confirm_delete(self, order_id: int):
         """Silme onayı"""
         reply = QMessageBox.question(
-            self, "Silme Onayı",
+            self,
+            "Silme Onayı",
             "Bu siparişi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(order_id)

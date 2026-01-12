@@ -4,19 +4,39 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox, QComboBox,
-    QDateEdit
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QComboBox,
+    QDateEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
 )
+
 
 class PaymentListPage(QWidget):
     """Odeme listesi sayfasi"""
@@ -53,13 +73,15 @@ class PaymentListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton("🔄 Yenile")
         refresh_btn.setFixedHeight(42)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
-        add_btn = QPushButton("+ Yeni Odeme")
+        add_btn = QPushButton("➕ Yeni Odeme")
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -125,17 +147,21 @@ class PaymentListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "Odeme No", "Tarih", "Tedarikci", "Tutar",
-            "Odeme Yontemi", "Durum", "Aciklama", "Islemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Odeme No",
+                "Tarih",
+                "Tedarikci",
+                "Tutar",
+                "Odeme Yontemi",
+                "Durum",
+                "Aciklama",
+                "Islemler",
+            ]
+        )
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
 
@@ -245,9 +271,7 @@ class PaymentListPage(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(date_str))
 
             # Tedarikci
-            self.table.setItem(
-                row, 2, QTableWidgetItem(pmt.get("supplier_name", ""))
-            )
+            self.table.setItem(row, 2, QTableWidgetItem(pmt.get("supplier_name", "")))
 
             # Tutar
             amount = pmt.get("amount") or 0
@@ -276,9 +300,7 @@ class PaymentListPage(QWidget):
                 "cancelled": ("Iptal", ERROR),
             }
             status = pmt.get("status", "")
-            status_text, status_color = status_map.get(
-                status, (status, TEXT_MUTED)
-            )
+            status_text, status_color = status_map.get(status, (status, TEXT_MUTED))
             status_item = QTableWidgetItem(status_text)
             self.table.setItem(row, 5, status_item)
 
@@ -349,9 +371,10 @@ class PaymentListPage(QWidget):
     def _confirm_cancel(self, payment_id: int):
         """Iptal onayi"""
         reply = QMessageBox.question(
-            self, "Iptal Onayi",
+            self,
+            "Iptal Onayi",
             "Bu odemeyi iptal etmek istediginize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(payment_id)

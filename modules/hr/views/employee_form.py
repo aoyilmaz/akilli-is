@@ -32,6 +32,7 @@ from config.styles import (
 from modules.hr.services import HRService
 from database.models.hr import EmploymentType, Gender
 
+
 class EmployeeFormDialog(QDialog):
     """Çalışan ekleme/düzenleme dialogu"""
 
@@ -119,6 +120,9 @@ class EmployeeFormDialog(QDialog):
         self.employment_type.addItem("Geçici", EmploymentType.TEMPORARY)
         work_layout.addRow("İstihdam Türü:", self.employment_type)
 
+        self.shift_team = QComboBox()
+        work_layout.addRow("Vardiya Ekibi:", self.shift_team)
+
         self.salary = QLineEdit()
         self.salary.setPlaceholderText("0.00")
         work_layout.addRow("Maaş:", self.salary)
@@ -175,6 +179,17 @@ class EmployeeFormDialog(QDialog):
             for emp in self.service.get_all_employees(limit=500):
                 if emp.id != self.employee_id:
                     self.manager.addItem(f"{emp.full_name} ({emp.employee_no})", emp.id)
+
+            # Vardiya Ekipleri
+            self.shift_team.addItem("Seçiniz...", None)
+            try:
+                from modules.production.calendar_services import ShiftTeamService
+
+                team_service = ShiftTeamService()
+                for team in team_service.get_all():
+                    self.shift_team.addItem(f"{team.code} - {team.name}", team.id)
+            except Exception:
+                pass
         except Exception as e:
             print(f"Combo yükleme hatası: {e}")
 
@@ -252,6 +267,11 @@ class EmployeeFormDialog(QDialog):
                 if emp.salary:
                     self.salary.setText(str(emp.salary))
 
+                if emp.shift_team_id:
+                    idx = self.shift_team.findData(emp.shift_team_id)
+                    if idx >= 0:
+                        self.shift_team.setCurrentIndex(idx)
+
         except Exception as e:
             QMessageBox.warning(self, "Hata", f"Çalışan yüklenirken hata: {str(e)}")
 
@@ -279,6 +299,7 @@ class EmployeeFormDialog(QDialog):
                 "department_id": self.department.currentData(),
                 "position_id": self.position.currentData(),
                 "manager_id": self.manager.currentData(),
+                "shift_team_id": self.shift_team.currentData(),
             }
 
             if self.salary.text().strip():

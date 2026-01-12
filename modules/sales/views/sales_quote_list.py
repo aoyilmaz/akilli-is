@@ -4,12 +4,24 @@ Akıllı İş - Satış Teklifleri Liste Sayfası
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.stat_cards import MiniStatCard
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
 
 class SalesQuoteListPage(QWidget):
     """Satış teklifleri listesi"""
@@ -65,13 +77,16 @@ class SalesQuoteListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yen")
-        refresh_btn.setFixedSize(42, 42)
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
-        add_btn = QPushButton("➕ Yeni Teklif")
+        add_btn = QPushButton(f"{ICONS['add']} Yeni Teklif")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -90,7 +105,9 @@ class SalesQuoteListPage(QWidget):
         self.sent_card = self._create_stat_card("📤", "Gönderildi", "0", "#3b82f6")
         stats_layout.addWidget(self.sent_card)
 
-        self.accepted_card = self._create_stat_card("🟢", "Kabul Edildi", "0", "#10b981")
+        self.accepted_card = self._create_stat_card(
+            "🟢", "Kabul Edildi", "0", "#10b981"
+        )
         stats_layout.addWidget(self.accepted_card)
 
         self.rejected_card = self._create_stat_card("🔴", "Reddedildi", "0", "#ef4444")
@@ -102,10 +119,19 @@ class SalesQuoteListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(9)
-        self.table.setHorizontalHeaderLabels([
-            "Teklif No", "Tarih", "Müşteri", "Toplam Tutar",
-            "Kalem", "Geçerlilik", "Durum", "Para Birimi", "İşlemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Teklif No",
+                "Tarih",
+                "Müşteri",
+                "Toplam Tutar",
+                "Kalem",
+                "Geçerlilik",
+                "Durum",
+                "Para Birimi",
+                "İşlemler",
+            ]
+        )
 
         # Tablo stili
         self.table.setAlternatingRowColors(True)
@@ -123,10 +149,10 @@ class SalesQuoteListPage(QWidget):
         self.table.setColumnWidth(0, 120)  # Teklif No
         self.table.setColumnWidth(1, 100)  # Tarih
         self.table.setColumnWidth(3, 120)  # Toplam Tutar
-        self.table.setColumnWidth(4, 60)   # Kalem
+        self.table.setColumnWidth(4, 60)  # Kalem
         self.table.setColumnWidth(5, 100)  # Geçerlilik
         self.table.setColumnWidth(6, 130)  # Durum
-        self.table.setColumnWidth(7, 80)   # Para Birimi
+        self.table.setColumnWidth(7, 80)  # Para Birimi
         self.table.setColumnWidth(8, 200)  # İşlemler
 
         self.table.doubleClicked.connect(self._on_double_click)
@@ -220,7 +246,9 @@ class SalesQuoteListPage(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(date_str))
 
             # Müşteri
-            self.table.setItem(row, 2, QTableWidgetItem(quote.get("customer_name", "") or "-"))
+            self.table.setItem(
+                row, 2, QTableWidgetItem(quote.get("customer_name", "") or "-")
+            )
 
             # Toplam Tutar
             total = quote.get("total_amount", 0) or 0
@@ -265,7 +293,9 @@ class SalesQuoteListPage(QWidget):
             view_btn = QPushButton("Gör")
             view_btn.setFixedSize(40, 28)
             view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(lambda checked, id=quote_id: self.view_clicked.emit(id))
+            view_btn.clicked.connect(
+                lambda checked, id=quote_id: self.view_clicked.emit(id)
+            )
             btn_layout.addWidget(view_btn)
 
             # Düzenle (sadece taslak)
@@ -273,14 +303,18 @@ class SalesQuoteListPage(QWidget):
                 edit_btn = QPushButton("Düz")
                 edit_btn.setFixedSize(40, 28)
                 edit_btn.setToolTip("Düzenle")
-                edit_btn.clicked.connect(lambda checked, id=quote_id: self.edit_clicked.emit(id))
+                edit_btn.clicked.connect(
+                    lambda checked, id=quote_id: self.edit_clicked.emit(id)
+                )
                 btn_layout.addWidget(edit_btn)
 
                 # Müşteriye Gönder
                 send_btn = QPushButton("Gön")
                 send_btn.setFixedSize(40, 28)
                 send_btn.setToolTip("Müşteriye Gönder")
-                send_btn.clicked.connect(lambda checked, id=quote_id: self.send_clicked.emit(id))
+                send_btn.clicked.connect(
+                    lambda checked, id=quote_id: self.send_clicked.emit(id)
+                )
                 btn_layout.addWidget(send_btn)
 
             # Kabul Et / Reddet (sadece sent)
@@ -288,13 +322,17 @@ class SalesQuoteListPage(QWidget):
                 accept_btn = QPushButton("On")
                 accept_btn.setFixedSize(40, 28)
                 accept_btn.setToolTip("Kabul Et")
-                accept_btn.clicked.connect(lambda checked, id=quote_id: self.accept_clicked.emit(id))
+                accept_btn.clicked.connect(
+                    lambda checked, id=quote_id: self.accept_clicked.emit(id)
+                )
                 btn_layout.addWidget(accept_btn)
 
                 reject_btn = QPushButton("İpt")
                 reject_btn.setFixedSize(40, 28)
                 reject_btn.setToolTip("Reddet")
-                reject_btn.clicked.connect(lambda checked, id=quote_id: self.reject_clicked.emit(id))
+                reject_btn.clicked.connect(
+                    lambda checked, id=quote_id: self.reject_clicked.emit(id)
+                )
                 btn_layout.addWidget(reject_btn)
 
             # Siparişe Dönüştür (sadece accepted)
@@ -302,7 +340,9 @@ class SalesQuoteListPage(QWidget):
                 order_btn = QPushButton("📦")
                 order_btn.setFixedSize(40, 28)
                 order_btn.setToolTip("Siparişe Dönüştür")
-                order_btn.clicked.connect(lambda checked, id=quote_id: self.convert_to_order_clicked.emit(id))
+                order_btn.clicked.connect(
+                    lambda checked, id=quote_id: self.convert_to_order_clicked.emit(id)
+                )
                 btn_layout.addWidget(order_btn)
 
             # Sil (sadece taslak)
@@ -310,7 +350,9 @@ class SalesQuoteListPage(QWidget):
                 del_btn = QPushButton("Sil")
                 del_btn.setFixedSize(40, 28)
                 del_btn.setToolTip("Sil")
-                del_btn.clicked.connect(lambda checked, id=quote_id: self._confirm_delete(id))
+                del_btn.clicked.connect(
+                    lambda checked, id=quote_id: self._confirm_delete(id)
+                )
                 btn_layout.addWidget(del_btn)
 
             self.table.setCellWidget(row, 8, btn_widget)
@@ -371,9 +413,10 @@ class SalesQuoteListPage(QWidget):
     def _confirm_delete(self, quote_id: int):
         """Silme onayı"""
         reply = QMessageBox.question(
-            self, "Silme Onayı",
+            self,
+            "Silme Onayı",
             "Bu teklifi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(quote_id)

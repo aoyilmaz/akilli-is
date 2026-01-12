@@ -4,19 +4,41 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame, QLineEdit,
-    QHeaderView, QAbstractItemView, QMessageBox, QComboBox,
-    QDateEdit
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QLineEdit,
+    QHeaderView,
+    QAbstractItemView,
+    QMessageBox,
+    QComboBox,
+    QDateEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style, get_input_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    get_input_style,
 )
+
 
 class ReceiptListPage(QWidget):
     """Tahsilat listesi sayfasi"""
@@ -53,13 +75,15 @@ class ReceiptListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton("🔄 Yenile")
         refresh_btn.setFixedHeight(42)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Yeni ekle butonu
-        add_btn = QPushButton("+ Yeni Tahsilat")
+        add_btn = QPushButton("➕ Yeni Tahsilat")
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 
@@ -125,10 +149,18 @@ class ReceiptListPage(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "Tahsilat No", "Tarih", "Musteri", "Tutar",
-            "Odeme Yontemi", "Durum", "Aciklama", "Islemler"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Tahsilat No",
+                "Tarih",
+                "Musteri",
+                "Tutar",
+                "Odeme Yontemi",
+                "Durum",
+                "Aciklama",
+                "Islemler",
+            ]
+        )
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -246,7 +278,9 @@ class ReceiptListPage(QWidget):
             # Tutar
             amount = rec.get("amount") or 0
             amount_item = QTableWidgetItem(f"{float(amount):,.2f} TL")
-            amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            amount_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             self.table.setItem(row, 3, amount_item)
 
             # Odeme yontemi
@@ -274,7 +308,9 @@ class ReceiptListPage(QWidget):
             self.table.setItem(row, 5, status_item)
 
             # Aciklama
-            self.table.setItem(row, 6, QTableWidgetItem(rec.get("description", "") or ""))
+            self.table.setItem(
+                row, 6, QTableWidgetItem(rec.get("description", "") or "")
+            )
 
             # Islem butonlari
             btn_widget = QWidget()
@@ -284,13 +320,17 @@ class ReceiptListPage(QWidget):
 
             view_btn = QPushButton("Gor")
             view_btn.setFixedSize(40, 28)
-            view_btn.clicked.connect(lambda checked, id=rec.get("id"): self.view_clicked.emit(id))
+            view_btn.clicked.connect(
+                lambda checked, id=rec.get("id"): self.view_clicked.emit(id)
+            )
             btn_layout.addWidget(view_btn)
 
             if rec.get("status") != "cancelled":
                 cancel_btn = QPushButton("Iptal")
                 cancel_btn.setFixedSize(45, 28)
-                cancel_btn.clicked.connect(lambda checked, id=rec.get("id"): self._confirm_cancel(id))
+                cancel_btn.clicked.connect(
+                    lambda checked, id=rec.get("id"): self._confirm_cancel(id)
+                )
                 btn_layout.addWidget(cancel_btn)
 
             self.table.setCellWidget(row, 7, btn_widget)
@@ -334,9 +374,10 @@ class ReceiptListPage(QWidget):
     def _confirm_cancel(self, receipt_id: int):
         """Iptal onayi"""
         reply = QMessageBox.question(
-            self, "Iptal Onayi",
+            self,
+            "Iptal Onayi",
             "Bu tahsilati iptal etmek istediginize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(receipt_id)

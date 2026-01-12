@@ -25,12 +25,22 @@ from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    SUCCESS, ERROR,
-    get_table_style, get_button_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from database.models.accounting import JournalEntryStatus
 from modules.accounting.services import AccountingService
+
 
 class JournalFormDialog(QDialog):
     """Yevmiye fişi formu"""
@@ -84,9 +94,7 @@ class JournalFormDialog(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            ["Hesap", "Borç", "Alacak", "Açıklama"]
-        )
+        self.table.setHorizontalHeaderLabels(["Hesap", "Borç", "Alacak", "Açıklama"])
 
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -94,19 +102,21 @@ class JournalFormDialog(QDialog):
         self.table.setColumnWidth(2, 150)
         self.table.setColumnWidth(3, 200)
 
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self.table)
 
         # Satır ekleme butonları
         btn_row = QHBoxLayout()
 
-        add_btn = QPushButton("Satır Ekle")
+        add_btn = QPushButton(f"{ICONS['add']} Satır Ekle")
+        add_btn.setStyleSheet(get_button_style("add"))
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         add_btn.clicked.connect(self._add_row)
         btn_row.addWidget(add_btn)
 
-        remove_btn = QPushButton("Satır Sil")
+        remove_btn = QPushButton(f"{ICONS['delete']} Satır Sil")
+        remove_btn.setStyleSheet(get_button_style("danger"))
+        remove_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         remove_btn.clicked.connect(self._remove_row)
         btn_row.addWidget(remove_btn)
 
@@ -128,11 +138,15 @@ class JournalFormDialog(QDialog):
         footer = QHBoxLayout()
         footer.addStretch()
 
-        cancel_btn = QPushButton("İptal")
+        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
+        cancel_btn.setStyleSheet(get_button_style("cancel"))
+        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         cancel_btn.clicked.connect(self.reject)
         footer.addWidget(cancel_btn)
 
-        save_btn = QPushButton("Kaydet")
+        save_btn = QPushButton(f"{ICONS['save']} Kaydet")
+        save_btn.setStyleSheet(get_button_style("save"))
+        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         save_btn.clicked.connect(self.save)
         footer.addWidget(save_btn)
 
@@ -215,6 +229,7 @@ class JournalFormDialog(QDialog):
             self.balance_label.setText("Dengeli")
         else:
             self.balance_label.setText(f"Fark: ₺{abs(diff):,.2f}")
+
     def load_journal(self):
         """Mevcut yevmiyeyi yükle"""
         self.journal = self.service.get_journal_by_id(self.journal_id)
@@ -273,12 +288,14 @@ class JournalFormDialog(QDialog):
 
             desc = self.table.item(row, 3).text() or ""
 
-            lines_data.append({
-                "account_id": account_id,
-                "debit": debit,
-                "credit": credit,
-                "description": desc,
-            })
+            lines_data.append(
+                {
+                    "account_id": account_id,
+                    "debit": debit,
+                    "credit": credit,
+                    "description": desc,
+                }
+            )
 
             total_debit += debit
             total_credit += credit
@@ -316,8 +333,6 @@ class JournalFormDialog(QDialog):
 
             self.accept()
         except Exception as e:
-            QMessageBox.critical(
-                self, "Hata", f"Kayıt sırasında hata:\n{str(e)}"
-            )
+            QMessageBox.critical(self, "Hata", f"Kayıt sırasında hata:\n{str(e)}")
         finally:
             self.service.close()

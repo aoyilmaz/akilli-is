@@ -31,6 +31,8 @@ from config.styles import (
     WARNING,
     get_button_style,
     get_title_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from modules.hr.services import HRService
 from database.models.hr import LeaveType, LeaveStatus
@@ -52,6 +54,7 @@ LEAVE_STATUS_LABELS = {
     LeaveStatus.REJECTED: "Reddedildi",
     LeaveStatus.CANCELLED: "İptal",
 }
+
 
 class LeaveFormDialog(QDialog):
     """İzin talebi dialogu"""
@@ -98,11 +101,15 @@ class LeaveFormDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        cancel_btn = QPushButton("İptal")
+        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
+        cancel_btn.setStyleSheet(get_button_style("cancel"))
+        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("Talep Oluştur")
+        save_btn = QPushButton(f"{ICONS['add']} Talep Oluştur")
+        save_btn.setStyleSheet(get_button_style("add"))
+        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 
@@ -144,6 +151,7 @@ class LeaveFormDialog(QDialog):
         self.service.close()
         super().closeEvent(event)
 
+
 class LeaveModule(QWidget):
     """İzin yönetim modülü"""
 
@@ -166,8 +174,9 @@ class LeaveModule(QWidget):
         header.addWidget(title)
         header.addStretch()
 
-        new_btn = QPushButton("Yeni İzin Talebi")
-        new_btn.setProperty("class", "primary")
+        new_btn = QPushButton(f"{ICONS['add']} Yeni İzin Talebi")
+        new_btn.setStyleSheet(get_button_style("add"))
+        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         new_btn.clicked.connect(self._new_leave)
         header.addWidget(new_btn)
 
@@ -256,13 +265,17 @@ class LeaveModule(QWidget):
                     btn_layout.setContentsMargins(4, 4, 4, 4)
                     btn_layout.setSpacing(4)
 
-                    approve_btn = QPushButton("Onayla")
+                    approve_btn = QPushButton(f"{ICONS['confirm']} Onayla")
+                    approve_btn.setStyleSheet(get_button_style("confirm"))
+                    approve_btn.setFixedHeight(28)
                     approve_btn.clicked.connect(
                         lambda checked, lid=leave.id: self._approve_leave(lid)
                     )
                     btn_layout.addWidget(approve_btn)
 
-                    reject_btn = QPushButton("Reddet")
+                    reject_btn = QPushButton(f"{ICONS['cancel']} Reddet")
+                    reject_btn.setStyleSheet(get_button_style("danger"))
+                    reject_btn.setFixedHeight(28)
                     reject_btn.clicked.connect(
                         lambda checked, lid=leave.id: self._reject_leave(lid)
                     )

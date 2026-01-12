@@ -119,9 +119,9 @@ try:
     )
     from modules.sales.views.price_list_module import PriceListModule
 except ImportError:
-    CustomerModule = SalesQuoteModule = SalesOrderModule = (
-        DeliveryNoteModule
-    ) = InvoiceModule = PriceListModule = PlaceholderPage
+    CustomerModule = SalesQuoteModule = SalesOrderModule = DeliveryNoteModule = (
+        InvoiceModule
+    ) = PriceListModule = PlaceholderPage
 
 try:
     from modules.purchasing.views.purchase_invoice_module import PurchaseInvoiceModule
@@ -141,7 +141,9 @@ try:
     from modules.finance.views.reconciliation_module import ReconciliationModule
     from modules.finance.views.account_statement_module import AccountStatementModule
 except ImportError:
-    ReceiptModule = PaymentModule = ReconciliationModule = AccountStatementModule = PlaceholderPage
+    ReceiptModule = PaymentModule = ReconciliationModule = AccountStatementModule = (
+        PlaceholderPage
+    )
 
 try:
     from modules.mrp.views.mrp_module import MRPModule
@@ -152,10 +154,25 @@ try:
     from modules.reports.views.sales_reports_module import SalesReportsModule
     from modules.reports.views.stock_aging_module import StockAgingModule
     from modules.reports.views.production_oee_module import ProductionOEEModule
-    from modules.reports.views.supplier_performance_module import SupplierPerformanceModule
+    from modules.reports.views.supplier_performance_module import (
+        SupplierPerformanceModule,
+    )
     from modules.reports.views.receivables_aging_module import ReceivablesAgingModule
 except ImportError:
-    SalesReportsModule = StockAgingModule = ProductionOEEModule = SupplierPerformanceModule = ReceivablesAgingModule = PlaceholderPage
+    SalesReportsModule = StockAgingModule = ProductionOEEModule = (
+        SupplierPerformanceModule
+    ) = ReceivablesAgingModule = PlaceholderPage
+
+try:
+    from modules.hr.views.employee_module import EmployeeModule
+    from modules.hr.views.department_module import DepartmentModule
+    from modules.hr.views.position_module import PositionModule
+    from modules.hr.views.leave_module import LeaveModule
+    from modules.hr.views.org_chart_module import OrgChartModule
+    from modules.hr.views.shift_team_overview import ShiftTeamOverview
+except ImportError:
+    EmployeeModule = DepartmentModule = PositionModule = LeaveModule = PlaceholderPage
+    OrgChartModule = ShiftTeamOverview = PlaceholderPage
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -552,7 +569,17 @@ MENU_DATA = {
         "title": "SİSTEM AYARLARI",
         "items": [
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
-            ("İnsan Kaynakları", "fa5s.users", "hr"),
+        ],
+    },
+    "hr": {
+        "title": "İNSAN KAYNAKLARI",
+        "items": [
+            ("Çalışanlar", "fa5s.user-tie", "employees"),
+            ("Departmanlar", "fa5s.building", "departments"),
+            ("Pozisyonlar", "fa5s.id-badge", "positions"),
+            ("İzin Yönetimi", "fa5s.calendar-check", "leaves"),
+            ("Organizasyon", "fa5s.sitemap", "org-chart"),
+            ("Vardiya Ekipleri", "fa5s.users-cog", "shift-teams"),
         ],
     },
 }
@@ -561,20 +588,28 @@ MENU_DATA = {
 
 
 class CustomTitleBar(QFrame):
-    """Kompakt Başlık Çubuğu"""
-
-    prev_tab_clicked = pyqtSignal()
-    next_tab_clicked = pyqtSignal()
+    """Özelleştirilmiş Başlık Çubuğu - Örnek 1 Tasarımı"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
-        self.setFixedHeight(30)
+        self.setFixedHeight(38)
         self.setObjectName("TitleBar")
+        self.setStyleSheet(
+            """
+            #TitleBar {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2d2d30, stop:1 #1e1e1e);
+                border-bottom: 1px solid #3e3e42;
+            }
+        """
+        )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 0, 0, 0)
+        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setSpacing(12)
 
+        # === SOL: Logo ve Uygulama Adı ===
         self.btn_toggle = QPushButton()
         self.btn_toggle.setObjectName("BtnToggle")
         logo_path = os.path.join(current_dir, "resources", "icons", "logo.svg")
@@ -582,80 +617,152 @@ class CustomTitleBar(QFrame):
             self.btn_toggle.setIcon(QIcon(logo_path))
         elif "qta" in globals():
             self.btn_toggle.setIcon(qta.icon("fa5s.cube", color="#007acc"))
-        self.btn_toggle.setIconSize(QSize(20, 20))
-        self.btn_toggle.setFixedSize(40, 30)
+        self.btn_toggle.setIconSize(QSize(24, 24))
+        self.btn_toggle.setFixedSize(32, 32)
         self.btn_toggle.setCheckable(True)
         self.btn_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_toggle.setStyleSheet("background: transparent; border: none;")
+        self.btn_toggle.setStyleSheet(
+            """
+            QPushButton {
+                background: transparent;
+                border: none;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        """
+        )
         layout.addWidget(self.btn_toggle)
 
-        self.title_label = QLabel(f"{APP_NAME}")
+        self.title_label = QLabel("Akıllı İş ERP")
         self.title_label.setStyleSheet(
-            "font-weight: bold; margin-left: 5px; border: none; color: #cccccc; font-size: 13px;"
+            """
+            font-weight: 600;
+            font-size: 14px;
+            color: #ffffff;
+            border: none;
+            background: transparent;
+        """
         )
         layout.addWidget(self.title_label)
-        layout.addStretch()
 
-        self.search_input = QLineEdit()
-        self.search_input.setObjectName("SearchInput")
-        self.search_input.setPlaceholderText("Ara (Ctrl+P)...")
-        self.search_input.setFixedWidth(300)
-        layout.addWidget(self.search_input)
+        layout.addStretch()  # Sol stretch
 
-        # Sekme Gezinme
-        self.btn_prev_tab = QPushButton()
-        self.btn_next_tab = QPushButton()
-        if "qta" in globals():
-            self.btn_prev_tab.setIcon(qta.icon("fa5s.chevron-left", color="#cccccc"))
-            self.btn_next_tab.setIcon(qta.icon("fa5s.chevron-right", color="#cccccc"))
-        else:
-            self.btn_prev_tab.setText("<")
-            self.btn_next_tab.setText(">")
-        for btn in [self.btn_prev_tab, self.btn_next_tab]:
-            btn.setFixedSize(30, 30)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setStyleSheet(
-                "QPushButton { background: transparent; border: none; border-radius: 4px; } QPushButton:hover { background-color: #3e3e42; }"
-            )
-            layout.addWidget(btn)
-        self.btn_prev_tab.clicked.connect(self.prev_tab_clicked.emit)
-        self.btn_next_tab.clicked.connect(self.next_tab_clicked.emit)
+        # === ORTA: Arama Kutusu (Kompakt, Ortalı) ===
+        search_container = QFrame()
+        search_container.setFixedHeight(22)
+        search_container.setFixedWidth(100)
+        search_container.setStyleSheet(
+            """
+            QFrame {
+                background: #3c3c3c;
+                border: 1px solid #4a4a4a;
+                border-radius: 11px;
+            }
+            QFrame:focus-within {
+                border-color: #007acc;
+            }
+        """
+        )
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(3)
+        search_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        layout.addStretch()
+        search_icon = QLabel("🔍")
+        search_icon.setStyleSheet("border: none; font-size: 10px;")
+        search_layout.addWidget(search_icon)
 
-        # Kontrol Butonları (Layout içinde sağa yaslanması için Stretch sonrası ekleniyor)
+        search_text = QLabel("Ara")
+        search_text.setStyleSheet("border: none; font-size: 10px; color: #808080;")
+        search_layout.addWidget(search_text)
+
+        layout.addWidget(search_container)
+
+        layout.addStretch()  # Sağ stretch
+
+        # === SAĞ: macOS Tarzı Pencere Butonları ===
         btn_container = QWidget()
+        btn_container.setStyleSheet("background: transparent;")
         btn_layout = QHBoxLayout(btn_container)
         btn_layout.setContentsMargins(0, 0, 0, 0)
-        btn_layout.setSpacing(0)
-        self.btn_min = QPushButton("─")
-        self.btn_min.setObjectName("BtnMinimize")
-        self.btn_min.setFixedSize(45, 30)
-        self.btn_max = QPushButton("▢")
-        self.btn_max.setObjectName("BtnMaximize")
-        self.btn_max.setFixedSize(45, 30)
-        self.btn_close = QPushButton("✕")
-        self.btn_close.setObjectName("BtnClose")
-        self.btn_close.setFixedSize(45, 30)
+        btn_layout.setSpacing(8)
+
+        # Yeşil (minimize)
+        self.btn_min = QPushButton()
+        self.btn_min.setFixedSize(14, 14)
+        self.btn_min.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_min.setStyleSheet(
+            """
+            QPushButton {
+                background: #28c840;
+                border: none;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                background: #3dd654;
+            }
+        """
+        )
+
+        # Sarı (maximize)
+        self.btn_max = QPushButton()
+        self.btn_max.setFixedSize(14, 14)
+        self.btn_max.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_max.setStyleSheet(
+            """
+            QPushButton {
+                background: #febc2e;
+                border: none;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                background: #ffc944;
+            }
+        """
+        )
+
+        # Kırmızı (close)
+        self.btn_close = QPushButton()
+        self.btn_close.setFixedSize(14, 14)
+        self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_close.setStyleSheet(
+            """
+            QPushButton {
+                background: #ff5f57;
+                border: none;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                background: #ff7369;
+            }
+        """
+        )
+
         btn_layout.addWidget(self.btn_min)
         btn_layout.addWidget(self.btn_max)
         btn_layout.addWidget(self.btn_close)
-
         layout.addWidget(btn_container)
 
+        # Sinyaller
         self.btn_close.clicked.connect(self.parent.close)
         self.btn_min.clicked.connect(self.parent.showMinimized)
         self.btn_max.clicked.connect(self.toggle_max)
+
+        # Sürükleme için
         self.start = QPoint(0, 0)
         self.pressing = False
+
+    def update_module_indicator(self, module: str, page: str = ""):
+        """Geriye uyumluluk için (artık görsel yok)"""
+        pass
 
     def toggle_max(self):
         if self.parent.isMaximized():
             self.parent.showNormal()
-            self.btn_max.setText("▢")
         else:
             self.parent.showMaximized()
-            self.btn_max.setText("❐")
 
     def mousePressEvent(self, e):
         self.start = self.mapToGlobal(e.pos())
@@ -688,6 +795,7 @@ class ActivityBar(QFrame):
             ("production", "fa5s.industry", "Üretim"),
             ("accounting", "fa5s.calculator", "Muhasebe"),
             ("finance", "fa5s.wallet", "Finans"),
+            ("hr", "fa5s.users", "İnsan Kaynakları"),
             ("reports", "fa5s.chart-pie", "Raporlar"),
             ("development", "fa5s.bug", "Geliştirme"),
             ("settings", "fa5s.cog", "Ayarlar"),
@@ -807,7 +915,7 @@ class MainWindow(QMainWindow):
 
             # Admin kullanıcıyı al veya oluştur
             session = get_session()
-            user = session.query(User).filter(User.username == 'admin').first()
+            user = session.query(User).filter(User.username == "admin").first()
 
             if user:
                 ErrorHandler.set_current_user(user)
@@ -872,8 +980,14 @@ class MainWindow(QMainWindow):
         self.pages["receivables-aging"] = ReceivablesAgingModule()
         # Geliştirme modülü
         self.pages["error-logs"] = DevelopmentModule()
+        # İnsan Kaynakları modülü
+        self.pages["employees"] = EmployeeModule()
+        self.pages["departments"] = DepartmentModule()
+        self.pages["positions"] = PositionModule()
+        self.pages["leaves"] = LeaveModule()
+        self.pages["org-chart"] = OrgChartModule()
+        self.pages["shift-teams"] = ShiftTeamOverview()
         # Sistem ayarları
-        self.pages["hr"] = PlaceholderPage("Insan Kaynaklari", "")
         self.pages["settings"] = PlaceholderPage("Ayarlar", "")
 
     def setup_ui(self):
@@ -925,12 +1039,115 @@ class MainWindow(QMainWindow):
         body.addWidget(content)
         root.addLayout(body)
 
+        # === STATUSBAR - Örnek 1 Tasarımı ===
         self.status_bar = QStatusBar()
-        self.status_bar.setFixedHeight(22)
-        self.setStatusBar(self.status_bar)
-        self.status_bar.addWidget(
-            QLabel(" Hazır", styleSheet="color: white; font-size: 11px;")
+        self.status_bar.setFixedHeight(28)
+        self.status_bar.setStyleSheet(
+            """
+            QStatusBar {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #252526, stop:1 #1e1e1e);
+                border-top: 1px solid #3e3e42;
+            }
+            QStatusBar::item { border: none; }
+            QLabel {
+                color: #808080;
+                font-size: 11px;
+                padding: 0 6px;
+                border: none;
+                background: transparent;
+            }
+        """
         )
+        self.setStatusBar(self.status_bar)
+
+        # === SOL: Kullanıcı Bilgisi ===
+        # Avatar
+        avatar_label = QLabel("👤")
+        avatar_label.setStyleSheet(
+            """
+            font-size: 14px;
+            padding: 2px 4px;
+            background: #3c3c3c;
+            border-radius: 4px;
+        """
+        )
+        self.status_bar.addWidget(avatar_label)
+
+        # Kullanıcı adı
+        self.status_user_name = QLabel("Ahmet Yılmaz")
+        self.status_user_name.setStyleSheet("color: #cccccc; font-weight: 500;")
+        self.status_bar.addWidget(self.status_user_name)
+
+        # Rol badge
+        self.status_role_badge = QLabel("Yönetici")
+        self.status_role_badge.setStyleSheet(
+            """
+            background: #007acc;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        """
+        )
+        self.status_bar.addWidget(self.status_role_badge)
+
+        # Ayırıcı
+        separator1 = QLabel("|")
+        separator1.setStyleSheet("color: #3e3e42; padding: 0 8px;")
+        self.status_bar.addWidget(separator1)
+
+        # === ORTA: Aktif Modül ===
+        self.status_module = QLabel("📊 Aktif Modül: Dashboard")
+        self.status_module.setStyleSheet("color: #808080;")
+        self.status_bar.addWidget(self.status_module)
+
+        # === SAĞ: Durum Bilgileri ===
+        # Bağlantı durumu
+        self.status_connection = QLabel("● Çevrimiçi")
+        self.status_connection.setStyleSheet("color: #4ec9b0;")
+        self.status_bar.addPermanentWidget(self.status_connection)
+
+        # Sync durumu
+        self.status_sync = QLabel("↻ Veritabanı Eşitleniyor...")
+        self.status_sync.setStyleSheet("color: #808080;")
+        self.status_bar.addPermanentWidget(self.status_sync)
+
+        # Tarih/Saat
+        from datetime import datetime
+
+        now = datetime.now()
+        date_str = (
+            now.strftime("%d %B %Y %H:%M")
+            .replace("January", "Ocak")
+            .replace("February", "Şubat")
+            .replace("March", "Mart")
+            .replace("April", "Nisan")
+            .replace("May", "Mayıs")
+            .replace("June", "Haziran")
+            .replace("July", "Temmuz")
+            .replace("August", "Ağustos")
+            .replace("September", "Eylül")
+            .replace("October", "Ekim")
+            .replace("November", "Kasım")
+            .replace("December", "Aralık")
+        )
+        self.status_datetime = QLabel(date_str)
+        self.status_datetime.setStyleSheet("color: #808080;")
+        self.status_bar.addPermanentWidget(self.status_datetime)
+
+        # Bildirim ikonu
+        self.status_notification = QLabel("🔔")
+        self.status_notification.setStyleSheet(
+            """
+            font-size: 14px;
+            padding: 2px 8px;
+            background: transparent;
+        """
+        )
+        self.status_bar.addPermanentWidget(self.status_notification)
+
         QSizeGrip(self.status_bar)
 
         self.anim = QPropertyAnimation(self.sidebar_container, b"maximumWidth")
@@ -942,8 +1159,6 @@ class MainWindow(QMainWindow):
         self.sidebar.pageSelected.connect(self.open_tab)
         self.sidebar.closeRequested.connect(self.close_menu_if_not_locked)
         self.title_bar.btn_toggle.toggled.connect(self.toggle_sidebar_lock)
-        self.title_bar.prev_tab_clicked.connect(self.go_prev_tab)
-        self.title_bar.next_tab_clicked.connect(self.go_next_tab)
 
     def _on_theme_changed(self, theme):
         self._apply_theme()

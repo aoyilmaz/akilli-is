@@ -24,12 +24,28 @@ from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER,
-    BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    SUCCESS, WARNING, ERROR, INPUT_BG, INPUT_BORDER,
-    get_tab_style, get_table_style, get_button_style, get_input_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    INPUT_BG,
+    INPUT_BORDER,
+    get_tab_style,
+    get_table_style,
+    get_button_style,
+    get_input_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from modules.accounting.services import AccountingService
+
 
 class AccountingReportsModule(QWidget):
     """Muhasebe raporlari modulu - ic menu yok, tab yapisi"""
@@ -92,7 +108,9 @@ class AccountingReportsModule(QWidget):
         self.ledger_end.setCalendarPopup(True)
         filter_layout.addWidget(self.ledger_end)
 
-        gen_btn = QPushButton("Rapor Olustur")
+        gen_btn = QPushButton(f"{ICONS['report']} Rapor Oluştur")
+        gen_btn.setStyleSheet(get_button_style("primary"))
+        gen_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         gen_btn.clicked.connect(self._generate_ledger)
         filter_layout.addWidget(gen_btn)
 
@@ -128,7 +146,9 @@ class AccountingReportsModule(QWidget):
         self.trial_date.setCalendarPopup(True)
         filter_layout.addWidget(self.trial_date)
 
-        gen_btn = QPushButton("Mizan Olustur")
+        gen_btn = QPushButton(f"{ICONS['report']} Mizan Oluştur")
+        gen_btn.setStyleSheet(get_button_style("primary"))
+        gen_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         gen_btn.clicked.connect(self._generate_trial_balance)
         filter_layout.addWidget(gen_btn)
 
@@ -171,7 +191,9 @@ class AccountingReportsModule(QWidget):
         self.balance_date.setCalendarPopup(True)
         filter_layout.addWidget(self.balance_date)
 
-        gen_btn = QPushButton("Bilanco Olustur")
+        gen_btn = QPushButton(f"{ICONS['report']} Bilanço Oluştur")
+        gen_btn.setStyleSheet(get_button_style("primary"))
+        gen_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         gen_btn.clicked.connect(self._generate_balance_sheet)
         filter_layout.addWidget(gen_btn)
 

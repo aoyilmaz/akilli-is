@@ -168,6 +168,7 @@ class Employee(BaseModel):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     position_id = Column(Integer, ForeignKey("positions.id"), nullable=True)
     manager_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+    shift_team_id = Column(Integer, ForeignKey("shift_teams.id"), nullable=True)
 
     # İş bilgileri
     hire_date = Column(Date, nullable=False, default=date.today)
@@ -199,6 +200,7 @@ class Employee(BaseModel):
         "Leave", back_populates="employee", foreign_keys="Leave.employee_id"
     )
     attendances = relationship("Attendance", back_populates="employee")
+    shift_team = relationship("ShiftTeam", back_populates="employees")
 
     __table_args__ = (
         Index("idx_emp_no", "employee_no"),

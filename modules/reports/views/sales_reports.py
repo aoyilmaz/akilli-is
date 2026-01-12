@@ -24,10 +24,23 @@ from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_tab_style, get_input_style, get_button_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_tab_style,
+    get_input_style,
+    get_button_style,
 )
+
 
 class SalesReportsPage(QWidget):
     """Satis raporlari sayfasi"""
@@ -61,7 +74,8 @@ class SalesReportsPage(QWidget):
 
         filter_layout.addStretch()
 
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(refresh_btn)
 
@@ -183,6 +197,7 @@ class SalesReportsPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
+
     def load_customer_data(self, data: list):
         self.customer_table.setRowCount(len(data))
         for row, item in enumerate(data):

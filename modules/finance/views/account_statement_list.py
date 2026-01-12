@@ -4,19 +4,37 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QFrame,
-    QHeaderView, QAbstractItemView, QComboBox, QDateEdit,
-    QGroupBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QFrame,
+    QHeaderView,
+    QAbstractItemView,
+    QComboBox,
+    QDateEdit,
+    QGroupBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
 )
+
 
 class AccountStatementListPage(QWidget):
     """Cari hesap ekstresi liste sayfasi"""
@@ -45,14 +63,16 @@ class AccountStatementListPage(QWidget):
         header_layout.addStretch()
 
         # Yenile butonu
-        refresh_btn = QPushButton("Yenile")
+        refresh_btn = QPushButton("🔄 Yenile")
         refresh_btn.setFixedHeight(42)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Excel'e aktar
-        export_btn = QPushButton("Excel'e Aktar")
+        export_btn = QPushButton("📊 Excel'e Aktar")
         export_btn.setFixedHeight(42)
+        export_btn.setStyleSheet(get_button_style("export"))
         export_btn.clicked.connect(self._on_export)
         header_layout.addWidget(export_btn)
 
@@ -117,12 +137,11 @@ class AccountStatementListPage(QWidget):
         filter_layout.addLayout(date_to_layout)
 
         # Filtrele butonu
-        filter_btn = QPushButton("Filtrele")
-        filter_btn.setFixedSize(100, 42)
+        filter_btn = QPushButton("⚡ Filtrele")
+        filter_btn.setFixedSize(110, 42)
+        filter_btn.setStyleSheet(get_button_style("filter"))
         filter_btn.clicked.connect(self.refresh_requested.emit)
-        filter_layout.addWidget(
-            filter_btn, alignment=Qt.AlignmentFlag.AlignBottom
-        )
+        filter_layout.addWidget(filter_btn, alignment=Qt.AlignmentFlag.AlignBottom)
 
         filter_layout.addStretch()
         layout.addWidget(filter_group)
@@ -134,19 +153,13 @@ class AccountStatementListPage(QWidget):
         self.opening_card = self._create_stat_card("Acilis", "0.00 TL", ACCENT)
         summary_layout.addWidget(self.opening_card)
 
-        self.debit_card = self._create_stat_card(
-            "Toplam Borc", "0.00 TL", ERROR
-        )
+        self.debit_card = self._create_stat_card("Toplam Borc", "0.00 TL", ERROR)
         summary_layout.addWidget(self.debit_card)
 
-        self.credit_card = self._create_stat_card(
-            "Toplam Alacak", "0.00 TL", SUCCESS
-        )
+        self.credit_card = self._create_stat_card("Toplam Alacak", "0.00 TL", SUCCESS)
         summary_layout.addWidget(self.credit_card)
 
-        self.balance_card = self._create_stat_card(
-            "Bakiye", "0.00 TL", WARNING
-        )
+        self.balance_card = self._create_stat_card("Bakiye", "0.00 TL", WARNING)
         summary_layout.addWidget(self.balance_card)
 
         summary_layout.addStretch()
@@ -155,17 +168,12 @@ class AccountStatementListPage(QWidget):
         # Hareket tablosu
         self.table = QTableWidget()
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([
-            "Tarih", "Hareket No", "Tur", "Aciklama",
-            "Borc", "Alacak", "Bakiye"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            ["Tarih", "Hareket No", "Tur", "Aciklama", "Borc", "Alacak", "Bakiye"]
+        )
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
 
@@ -297,9 +305,7 @@ class AccountStatementListPage(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(date_str))
 
             # Hareket No
-            self.table.setItem(
-                row, 1, QTableWidgetItem(mov.get("transaction_no", ""))
-            )
+            self.table.setItem(row, 1, QTableWidgetItem(mov.get("transaction_no", "")))
 
             # Tur
             type_map = {
@@ -315,9 +321,7 @@ class AccountStatementListPage(QWidget):
             self.table.setItem(row, 2, type_item)
 
             # Aciklama
-            self.table.setItem(
-                row, 3, QTableWidgetItem(mov.get("description", ""))
-            )
+            self.table.setItem(row, 3, QTableWidgetItem(mov.get("description", "")))
 
             # Borc
             debit = mov.get("debit") or Decimal(0)
@@ -358,8 +362,7 @@ class AccountStatementListPage(QWidget):
                 self.credit_card, f"{summary.get('total_credit', 0):,.2f} TL"
             )
             self._update_card(
-                self.balance_card,
-                f"{summary.get('closing_balance', 0):,.2f} TL"
+                self.balance_card, f"{summary.get('closing_balance', 0):,.2f} TL"
             )
 
     def _on_type_changed(self, index):
@@ -373,12 +376,14 @@ class AccountStatementListPage(QWidget):
 
     def _on_export(self):
         """Excel'e aktar"""
-        self.export_requested.emit({
-            "entity_type": self.current_entity_type,
-            "entity_id": self.current_entity_id,
-            "date_from": self.date_from.date().toPyDate(),
-            "date_to": self.date_to.date().toPyDate(),
-        })
+        self.export_requested.emit(
+            {
+                "entity_type": self.current_entity_type,
+                "entity_id": self.current_entity_id,
+                "date_from": self.date_from.date().toPyDate(),
+                "date_to": self.date_to.date().toPyDate(),
+            }
+        )
 
     def get_filter_data(self) -> dict:
         """Filtre verilerini getir"""

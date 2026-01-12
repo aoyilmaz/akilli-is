@@ -6,8 +6,18 @@ from enum import Enum
 from decimal import Decimal
 from datetime import date
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, Date, DateTime,
-    ForeignKey, Numeric, Enum as SQLEnum, Index, Table
+    Column,
+    Integer,
+    String,
+    Text,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    Enum as SQLEnum,
+    Index,
+    Table,
 )
 from sqlalchemy.orm import relationship
 from database.base import BaseModel
@@ -15,32 +25,38 @@ from database.base import BaseModel
 
 # === ENUM TANIMLARI ===
 
+
 class TransactionType(str, Enum):
     """Cari hesap hareket turleri"""
-    INVOICE = "invoice"          # Fatura
-    PAYMENT = "payment"          # Odeme (tedarikci)
-    RECEIPT = "receipt"          # Tahsilat (musteri)
-    OPENING = "opening"          # Acilis bakiyesi
-    ADJUSTMENT = "adjustment"    # Duzeltme
+
+    INVOICE = "invoice"  # Satis Faturasi
+    PURCHASE_INVOICE = "purchase_invoice"  # Satin Alma Faturasi
+    PAYMENT = "payment"  # Odeme (tedarikci)
+    RECEIPT = "receipt"  # Tahsilat (musteri)
+    OPENING = "opening"  # Acilis bakiyesi
+    ADJUSTMENT = "adjustment"  # Duzeltme
 
 
 class PaymentMethod(str, Enum):
     """Odeme yontemleri"""
-    CASH = "cash"                        # Nakit
-    BANK_TRANSFER = "bank_transfer"      # Havale/EFT
-    CHECK = "check"                      # Cek
-    CREDIT_CARD = "credit_card"          # Kredi Karti
+
+    CASH = "cash"  # Nakit
+    BANK_TRANSFER = "bank_transfer"  # Havale/EFT
+    CHECK = "check"  # Cek
+    CREDIT_CARD = "credit_card"  # Kredi Karti
     PROMISSORY_NOTE = "promissory_note"  # Senet
 
 
 class PaymentStatus(str, Enum):
     """Odeme/Tahsilat durumlari"""
-    PENDING = "pending"          # Beklemede
-    COMPLETED = "completed"      # Tamamlandi
-    CANCELLED = "cancelled"      # Iptal
+
+    PENDING = "pending"  # Beklemede
+    COMPLETED = "completed"  # Tamamlandi
+    CANCELLED = "cancelled"  # Iptal
 
 
 # === CARI HESAP HAREKETI ===
+
 
 class AccountTransaction(BaseModel):
     """Cari hesap hareketleri tablosu"""
@@ -52,7 +68,7 @@ class AccountTransaction(BaseModel):
     transaction_date = Column(Date, nullable=False, default=date.today)
     transaction_type = Column(
         SQLEnum(TransactionType, values_callable=lambda x: [e.value for e in x]),
-        nullable=False
+        nullable=False,
     )
 
     # Cari hesap (musteri veya tedarikci)
@@ -61,17 +77,21 @@ class AccountTransaction(BaseModel):
 
     # Belge referansi
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
+    purchase_invoice_id = Column(
+        Integer, ForeignKey("purchase_invoices.id"), nullable=True
+    )
     receipt_id = Column(Integer, ForeignKey("receipts.id"), nullable=True)
     payment_id = Column(Integer, ForeignKey("payments.id"), nullable=True)
+    journal_entry_id = Column(Integer, ForeignKey("journal_entries.id"), nullable=True)
 
     # Tutarlar
-    debit = Column(Numeric(15, 2), default=0)   # Borc
+    debit = Column(Numeric(15, 2), default=0)  # Borc
     credit = Column(Numeric(15, 2), default=0)  # Alacak
 
     # Odeme bilgileri
     payment_method = Column(
         SQLEnum(PaymentMethod, values_callable=lambda x: [e.value for e in x]),
-        nullable=True
+        nullable=True,
     )
     reference_no = Column(String(50))  # Cek no, dekont no vs.
 
@@ -96,6 +116,7 @@ class AccountTransaction(BaseModel):
 
 # === TAHSILAT (Musterilerden) ===
 
+
 class Receipt(BaseModel):
     """Tahsilat kayitlari tablosu"""
 
@@ -116,7 +137,7 @@ class Receipt(BaseModel):
     # Odeme yontemi
     payment_method = Column(
         SQLEnum(PaymentMethod, values_callable=lambda x: [e.value for e in x]),
-        nullable=False
+        nullable=False,
     )
 
     # Banka/Cek bilgileri
@@ -128,7 +149,7 @@ class Receipt(BaseModel):
     # Durum
     status = Column(
         SQLEnum(PaymentStatus, values_callable=lambda x: [e.value for e in x]),
-        default=PaymentStatus.COMPLETED
+        default=PaymentStatus.COMPLETED,
     )
 
     # Aciklama
@@ -138,14 +159,12 @@ class Receipt(BaseModel):
     # Iliskiler
     customer = relationship("Customer", backref="receipts")
     allocations = relationship(
-        "ReceiptAllocation",
-        back_populates="receipt",
-        cascade="all, delete-orphan"
+        "ReceiptAllocation", back_populates="receipt", cascade="all, delete-orphan"
     )
     transactions = relationship(
         "AccountTransaction",
         foreign_keys=[AccountTransaction.receipt_id],
-        backref="receipt_ref"
+        backref="receipt_ref",
     )
 
     __table_args__ = (
@@ -159,7 +178,9 @@ class Receipt(BaseModel):
     @property
     def allocated_amount(self) -> Decimal:
         """Faturalara dagilmis tutar"""
-        return sum(a.amount for a in self.allocations) if self.allocations else Decimal(0)
+        return (
+            sum(a.amount for a in self.allocations) if self.allocations else Decimal(0)
+        )
 
     @property
     def unallocated_amount(self) -> Decimal:
@@ -187,6 +208,7 @@ class ReceiptAllocation(BaseModel):
 
 # === ODEME (Tedarikcilere) ===
 
+
 class Payment(BaseModel):
     """Odeme kayitlari tablosu"""
 
@@ -207,7 +229,7 @@ class Payment(BaseModel):
     # Odeme yontemi
     payment_method = Column(
         SQLEnum(PaymentMethod, values_callable=lambda x: [e.value for e in x]),
-        nullable=False
+        nullable=False,
     )
 
     # Banka/Cek bilgileri
@@ -219,7 +241,7 @@ class Payment(BaseModel):
     # Durum
     status = Column(
         SQLEnum(PaymentStatus, values_callable=lambda x: [e.value for e in x]),
-        default=PaymentStatus.COMPLETED
+        default=PaymentStatus.COMPLETED,
     )
 
     # Aciklama
@@ -229,14 +251,12 @@ class Payment(BaseModel):
     # Iliskiler
     supplier = relationship("Supplier", backref="payments_made")
     allocations = relationship(
-        "PaymentAllocation",
-        back_populates="payment",
-        cascade="all, delete-orphan"
+        "PaymentAllocation", back_populates="payment", cascade="all, delete-orphan"
     )
     transactions = relationship(
         "AccountTransaction",
         foreign_keys=[AccountTransaction.payment_id],
-        backref="payment_ref"
+        backref="payment_ref",
     )
 
     __table_args__ = (
@@ -250,7 +270,9 @@ class Payment(BaseModel):
     @property
     def allocated_amount(self) -> Decimal:
         """Faturalara dagilmis tutar"""
-        return sum(a.amount for a in self.allocations) if self.allocations else Decimal(0)
+        return (
+            sum(a.amount for a in self.allocations) if self.allocations else Decimal(0)
+        )
 
     @property
     def unallocated_amount(self) -> Decimal:

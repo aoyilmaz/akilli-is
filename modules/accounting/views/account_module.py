@@ -14,13 +14,24 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER,
-    BORDER, TEXT_PRIMARY, TEXT_MUTED, ACCENT,
-    SUCCESS, get_button_style, get_title_style,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    get_button_style,
+    get_title_style,
+    BTN_HEIGHT_NORMAL,
+    ICONS,
 )
 from modules.accounting.services import AccountingService
 from modules.accounting.views.account_tree import AccountTreeWidget
 from modules.accounting.views.account_form import AccountFormDialog
+
 
 class AccountModule(QWidget):
     """Hesap planı yönetim modülü"""
@@ -47,12 +58,16 @@ class AccountModule(QWidget):
         header.addStretch()
 
         # Seed butonu
-        seed_btn = QPushButton("Tekduzen Hesap Plani Yukle")
+        seed_btn = QPushButton(f"{ICONS['import']} Tekdüzen Hesap Planı Yükle")
+        seed_btn.setStyleSheet(get_button_style("import"))
+        seed_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         seed_btn.clicked.connect(self._seed_accounts)
         header.addWidget(seed_btn)
 
         # Yeni hesap
-        new_btn = QPushButton("Yeni Hesap")
+        new_btn = QPushButton(f"{ICONS['add']} Yeni Hesap")
+        new_btn.setStyleSheet(get_button_style("add"))
+        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         new_btn.clicked.connect(self._new_account)
         header.addWidget(new_btn)
 

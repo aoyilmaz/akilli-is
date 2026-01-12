@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.stat_cards import MiniStatCard
+from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
 
 class PurchaseInvoiceListPage(QWidget):
     """Satınalma faturası listesi"""
@@ -74,40 +76,23 @@ class PurchaseInvoiceListPage(QWidget):
         header_layout.addWidget(self.search_input)
 
         # Yenile
-        refresh_btn = QPushButton("Yen")
-        refresh_btn.setFixedSize(42, 42)
+        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
+        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        refresh_btn.setStyleSheet(get_button_style("refresh"))
         refresh_btn.clicked.connect(self.refresh_requested.emit)
         header_layout.addWidget(refresh_btn)
 
         # Mal Kabulden Fatura
         from_receipt_btn = QPushButton("📦 Mal Kabulden")
+        from_receipt_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        from_receipt_btn.setStyleSheet(get_button_style("secondary"))
         from_receipt_btn.clicked.connect(self.add_from_receipt_clicked.emit)
         header_layout.addWidget(from_receipt_btn)
 
         # Yeni (manuel)
-        add_btn = QPushButton("➕ Yeni Fatura")
-        add_btn.setStyleSheet(
-            """
-            QPushButton {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6366f1, stop:1 #a855f7
-                );
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 20px;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #4f46e5, stop:1 #9333ea
-                );
-            }
-        """
-        )
+        add_btn = QPushButton(f"{ICONS['add']} Yeni Fatura")
+        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        add_btn.setStyleSheet(get_button_style("add"))
         add_btn.clicked.connect(self.add_clicked.emit)
         header_layout.addWidget(add_btn)
 

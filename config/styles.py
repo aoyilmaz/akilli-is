@@ -56,6 +56,47 @@ BTN_DANGER_HOVER = "#d73a3a"
 BTN_SUCCESS_BG = "#4ec9b0"
 BTN_SUCCESS_HOVER = "#3eb89f"
 
+# Yeni düğme türü renkleri
+BTN_ADD_BG = "#22c55e"  # Yeşil (Yeni/Ekle)
+BTN_ADD_HOVER = "#16a34a"
+BTN_REFRESH_BG = "#3b82f6"  # Mavi (Yenile)
+BTN_REFRESH_HOVER = "#2563eb"
+BTN_PRINT_BG = "#f97316"  # Turuncu (Yazdır)
+BTN_PRINT_HOVER = "#ea580c"
+BTN_SEARCH_BG = "#8b5cf6"  # Mor (Sorgula)
+BTN_SEARCH_HOVER = "#7c3aed"
+BTN_FILTER_BG = "#06b6d4"  # Cyan (Filtrele)
+BTN_FILTER_HOVER = "#0891b2"
+BTN_EXPORT_BG = "#10b981"  # Teal (Export)
+BTN_EXPORT_HOVER = "#059669"
+
+# === STANDART DÜĞME BOYUTLARI ===
+BTN_HEIGHT_NORMAL = 36  # Normal düğme yüksekliği
+BTN_HEIGHT_SMALL = 28  # Küçük düğme (tablo içi)
+BTN_MIN_WIDTH = 100  # Minimum genişlik
+BTN_PADDING = "8px 16px"  # Normal padding
+BTN_PADDING_SMALL = "4px 8px"  # Küçük padding
+
+# === DÜĞME SİMGELERİ ===
+ICONS = {
+    "add": "➕",
+    "refresh": "🔄",
+    "print": "🖨️",
+    "search": "🔍",
+    "filter": "⚡",
+    "export": "📊",
+    "save": "💾",
+    "cancel": "✖️",
+    "delete": "🗑️",
+    "edit": "✏️",
+    "view": "👁️",
+    "back": "←",
+    "confirm": "✅",
+    "excel": "📊",
+    "import": "📥",
+    "report": "📋",
+}
+
 
 def get_input_style():
     """Standart input stili"""
@@ -140,6 +181,91 @@ def get_button_style(btn_type="primary"):
             }}
             QPushButton:hover {{
                 background-color: {BTN_SUCCESS_HOVER};
+            }}
+        """
+    # Yeni düğme türleri
+    elif btn_type == "add":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_ADD_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_ADD_HOVER};
+            }}
+        """
+    elif btn_type == "refresh":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_REFRESH_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_REFRESH_HOVER};
+            }}
+        """
+    elif btn_type == "print":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_PRINT_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_PRINT_HOVER};
+            }}
+        """
+    elif btn_type == "search":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_SEARCH_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_SEARCH_HOVER};
+            }}
+        """
+    elif btn_type == "filter":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_FILTER_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_FILTER_HOVER};
+            }}
+        """
+    elif btn_type == "export":
+        return f"""
+            QPushButton {{
+                background-color: {BTN_EXPORT_BG};
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {BTN_EXPORT_HOVER};
             }}
         """
 
