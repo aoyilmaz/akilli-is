@@ -13,6 +13,7 @@ try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.traceback import Traceback as RichTraceback
+
     RICH_AVAILABLE = True
     console = Console()
 except ImportError:
@@ -62,9 +63,9 @@ class ErrorHandler:
         screen: str,
         function: str,
         show_message: bool = True,
-        severity: str = 'error',
-        parent_widget=None
-    ) -> Optional['ErrorLog']:
+        severity: str = "error",
+        parent_widget=None,
+    ) -> Optional["ErrorLog"]:
         """
         Tüm hataları yönetir
 
@@ -92,9 +93,11 @@ class ErrorHandler:
 
         # 1. Traceback bilgisini al
         tb = traceback.extract_tb(exception.__traceback__)
-        tb_str = ''.join(traceback.format_exception(
-            type(exception), exception, exception.__traceback__
-        ))
+        tb_str = "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
 
         # Dosya ve satır bilgisi
         if tb:
@@ -106,22 +109,23 @@ class ErrorHandler:
             line_number = None
 
         # 2. Console'a RICH ile yaz (RENKLI + GÜZEL)
-        cls._log_to_console(
-            exception, module, screen, function,
-            severity, tb_str
-        )
+        cls._log_to_console(exception, module, screen, function, severity, tb_str)
 
         # 3. Database'e kaydet (DETAYLI)
         error_log = cls._log_to_database(
-            exception, module, screen, function,
-            severity, tb_str, file_path, line_number
+            exception,
+            module,
+            screen,
+            function,
+            severity,
+            tb_str,
+            file_path,
+            line_number,
         )
 
         # 4. QMessageBox göster (isteğe bağlı)
         if show_message and QMessageBox:
-            cls._show_message_box(
-                exception, severity, parent_widget
-            )
+            cls._show_message_box(exception, severity, parent_widget)
 
         return error_log
 
@@ -131,12 +135,12 @@ class ErrorHandler:
 
         # Severity'ye göre emoji
         severity_config = {
-            'critical': {'emoji': '🔴'},
-            'error': {'emoji': '🔴'},
-            'warning': {'emoji': '🟡'},
-            'info': {'emoji': '🔵'}
+            "critical": {"emoji": "🔴"},
+            "error": {"emoji": "🔴"},
+            "warning": {"emoji": "🟡"},
+            "info": {"emoji": "🔵"},
         }
-        config = severity_config.get(severity, severity_config['error'])
+        config = severity_config.get(severity, severity_config["error"])
 
         # Kullanıcı bilgisi
         user_info = "N/A"
@@ -154,24 +158,32 @@ class ErrorHandler:
                 f"[bold cyan]User:[/bold cyan] {user_info}",
                 "",
                 "[bold red]Error Message:[/bold red]",
-                str(exception)
+                str(exception),
             ]
             content = "\n".join(content_lines)
 
             console.print()
-            console.print(Panel(
-                content,
-                title=title,
-                border_style='red' if severity in ['critical', 'error'] else 'yellow',
-                expand=False
-            ))
+            console.print(
+                Panel(
+                    content,
+                    title=title,
+                    border_style=(
+                        "red" if severity in ["critical", "error"] else "yellow"
+                    ),
+                    expand=False,
+                )
+            )
 
             console.print("[bold]Full Traceback:[/bold]")
             try:
-                console.print(RichTraceback.from_exception(
-                    type(exception), exception, exception.__traceback__,
-                    show_locals=False
-                ))
+                console.print(
+                    RichTraceback.from_exception(
+                        type(exception),
+                        exception,
+                        exception.__traceback__,
+                        show_locals=False,
+                    )
+                )
             except:
                 console.print(tb_str)
             console.print()
@@ -193,8 +205,15 @@ class ErrorHandler:
 
     @classmethod
     def _log_to_database(
-        cls, exception, module, screen, function,
-        severity, tb_str, file_path, line_number
+        cls,
+        exception,
+        module,
+        screen,
+        function,
+        severity,
+        tb_str,
+        file_path,
+        line_number,
     ):
         """Database'e DETAYLI kayıt"""
 
@@ -202,18 +221,18 @@ class ErrorHandler:
             service = ErrorLogService()
 
             # Severity enum'a çevir (lowercase)
-            severity_lower = severity.lower() if severity else 'error'
+            severity_lower = severity.lower() if severity else "error"
             severity_map = {
-                'critical': ErrorSeverity.CRITICAL,
-                'error': ErrorSeverity.ERROR,
-                'warning': ErrorSeverity.WARNING,
-                'info': ErrorSeverity.INFO,
+                "critical": ErrorSeverity.CRITICAL,
+                "error": ErrorSeverity.ERROR,
+                "warning": ErrorSeverity.WARNING,
+                "info": ErrorSeverity.INFO,
             }
             severity_enum = severity_map.get(severity_lower, ErrorSeverity.ERROR)
 
             # User bilgisi
             user_id = cls._current_user.id if cls._current_user else None
-            username = cls._current_user.username if cls._current_user else 'system'
+            username = cls._current_user.username if cls._current_user else "system"
 
             # ErrorLog oluştur
             error_log = service.create(
@@ -237,7 +256,12 @@ class ErrorHandler:
 
         except Exception as db_error:
             # Database kayıt hatası durumunda sadece console'a yaz
-            console.print(f"[bold red]Database logging failed:[/bold red] {db_error}")
+            if console:
+                console.print(
+                    f"[bold red]Database logging failed:[/bold red] {db_error}"
+                )
+            else:
+                print(f"Database logging failed: {db_error}")
             return None
 
     @classmethod
@@ -290,8 +314,12 @@ class ErrorHandler:
                 break
 
         return cls.handle_error(
-            exception, module, screen, function,
-            show_message=show_message, severity='error'
+            exception,
+            module,
+            screen,
+            function,
+            show_message=show_message,
+            severity="error",
         )
 
     @classmethod
@@ -302,19 +330,19 @@ class ErrorHandler:
             return
 
         title_map = {
-            'critical': 'Kritik Hata',
-            'error': 'Hata',
-            'warning': 'Uyarı',
-            'info': 'Bilgi'
+            "critical": "Kritik Hata",
+            "error": "Hata",
+            "warning": "Uyarı",
+            "info": "Bilgi",
         }
-        title = title_map.get(severity, 'Hata')
+        title = title_map.get(severity, "Hata")
 
         message = f"{type(exception).__name__}: {str(exception)}"
 
         try:
-            if severity in ['critical', 'error']:
+            if severity in ["critical", "error"]:
                 QMessageBox.critical(parent, title, message)
-            elif severity == 'warning':
+            elif severity == "warning":
                 QMessageBox.warning(parent, title, message)
             else:
                 QMessageBox.information(parent, title, message)

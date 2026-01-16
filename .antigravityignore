@@ -1,0 +1,4 @@
+ui/resources/icons/   # Binary görsel verisi kafasını karıştırır
+alembic/versions/     # Sadece en son `models/` klasörü şema için yeterlidir
+scripts/*.sh          # Eski shell scriptleri
+*.log                 # Log dosyaları

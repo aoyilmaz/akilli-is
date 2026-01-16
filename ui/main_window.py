@@ -63,6 +63,14 @@ from config.themes import ThemeManager, get_theme
 # --- IMPORTLAR ---
 from ui.pages.placeholder import PlaceholderPage
 
+
+class MissingModule(PlaceholderPage):
+    """Eksik bağımlılık durumunda kullanılacak sarmalayıcı sınıf"""
+
+    def __init__(self, parent=None):
+        super().__init__("Modül Yüklenemedi", "⚠️", parent)
+
+
 # Modül Importları (Güvenli Blok)
 try:
     from modules.inventory import InventoryModule
@@ -77,7 +85,7 @@ try:
 except ImportError:
     InventoryModule = WarehouseModule = MovementModule = CategoryModule = (
         StockReportsModule
-    ) = StockCountModule = UnitModule = PlaceholderPage
+    ) = StockCountModule = UnitModule = MissingModule
 
 try:
     from modules.production import (
@@ -87,10 +95,11 @@ try:
         WorkStationModule,
     )
     from modules.production.views.calendar_module import CalendarModule
+    from modules.production.views.operator_panel import OperatorPanel
 except ImportError:
     BOMModule = WorkOrderModule = PlanningModule = WorkStationModule = (
         CalendarModule
-    ) = PlaceholderPage
+    ) = OperatorPanel = MissingModule
 
 try:
     from modules.purchasing import (
@@ -102,17 +111,24 @@ try:
 except ImportError:
     SupplierModule = PurchaseRequestModule = GoodsReceiptModule = (
         PurchaseOrderModule
-    ) = PlaceholderPage
+    ) = MissingModule
 
 try:
     from modules.development.views import DevelopmentModule
 except ImportError:
-    DevelopmentModule = PlaceholderPage
+    DevelopmentModule = MissingModule
 
 try:
-    from modules.system import UserManagement
+    from modules.system import UserManagement, LabelTemplatesPage, AuditLogViewer
 except ImportError:
-    UserManagement = PlaceholderPage
+    UserManagement = LabelTemplatesPage = AuditLogViewer = MissingModule
+
+try:
+    from modules.crm.views import CRMModule, OpportunityModule, ActivityModule
+except ImportError:
+    CRMModule = MissingModule
+    OpportunityModule = MissingModule
+    ActivityModule = MissingModule
 
 try:
     from modules.sales import (
@@ -126,19 +142,19 @@ try:
 except ImportError:
     CustomerModule = SalesQuoteModule = SalesOrderModule = DeliveryNoteModule = (
         InvoiceModule
-    ) = PriceListModule = PlaceholderPage
+    ) = PriceListModule = MissingModule
 
 try:
     from modules.purchasing.views.purchase_invoice_module import PurchaseInvoiceModule
 except ImportError:
-    PurchaseInvoiceModule = PlaceholderPage
+    PurchaseInvoiceModule = MissingModule
 
 try:
     from modules.accounting.views.account_module import AccountModule
     from modules.accounting.views.journal_module import JournalModule
     from modules.accounting.views.reports_module import AccountingReportsModule
 except ImportError:
-    AccountModule = JournalModule = AccountingReportsModule = PlaceholderPage
+    AccountModule = JournalModule = AccountingReportsModule = MissingModule
 
 try:
     from modules.finance.views.receipt_module import ReceiptModule
@@ -147,13 +163,13 @@ try:
     from modules.finance.views.account_statement_module import AccountStatementModule
 except ImportError:
     ReceiptModule = PaymentModule = ReconciliationModule = AccountStatementModule = (
-        PlaceholderPage
+        MissingModule
     )
 
 try:
     from modules.mrp.views.mrp_module import MRPModule
 except ImportError:
-    MRPModule = PlaceholderPage
+    MRPModule = MissingModule
 
 try:
     from modules.reports.views.sales_reports_module import SalesReportsModule
@@ -166,7 +182,7 @@ try:
 except ImportError:
     SalesReportsModule = StockAgingModule = ProductionOEEModule = (
         SupplierPerformanceModule
-    ) = ReceivablesAgingModule = PlaceholderPage
+    ) = ReceivablesAgingModule = MissingModule
 
 try:
     from modules.hr.views.employee_module import EmployeeModule
@@ -176,8 +192,21 @@ try:
     from modules.hr.views.org_chart_module import OrgChartModule
     from modules.hr.views.shift_team_overview import ShiftTeamOverview
 except ImportError:
-    EmployeeModule = DepartmentModule = PositionModule = LeaveModule = PlaceholderPage
-    OrgChartModule = ShiftTeamOverview = PlaceholderPage
+    EmployeeModule = DepartmentModule = PositionModule = LeaveModule = MissingModule
+    OrgChartModule = ShiftTeamOverview = MissingModule
+
+try:
+    from modules.maintenance.views import (
+        EquipmentListWidget,
+        MaintenanceRequestWidget,
+        WorkOrderManagerWidget,
+        MaintenancePlanWidget,
+        ReportingWidget,
+    )
+except ImportError:
+    EquipmentListWidget = MaintenanceRequestWidget = WorkOrderManagerWidget = (
+        MaintenancePlanWidget
+    ) = ReportingWidget = MissingModule
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -524,6 +553,25 @@ MENU_DATA = {
             ("İş İstasyonları", "fa5s.cogs", "work-stations"),
             ("Takvim", "fa5s.calendar-day", "calendar"),
             ("MRP", "fa5s.project-diagram", "mrp"),
+            ("Operatör Paneli", "fa5s.desktop", "operator-panel"),
+        ],
+    },
+    "maintenance": {
+        "title": "BAKIM & ONARIM",
+        "items": [
+            ("Ekipmanlar", "fa5s.tools", "equipments"),
+            ("Arıza Talepleri", "fa5s.exclamation-triangle", "maintenance-requests"),
+            ("İş Emirleri", "fa5s.clipboard-list", "maintenance-work-orders"),
+            ("Periyodik Bakım", "fa5s.calendar-check", "maintenance-plans"),
+            ("Raporlar", "fa5s.chart-bar", "maintenance-reports"),
+        ],
+    },
+    "crm": {
+        "title": "CRM",
+        "items": [
+            ("Aday Müşteriler", "fa5s.user-friends", "leads"),
+            ("Fırsatlar", "fa5s.funnel-dollar", "opportunities"),
+            ("Aktiviteler", "fa5s.calendar-alt", "activities"),
         ],
     },
     "sales": {
@@ -574,7 +622,9 @@ MENU_DATA = {
         "title": "SİSTEM AYARLARI",
         "items": [
             ("Kullanıcı Yönetimi", "fa5s.users-cog", "users"),
+            ("İşlem Geçmişi", "fa5s.history", "audit-logs"),
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
+            ("Yazdırma Şablonları", "fa5s.print", "label-templates"),
         ],
     },
     "hr": {
@@ -804,6 +854,7 @@ class ActivityBar(QFrame):
             ("hr", "fa5s.users", "İnsan Kaynakları"),
             ("reports", "fa5s.chart-pie", "Raporlar"),
             ("development", "fa5s.bug", "Geliştirme"),
+            ("maintenance", "fa5s.tools", "Bakım & Onarım"),
             ("settings", "fa5s.cog", "Ayarlar"),
         ]:
             btn = QPushButton()
@@ -955,7 +1006,9 @@ class MainWindow(QMainWindow):
         self.pages["planning"] = PlanningModule()
         self.pages["work-stations"] = WorkStationModule()
         self.pages["calendar"] = CalendarModule()
+        self.pages["calendar"] = CalendarModule()
         self.pages["mrp"] = MRPModule()
+        self.pages["operator-panel"] = OperatorPanel()
         # Satınalma modülü sayfaları
         self.pages["suppliers"] = SupplierModule()
         self.pages["purchase-requests"] = PurchaseRequestModule()
@@ -996,6 +1049,21 @@ class MainWindow(QMainWindow):
         # Sistem ayarları
         self.pages["settings"] = PlaceholderPage("Ayarlar", "")
         self.pages["users"] = UserManagement()
+        self.pages["label-templates"] = LabelTemplatesPage()
+        self.pages["audit-logs"] = AuditLogViewer()
+
+        # Bakım ve Onarım Modülü
+        # Bakım ve Onarım Modülü
+        self.pages["equipments"] = EquipmentListWidget()
+        self.pages["maintenance-requests"] = MaintenanceRequestWidget()
+        self.pages["maintenance-work-orders"] = WorkOrderManagerWidget()
+        self.pages["maintenance-plans"] = MaintenancePlanWidget()
+        self.pages["maintenance-reports"] = ReportingWidget()
+
+        # CRM Modülü
+        self.pages["leads"] = CRMModule()
+        self.pages["opportunities"] = OpportunityModule()
+        self.pages["activities"] = ActivityModule()
 
     def setup_ui(self):
         central_widget = QWidget()

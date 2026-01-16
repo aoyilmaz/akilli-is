@@ -70,44 +70,50 @@ class GanttBar(QWidget):
 
         rect = self.rect()
 
-        # Gradient arka plan
-        gradient = QLinearGradient(0, 0, 0, rect.height())
+        # Arka plan (Açık Renk - Bekleyen Kısım)
         bg_color = QColor(self.color)
-        bg_color.setAlpha(180)
-        gradient.setColorAt(0, bg_color.lighter(120))
-        gradient.setColorAt(1, bg_color)
-
-        painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(self.color.darker(110), 1))
+        bg_color.setAlpha(80)  # Daha açık renk
+        painter.setBrush(QBrush(bg_color))
+        painter.setPen(QPen(self.color.darker(120), 1))
         painter.drawRoundedRect(rect.adjusted(1, 2, -1, -2), 4, 4)
 
-        # İlerleme çubuğu (alt kısımda)
+        # İlerleme (Koyu Renk - Tamamlanan Kısım)
         if self.progress > 0:
-            progress_width = int((rect.width() - 4) * min(self.progress, 100) / 100)
-            progress_rect = QRect(2, rect.height() - 6, progress_width, 4)
-            painter.setBrush(QBrush(QColor("#ffffff")))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(progress_rect, 2, 2)
+            progress_width = int((rect.width() - 2) * min(self.progress, 100) / 100)
+            if progress_width > 0:
+                # Koyu kısım için gradient
+                done_gradient = QLinearGradient(0, 0, 0, rect.height())
+                done_color = QColor(self.color)
+                done_color.setAlpha(255)
+                done_gradient.setColorAt(0, done_color.lighter(120))
+                done_gradient.setColorAt(1, done_color.darker(110))
 
-        # Metin
+                painter.setBrush(QBrush(done_gradient))
+                painter.setPen(Qt.PenStyle.NoPen)
+                # İlerleme çubuğunu çiz
+                progress_rect = QRect(1, 2, progress_width, rect.height() - 4)
+                painter.drawRoundedRect(progress_rect, 4, 4)
+
+        # Metin (Yüzde ve Bilgi)
         painter.setPen(QPen(QColor("#ffffff")))
-        font = QFont("Segoe UI", 9)
+        font = QFont("Segoe UI", 8)
         font.setBold(True)
         painter.setFont(font)
 
-        text = f"{self.order_no}"
-        if rect.width() > 120:
-            text = f"{self.order_no} - {self.item_name[:15]}"
-        if rect.width() > 200:
-            text = (
-                f"{self.order_no} - {self.item_name[:20]} ({self.duration_hours:.0f}h)"
+        # Merkeze Yüzde Yaz (%)
+        if rect.width() > 40:
+            painter.drawText(
+                rect, Qt.AlignmentFlag.AlignCenter, f"%{self.progress:.0f}"
             )
 
-        painter.drawText(
-            rect.adjusted(8, 0, -8, -4),
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            text,
-        )
+        # Sola Sipariş No Yaz
+        text = f"{self.order_no}"
+        if rect.width() > 100:
+            painter.drawText(
+                rect.adjusted(8, 0, -8, 0),
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                text,
+            )
 
     def mousePressEvent(self, event):
         self.clicked.emit(self.wo_id)

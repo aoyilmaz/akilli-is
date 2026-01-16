@@ -26,6 +26,8 @@ from PyQt6.QtGui import QColor, QAction
 from config import COLORS
 from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 from database.models import ItemType
+from core.export_manager import ExportManager
+from core.label_manager import LabelManager
 
 
 class StockListPage(QWidget):
@@ -73,6 +75,17 @@ class StockListPage(QWidget):
         export_btn = QPushButton(f"{ICONS['export']} Dışa Aktar")
         export_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
         export_btn.setStyleSheet(get_button_style("export"))
+
+        # Export Menüsü
+        export_menu = ExportManager.create_export_menu(self, self._get_export_data)
+
+        # Etiket için özel aksiyon ekle
+        export_menu.addSeparator()
+        label_action = QAction("🏷️ Ürün Etiketi Bas", self)
+        label_action.triggered.connect(self._print_labels)
+        export_menu.addAction(label_action)
+
+        export_btn.setMenu(export_menu)
         header_layout.addWidget(export_btn)
 
         # Yeni ekle butonu
@@ -297,6 +310,15 @@ class StockListPage(QWidget):
     def _do_search(self):
         """Aramayı gerçekleştir"""
         self.refresh_requested.emit()
+
+    def _get_export_data(self):
+        """Tablodaki veriyi dışa aktarma formatına çevir"""
+        return ExportManager.extract_data_from_table(self.table)
+
+    def _print_labels(self):
+        """Etiket yazdırma işlemini başlat"""
+        data = self._get_export_data()
+        LabelManager.print_product_labels(self, data)
 
     def get_filters(self) -> dict:
         """Mevcut filtreleri döndür"""

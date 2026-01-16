@@ -4,7 +4,7 @@ V3 - MODEL UYUMLU STOK ENTEGRASYONU
 
 DÜZELTMELER (V2 -> V3):
 - scrap_quantity → scrapped_quantity
-- actual_quantity → completed_quantity  
+- actual_quantity → completed_quantity
 - warehouse_id → source_warehouse_id
 """
 
@@ -15,36 +15,54 @@ from sqlalchemy.orm import Session, joinedload
 
 from database.base import get_session
 from database.models.production import (
-    BillOfMaterials, BOMLine, BOMOperation, BOMStatus,
-    WorkStation, WorkStationType,
-    WorkOrder, WorkOrderLine, WorkOrderOperation, 
-    WorkOrderStatus, WorkOrderPriority
+    BillOfMaterials,
+    BOMLine,
+    BOMOperation,
+    BOMByProduct,
+    BOMStatus,
+    WorkStation,
+    WorkOrder,
+    WorkOrderLine,
+    WorkOrderOperation,
+    WorkOrderByProduct,
+    WorkOrderStatus,
+    WorkOrderOperationPersonnel,
 )
-from database.models.inventory import Item, Warehouse, StockMovement, StockMovementType, StockBalance
+from database.models.inventory import (
+    Item,
+    Warehouse,
+    StockMovement,
+    StockMovementType,
+    StockBalance,
+)
 
 
 # ============================================================
 # CUSTOM EXCEPTIONS
 # ============================================================
 
+
 class ProductionError(Exception):
     """Üretim hatası base class"""
+
     pass
 
 
 class InsufficientMaterialError(ProductionError):
     """Yetersiz malzeme hatası"""
+
     def __init__(self, item_code: str, required: Decimal, available: Decimal):
         self.item_code = item_code
         self.required = required
         self.available = available
         super().__init__(
-            f"Yetersiz malzeme! {item_code}: Gerekli {required}, Mevcut {available}"
+            f"Yetersiz malzeme! {item_code}: " f"Gerekli {required}, Mevcut {available}"
         )
 
 
 class InvalidStatusTransitionError(ProductionError):
     """Geçersiz durum geçişi hatası"""
+
     def __init__(self, current: str, target: str):
         super().__init__(f"Geçersiz durum geçişi: {current} → {target}")
 
@@ -53,157 +71,197 @@ class InvalidStatusTransitionError(ProductionError):
 # BOM SERVICE (Ürün Reçetesi)
 # ============================================================
 
+
 class BOMService:
     """Ürün Reçetesi (BOM) servisi"""
-    
+
     def __init__(self):
         self.session: Session = get_session()
-        
+
     def close(self):
         if self.session:
             self.session.close()
-            
-    def get_all(self, status: BOMStatus = None, item_id: int = None) -> List[BillOfMaterials]:
+
+    def get_all(
+        self, status: BOMStatus = None, item_id: int = None
+    ) -> List[BillOfMaterials]:
         """Tüm reçeteleri getir"""
         query = self.session.query(BillOfMaterials).options(
             joinedload(BillOfMaterials.item),
-            joinedload(BillOfMaterials.lines).joinedload(BOMLine.item)
+            joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
         )
-        
+
         if status:
             query = query.filter(BillOfMaterials.status == status)
         if item_id:
             query = query.filter(BillOfMaterials.item_id == item_id)
-            
-        return query.filter(BillOfMaterials.is_active == True).order_by(BillOfMaterials.code).all()
-    
+
+        return (
+            query.filter(BillOfMaterials.is_active == True)
+            .order_by(BillOfMaterials.code)
+            .all()
+        )
+
     def get_by_id(self, bom_id: int) -> Optional[BillOfMaterials]:
         """ID ile reçete getir"""
-        return self.session.query(BillOfMaterials).options(
-            joinedload(BillOfMaterials.item),
-            joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
-            joinedload(BillOfMaterials.operations).joinedload(BOMOperation.work_station)
-        ).filter(BillOfMaterials.id == bom_id).first()
-    
-    def get_by_item(self, item_id: int, active_only: bool = True) -> List[BillOfMaterials]:
+        return (
+            self.session.query(BillOfMaterials)
+            .options(
+                joinedload(BillOfMaterials.item),
+                joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
+                joinedload(BillOfMaterials.operations).joinedload(
+                    BOMOperation.work_station
+                ),
+                joinedload(BillOfMaterials.by_products).joinedload(BOMByProduct.item),
+            )
+            .filter(BillOfMaterials.id == bom_id)
+            .first()
+        )
+
+    def get_by_item(
+        self, item_id: int, active_only: bool = True
+    ) -> List[BillOfMaterials]:
         """Ürüne ait reçeteleri getir"""
-        query = self.session.query(BillOfMaterials).filter(BillOfMaterials.item_id == item_id)
+        query = self.session.query(BillOfMaterials).filter(
+            BillOfMaterials.item_id == item_id
+        )
         if active_only:
             query = query.filter(BillOfMaterials.status == BOMStatus.ACTIVE)
         return query.all()
-    
+
     def get_active_bom(self, item_id: int) -> Optional[BillOfMaterials]:
         """Ürünün aktif reçetesini getir"""
-        return self.session.query(BillOfMaterials).filter(
-            BillOfMaterials.item_id == item_id,
-            BillOfMaterials.status == BOMStatus.ACTIVE,
-            BillOfMaterials.is_active == True
-        ).first()
-    
+        return (
+            self.session.query(BillOfMaterials)
+            .filter(
+                BillOfMaterials.item_id == item_id,
+                BillOfMaterials.status == BOMStatus.ACTIVE,
+                BillOfMaterials.is_active == True,
+            )
+            .first()
+        )
+
     def create(self, **kwargs) -> BillOfMaterials:
         """Yeni reçete oluştur"""
-        lines_data = kwargs.pop('lines', [])
-        operations_data = kwargs.pop('operations', [])
-        
+        lines_data = kwargs.pop("lines", [])
+        operations_data = kwargs.pop("operations", [])
+        by_products_data = kwargs.pop("by_products", [])
+
         bom = BillOfMaterials(**kwargs)
         self.session.add(bom)
         self.session.flush()
-        
+
         # Satırları ekle
         for i, line_data in enumerate(lines_data):
-            line_data['bom_id'] = bom.id
-            line_data['line_no'] = i + 1
+            line_data["bom_id"] = bom.id
+            line_data["line_no"] = i + 1
             line = BOMLine(**line_data)
             self.session.add(line)
-            
+
         # Operasyonları ekle
         for op_data in operations_data:
-            op_data['bom_id'] = bom.id
             op = BOMOperation(**op_data)
             self.session.add(op)
-        
+
+        # Yan ürünleri ekle
+        for bp_data in by_products_data:
+            bp_data["bom_id"] = bom.id
+            bp = BOMByProduct(**bp_data)
+            self.session.add(bp)
+
         self.session.commit()
         return bom
-    
+
     def update(self, bom_id: int, **kwargs) -> Optional[BillOfMaterials]:
         """Reçete güncelle"""
         bom = self.get_by_id(bom_id)
         if not bom:
             return None
-        
+
         # ACTIVE BOM düzenlenemez - kopyalanmalı
         if bom.status == BOMStatus.ACTIVE:
             raise ProductionError("Aktif reçete düzenlenemez! Önce kopyalayın.")
-            
-        lines_data = kwargs.pop('lines', None)
-        operations_data = kwargs.pop('operations', None)
-        
+
+        lines_data = kwargs.pop("lines", None)
+        operations_data = kwargs.pop("operations", None)
+        by_products_data = kwargs.pop("by_products", None)
+
         for key, value in kwargs.items():
             if hasattr(bom, key):
                 setattr(bom, key, value)
-        
+
         # Satırları güncelle
         if lines_data is not None:
             for line in bom.lines:
                 self.session.delete(line)
-            
+
             for i, line_data in enumerate(lines_data):
-                line_data['bom_id'] = bom.id
-                line_data['line_no'] = i + 1
+                line_data["bom_id"] = bom.id
+                line_data["line_no"] = i + 1
                 line = BOMLine(**line_data)
                 self.session.add(line)
-        
+
         # Operasyonları güncelle
         if operations_data is not None:
             for op in bom.operations:
                 self.session.delete(op)
-            
+
             for op_data in operations_data:
-                op_data['bom_id'] = bom.id
+                op_data["bom_id"] = bom.id
                 op = BOMOperation(**op_data)
                 self.session.add(op)
-        
+
+        # Yan ürünleri güncelle
+        if by_products_data is not None:
+            for bp in bom.by_products:
+                self.session.delete(bp)
+
+            for bp_data in by_products_data:
+                bp_data["bom_id"] = bom.id
+                bp = BOMByProduct(**bp_data)
+                self.session.add(bp)
+
         self.session.commit()
         return bom
-    
+
     def delete(self, bom_id: int, soft: bool = True) -> bool:
         """Reçete sil"""
         bom = self.get_by_id(bom_id)
         if not bom:
             return False
-            
+
         if soft:
             bom.is_active = False
             bom.status = BOMStatus.OBSOLETE
         else:
             self.session.delete(bom)
-            
+
         self.session.commit()
         return True
-    
+
     def activate(self, bom_id: int) -> Optional[BillOfMaterials]:
         """Reçeteyi aktifleştir (diğerlerini pasifleştir)"""
         bom = self.get_by_id(bom_id)
         if not bom:
             return None
-        
+
         # Aynı ürünün diğer aktif reçetelerini pasifleştir
         self.session.query(BillOfMaterials).filter(
             BillOfMaterials.item_id == bom.item_id,
             BillOfMaterials.id != bom_id,
-            BillOfMaterials.status == BOMStatus.ACTIVE
+            BillOfMaterials.status == BOMStatus.ACTIVE,
         ).update({BillOfMaterials.status: BOMStatus.OBSOLETE})
-        
+
         bom.status = BOMStatus.ACTIVE
         self.session.commit()
         return bom
-    
+
     def copy(self, bom_id: int, new_code: str = None) -> Optional[BillOfMaterials]:
         """Reçeteyi kopyala (yeni versiyon)"""
         original = self.get_by_id(bom_id)
         if not original:
             return None
-        
+
         # Yeni reçete
         new_bom = BillOfMaterials(
             item_id=original.item_id,
@@ -222,7 +280,7 @@ class BOMService:
         )
         self.session.add(new_bom)
         self.session.flush()
-        
+
         # Satırları kopyala
         for line in original.lines:
             new_line = BOMLine(
@@ -236,7 +294,7 @@ class BOMService:
                 notes=line.notes,
             )
             self.session.add(new_line)
-        
+
         # Operasyonları kopyala
         for op in original.operations:
             new_op = BOMOperation(
@@ -251,32 +309,50 @@ class BOMService:
                 move_time=op.move_time,
             )
             self.session.add(new_op)
-        
+
+        # Yan ürünleri kopyala
+        for bp in original.by_products:
+            new_bp = BOMByProduct(
+                bom_id=new_bom.id,
+                item_id=bp.item_id,
+                quantity=bp.quantity,
+                unit_id=bp.unit_id,
+                cost_share_rate=bp.cost_share_rate,
+                notes=bp.notes,
+            )
+            self.session.add(new_bp)
+
         self.session.commit()
         return new_bom
-    
+
     def calculate_cost(self, bom_id: int) -> dict:
         """Reçete maliyetini hesapla"""
         bom = self.get_by_id(bom_id)
         if not bom:
             return {}
-        
+
         material_cost = Decimal(0)
         for line in bom.lines:
             if line.item and line.item.purchase_price:
                 qty = line.effective_quantity
                 material_cost += qty * line.item.purchase_price
-        
+
         return {
-            'material_cost': material_cost,
-            'labor_cost': bom.labor_cost or Decimal(0),
-            'overhead_cost': bom.overhead_cost or Decimal(0),
-            'total_cost': material_cost + (bom.labor_cost or Decimal(0)) + (bom.overhead_cost or Decimal(0)),
+            "material_cost": material_cost,
+            "labor_cost": bom.labor_cost or Decimal(0),
+            "overhead_cost": bom.overhead_cost or Decimal(0),
+            "total_cost": material_cost
+            + (bom.labor_cost or Decimal(0))
+            + (bom.overhead_cost or Decimal(0)),
         }
-    
+
     def generate_code(self) -> str:
         """Otomatik reçete kodu üret"""
-        last = self.session.query(BillOfMaterials).order_by(BillOfMaterials.id.desc()).first()
+        last = (
+            self.session.query(BillOfMaterials)
+            .order_by(BillOfMaterials.id.desc())
+            .first()
+        )
         if last:
             num = last.id + 1
         else:
@@ -288,58 +364,61 @@ class BOMService:
 # WORKSTATION SERVICE (İş İstasyonu)
 # ============================================================
 
+
 class WorkStationService:
     """İş İstasyonu servisi"""
-    
+
     def __init__(self):
         self.session: Session = get_session()
-        
+
     def close(self):
         if self.session:
             self.session.close()
-            
+
     def get_all(self, active_only: bool = True) -> List[WorkStation]:
         """Tüm iş istasyonlarını getir"""
         query = self.session.query(WorkStation)
         if active_only:
-            query = query.filter(WorkStation.is_active == True)
+            query = query.filter(WorkStation.is_active.is_(True))
         return query.order_by(WorkStation.code).all()
-    
+
     def get_by_id(self, station_id: int) -> Optional[WorkStation]:
         """ID ile iş istasyonu getir"""
-        return self.session.query(WorkStation).filter(WorkStation.id == station_id).first()
-    
+        return (
+            self.session.query(WorkStation).filter(WorkStation.id == station_id).first()
+        )
+
     def create(self, **kwargs) -> WorkStation:
         """Yeni iş istasyonu oluştur"""
         station = WorkStation(**kwargs)
         self.session.add(station)
         self.session.commit()
         return station
-    
+
     def update(self, station_id: int, **kwargs) -> Optional[WorkStation]:
         """İş istasyonu güncelle"""
         station = self.get_by_id(station_id)
         if not station:
             return None
-        
+
         for key, value in kwargs.items():
             if hasattr(station, key):
                 setattr(station, key, value)
-        
+
         self.session.commit()
         return station
-    
+
     def delete(self, station_id: int, soft: bool = True) -> bool:
         """İş istasyonu sil"""
         station = self.get_by_id(station_id)
         if not station:
             return False
-        
+
         if soft:
             station.is_active = False
         else:
             self.session.delete(station)
-        
+
         self.session.commit()
         return True
 
@@ -348,10 +427,11 @@ class WorkStationService:
 # WORKORDER SERVICE (İş Emri) - STOK ENTEGRASYONLU
 # ============================================================
 
+
 class WorkOrderService:
     """
     İş Emri servisi - STOK ENTEGRASYONLU
-    
+
     Durum Geçişleri:
     - DRAFT: Taslak, düzenlenebilir
     - PLANNED: Planlandı, malzeme rezervasyonu yapılabilir
@@ -361,69 +441,87 @@ class WorkOrderService:
     - CLOSED: Kapatıldı
     - CANCELLED: İptal edildi
     """
-    
+
     def __init__(self):
         self.session: Session = get_session()
-        
+
     def close(self):
         if self.session:
             self.session.close()
-    
+
     # ----------------------------------------------------------
     # TEMEL CRUD İŞLEMLERİ
     # ----------------------------------------------------------
-            
-    def get_all(self, status: WorkOrderStatus = None, item_id: int = None) -> List[WorkOrder]:
+
+    def get_all(
+        self, status: WorkOrderStatus = None, item_id: int = None
+    ) -> List[WorkOrder]:
         """Tüm iş emirlerini getir"""
         query = self.session.query(WorkOrder).options(
-            joinedload(WorkOrder.item),
-            joinedload(WorkOrder.bom)
+            joinedload(WorkOrder.item), joinedload(WorkOrder.bom)
         )
-        
+
         if status:
             query = query.filter(WorkOrder.status == status)
         if item_id:
             query = query.filter(WorkOrder.item_id == item_id)
-            
-        return query.filter(WorkOrder.is_active == True).order_by(WorkOrder.created_at.desc()).all()
-    
+
+        return (
+            query.filter(WorkOrder.is_active.is_(True))
+            .order_by(WorkOrder.created_at.desc())
+            .all()
+        )
+
     def get_by_id(self, order_id: int) -> Optional[WorkOrder]:
         """ID ile iş emri getir"""
-        return self.session.query(WorkOrder).options(
-            joinedload(WorkOrder.item),
-            joinedload(WorkOrder.bom),
-            joinedload(WorkOrder.lines).joinedload(WorkOrderLine.item),
-            joinedload(WorkOrder.operations)
-        ).filter(WorkOrder.id == order_id).first()
-    
+        return (
+            self.session.query(WorkOrder)
+            .options(
+                joinedload(WorkOrder.item),
+                joinedload(WorkOrder.bom),
+                joinedload(WorkOrder.lines).joinedload(WorkOrderLine.item),
+                joinedload(WorkOrder.operations),
+                joinedload(WorkOrder.by_products).joinedload(WorkOrderByProduct.item),
+            )
+            .filter(WorkOrder.id == order_id)
+            .first()
+        )
+
     def create(self, **kwargs) -> WorkOrder:
         """Yeni iş emri oluştur"""
-        bom_id = kwargs.get('bom_id')
-        planned_quantity = kwargs.get('planned_quantity', Decimal(1))
-        
+        bom_id = kwargs.get("bom_id")
+        planned_quantity = kwargs.get("planned_quantity", Decimal(1))
+
         order = WorkOrder(**kwargs)
         self.session.add(order)
         self.session.flush()
-        
+
         # BOM varsa satırları ve operasyonları kopyala
         if bom_id:
             self._create_lines_from_bom(order, bom_id, planned_quantity)
-        
+
         self.session.commit()
         return order
-    
-    def _create_lines_from_bom(self, order: WorkOrder, bom_id: int, planned_quantity: Decimal):
+
+    def _create_lines_from_bom(
+        self, order: WorkOrder, bom_id: int, planned_quantity: Decimal
+    ):
         """BOM'dan iş emri satırlarını oluştur"""
-        bom = self.session.query(BillOfMaterials).options(
-            joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
-            joinedload(BillOfMaterials.operations)
-        ).filter(BillOfMaterials.id == bom_id).first()
-        
+        bom = (
+            self.session.query(BillOfMaterials)
+            .options(
+                joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
+                joinedload(BillOfMaterials.operations),
+            )
+            .filter(BillOfMaterials.id == bom_id)
+            .first()
+        )
+
         if not bom:
             return
-        
+
         multiplier = planned_quantity / (bom.base_quantity or Decimal(1))
-        
+
         # Malzeme satırlarını oluştur
         for line in bom.lines:
             wo_line = WorkOrderLine(
@@ -437,7 +535,7 @@ class WorkOrderService:
             )
             wo_line.line_cost = wo_line.required_quantity * wo_line.unit_cost
             self.session.add(wo_line)
-        
+
         # Operasyonları oluştur
         for op in bom.operations:
             wo_op = WorkOrderOperation(
@@ -450,52 +548,70 @@ class WorkOrderService:
                 planned_run_time=int(op.run_time * float(planned_quantity)),
             )
             self.session.add(wo_op)
-        
+
         # Planlanan maliyetleri hesapla
         if bom.total_material_cost:
             order.planned_material_cost = bom.total_material_cost * multiplier
         order.planned_labor_cost = (bom.labor_cost or Decimal(0)) * multiplier
         order.planned_overhead_cost = (bom.overhead_cost or Decimal(0)) * multiplier
-    
+
     def update(self, order_id: int, **kwargs) -> Optional[WorkOrder]:
         """İş emri güncelle"""
         order = self.get_by_id(order_id)
         if not order:
             return None
-        
-        # Sadece DRAFT ve PLANNED durumda güncellenebilir
-        if order.status not in [WorkOrderStatus.DRAFT, WorkOrderStatus.PLANNED]:
-            raise ProductionError(f"Bu durumda ({order.status.value}) iş emri güncellenemez!")
-        
+
+        # Sadece belirli alanlar her durumda güncellenebilir (bilgilendirme amaçlı)
+        info_only_fields = {
+            "description",
+            "notes",
+            "production_notes",
+            "quality_notes",
+            "shipping_notes",
+        }
+        updating_restricted_fields = any(
+            k not in info_only_fields for k in kwargs.keys()
+        )
+
+        # Eğer kısıtlı bir alan güncelleniyorsa durum kontrolü yap
+        if updating_restricted_fields and order.status not in [
+            WorkOrderStatus.DRAFT,
+            WorkOrderStatus.PLANNED,
+        ]:
+            raise ProductionError(
+                f"Bu durumda ({order.status.value}) iş emrinin temel verileri güncellenemez! "
+                "Sadece açıklamalar ve notlar güncellenebilir."
+            )
+
         for key, value in kwargs.items():
             if hasattr(order, key):
                 setattr(order, key, value)
-        
+
         self.session.commit()
         return order
-    
+
     def delete(self, order_id: int, soft: bool = True) -> bool:
         """İş emri sil"""
         order = self.get_by_id(order_id)
         if not order:
             return False
-        
+
         if order.status not in [WorkOrderStatus.DRAFT, WorkOrderStatus.PLANNED]:
             return False
-        
+
         if soft:
             order.is_active = False
             order.status = WorkOrderStatus.CANCELLED
         else:
             self.session.delete(order)
-        
+
         self.session.commit()
         return True
-    
+
     # ----------------------------------------------------------
     # DURUM GEÇİŞLERİ - STOK ENTEGRASYONLU
     # ----------------------------------------------------------
-    
+
     def release(self, order_id: int, warehouse_id: int = None) -> WorkOrder:
         """
         İş emrini serbest bırak (RELEASED)
@@ -515,6 +631,7 @@ class WorkOrderService:
         # Malzeme rezervasyonu yap
         if warehouse_id:
             from modules.inventory.services import StockMovementService
+
             stock_service = StockMovementService()
 
             try:
@@ -526,7 +643,7 @@ class WorkOrderService:
                             warehouse_id=warehouse_id,
                             quantity=line.required_quantity,
                             reference_type="work_order",
-                            reference_id=order.id
+                            reference_id=order.id,
                         )
                         # Rezerve edildiğini işaretle
                         line.is_reserved = True
@@ -541,7 +658,7 @@ class WorkOrderService:
 
         self.session.commit()
         return order
-    
+
     def start_production(self, order_id: int, warehouse_id: int) -> WorkOrder:
         """
         Üretimi başlat (IN_PROGRESS)
@@ -558,12 +675,15 @@ class WorkOrderService:
         if order.status != WorkOrderStatus.RELEASED:
             raise InvalidStatusTransitionError(order.status.value, "IN_PROGRESS")
 
-        warehouse = self.session.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
+        warehouse = (
+            self.session.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
+        )
         if not warehouse:
             raise ProductionError("Depo bulunamadı!")
 
         try:
             from modules.inventory.services import StockMovementService
+
             stock_service = StockMovementService()
 
             # === TRANSACTION BAŞLANGICI ===
@@ -583,13 +703,15 @@ class WorkOrderService:
                     stock_service.release_reservation(
                         item_id=line.item_id,
                         warehouse_id=warehouse_id,
-                        quantity=line.required_quantity
+                        quantity=line.required_quantity,
                     )
                     line.is_reserved = False
 
                 # Stok bakiyesini al
                 balance = self._get_balance(line.item_id, warehouse_id)
-                current_cost = balance.unit_cost if balance else (line.unit_cost or Decimal(0))
+                current_cost = (
+                    balance.unit_cost if balance else (line.unit_cost or Decimal(0))
+                )
 
                 # Stok hareketi oluştur (URETIM_GIRIS = üretim için malzeme çıkışı)
                 movement = StockMovement(
@@ -616,31 +738,34 @@ class WorkOrderService:
                 line.issued_quantity = line.required_quantity
                 line.actual_unit_cost = current_cost
                 line.actual_line_cost = line.required_quantity * current_cost
-                
+
                 actual_material_cost += line.actual_line_cost
-            
+
             # İş emrini güncelle
             order.status = WorkOrderStatus.IN_PROGRESS
             order.actual_start = datetime.now()
-            order.source_warehouse_id = warehouse_id  # DÜZELTME: warehouse_id → source_warehouse_id
+            order.source_warehouse_id = (
+                warehouse_id  # DÜZELTME: warehouse_id → source_warehouse_id
+            )
             order.actual_material_cost = actual_material_cost
-            
+
             # Transaction'ı tamamla
             self.session.commit()
-            
+
             return order
-            
+
         except Exception as e:
             self.session.rollback()
             raise e
-    
+
     def complete_production(
         self,
         order_id: int,
         completed_quantity: Decimal,
         scrap_quantity: Decimal = Decimal(0),
         target_warehouse_id: int = None,
-        send_to_qc: bool = True
+        send_to_qc: bool = True,
+        by_product_quantities: dict = None,  # {bp_id: quantity}
     ) -> WorkOrder:
         """
         Üretimi tamamla
@@ -657,26 +782,38 @@ class WorkOrderService:
 
         if order.status != WorkOrderStatus.IN_PROGRESS:
             raise InvalidStatusTransitionError(order.status.value, "COMPLETED")
-        
+
         if completed_quantity <= 0:
             raise ProductionError("Tamamlanan miktar sıfırdan büyük olmalı!")
-        
+
         # Hedef depo (belirtilmezse kaynak depo kullan)
-        warehouse_id = target_warehouse_id or order.target_warehouse_id or order.source_warehouse_id
+        warehouse_id = (
+            target_warehouse_id
+            or order.target_warehouse_id
+            or order.source_warehouse_id
+        )
         if not warehouse_id:
             raise ProductionError("Hedef depo belirtilmeli!")
-        
+
         try:
             # === TRANSACTION BAŞLANGICI ===
-            
+
             # Birim maliyet hesapla
             total_cost = (
-                (order.actual_material_cost or Decimal(0)) +
-                (order.actual_labor_cost or order.planned_labor_cost or Decimal(0)) +
-                (order.actual_overhead_cost or order.planned_overhead_cost or Decimal(0))
+                (order.actual_material_cost or Decimal(0))
+                + (order.actual_labor_cost or order.planned_labor_cost or Decimal(0))
+                + (
+                    order.actual_overhead_cost
+                    or order.planned_overhead_cost
+                    or Decimal(0)
+                )
             )
-            unit_cost = total_cost / completed_quantity if completed_quantity > 0 else Decimal(0)
-            
+            unit_cost = (
+                total_cost / completed_quantity
+                if completed_quantity > 0
+                else Decimal(0)
+            )
+
             # Mamül stok girişi (URETIM_CIKIS = üretimden mamül girişi)
             movement = StockMovement(
                 item_id=order.item_id,
@@ -691,18 +828,54 @@ class WorkOrderService:
                 movement_date=datetime.now(),
             )
             self.session.add(movement)
-            
+
             # Bakiyeyi güncelle (mamül için)
             balance = self._get_or_create_balance(order.item_id, warehouse_id)
             old_qty = balance.quantity
             old_cost = balance.unit_cost
             new_qty = old_qty + completed_quantity
-            
+
             # Ağırlıklı ortalama maliyet
             if new_qty > 0:
-                balance.unit_cost = ((old_qty * old_cost) + (completed_quantity * unit_cost)) / new_qty
+                balance.unit_cost = (
+                    (old_qty * old_cost) + (completed_quantity * unit_cost)
+                ) / new_qty
             balance.quantity = new_qty
-            
+
+            # Yan ürünleri stoğa al
+            try:
+                from modules.inventory.services import StockMovementService
+
+                movement_service = StockMovementService()
+
+                if order.by_products:
+                    for bp in order.by_products:
+                        # Girilen miktar veya varsayılan
+                        completed_qty = Decimal(0)
+                        if by_product_quantities and bp.id in by_product_quantities:
+                            completed_qty = Decimal(str(by_product_quantities[bp.id]))
+                        elif bp.planned_quantity > 0:
+                            # Oranla: Üretilen / Planlanan * BP Planlanan
+                            # Basitçe hepsi üretildi varsayalım veya 0
+                            completed_qty = bp.planned_quantity
+
+                        if completed_qty > 0:
+                            bp.completed_quantity = completed_qty
+                            bp.actual_date = datetime.now()
+
+                            movement_service.create_movement(
+                                movement_type=StockMovementType.URETIM_GIRIS,
+                                item_id=bp.item_id,
+                                to_warehouse_id=warehouse_id,
+                                quantity=float(bp.completed_quantity),
+                                document_type="work_order_by_product",
+                                document_no=order.order_no,
+                                description=f"İş Emri Yan Ürün: {order.order_no}",
+                                unit_cost=0,  # Yan ürün maliyeti 0 kabul ediliyor
+                            )
+            except Exception as e:
+                print(f"Yan ürün stok hatası: {e}")
+
             # Fire varsa
             if scrap_quantity > 0:
                 scrap_movement = StockMovement(
@@ -718,7 +891,7 @@ class WorkOrderService:
                     movement_date=datetime.now(),
                 )
                 self.session.add(scrap_movement)
-            
+
             # İş emrini güncelle
             if send_to_qc:
                 # Kalite kontrole gönder
@@ -736,17 +909,19 @@ class WorkOrderService:
 
             # Verimlilik hesapla
             if order.planned_quantity > 0:
-                order.efficiency_rate = (completed_quantity / order.planned_quantity) * 100
+                order.efficiency_rate = (
+                    completed_quantity / order.planned_quantity
+                ) * 100
 
             # Transaction'ı tamamla
             self.session.commit()
 
             return order
-            
+
         except Exception as e:
             self.session.rollback()
             raise e
-    
+
     def cancel_production(self, order_id: int, warehouse_id: int = None) -> WorkOrder:
         """
         Üretimi iptal et
@@ -765,6 +940,7 @@ class WorkOrderService:
         # RELEASED durumundaysa rezervasyonları serbest bırak
         if order.status == WorkOrderStatus.RELEASED and warehouse_id:
             from modules.inventory.services import StockMovementService
+
             stock_service = StockMovementService()
 
             for line in order.lines:
@@ -772,7 +948,7 @@ class WorkOrderService:
                     stock_service.release_reservation(
                         item_id=line.item_id,
                         warehouse_id=warehouse_id,
-                        quantity=line.required_quantity
+                        quantity=line.required_quantity,
                     )
                     line.is_reserved = False
 
@@ -781,14 +957,14 @@ class WorkOrderService:
 
         self.session.commit()
         return order
-    
+
     def approve_quality_check(
         self,
         order_id: int,
         approved_quantity: Decimal,
         rejected_quantity: Decimal = Decimal(0),
         notes: str = None,
-        checked_by: int = None
+        checked_by: int = None,
     ) -> WorkOrder:
         """
         Kalite kontrolü onayla
@@ -802,7 +978,9 @@ class WorkOrderService:
             raise ProductionError("İş emri bulunamadı!")
 
         if order.status != WorkOrderStatus.QUALITY_CHECK:
-            raise InvalidStatusTransitionError(order.status.value, "QUALITY_CHECK_APPROVED")
+            raise InvalidStatusTransitionError(
+                order.status.value, "QUALITY_CHECK_APPROVED"
+            )
 
         if approved_quantity <= 0:
             raise ProductionError("Onaylanan miktar sıfırdan büyük olmalı!")
@@ -814,11 +992,19 @@ class WorkOrderService:
         try:
             # Birim maliyet hesapla
             total_cost = (
-                (order.actual_material_cost or Decimal(0)) +
-                (order.actual_labor_cost or order.planned_labor_cost or Decimal(0)) +
-                (order.actual_overhead_cost or order.planned_overhead_cost or Decimal(0))
+                (order.actual_material_cost or Decimal(0))
+                + (order.actual_labor_cost or order.planned_labor_cost or Decimal(0))
+                + (
+                    order.actual_overhead_cost
+                    or order.planned_overhead_cost
+                    or Decimal(0)
+                )
             )
-            unit_cost = total_cost / order.completed_quantity if order.completed_quantity > 0 else Decimal(0)
+            unit_cost = (
+                total_cost / order.completed_quantity
+                if order.completed_quantity > 0
+                else Decimal(0)
+            )
 
             # Onaylanan mamülü stoğa ekle
             movement = StockMovement(
@@ -842,7 +1028,9 @@ class WorkOrderService:
             new_qty = old_qty + approved_quantity
 
             if new_qty > 0:
-                balance.unit_cost = ((old_qty * old_cost) + (approved_quantity * unit_cost)) / new_qty
+                balance.unit_cost = (
+                    (old_qty * old_cost) + (approved_quantity * unit_cost)
+                ) / new_qty
             balance.quantity = new_qty
 
             # Reddedilen miktar varsa fire olarak kaydet
@@ -879,10 +1067,7 @@ class WorkOrderService:
             raise e
 
     def reject_quality_check(
-        self,
-        order_id: int,
-        notes: str = None,
-        checked_by: int = None
+        self, order_id: int, notes: str = None, checked_by: int = None
     ) -> WorkOrder:
         """
         Kalite kontrolü reddet
@@ -895,7 +1080,9 @@ class WorkOrderService:
             raise ProductionError("İş emri bulunamadı!")
 
         if order.status != WorkOrderStatus.QUALITY_CHECK:
-            raise InvalidStatusTransitionError(order.status.value, "QUALITY_CHECK_REJECTED")
+            raise InvalidStatusTransitionError(
+                order.status.value, "QUALITY_CHECK_REJECTED"
+            )
 
         # Kalite kontrol bilgilerini kaydet
         order.qc_approved_quantity = Decimal(0)
@@ -922,34 +1109,48 @@ class WorkOrderService:
         order.status = WorkOrderStatus.CLOSED
         self.session.commit()
         return order
-    
+
     # ----------------------------------------------------------
     # FIRE (HURDA) YÖNETİMİ
     # ----------------------------------------------------------
-    
+
     def report_scrap(
-        self, 
-        order_id: int, 
-        item_id: int, 
-        quantity: Decimal, 
-        reason: str = None
+        self,
+        order_id: int = None,
+        item_id: int = None,
+        quantity: Decimal = 0,
+        reason: Optional[str] = None,
+        operation_id: int = None,
     ) -> StockMovement:
         """
         Üretim sırasında fire/hurda bildir
-        
+
         - Malzeme veya yarı mamül firesi olabilir
         - FIRE hareketi oluşturur
         """
-        order = self.get_by_id(order_id)
-        if not order:
-            raise ProductionError("İş emri bulunamadı!")
-        
+        if operation_id:
+            op = self.session.query(WorkOrderOperation).get(operation_id)
+            if not op:
+                raise ProductionError("Operasyon bulunamadı!")
+            order_id = op.work_order_id
+            item_id = op.work_order.item_id
+            order = op.work_order
+        else:
+            order = self.get_by_id(order_id)
+            if not order:
+                raise ProductionError("İş emri bulunamadı!")
+
+        # Miktarı Decimal'e çevir
+        quantity = Decimal(str(quantity))
+
         if order.status != WorkOrderStatus.IN_PROGRESS:
             raise ProductionError("Fire sadece üretim sırasında bildirilebilir!")
-        
-        if not order.source_warehouse_id:  # DÜZELTME: warehouse_id → source_warehouse_id
+
+        if (
+            not order.source_warehouse_id
+        ):  # DÜZELTME: warehouse_id → source_warehouse_id
             raise ProductionError("İş emrinde depo bilgisi yok!")
-        
+
         # Fire hareketi
         movement = StockMovement(
             item_id=item_id,
@@ -957,101 +1158,356 @@ class WorkOrderService:
             quantity=quantity,
             unit_price=Decimal(0),  # Fire maliyeti hesaplanabilir
             total_price=Decimal(0),
-            from_warehouse_id=order.source_warehouse_id,  # DÜZELTME
-            document_no=order.order_no,
-            document_type="work_order_scrap",
+            from_warehouse_id=order.source_warehouse_id,
+            document_no=str(operation_id) if operation_id else order.order_no,
+            document_type="production_scrap" if operation_id else "work_order_scrap",
             description=f"İş Emri Fire: {reason or 'Belirtilmedi'}",
+            notes=reason,
             movement_date=datetime.now(),
         )
         self.session.add(movement)
-        
+
         # Bakiyeyi güncelle
         balance = self._get_balance(item_id, order.source_warehouse_id)  # DÜZELTME
         if balance:
             balance.quantity -= quantity
             if balance.quantity < 0:
                 balance.quantity = Decimal(0)
-        
+
         self.session.commit()
         return movement
-    
+
     # ----------------------------------------------------------
     # OPERASYON TAKİBİ
     # ----------------------------------------------------------
-    
-    def start_operation(self, operation_id: int) -> WorkOrderOperation:
+
+    def start_operation(
+        self, operation_id: int, user_id: int = None
+    ) -> WorkOrderOperation:
         """Operasyonu başlat"""
-        op = self.session.query(WorkOrderOperation).filter(
-            WorkOrderOperation.id == operation_id
-        ).first()
-        
+        op = (
+            self.session.query(WorkOrderOperation)
+            .options(joinedload(WorkOrderOperation.work_station))
+            .filter(WorkOrderOperation.id == operation_id)
+            .first()
+        )
+
         if not op:
             raise ProductionError("Operasyon bulunamadı!")
-        
-        op.actual_start = datetime.now()
+
+        # Zaten çalışıyorsa hata ver
+        if op.status == "in_progress":
+            raise ProductionError("Operasyon zaten devam ediyor!")
+
+        # 1. Önceki operasyon tamamlanmış mı kontrol et
+        if op.operation_no > 1:
+            prev_op = (
+                self.session.query(WorkOrderOperation)
+                .filter_by(
+                    work_order_id=op.work_order_id, operation_no=op.operation_no - 1
+                )
+                .first()
+            )
+            if prev_op and prev_op.status != "completed":
+                raise ProductionError(
+                    f"Önceki operasyon ({prev_op.name}) tamamlanmadan bu operasyona başlayamazsınız!"
+                )
+
+        # En az bir personel atanmış mı kontrol et
+        active_personnel_count = (
+            self.session.query(WorkOrderOperationPersonnel)
+            .filter_by(operation_id=operation_id, end_time=None)
+            .count()
+        )
+
+        if active_personnel_count == 0 and not user_id:
+            # Eğer user_id parametresi geldiyse aşağıda atanacak, gelmediyse hata
+            raise ProductionError(
+                "Operasyona başlamadan önce en az bir personel atamalısınız!"
+            )
+
+        # İlk başlangıç ise actual_start ata
+        if not op.actual_start:
+            op.actual_start = datetime.now()
+
+        # Devam etme (Resume) veya İlk Başlama
+        op.last_start_time = datetime.now()
         op.status = "in_progress"
-        
+
+        # İş emrinin durumu güncelle
+        if op.work_order and op.work_order.status != WorkOrderStatus.IN_PROGRESS:
+            op.work_order.status = WorkOrderStatus.IN_PROGRESS
+
+        # Personel ataması varsa (ve user_id geldiyse) oturum başlat
+        if user_id:
+            self._ensure_personnel_active(op.id, user_id)
+
+        # Fason üretim kontrolü
+        if op.work_station and op.work_station.is_external:
+            # Fason operasyon başladığında yarı mamül transferi
+            # Not: Şu an için fiziksel stok hareketi yapılmıyor çünkü ara ürün kodu yok.
+            # Ancak log veya durum güncellemesi yapılabilir.
+            if not op.purchase_order_id:
+                # Otomatik satınalma siparişi oluşturulabilir veya uyarı verilebilir
+                pass
+
+            if not op.purchase_order_id:
+                # Otomatik satınalma siparişi oluşturulabilir veya uyarı verilebilir
+                pass
+
         self.session.commit()
         return op
-    
-    def complete_operation(
-        self, 
-        operation_id: int, 
-        actual_run_time: int = None
+
+    def pause_operation(
+        self, operation_id: int, user_id: int = None
     ) -> WorkOrderOperation:
-        """Operasyonu tamamla"""
-        op = self.session.query(WorkOrderOperation).filter(
-            WorkOrderOperation.id == operation_id
-        ).first()
-        
+        """Operasyonu duraklat"""
+        op = self.session.query(WorkOrderOperation).get(operation_id)
         if not op:
             raise ProductionError("Operasyon bulunamadı!")
-        
+
+        if op.status != "in_progress":
+            raise ProductionError("Sadece devam eden operasyon duraklatılabilir!")
+
+        # Süre hesapla ve ekle
+        if op.last_start_time:
+            delta = datetime.now() - op.last_start_time
+            added_minutes = int(delta.total_seconds() / 60)
+            op.actual_run_time = (op.actual_run_time or 0) + added_minutes
+
+        op.last_start_time = None
+        op.status = "paused"
+
+        self.session.commit()
+        return op
+
+    def stop_operation(
+        self, operation_id: int, reason: str = None
+    ) -> WorkOrderOperation:
+        """Operasyonu durdur (Arıza vb.) - Pause ile benzer ama durum farklı olabilir"""
+        # Şimdilik pause ile aynı mantık
+        return self.pause_operation(operation_id)
+
+    def assign_personnel(self, operation_id: int, user_id: int, role: str = "operator"):
+        """Operasyona personel ata"""
+        # 1. Başka bir makinede/operasyonda aktif mi?
+        busy = (
+            self.session.query(WorkOrderOperationPersonnel)
+            .filter_by(user_id=user_id, end_time=None)
+            .first()
+        )
+
+        if busy:
+            if busy.operation_id == operation_id:
+                return  # Zaten burada atanmış
+
+            # Başka bir yerde aktif
+            from database.models.production import WorkOrderOperation
+
+            op_busy = self.session.query(WorkOrderOperation).get(busy.operation_id)
+            raise ProductionError(
+                f"Bu personel şu anda başka bir operasyonda çalışıyor: {op_busy.name if op_busy else busy.operation_id}"
+            )
+
+        # 2. Atamayı yap
+        personnel = WorkOrderOperationPersonnel(
+            operation_id=operation_id,
+            user_id=user_id,
+            role=role,
+            start_time=datetime.now(),
+        )
+        self.session.add(personnel)
+        self.session.commit()
+
+    def get_active_personnel(self, operation_id: int):
+        """Operasyonda çalışan aktif personelleri getir"""
+        return (
+            self.session.query(WorkOrderOperationPersonnel)
+            .filter_by(operation_id=operation_id, end_time=None)
+            .all()
+        )
+
+    def remove_personnel(self, operation_id: int, user_id: int):
+        """Personeli operasyondan çıkar (Çıkış saati ver)"""
+        personnel = (
+            self.session.query(WorkOrderOperationPersonnel)
+            .filter_by(operation_id=operation_id, user_id=user_id, end_time=None)
+            .first()
+        )
+
+        if personnel:
+            personnel.end_time = datetime.now()
+            # Süre hesapla
+            delta = personnel.end_time - personnel.start_time
+            personnel.duration_minutes = int(delta.total_seconds() / 60)
+            self.session.commit()
+
+    def _ensure_personnel_active(self, operation_id: int, user_id: int):
+        """Personelin aktif kaydı yoksa oluştur"""
+        self.assign_personnel(operation_id, user_id)
+
+    def create_partial_production(
+        self, operation_id: int, quantity: Decimal, pack_type: str = "Pallet"
+    ) -> dict:
+        """Parçalı üretim girişi (Paket/Palet etiketi üretir)"""
+        op = self.session.query(WorkOrderOperation).get(operation_id)
+        if not op:
+            raise ProductionError("Operasyon bulunamadı!")
+
+        # Miktarı Decimal'e çevir
+        quantity = Decimal(str(quantity))
+
+        order = op.work_order
+        if not order:
+            raise ProductionError("İş emri bulunamadı!")
+
+        # Benzersiz Paket ID
+        timestamp = datetime.now().strftime("%Y%m%d%H%M")
+        pack_id = f"{order.order_no}-{pack_type[:3].upper()}-{timestamp}"
+
+        # Stok hareketi (Üretim Giriş)
+        movement = StockMovement(
+            item_id=order.item_id,
+            movement_type=StockMovementType.URETIM_GIRIS,
+            quantity=quantity,
+            unit_price=Decimal(0),  # Maliyet sonra hesaplanabilir
+            total_price=Decimal(0),
+            to_warehouse_id=order.target_warehouse_id,
+            document_no=order.order_no,
+            document_type="partial_production",
+            reference_no=pack_id,  # Paket ID referans olarak
+            description=f"Parçalı Üretim: {pack_type} ({quantity})",
+            movement_date=datetime.now(),
+        )
+        self.session.add(movement)
+
+        # İş emri tamamlanan miktar güncelle
+        order.completed_quantity = (order.completed_quantity or 0) + quantity
+        op.completed_quantity = (op.completed_quantity or 0) + quantity
+
+        self.session.commit()
+
+        return {
+            "pack_id": pack_id,
+            "order_no": order.order_no,
+            "item_code": order.item.code,
+            "item_name": order.item.name,
+            "quantity": float(quantity),
+            "date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        }
+
+    def create_subcontracting_po(self, operation_id: int) -> Optional[int]:
+        """Fason operasyon için satınalma siparişi oluştur"""
+        from database.models.purchasing import (
+            PurchaseOrder,
+            PurchaseOrderItem,
+            PurchaseOrderStatus,
+        )
+
+        op = (
+            self.session.query(WorkOrderOperation)
+            .options(
+                joinedload(WorkOrderOperation.work_station),
+                joinedload(WorkOrderOperation.work_order),
+            )
+            .filter(WorkOrderOperation.id == operation_id)
+            .first()
+        )
+
+        if not op or not op.work_station or not op.work_station.is_external:
+            return None
+
+        if not op.work_station.supplier_id:
+            raise ProductionError("İş istasyonunda tedarikçi tanımlı değil!")
+
+        # Sipariş oluştur
+        po = PurchaseOrder(
+            order_no=f"PO-SUB-{op.id}",  # Geçici numara
+            order_date=datetime.now(),
+            supplier_id=op.work_station.supplier_id,
+            status=PurchaseOrderStatus.DRAFT,
+            notes=f"İş Emri Fason Hizmet: {op.work_order.order_no} - {op.name}",
+        )
+        self.session.add(po)
+        self.session.flush()
+
+        # Hizmet kalemi ekle (Item ID yoksa açıklama ile)
+        # Not: Hizmet item'ı varsa kullanılmalı. Şimdilik dummy.
+        po_item = PurchaseOrderItem(
+            order_id=po.id,
+            quantity=Decimal(1),  # Birim hizmet
+            unit_price=op.work_station.hourly_rate or Decimal(0),
+            description=f"Fason İşçilik: {op.name}",
+        )
+        self.session.add(po_item)
+
+        op.purchase_order_id = po.id
+        self.session.commit()
+
+        return po.id
+
+    def complete_operation(
+        self, operation_id: int, actual_run_time: int = None
+    ) -> WorkOrderOperation:
+        """Operasyonu tamamla"""
+        op = (
+            self.session.query(WorkOrderOperation)
+            .filter(WorkOrderOperation.id == operation_id)
+            .first()
+        )
+
+        if not op:
+            raise ProductionError("Operasyon bulunamadı!")
+
         op.actual_end = datetime.now()
         op.status = "completed"
-        
+
         if actual_run_time:
             op.actual_run_time = actual_run_time
         elif op.actual_start:
             # Otomatik hesapla
             delta = op.actual_end - op.actual_start
             op.actual_run_time = int(delta.total_seconds() / 60)
-        
+
         self.session.commit()
         return op
-    
+
     # ----------------------------------------------------------
     # YARDIMCI METODLAR
     # ----------------------------------------------------------
-    
+
     def _check_material_availability(self, order: WorkOrder, warehouse_id: int = None):
         """Malzeme yeterliliği kontrolü"""
         for line in order.lines:
             if line.required_quantity <= 0:
                 continue
-            
+
             if warehouse_id:
                 balance = self._get_balance(line.item_id, warehouse_id)
                 available = balance.quantity if balance else Decimal(0)
             else:
                 # Tüm depolardaki toplam
                 available = self._get_total_stock(line.item_id)
-            
+
             if available < line.required_quantity:
                 item = self.session.query(Item).filter(Item.id == line.item_id).first()
                 raise InsufficientMaterialError(
                     item.code if item else str(line.item_id),
                     line.required_quantity,
-                    available
+                    available,
                 )
-    
+
     def _get_balance(self, item_id: int, warehouse_id: int) -> Optional[StockBalance]:
         """Stok bakiyesi getir"""
-        return self.session.query(StockBalance).filter(
-            StockBalance.item_id == item_id,
-            StockBalance.warehouse_id == warehouse_id
-        ).first()
-    
+        return (
+            self.session.query(StockBalance)
+            .filter(
+                StockBalance.item_id == item_id,
+                StockBalance.warehouse_id == warehouse_id,
+            )
+            .first()
+        )
+
     def _get_or_create_balance(self, item_id: int, warehouse_id: int) -> StockBalance:
         """Stok bakiyesi getir veya oluştur"""
         balance = self._get_balance(item_id, warehouse_id)
@@ -1064,24 +1520,30 @@ class WorkOrderService:
             )
             self.session.add(balance)
         return balance
-    
+
     def _get_total_stock(self, item_id: int) -> Decimal:
         """Tüm depolardaki toplam stok"""
         from sqlalchemy import func
-        result = self.session.query(func.sum(StockBalance.quantity)).filter(
-            StockBalance.item_id == item_id
-        ).scalar()
+
+        result = (
+            self.session.query(func.sum(StockBalance.quantity))
+            .filter(StockBalance.item_id == item_id)
+            .scalar()
+        )
         return result or Decimal(0)
-    
+
     def generate_order_no(self) -> str:
         """Otomatik iş emri numarası üret"""
         today = datetime.now()
         prefix = f"WO{today.strftime('%Y%m')}"
-        
-        last = self.session.query(WorkOrder).filter(
-            WorkOrder.order_no.like(f"{prefix}%")
-        ).order_by(WorkOrder.order_no.desc()).first()
-        
+
+        last = (
+            self.session.query(WorkOrder)
+            .filter(WorkOrder.order_no.like(f"{prefix}%"))
+            .order_by(WorkOrder.order_no.desc())
+            .first()
+        )
+
         if last:
             try:
                 num = int(last.order_no[-4:]) + 1
@@ -1089,35 +1551,35 @@ class WorkOrderService:
                 num = 1
         else:
             num = 1
-        
+
         return f"{prefix}{num:04d}"
-    
+
     # ----------------------------------------------------------
     # RAPORLAMA
     # ----------------------------------------------------------
-    
+
     def get_production_summary(self, order_id: int) -> dict:
         """Üretim özeti"""
         order = self.get_by_id(order_id)
         if not order:
             return {}
-        
+
         return {
             "order_no": order.order_no,
             "item": order.item.name if order.item else "",
             "status": order.status.value,
             "planned_quantity": float(order.planned_quantity),
             "completed_quantity": float(order.completed_quantity or 0),  # DÜZELTME
-            "scrapped_quantity": float(order.scrapped_quantity or 0),    # DÜZELTME
+            "scrapped_quantity": float(order.scrapped_quantity or 0),  # DÜZELTME
             "efficiency_rate": float(order.efficiency_rate or 0),
             "planned_cost": {
                 "material": float(order.planned_material_cost or 0),
                 "labor": float(order.planned_labor_cost or 0),
                 "overhead": float(order.planned_overhead_cost or 0),
                 "total": float(
-                    (order.planned_material_cost or 0) +
-                    (order.planned_labor_cost or 0) +
-                    (order.planned_overhead_cost or 0)
+                    (order.planned_material_cost or 0)
+                    + (order.planned_labor_cost or 0)
+                    + (order.planned_overhead_cost or 0)
                 ),
             },
             "actual_cost": {
@@ -1125,31 +1587,40 @@ class WorkOrderService:
                 "labor": float(order.actual_labor_cost or 0),
                 "overhead": float(order.actual_overhead_cost or 0),
                 "total": float(
-                    (order.actual_material_cost or 0) +
-                    (order.actual_labor_cost or 0) +
-                    (order.actual_overhead_cost or 0)
+                    (order.actual_material_cost or 0)
+                    + (order.actual_labor_cost or 0)
+                    + (order.actual_overhead_cost or 0)
                 ),
             },
             "variance": {
                 "material": float(
-                    (order.actual_material_cost or 0) - (order.planned_material_cost or 0)
+                    (order.actual_material_cost or 0)
+                    - (order.planned_material_cost or 0)
                 ),
                 "quantity": float(
                     (order.completed_quantity or 0) - order.planned_quantity  # DÜZELTME
                 ),
             },
             "duration": {
-                "planned_start": order.planned_start.isoformat() if order.planned_start else None,
-                "planned_end": order.planned_end.isoformat() if order.planned_end else None,
-                "actual_start": order.actual_start.isoformat() if order.actual_start else None,
-                "actual_end": order.actual_end.isoformat() if order.actual_end else None,
+                "planned_start": (
+                    order.planned_start.isoformat() if order.planned_start else None
+                ),
+                "planned_end": (
+                    order.planned_end.isoformat() if order.planned_end else None
+                ),
+                "actual_start": (
+                    order.actual_start.isoformat() if order.actual_start else None
+                ),
+                "actual_end": (
+                    order.actual_end.isoformat() if order.actual_end else None
+                ),
             },
         }
 
     def change_status(self, order_id: int, new_status: WorkOrderStatus) -> WorkOrder:
         """
         İş emri durumunu değiştir (UI için basit metod)
-        
+
         Geçerli geçişler:
         - DRAFT → PLANNED
         - PLANNED → RELEASED
@@ -1160,23 +1631,34 @@ class WorkOrderService:
         order = self.get_by_id(order_id)
         if not order:
             raise ProductionError("İş emri bulunamadı!")
-        
+
         current = order.status
-        
+
         # Geçiş kuralları
         valid_transitions = {
             WorkOrderStatus.DRAFT: [WorkOrderStatus.PLANNED, WorkOrderStatus.CANCELLED],
-            WorkOrderStatus.PLANNED: [WorkOrderStatus.RELEASED, WorkOrderStatus.DRAFT, WorkOrderStatus.CANCELLED],
-            WorkOrderStatus.RELEASED: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.PLANNED, WorkOrderStatus.CANCELLED],
-            WorkOrderStatus.IN_PROGRESS: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED],
+            WorkOrderStatus.PLANNED: [
+                WorkOrderStatus.RELEASED,
+                WorkOrderStatus.DRAFT,
+                WorkOrderStatus.CANCELLED,
+            ],
+            WorkOrderStatus.RELEASED: [
+                WorkOrderStatus.IN_PROGRESS,
+                WorkOrderStatus.PLANNED,
+                WorkOrderStatus.CANCELLED,
+            ],
+            WorkOrderStatus.IN_PROGRESS: [
+                WorkOrderStatus.COMPLETED,
+                WorkOrderStatus.CANCELLED,
+            ],
             WorkOrderStatus.COMPLETED: [WorkOrderStatus.CLOSED],
             WorkOrderStatus.CLOSED: [],
             WorkOrderStatus.CANCELLED: [],
         }
-        
+
         if new_status not in valid_transitions.get(current, []):
             raise InvalidStatusTransitionError(current.value, new_status.value)
-        
+
         # Özel durumlar
         if new_status == WorkOrderStatus.RELEASED:
             return self.release(order_id)
@@ -1184,12 +1666,57 @@ class WorkOrderService:
             return self.close_order(order_id)
         elif new_status == WorkOrderStatus.CANCELLED:
             return self.cancel_production(order_id)
-        
+
         # Basit durum değişiklikleri
         order.status = new_status
-        
         if new_status == WorkOrderStatus.PLANNED:
             order.released_at = None
-        
+
         self.session.commit()
         return order
+
+    def get_all_users(self):
+        """Tüm personeli getir"""
+        from database.models.user import User
+
+        return self.session.query(User).filter(User.is_active == True).all()
+
+    def get_shift_teams(self):
+        """Tüm vardiya ekiplerini getir"""
+        from database.models.shift_teams import ShiftTeam
+
+        return self.session.query(ShiftTeam).all()
+
+    def get_users_by_team(self, team_id: int, exclude_busy: bool = True):
+        """Vardiya ekibindeki kullanıcıları getir"""
+        from database.models.hr import Employee
+        from database.models.production import WorkOrderOperationPersonnel
+
+        # Employee üzerinden team_id filtrele ve ilişkili User'ları döndür
+        employees = (
+            self.session.query(Employee)
+            .filter(
+                Employee.shift_team_id == team_id,
+                Employee.is_active == True,
+                Employee.user_id.isnot(None),
+            )
+            .all()
+        )
+
+        # Meşgul personelleri bul
+        busy_user_ids = []
+        if exclude_busy:
+            busy_assignments = (
+                self.session.query(WorkOrderOperationPersonnel.user_id)
+                .filter(WorkOrderOperationPersonnel.end_time == None)
+                .all()
+            )
+            busy_user_ids = [a[0] for a in busy_assignments]
+
+        # User listesi oluştur
+        users = []
+        for emp in employees:
+            if emp.user and emp.user_id not in busy_user_ids:
+                users.append(emp.user)
+
+        return users

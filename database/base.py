@@ -50,6 +50,10 @@ def get_session() -> Session:
     return _ScopedSession()
 
 
+# Geriye dönük uyumluluk için alias
+SessionLocal = get_session
+
+
 def init_database():
     """Veritabanı tablolarını oluşturur"""
     # Tüm modelleri import et

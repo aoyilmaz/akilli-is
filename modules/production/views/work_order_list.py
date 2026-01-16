@@ -22,6 +22,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 from ui.components.stat_cards import MiniStatCard
 from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+from core.export_manager import ExportManager
+from core.label_manager import LabelManager
 
 
 class WorkOrderListPage(QWidget):
@@ -76,6 +78,20 @@ class WorkOrderListPage(QWidget):
         self.search_input.setFixedWidth(200)
         self.search_input.textChanged.connect(self._on_search)
         header_layout.addWidget(self.search_input)
+
+        # Dışa Aktar
+        export_btn = QPushButton(f"{ICONS['export']} Dışa Aktar")
+        export_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        export_btn.setStyleSheet(get_button_style("export"))
+
+        export_menu = ExportManager.create_export_menu(self, self._get_export_data)
+        export_menu.addSeparator()
+        label_action = QAction("🏷️ Etiket Bas", self)
+        label_action.triggered.connect(self._print_labels)
+        export_menu.addAction(label_action)
+
+        export_btn.setMenu(export_menu)
+        header_layout.addWidget(export_btn)
 
         # Yenile
         refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
@@ -355,3 +371,10 @@ class WorkOrderListPage(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(wo_id)
+
+    def _get_export_data(self):
+        return ExportManager.extract_data_from_table(self.table)
+
+    def _print_labels(self):
+        data = self._get_export_data()
+        LabelManager.print_work_order_labels(self, data)

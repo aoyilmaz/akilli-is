@@ -7,6 +7,7 @@ from database.base import (
     BaseModel,
     get_engine,
     get_session,
+    SessionLocal,
     init_database,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "BaseModel",
     "get_engine",
     "get_session",
+    "SessionLocal",
     "init_database",
 ]

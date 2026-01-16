@@ -23,9 +23,20 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style, get_input_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    get_input_style,
 )
 
 from .work_order_list import WorkOrderListPage
@@ -33,6 +44,7 @@ from .work_order_form import WorkOrderFormPage
 
 from decimal import Decimal
 from modules.development import ErrorHandler
+
 
 class StartProductionDialog(QDialog):
     """Üretime başlama dialogu - Depo seçimi ve malzeme kontrolü"""
@@ -233,6 +245,7 @@ class StartProductionDialog(QDialog):
     def get_warehouse_id(self) -> int:
         return self.selected_warehouse_id
 
+
 class CompleteProductionDialog(QDialog):
     """Üretim tamamlama dialogu"""
 
@@ -300,6 +313,20 @@ class CompleteProductionDialog(QDialog):
 
         layout.addLayout(form)
 
+        if hasattr(self.work_order, "by_products") and self.work_order.by_products:
+            layout.addWidget(QLabel("♻️ Yan Ürünler:"))
+            self.bp_table = QTableWidget()
+            self.bp_table.setColumnCount(3)
+            self.bp_table.setHorizontalHeaderLabels(
+                ["Yan Ürün", "Planlanan", "Gerçekleşen"]
+            )
+            self.bp_table.horizontalHeader().setSectionResizeMode(
+                0, QHeaderView.ResizeMode.Stretch
+            )
+            self.bp_table.verticalHeader().setVisible(False)
+            self._fill_bp_table()
+            layout.addWidget(self.bp_table)
+
         # Bilgi
         info = QLabel("ℹ️ Tamamlanan miktar mamul deposuna giriş yapılacak")
         layout.addWidget(info)
@@ -325,7 +352,22 @@ class CompleteProductionDialog(QDialog):
             "completed_quantity": self.completed_input.value(),
             "scrap_quantity": self.scrap_input.value(),
             "warehouse_id": self.warehouse_combo.currentData(),
+            "by_product_quantities": self._get_by_product_quantities(),
         }
+
+    def _get_by_product_quantities(self) -> dict:
+        """Yan ürün miktarlarını al"""
+        quantities = {}
+        if hasattr(self, "bp_table"):
+            for row in range(self.bp_table.rowCount()):
+                bp_item = self.bp_table.item(row, 0)
+                bp_id = bp_item.data(Qt.ItemDataRole.UserRole)
+
+                qty_widget = self.bp_table.cellWidget(row, 2)
+                if qty_widget:
+                    quantities[bp_id] = qty_widget.value()
+        return quantities
+
 
 class WorkOrderModule(QWidget):
     """İş Emirleri modülü"""
@@ -383,11 +425,11 @@ class WorkOrderModule(QWidget):
             except Exception as e:
                 ErrorHandler.handle_error(
                     e,
-                    module='production',
-                    screen='WorkOrderModule',
-                    function='_ensure_services',
+                    module="production",
+                    screen="WorkOrderModule",
+                    function="_ensure_services",
                     parent_widget=self,
-                    show_message=False
+                    show_message=False,
                 )
 
     def _load_data(self):
@@ -431,10 +473,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_load_data',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_load_data",
+                parent_widget=self,
             )
             self.list_page.load_data([])
 
@@ -563,6 +605,7 @@ class WorkOrderModule(QWidget):
                         "default_run_time_per_unit": float(
                             getattr(ws, "default_run_time_per_unit", 0) or 0
                         ),
+                        "is_external": getattr(ws, "is_external", False),
                     }
                 )
             form.set_work_stations(ws_list)
@@ -570,11 +613,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_load_form_data',
+                module="production",
+                screen="WorkOrderModule",
+                function="_load_form_data",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
 
     def _load_boms_for_product(self, form: WorkOrderFormPage, item_id: int):
@@ -596,11 +639,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_load_boms_for_product',
+                module="production",
+                screen="WorkOrderModule",
+                function="_load_boms_for_product",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
 
     def _load_bom_details(self, form: WorkOrderFormPage, bom):
@@ -661,11 +704,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_load_bom_details',
+                module="production",
+                screen="WorkOrderModule",
+                function="_load_bom_details",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
 
     def _load_work_order_operations(self, form: WorkOrderFormPage, wo):
@@ -691,11 +734,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_load_work_order_operations',
+                module="production",
+                screen="WorkOrderModule",
+                function="_load_work_order_operations",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
 
     def _generate_order_no(self, form: WorkOrderFormPage):
@@ -706,11 +749,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_generate_order_no',
+                module="production",
+                screen="WorkOrderModule",
+                function="_generate_order_no",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
 
     def _save_work_order(self, data: dict):
@@ -741,10 +784,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_save_work_order',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_save_work_order",
+                parent_widget=self,
             )
 
     def _save_operations(self, wo, operations_data: list):
@@ -772,11 +815,11 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_save_operations',
+                module="production",
+                screen="WorkOrderModule",
+                function="_save_operations",
                 parent_widget=self,
-                show_message=False
+                show_message=False,
             )
             self.wo_service.session.rollback()
 
@@ -815,10 +858,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_change_status',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_change_status",
+                parent_widget=self,
             )
 
     def _start_production(self, wo_id: int):
@@ -887,10 +930,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_start_production',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_start_production",
+                parent_widget=self,
             )
 
     def _complete_production(self, wo_id: int):
@@ -913,6 +956,7 @@ class WorkOrderModule(QWidget):
                     completed_quantity=Decimal(str(data["completed_quantity"])),
                     scrap_quantity=Decimal(str(data["scrap_quantity"])),
                     target_warehouse_id=data["warehouse_id"],
+                    by_product_quantities=data.get("by_product_quantities"),
                 )
 
                 QMessageBox.information(
@@ -929,10 +973,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_complete_production',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_complete_production",
+                parent_widget=self,
             )
 
     def _delete_work_order(self, wo_id: int):
@@ -950,10 +994,10 @@ class WorkOrderModule(QWidget):
         except Exception as e:
             ErrorHandler.handle_error(
                 e,
-                module='production',
-                screen='WorkOrderModule',
-                function='_delete_work_order',
-                parent_widget=self
+                module="production",
+                screen="WorkOrderModule",
+                function="_delete_work_order",
+                parent_widget=self,
             )
 
     def _show_list(self):

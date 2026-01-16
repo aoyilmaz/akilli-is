@@ -1,0 +1,31 @@
+# .repomixignore
+
+# Sistem dosyaları ve önbellekler
+**/*.pyc
+**/__pycache__
+.git/
+.env
+.venv/
+env/
+venv/
+
+# Büyük Binary ve Medya Dosyaları
+ui/resources/icons/  # İkonlar token canavarıdır, gönderme
+docs/*.docx          # Word dokümanını her seferinde okumasına gerek yok
+*.png
+*.svg
+*.qss                # Tema dosyalarını sadece tema çalışırken gönder
+
+# Eski Göç Dosyaları (Sadece en sonuncusu önemlidir)
+alembic/versions/
+
+# Tek seferlik temizlik scriptleri (Proje yapında bunlardan çok var)
+clean_*.py
+update_*.py
+replace_emojis.py
+add_*.py
+scripts/
+
+# Kütüphane dosyaları
+alembic/env.py
+alembic/script.py.mako

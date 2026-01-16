@@ -5,8 +5,17 @@ Akıllı İş - Satış Modülü Veritabanı Modelleri
 from enum import Enum
 from decimal import Decimal
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, Date, DateTime,
-    ForeignKey, Numeric, Enum as SQLEnum, Index
+    Column,
+    Integer,
+    String,
+    Text,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    Enum as SQLEnum,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from database.base import BaseModel
@@ -14,47 +23,53 @@ from database.base import BaseModel
 
 # === ENUM TANIMLARI ===
 
+
 class SalesQuoteStatus(str, Enum):
     """Satış teklifi durumları"""
-    DRAFT = "draft"              # Taslak
-    SENT = "sent"                # Müşteriye gönderildi
-    ACCEPTED = "accepted"        # Kabul edildi
-    REJECTED = "rejected"        # Reddedildi
-    ORDERED = "ordered"          # Siparişe dönüştürüldü
-    EXPIRED = "expired"          # Süresi doldu
-    CANCELLED = "cancelled"      # İptal
+
+    DRAFT = "draft"  # Taslak
+    SENT = "sent"  # Müşteriye gönderildi
+    ACCEPTED = "accepted"  # Kabul edildi
+    REJECTED = "rejected"  # Reddedildi
+    ORDERED = "ordered"  # Siparişe dönüştürüldü
+    EXPIRED = "expired"  # Süresi doldu
+    CANCELLED = "cancelled"  # İptal
 
 
 class SalesOrderStatus(str, Enum):
     """Satış siparişi durumları"""
-    DRAFT = "draft"              # Taslak
-    CONFIRMED = "confirmed"      # Onaylandı
-    PARTIAL = "partial"          # Kısmi sevk
-    DELIVERED = "delivered"      # Tam sevk
-    CLOSED = "closed"            # Kapatıldı
-    CANCELLED = "cancelled"      # İptal
+
+    DRAFT = "draft"  # Taslak
+    CONFIRMED = "confirmed"  # Onaylandı
+    PARTIAL = "partial"  # Kısmi sevk
+    DELIVERED = "delivered"  # Tam sevk
+    CLOSED = "closed"  # Kapatıldı
+    CANCELLED = "cancelled"  # İptal
 
 
 class DeliveryNoteStatus(str, Enum):
     """Teslimat irsaliyesi durumları"""
-    DRAFT = "draft"              # Taslak
-    SHIPPED = "shipped"          # Sevk edildi
-    DELIVERED = "delivered"      # Teslim edildi
-    CANCELLED = "cancelled"      # İptal
+
+    DRAFT = "draft"  # Taslak
+    SHIPPED = "shipped"  # Sevk edildi
+    DELIVERED = "delivered"  # Teslim edildi
+    CANCELLED = "cancelled"  # İptal
 
 
 class InvoiceStatus(str, Enum):
     """Fatura durumları"""
-    DRAFT = "draft"              # Taslak
-    ISSUED = "issued"            # Kesildi
-    PARTIAL = "partial"          # Kısmi ödendi
-    PAID = "paid"                # Ödendi
-    OVERDUE = "overdue"          # Vadesi geçti
-    CANCELLED = "cancelled"      # İptal
+
+    DRAFT = "draft"  # Taslak
+    ISSUED = "issued"  # Kesildi
+    PARTIAL = "partial"  # Kısmi ödendi
+    PAID = "paid"  # Ödendi
+    OVERDUE = "overdue"  # Vadesi geçti
+    CANCELLED = "cancelled"  # İptal
 
 
 class Currency(str, Enum):
     """Para birimleri"""
+
     TRY = "TRY"
     USD = "USD"
     EUR = "EUR"
@@ -63,11 +78,13 @@ class Currency(str, Enum):
 
 class PriceListType(str, Enum):
     """Fiyat listesi türleri"""
-    SALES = "sales"          # Satış fiyat listesi
-    PURCHASE = "purchase"    # Alış fiyat listesi
+
+    SALES = "sales"  # Satış fiyat listesi
+    PURCHASE = "purchase"  # Alış fiyat listesi
 
 
 # === FİYAT LİSTESİ ===
+
 
 class PriceList(BaseModel):
     """Fiyat listeleri tablosu"""
@@ -82,7 +99,7 @@ class PriceList(BaseModel):
     # Tür
     list_type = Column(
         SQLEnum(PriceListType, values_callable=lambda x: [e.value for e in x]),
-        default=PriceListType.SALES
+        default=PriceListType.SALES,
     )
 
     # Para birimi
@@ -99,8 +116,9 @@ class PriceList(BaseModel):
     priority = Column(Integer, default=10)
 
     # İlişkiler
-    items = relationship("PriceListItem", back_populates="price_list",
-                         cascade="all, delete-orphan")
+    items = relationship(
+        "PriceListItem", back_populates="price_list", cascade="all, delete-orphan"
+    )
     customers = relationship("Customer", back_populates="price_list")
 
     def __repr__(self):
@@ -113,9 +131,7 @@ class PriceListItem(BaseModel):
     __tablename__ = "price_list_items"
 
     # İlişkiler
-    price_list_id = Column(
-        Integer, ForeignKey("price_lists.id"), nullable=False
-    )
+    price_list_id = Column(Integer, ForeignKey("price_lists.id"), nullable=False)
     item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
 
     # Fiyat
@@ -137,8 +153,10 @@ class PriceListItem(BaseModel):
     __table_args__ = (
         Index(
             "idx_price_list_item_unique",
-            "price_list_id", "item_id", "min_quantity",
-            unique=True
+            "price_list_id",
+            "item_id",
+            "min_quantity",
+            unique=True,
         ),
     )
 
@@ -147,6 +165,7 @@ class PriceListItem(BaseModel):
 
 
 # === MÜŞTERİ ===
+
 
 class Customer(BaseModel):
     """Müşteriler tablosu"""
@@ -206,6 +225,7 @@ class Customer(BaseModel):
 
 # === SATIŞ TEKLİFİ ===
 
+
 class SalesQuote(BaseModel):
     """Satış teklifleri tablosu"""
 
@@ -218,10 +238,13 @@ class SalesQuote(BaseModel):
     # Müşteri
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
 
+    # CRM Fırsat Bağlantısı
+    opportunity_id = Column(Integer, ForeignKey("opportunities.id"), nullable=True)
+
     # Durum
     status = Column(
         SQLEnum(SalesQuoteStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SalesQuoteStatus.DRAFT
+        default=SalesQuoteStatus.DRAFT,
     )
 
     # Geçerlilik
@@ -251,8 +274,9 @@ class SalesQuote(BaseModel):
 
     # İlişkiler
     customer = relationship("Customer", back_populates="sales_quotes")
-    items = relationship("SalesQuoteItem", back_populates="quote",
-                        cascade="all, delete-orphan")
+    items = relationship(
+        "SalesQuoteItem", back_populates="quote", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_sq_customer", "customer_id"),
@@ -282,11 +306,15 @@ class SalesQuote(BaseModel):
             Decimal(str(item.quantity or 0)) * Decimal(str(item.unit_price or 0))
             for item in self.items
         )
-        self.discount_amount = self.subtotal * Decimal(str(self.discount_rate or 0)) / 100
+        self.discount_amount = (
+            self.subtotal * Decimal(str(self.discount_rate or 0)) / 100
+        )
         taxable = self.subtotal - self.discount_amount
         self.tax_amount = sum(
-            Decimal(str(item.quantity or 0)) * Decimal(str(item.unit_price or 0)) *
-            Decimal(str(item.tax_rate or 0)) / 100
+            Decimal(str(item.quantity or 0))
+            * Decimal(str(item.unit_price or 0))
+            * Decimal(str(item.tax_rate or 0))
+            / 100
             for item in self.items
         )
         self.total = taxable + self.tax_amount
@@ -300,7 +328,9 @@ class SalesQuoteItem(BaseModel):
 
     __tablename__ = "sales_quote_items"
 
-    quote_id = Column(Integer, ForeignKey("sales_quotes.id", ondelete="CASCADE"), nullable=False)
+    quote_id = Column(
+        Integer, ForeignKey("sales_quotes.id", ondelete="CASCADE"), nullable=False
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
 
     # Miktar
@@ -338,6 +368,7 @@ class SalesQuoteItem(BaseModel):
 
 # === SATIŞ SİPARİŞİ ===
 
+
 class SalesOrder(BaseModel):
     """Satış siparişleri tablosu"""
 
@@ -356,7 +387,7 @@ class SalesOrder(BaseModel):
     # Durum
     status = Column(
         SQLEnum(SalesOrderStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SalesOrderStatus.DRAFT
+        default=SalesOrderStatus.DRAFT,
     )
 
     # Tarihler
@@ -389,8 +420,9 @@ class SalesOrder(BaseModel):
     customer = relationship("Customer", back_populates="sales_orders")
     quote = relationship("SalesQuote", foreign_keys=[quote_id])
     source_warehouse = relationship("Warehouse", foreign_keys=[source_warehouse_id])
-    items = relationship("SalesOrderItem", back_populates="order",
-                        cascade="all, delete-orphan")
+    items = relationship(
+        "SalesOrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
     delivery_notes = relationship("DeliveryNote", back_populates="sales_order")
     invoices = relationship("Invoice", back_populates="sales_order")
 
@@ -429,11 +461,15 @@ class SalesOrder(BaseModel):
             Decimal(str(item.quantity or 0)) * Decimal(str(item.unit_price or 0))
             for item in self.items
         )
-        self.discount_amount = self.subtotal * Decimal(str(self.discount_rate or 0)) / 100
+        self.discount_amount = (
+            self.subtotal * Decimal(str(self.discount_rate or 0)) / 100
+        )
         taxable = self.subtotal - self.discount_amount
         self.tax_amount = sum(
-            Decimal(str(item.quantity or 0)) * Decimal(str(item.unit_price or 0)) *
-            Decimal(str(item.tax_rate or 0)) / 100
+            Decimal(str(item.quantity or 0))
+            * Decimal(str(item.unit_price or 0))
+            * Decimal(str(item.tax_rate or 0))
+            / 100
             for item in self.items
         )
         self.total = taxable + self.tax_amount
@@ -447,7 +483,9 @@ class SalesOrderItem(BaseModel):
 
     __tablename__ = "sales_order_items"
 
-    order_id = Column(Integer, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(
+        Integer, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
 
     # Miktar
@@ -477,7 +515,9 @@ class SalesOrderItem(BaseModel):
 
     @property
     def remaining_quantity(self) -> Decimal:
-        return Decimal(str(self.quantity or 0)) - Decimal(str(self.delivered_quantity or 0))
+        return Decimal(str(self.quantity or 0)) - Decimal(
+            str(self.delivered_quantity or 0)
+        )
 
     @property
     def is_fully_delivered(self) -> bool:
@@ -498,6 +538,7 @@ class SalesOrderItem(BaseModel):
 
 # === TESLİMAT İRSALİYESİ ===
 
+
 class DeliveryNote(BaseModel):
     """Teslimat irsaliyeleri tablosu"""
 
@@ -516,7 +557,7 @@ class DeliveryNote(BaseModel):
     # Durum
     status = Column(
         SQLEnum(DeliveryNoteStatus, values_callable=lambda x: [e.value for e in x]),
-        default=DeliveryNoteStatus.DRAFT
+        default=DeliveryNoteStatus.DRAFT,
     )
 
     # Kaynak depo
@@ -537,8 +578,9 @@ class DeliveryNote(BaseModel):
     sales_order = relationship("SalesOrder", back_populates="delivery_notes")
     customer = relationship("Customer", back_populates="delivery_notes")
     source_warehouse = relationship("Warehouse", foreign_keys=[source_warehouse_id])
-    items = relationship("DeliveryNoteItem", back_populates="delivery_note",
-                        cascade="all, delete-orphan")
+    items = relationship(
+        "DeliveryNoteItem", back_populates="delivery_note", cascade="all, delete-orphan"
+    )
     invoices = relationship("Invoice", back_populates="delivery_note")
 
     __table_args__ = (
@@ -571,7 +613,9 @@ class DeliveryNoteItem(BaseModel):
 
     __tablename__ = "delivery_note_items"
 
-    delivery_note_id = Column(Integer, ForeignKey("delivery_notes.id", ondelete="CASCADE"), nullable=False)
+    delivery_note_id = Column(
+        Integer, ForeignKey("delivery_notes.id", ondelete="CASCADE"), nullable=False
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
 
     # Sipariş kalemi (varsa)
@@ -600,6 +644,7 @@ class DeliveryNoteItem(BaseModel):
 
 # === FATURA ===
 
+
 class Invoice(BaseModel):
     """Faturalar tablosu"""
 
@@ -620,7 +665,7 @@ class Invoice(BaseModel):
     # Durum
     status = Column(
         SQLEnum(InvoiceStatus, values_callable=lambda x: [e.value for e in x]),
-        default=InvoiceStatus.DRAFT
+        default=InvoiceStatus.DRAFT,
     )
 
     # Fiyatlandırma
@@ -646,8 +691,9 @@ class Invoice(BaseModel):
     customer = relationship("Customer", back_populates="invoices")
     sales_order = relationship("SalesOrder", back_populates="invoices")
     delivery_note = relationship("DeliveryNote", back_populates="invoices")
-    items = relationship("InvoiceItem", back_populates="invoice",
-                        cascade="all, delete-orphan")
+    items = relationship(
+        "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_inv_customer", "customer_id"),
@@ -663,7 +709,11 @@ class Invoice(BaseModel):
     @property
     def is_overdue(self) -> bool:
         from datetime import date
-        if self.due_date and self.status not in [InvoiceStatus.PAID, InvoiceStatus.CANCELLED]:
+
+        if self.due_date and self.status not in [
+            InvoiceStatus.PAID,
+            InvoiceStatus.CANCELLED,
+        ]:
             return date.today() > self.due_date
         return False
 
@@ -685,8 +735,10 @@ class Invoice(BaseModel):
             for item in self.items
         )
         self.tax_amount = sum(
-            Decimal(str(item.quantity or 0)) * Decimal(str(item.unit_price or 0)) *
-            Decimal(str(item.tax_rate or 0)) / 100
+            Decimal(str(item.quantity or 0))
+            * Decimal(str(item.unit_price or 0))
+            * Decimal(str(item.tax_rate or 0))
+            / 100
             for item in self.items
         )
         self.total = self.subtotal - self.discount_amount + self.tax_amount
@@ -701,7 +753,9 @@ class InvoiceItem(BaseModel):
 
     __tablename__ = "invoice_items"
 
-    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
+    invoice_id = Column(
+        Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
 
     # Miktar

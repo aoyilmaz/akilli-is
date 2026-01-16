@@ -201,6 +201,7 @@ class Employee(BaseModel):
     )
     attendances = relationship("Attendance", back_populates="employee")
     shift_team = relationship("ShiftTeam", back_populates="employees")
+    user = relationship("User", foreign_keys=[user_id])
 
     __table_args__ = (
         Index("idx_emp_no", "employee_no"),

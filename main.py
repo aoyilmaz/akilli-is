@@ -16,6 +16,11 @@ from PyQt6.QtGui import QFont, QIcon
 
 from config import APP_NAME, APP_VERSION, UI, ICONS_DIR
 
+# Auth ve Audit sistemi
+from database.audit_engine import audit_engine
+from core.session_manager import session_manager
+from core.user_context import get_current_user, set_current_user, create_user_context
+
 
 class ApplicationController:
     """Uygulama akış kontrolcüsü"""
@@ -26,9 +31,14 @@ class ApplicationController:
         self.login = None
         self.main_window = None
         self.current_user = None
+        self._db_session = None
 
     def start(self):
         """Uygulama akışını başlat: Splash -> Login -> MainWindow"""
+        # Audit engine'i başlat
+        audit_engine.init_listeners()
+        print("✓ Audit engine başlatıldı")
+
         self._show_splash()
 
     def _show_splash(self):
@@ -40,9 +50,9 @@ class ApplicationController:
         self.splash.start()
 
     def _on_splash_finished(self):
-        """Splash tamamlandığında login göster"""
+        """Splash tamamlandığında ana pencereyi göster (Login devre dışı)"""
         self.splash = None
-        self._show_login()
+        self._show_main_window()
 
     def _show_login(self):
         """Login ekranını göster"""
@@ -57,6 +67,18 @@ class ApplicationController:
         """Başarılı giriş sonrası ana pencereyi göster"""
         self.current_user = user
 
+        # User context'i ayarla
+        from database.base import get_session
+        db = get_session()
+        try:
+            context = create_user_context(user)
+            set_current_user(context)
+            print(f"✓ Kullanıcı context'i ayarlandı: {user.username}")
+        except Exception as e:
+            print(f"Kullanıcı context hatası: {e}")
+        finally:
+            db.close()
+
         if self.login:
             self.login.close()
             self.login = None
@@ -66,10 +88,11 @@ class ApplicationController:
     def _on_forgot_password(self):
         """Şifremi unuttum işlemi"""
         from PyQt6.QtWidgets import QMessageBox
+
         QMessageBox.information(
             self.login,
             "Şifre Sıfırlama",
-            "Şifre sıfırlama talebi için sistem yöneticinize başvurun."
+            "Şifre sıfırlama talebi için sistem yöneticinize başvurun.",
         )
 
     def _show_main_window(self):
@@ -82,14 +105,15 @@ class ApplicationController:
         if self.current_user:
             try:
                 # Status bar'da kullanıcı bilgisini güncelle
-                if hasattr(self.main_window, 'status_user_name'):
-                    name = getattr(self.current_user, 'full_name', None) or \
-                           getattr(self.current_user, 'username', 'Kullanıcı')
+                if hasattr(self.main_window, "status_user_name"):
+                    name = getattr(self.current_user, "full_name", None) or getattr(
+                        self.current_user, "username", "Kullanıcı"
+                    )
                     self.main_window.status_user_name.setText(name)
-                if hasattr(self.main_window, 'status_role_badge'):
-                    role = getattr(self.current_user, 'role', None)
+                if hasattr(self.main_window, "status_role_badge"):
+                    role = getattr(self.current_user, "role", None)
                     if role:
-                        role_name = getattr(role, 'name', 'Kullanıcı')
+                        role_name = getattr(role, "name", "Kullanıcı")
                         self.main_window.status_role_badge.setText(role_name)
             except Exception:
                 pass
@@ -100,9 +124,10 @@ class ApplicationController:
 
 def main():
     """Ana uygulama fonksiyonu"""
-    print("=" * 50)
+    print("=" * 80)
     print(f"{APP_NAME} v{APP_VERSION} başlatılıyor...")
-    print("=" * 50)
+    print("=" * 80)
+    print("=" * 80)
 
     # Uygulama oluştur
     app = QApplication(sys.argv)
@@ -126,6 +151,7 @@ def main():
 
     # Global tema uygula (config/theme.qss)
     from config.theme_manager import apply_global_theme
+
     apply_global_theme(app)
 
     # Uygulama kontrolcüsünü başlat
@@ -155,9 +181,33 @@ def main_direct():
     app.setFont(font)
 
     from config.theme_manager import apply_global_theme
+
     apply_global_theme(app)
 
+    # Audit engine'i başlat
+    audit_engine.init_listeners()
+    print("✓ Audit engine başlatıldı")
+
+    # Dev modunda admin kullanıcısını otomatik ayarla
+    from database.base import get_session
+    from database.models.user import User
+
+    db = get_session()
+    try:
+        admin_user = db.query(User).filter(User.username == "admin").first()
+        if admin_user:
+            context = create_user_context(admin_user)
+            set_current_user(context)
+            print(f"✓ Dev kullanıcı context'i ayarlandı: {admin_user.username}")
+        else:
+            print("! Admin kullanıcısı bulunamadı - seed_auth.py çalıştırın")
+    except Exception as e:
+        print(f"Dev kullanıcı hatası: {e}")
+    finally:
+        db.close()
+
     from ui.main_window import MainWindow
+
     window = MainWindow()
     window.showMaximized()
 

@@ -10,6 +10,8 @@ from database.models.user import (
     AuditLog,
     Setting,
     Sequence,
+    UserSession,
+    UserPagePermission,
     user_roles,
     role_permissions,
 )
@@ -48,6 +50,8 @@ __all__ = [
     "AuditLog",
     "Setting",
     "Sequence",
+    "UserSession",
+    "UserPagePermission",
     "user_roles",
     "role_permissions",
     # Inventory
@@ -194,4 +198,29 @@ from database.models.quality import (
     ComplaintStatus,
     CAPAType,
     CAPAStatus,
+)
+
+# CRM Modülü
+from database.models.crm import (
+    Lead,
+    LeadStatus,
+    LeadSource,
+    Opportunity,
+    OpportunityStage,
+    Activity,
+    ActivityType,
+)
+
+# Bakım ve Onarım Modülü
+from database.models.maintenance import (
+    MaintenanceCategory,
+    Equipment,
+    MaintenanceRequest,
+    MaintenanceWorkOrder,
+    MaintenanceWorkOrderPart,
+    MaintenancePriority,
+    MaintenanceStatus,
+    WorkOrderStatus,
+    MaintenanceType,
+    CriticalityLevel,
 )

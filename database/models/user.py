@@ -283,3 +283,95 @@ class Sequence(Base):
 
     def __repr__(self):
         return f"<Sequence(code={self.code}, current={self.current_value})>"
+
+
+class UserPagePermission(Base):
+    """
+    Kullanıcı bazlı sayfa izinleri tablosu.
+
+    Rol izinlerine EK olarak belirli sayfalara erişim verir.
+    Örn: WAREHOUSE rolündeki kullanıcıya ek olarak 'purchase-requests' sayfası.
+    """
+
+    __tablename__ = "user_page_permissions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    page_id = Column(String(100), nullable=False)  # örn: "purchase-requests", "work-orders"
+    granted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    granted_at = Column(DateTime, default=datetime.utcnow)
+    notes = Column(String(500), nullable=True)  # Neden verildi notları
+
+    # İlişkiler
+    user = relationship("User", foreign_keys=[user_id], backref="page_permissions")
+    granter = relationship("User", foreign_keys=[granted_by])
+
+    # Unique constraint - aynı kullanıcıya aynı sayfa iki kez verilemez
+    __table_args__ = (
+        Index("idx_user_page", "user_id", "page_id", unique=True),
+    )
+
+    def __repr__(self):
+        return f"<UserPagePermission(user_id={self.user_id}, page={self.page_id})>"
+
+
+class UserSession(BaseModel):
+    """Kullanıcı oturumları tablosu (çoklu cihaz desteği)"""
+
+    __tablename__ = "user_sessions"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Token bilgileri
+    session_token = Column(String(64), unique=True, nullable=False, index=True)
+    refresh_token = Column(String(64), unique=True, nullable=True)
+
+    # Cihaz bilgileri
+    device_name = Column(String(100), nullable=True)  # "MacBook Pro", "iPhone 15"
+    device_type = Column(String(20), nullable=True)  # desktop, mobile, tablet
+    os_info = Column(String(100), nullable=True)  # "macOS 14.0", "Windows 11"
+    app_version = Column(String(20), nullable=True)  # Uygulama versiyonu
+
+    # Konum/IP
+    ip_address = Column(String(45), nullable=True)
+    location = Column(String(200), nullable=True)  # Şehir, ülke
+
+    # Süre bilgileri
+    expires_at = Column(DateTime, nullable=False)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+
+    # Durum
+    is_revoked = Column(Boolean, default=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revoke_reason = Column(String(100), nullable=True)  # logout, expired, forced, security
+
+    # İlişkiler
+    user = relationship("User", backref="sessions")
+
+    # Index'ler
+    __table_args__ = (
+        Index("idx_session_user", "user_id"),
+        Index("idx_session_token", "session_token"),
+        Index("idx_session_expires", "expires_at"),
+        Index("idx_session_active", "is_active", "is_revoked"),
+    )
+
+    @property
+    def is_valid(self) -> bool:
+        """Oturum hâlâ geçerli mi?"""
+        if self.is_revoked or not self.is_active:
+            return False
+        return datetime.utcnow() < self.expires_at
+
+    def revoke(self, reason: str = "logout") -> None:
+        """Oturumu iptal et"""
+        self.is_revoked = True
+        self.revoked_at = datetime.utcnow()
+        self.revoke_reason = reason
+
+    def refresh_activity(self) -> None:
+        """Son aktivite zamanını güncelle"""
+        self.last_activity = datetime.utcnow()
+
+    def __repr__(self):
+        return f"<UserSession(user_id={self.user_id}, device={self.device_name}, valid={self.is_valid})>"

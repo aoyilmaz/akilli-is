@@ -17,6 +17,7 @@ class WorkStationModule(QWidget):
         super().__init__(parent)
         self.station_service = None
         self.warehouse_service = None
+        self.supplier_service = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -47,9 +48,11 @@ class WorkStationModule(QWidget):
             try:
                 from modules.production.services import WorkStationService
                 from modules.inventory.services import WarehouseService
+                from modules.purchasing.services import SupplierService
 
                 self.station_service = WorkStationService()
                 self.warehouse_service = WarehouseService()
+                self.supplier_service = SupplierService()
             except Exception as e:
                 print(f"Servis yükleme hatası: {e}")
 
@@ -124,6 +127,8 @@ class WorkStationModule(QWidget):
             "warehouse_id": station.warehouse_id,
             "location": station.location,
             "is_active": station.is_active,
+            "is_external": station.is_external,
+            "supplier_id": station.supplier_id,
         }
 
         form = WorkStationFormPage(station_data)
@@ -167,6 +172,8 @@ class WorkStationModule(QWidget):
             "warehouse_id": station.warehouse_id,
             "location": station.location,
             "is_active": station.is_active,
+            "is_external": station.is_external,
+            "supplier_id": station.supplier_id,
             "default_operation_name": getattr(station, "default_operation_name", None),
             "default_setup_time": getattr(station, "default_setup_time", None),
             "default_run_time_per_unit": getattr(
@@ -196,6 +203,11 @@ class WorkStationModule(QWidget):
         try:
             warehouses = self.warehouse_service.get_all()
             form.set_warehouses(warehouses)
+
+            # Tedarikçileri yükle
+            if self.supplier_service:
+                suppliers = self.supplier_service.get_all()
+                form.set_suppliers(suppliers)
         except Exception as e:
             print(f"Form veri yükleme hatası: {e}")
 
