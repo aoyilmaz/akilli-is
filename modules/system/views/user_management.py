@@ -13,21 +13,20 @@ from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QLineEdit,
-    QComboBox,
     QFormLayout,
-    QMessageBox,
     QCheckBox,
     QScrollArea,
     QFrame,
     QTabWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt
+from ui.components.toast import show_toast
 import qtawesome as qta
 
 from database.base import get_session
-from database.models.user import User, Role
-from config.themes import get_theme
+from database.models.user import User, Role, UserPagePermission
+from core.permission_map import PAGE_DEFINITIONS
+from modules.development.error_handler import ErrorHandler
 
 
 class UserDialog(QDialog):
@@ -60,6 +59,11 @@ class UserDialog(QDialog):
         self.roles_tab = QWidget()
         self.setup_roles_tab()
         self.tabs.addTab(self.roles_tab, "Roller")
+
+        # Sayfa İzinleri Sekmesi
+        self.pages_tab = QWidget()
+        self.setup_page_permissions_tab()
+        self.tabs.addTab(self.pages_tab, "Sayfa İzinleri")
 
         # Butonlar
         btn_layout = QHBoxLayout()
@@ -133,6 +137,47 @@ class UserDialog(QDialog):
 
         self.role_layout.addStretch()
 
+    def setup_page_permissions_tab(self):
+        """Sayfa izinleri sekmesini oluşturur - modüller gruplu, sayfalar checkbox"""
+        layout = QVBoxLayout(self.pages_tab)
+
+        # Açıklama
+        info_label = QLabel(
+            "Kullanıcının rolü dışında ek olarak erişim " "vereceğiniz sayfaları seçin:"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #888; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        layout.addWidget(scroll)
+
+        content = QWidget()
+        scroll.setWidget(content)
+        self.page_layout = QVBoxLayout(content)
+
+        # Modülleri ve sayfaları listele
+        self.page_checks = {}  # page_id -> QCheckBox
+
+        for module_key, module_data in PAGE_DEFINITIONS.items():
+            # Modül başlığı
+            module_label = QLabel(f"📁 {module_data['name']}")
+            module_label.setStyleSheet(
+                "font-weight: bold; font-size: 13px; margin-top: 10px; color: #3498db;"
+            )
+            self.page_layout.addWidget(module_label)
+
+            # Sayfalar (girintili)
+            for page_id, page_name in module_data["pages"]:
+                chk = QCheckBox(f"    {page_name}")
+                chk.setToolTip(f"Sayfa ID: {page_id}")
+                self.page_layout.addWidget(chk)
+                self.page_checks[page_id] = chk
+
+        self.page_layout.addStretch()
+
     def load_user_data(self):
         if not self.user_id:
             return
@@ -154,12 +199,18 @@ class UserDialog(QDialog):
                 for rid, chk in self.role_checks.items():
                     if rid in user_role_ids:
                         chk.setChecked(True)
+
+                # Sayfa izinlerini işaretle
+                user_page_ids = [p.page_id for p in user.page_permissions]
+                for page_id, chk in self.page_checks.items():
+                    if page_id in user_page_ids:
+                        chk.setChecked(True)
         finally:
             session.close()
 
     def save_user(self):
         if not self.inp_username.text() or not self.inp_email.text():
-            QMessageBox.warning(self, "Hata", "Kullanıcı adı ve e-posta zorunludur.")
+            show_toast("Kullanıcı adı ve e-posta zorunludur.", "WARNING")
             return
 
         session = get_session()
@@ -174,9 +225,7 @@ class UserDialog(QDialog):
                     .first()
                 )
                 if existing:
-                    QMessageBox.warning(
-                        self, "Hata", "Bu kullanıcı adı zaten kullanılıyor."
-                    )
+                    show_toast("Bu kullanıcı adı zaten kullanılıyor.", "WARNING")
                     return
 
                 user = User(username=self.inp_username.text())
@@ -193,15 +242,11 @@ class UserDialog(QDialog):
             password = self.inp_password.text()
             if password:
                 if len(password) < 6:
-                    QMessageBox.warning(
-                        self, "Hata", "Şifre en az 6 karakter olmalıdır."
-                    )
+                    show_toast("Şifre en az 6 karakter olmalıdır.", "WARNING")
                     return
                 user.set_password(password)
             elif not self.user_id:
-                QMessageBox.warning(
-                    self, "Hata", "Yeni kullanıcı için şifre zorunludur."
-                )
+                show_toast("Yeni kullanıcı için şifre zorunludur.", "WARNING")
                 return
 
             # Rolleri güncelle
@@ -211,12 +256,42 @@ class UserDialog(QDialog):
                     role = session.query(Role).get(rid)
                     user.roles.append(role)
 
+            # Önce commit yaparak user.id'nin oluşmasını sağla
+            session.flush()
+
+            # Sayfa izinlerini güncelle
+            # Mevcut izinleri sil
+            session.query(UserPagePermission).filter(
+                UserPagePermission.user_id == user.id
+            ).delete()
+
+            # Yeni izinleri ekle
+            from core.user_context import get_current_user
+
+            current_user = get_current_user()
+            granter_id = current_user.user_id if current_user else None
+
+            for page_id, chk in self.page_checks.items():
+                if chk.isChecked():
+                    perm = UserPagePermission(
+                        user_id=user.id,
+                        page_id=page_id,
+                        granted_by=granter_id,
+                    )
+                    session.add(perm)
+
             session.commit()
             self.accept()
 
         except Exception as e:
             session.rollback()
-            QMessageBox.critical(self, "Hata", f"Kayıt hatası: {str(e)}")
+            ErrorHandler.handle_error(
+                e,
+                module="system",
+                screen="UserDialog",
+                function="save_user",
+                parent_widget=self,
+            )
         finally:
             session.close()
 

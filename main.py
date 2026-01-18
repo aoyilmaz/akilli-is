@@ -5,7 +5,11 @@ Ana uygulama giriş noktası
 """
 
 import sys
+import warnings
 from pathlib import Path
+
+# urllib3 SSL uyarısını bastır (LibreSSL uyumluluğu)
+warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 
 # Proje kök dizinini Python path'ine ekle
 ROOT_DIR = Path(__file__).resolve().parent
@@ -52,7 +56,31 @@ class ApplicationController:
     def _on_splash_finished(self):
         """Splash tamamlandığında ana pencereyi göster (Login devre dışı)"""
         self.splash = None
+
+        # Login bypass edildiğinde dev kullanıcı context'i ayarla
+        self._setup_dev_user_context()
+
         self._show_main_window()
+
+    def _setup_dev_user_context(self):
+        """Geliştirme modu için admin kullanıcı context'i ayarla"""
+        from database.base import get_session
+        from database.models.user import User
+
+        db = get_session()
+        try:
+            admin_user = db.query(User).filter(User.username == "admin").first()
+            if admin_user:
+                self.current_user = admin_user
+                context = create_user_context(admin_user)
+                set_current_user(context)
+                print(f"✓ Dev kullanıcı context'i ayarlandı: {admin_user.username}")
+            else:
+                print("! Admin kullanıcısı bulunamadı - seed_auth.py çalıştırın")
+        except Exception as e:
+            print(f"Dev kullanıcı hatası: {e}")
+        finally:
+            db.close()
 
     def _show_login(self):
         """Login ekranını göster"""

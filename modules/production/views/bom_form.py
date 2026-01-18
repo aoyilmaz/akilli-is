@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QSpinBox,
     QFrame,
-    QMessageBox,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -26,6 +25,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from ui.components.toast import show_toast
 from PyQt6.QtGui import QColor
 
 
@@ -127,8 +127,6 @@ class BOMFormPage(QWidget):
 
     def __init__(self, bom_data: Optional[dict] = None, parent=None):
         super().__init__(parent)
-        self.bom_data = bom_data
-        self.is_edit_mode = bom_data is not None
         self.bom_data = bom_data
         self.is_edit_mode = bom_data is not None
         self.lines = []
@@ -365,7 +363,7 @@ class BOMFormPage(QWidget):
 
     def _add_by_product(self):
         if not self.available_items:
-            QMessageBox.warning(self, "Uyarı", "Malzeme listesi yüklenmedi!")
+            show_toast("Malzeme listesi yüklenmedi!", "WARNING")
             return
 
         dialog = MaterialSelectDialog(self.available_items, self)
@@ -526,7 +524,7 @@ class BOMFormPage(QWidget):
 
     def _add_material(self):
         if not self.available_items:
-            QMessageBox.warning(self, "Uyarı", "Malzeme listesi yüklenmedi!")
+            show_toast("Malzeme listesi yüklenmedi!", "WARNING")
             return
 
         dialog = MaterialSelectDialog(self.available_items, self)
@@ -649,17 +647,17 @@ class BOMFormPage(QWidget):
         name = self.name_input.text().strip()
 
         if not code:
-            QMessageBox.warning(self, "Uyarı", "Reçete kodu zorunludur!")
+            show_toast("Reçete kodu zorunludur!", "WARNING")
             return
         if not name:
-            QMessageBox.warning(self, "Uyarı", "Reçete adı zorunludur!")
+            show_toast("Reçete adı zorunludur!", "WARNING")
             return
         product_id = self.product_combo.currentData()
         if not product_id:
-            QMessageBox.warning(self, "Uyarı", "Mamul seçimi zorunludur!")
+            show_toast("Mamul seçimi zorunludur!", "WARNING")
             return
         if not self.lines:
-            QMessageBox.warning(self, "Uyarı", "En az bir malzeme eklemelisiniz!")
+            show_toast("En az bir malzeme eklemelisiniz!", "WARNING")
             return
 
         data = {
@@ -676,14 +674,14 @@ class BOMFormPage(QWidget):
             "overhead_cost": Decimal(str(self.overhead_cost_input.value())),
             "lines": [
                 {
-                    "item_id": l["item_id"],
-                    "quantity": l["quantity"],
-                    "unit_id": l.get("unit_id"),
-                    "scrap_rate": l.get("scrap_rate", Decimal(0)),
-                    "unit_cost": l.get("unit_cost", Decimal(0)),
-                    "line_cost": l.get("line_cost", Decimal(0)),
+                    "item_id": line_item["item_id"],
+                    "quantity": line_item["quantity"],
+                    "unit_id": line_item.get("unit_id"),
+                    "scrap_rate": line_item.get("scrap_rate", Decimal(0)),
+                    "unit_cost": line_item.get("unit_cost", Decimal(0)),
+                    "line_cost": line_item.get("line_cost", Decimal(0)),
                 }
-                for l in self.lines
+                for line_item in self.lines
             ],
             "by_products": [
                 {

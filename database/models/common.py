@@ -4,6 +4,7 @@ Akıllı İş - Ortak Tablolar
 
 from datetime import datetime, date
 from decimal import Decimal
+from enum import Enum as PyEnum
 from sqlalchemy import (
     Column,
     Integer,
@@ -15,10 +16,22 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Enum,
 )
 from sqlalchemy.orm import relationship
 
 from database.base import Base, BaseModel
+
+
+# ==================== ENUMS ====================
+
+class NotificationType(str, PyEnum):
+    """Bildirim türleri"""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    SUCCESS = "success"
+    ACTION_REQUIRED = "action_required"
 
 
 class Currency(BaseModel):
@@ -241,3 +254,54 @@ class LabelTemplate(BaseModel):
 
     def __repr__(self):
         return f"<LabelTemplate(code={self.code}, name={self.name})>"
+
+
+class Notification(BaseModel):
+    """
+    Bildirimler tablosu
+
+    Sistemdeki olayları (stok uyarısı, onay bekleyen işlem vb.)
+    kullanıcılara bildirmek için kullanılır.
+    """
+
+    __tablename__ = "notifications"
+
+    # Bildirim kime?
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Bildirim içeriği
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    notification_type = Column(
+        String(20),
+        default=NotificationType.INFO.value,
+        nullable=False,
+    )
+
+    # Durum
+    is_read = Column(Boolean, default=False, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+
+    # Navigasyon
+    link = Column(String(255), nullable=True)  # Örn: 'inventory/stock-cards/15'
+    related_module = Column(String(50), nullable=True)  # Örn: 'inventory', 'purchasing'
+    related_record_id = Column(Integer, nullable=True)  # İlgili kaydın ID'si
+
+    # İlişkiler
+    user = relationship("User", backref="notifications")
+
+    # Index'ler (performans için)
+    __table_args__ = (
+        Index("idx_notification_user_unread", "user_id", "is_read"),
+        Index("idx_notification_module", "related_module"),
+        Index("idx_notification_created", "created_at"),
+    )
+
+    def mark_as_read(self):
+        """Bildirimi okundu olarak işaretle"""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = datetime.utcnow()
+
+    def __repr__(self):
+        return f"<Notification(id={self.id}, user_id={self.user_id}, title={self.title[:30]}...)>"

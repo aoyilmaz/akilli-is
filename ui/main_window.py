@@ -14,42 +14,42 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from PyQt6.QtWidgets import (
+    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QLabel,
-    QLineEdit,
     QPushButton,
-    QFrame,
+    QLabel,
     QTabWidget,
+    QStatusBar,
+    QSizePolicy,
     QTreeWidget,
     QTreeWidgetItem,
-    QApplication,
     QSizeGrip,
-    QStatusBar,
     QScrollArea,
-    QSizePolicy,
+    QFrame,
 )
 from PyQt6.QtCore import (
     Qt,
+    pyqtSignal,
     QPoint,
+    QPointF,
+    QSize,
     QPropertyAnimation,
     QEasingCurve,
     QSize,
     pyqtSignal,
-    QPointF,
-    QTimer,
 )
 from PyQt6.QtGui import (
     QIcon,
     QFont,
     QColor,
     QPainter,
+    QPainterPath,
     QPen,
     QBrush,
     QLinearGradient,
-    QPainterPath,
 )
 
 try:
@@ -62,6 +62,8 @@ from config.themes import ThemeManager, get_theme
 
 # --- IMPORTLAR ---
 from ui.pages.placeholder import PlaceholderPage
+from ui.pages.dashboard import DashboardPage
+from ui.components.toast import show_toast
 
 
 class MissingModule(PlaceholderPage):
@@ -602,6 +604,17 @@ MENU_DATA = {
             ("Cari Hesaplar", "fa5s.address-book", "account-statements"),
         ],
     },
+    "hr": {
+        "title": "İNSAN KAYNAKLARI",
+        "items": [
+            ("Çalışanlar", "fa5s.user-tie", "employees"),
+            ("Departmanlar", "fa5s.building", "departments"),
+            ("Pozisyonlar", "fa5s.id-badge", "positions"),
+            ("İzin Yönetimi", "fa5s.calendar-check", "leaves"),
+            ("Organizasyon", "fa5s.sitemap", "org-chart"),
+            ("Vardiya Ekipleri", "fa5s.users-cog", "shift-teams"),
+        ],
+    },
     "reports": {
         "title": "RAPORLAR",
         "items": [
@@ -612,30 +625,14 @@ MENU_DATA = {
             ("Alacak Yaşlandırma", "fa5s.credit-card", "receivables-aging"),
         ],
     },
-    "development": {
-        "title": "GELİŞTİRME",
-        "items": [
-            ("Hata Kayıtları", "fa5s.bug", "error-logs"),
-        ],
-    },
     "settings": {
-        "title": "SİSTEM AYARLARI",
+        "title": "GELİŞTİRME",
         "items": [
             ("Kullanıcı Yönetimi", "fa5s.users-cog", "users"),
             ("İşlem Geçmişi", "fa5s.history", "audit-logs"),
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
             ("Yazdırma Şablonları", "fa5s.print", "label-templates"),
-        ],
-    },
-    "hr": {
-        "title": "İNSAN KAYNAKLARI",
-        "items": [
-            ("Çalışanlar", "fa5s.user-tie", "employees"),
-            ("Departmanlar", "fa5s.building", "departments"),
-            ("Pozisyonlar", "fa5s.id-badge", "positions"),
-            ("İzin Yönetimi", "fa5s.calendar-check", "leaves"),
-            ("Organizasyon", "fa5s.sitemap", "org-chart"),
-            ("Vardiya Ekipleri", "fa5s.users-cog", "shift-teams"),
+            ("Hata Kayıtları", "fa5s.bug", "error-logs"),
         ],
     },
 }
@@ -991,7 +988,7 @@ class MainWindow(QMainWindow):
 
     def setup_pages_dict(self):
         self.pages = {}
-        self.pages["dashboard"] = HomeDashboard()
+        self.pages["dashboard"] = DashboardPage()
         # Stok modülü sayfaları
         self.pages["stock-cards"] = InventoryModule()
         self.pages["categories"] = CategoryModule()
@@ -1243,7 +1240,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             f"""
         QMainWindow, #CentralWidget {{ background-color: {t.bg_primary}; }}
-        QWidget {{ color: #cccccc; font-family: 'Segoe UI', sans-serif; font-size: 13px; }}
+        QWidget {{ color: #cccccc; font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif; font-size: 13px; }}
         
         #TitleBar {{ background-color: #3c3c3c; border-bottom: 1px solid #3e3e42; }}
         #SearchInput {{ background-color: #252526; border: 1px solid #3e3e42; border-radius: 3px; color: #cccccc; padding: 1px 10px; height: 22px; }}
@@ -1278,29 +1275,15 @@ class MainWindow(QMainWindow):
         )
 
     def show_notification(self, message: str, level: str = "INFO"):
-        t = get_theme()
-        colors = {
-            "INFO": t.accent_primary,
-            "SUCCESS": t.success,
-            "WARNING": t.warning,
-            "ERROR": t.error,
-        }
-        bg_color = colors.get(level, t.accent_primary)
-        text_color = "white" if level != "WARNING" else "black"
-        self.status_bar.setStyleSheet(
-            f"QStatusBar {{ background-color: {bg_color}; color: {text_color}; border-top: 1px solid {t.border}; font-weight: bold; min-height: 22px; }}"
-        )
-        icons = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "⛔"}
-        self.status_bar.showMessage(f"  {icons.get(level, '')}  {message}")
-        QTimer.singleShot(3000, self._reset_statusbar)
+        """
+        Yeni modern toast bildirim sistemini kullanarak mesaj gösterir.
+        """
+        # Yeni Toast Bildirimi (Sağ alt köşede çıkar)
+        show_toast(message, level)
 
-    def _reset_statusbar(self):
-        self.status_bar.clearMessage()
-        t = get_theme()
-        self.status_bar.setStyleSheet(
-            f"QStatusBar {{ background-color: #5e3b8e; color: white; border-top: 1px solid #3e3e42; min-height: 22px; }}"
-        )
-        self.status_bar.showMessage(" Hazır")
+        # Durum çubuğunda da kısa süreli (5sn) göster
+        icons = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "⛔"}
+        self.status_bar.showMessage(f"  {icons.get(level, '')}  {message}", 5000)
 
     def toggle_sidebar_lock(self, checked):
         self.sidebar.is_locked = checked

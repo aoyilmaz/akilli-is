@@ -40,6 +40,15 @@ from database.models.common import (
     District,
     Attachment,
     Note,
+    Notification,
+    NotificationType,
+)
+
+# Dashboard
+from database.models.dashboard import (
+    DashboardWidget,
+    RoleDefaultLayout,
+    UserDashboardLayout,
 )
 
 __all__ = [
@@ -74,6 +83,12 @@ __all__ = [
     "District",
     "Attachment",
     "Note",
+    "Notification",
+    "NotificationType",
+    # Dashboard
+    "DashboardWidget",
+    "RoleDefaultLayout",
+    "UserDashboardLayout",
 ]
 
 from .production import (

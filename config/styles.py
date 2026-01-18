@@ -77,6 +77,18 @@ BTN_MIN_WIDTH = 100  # Minimum genişlik
 BTN_PADDING = "8px 16px"  # Normal padding
 BTN_PADDING_SMALL = "4px 8px"  # Küçük padding
 
+# === FONT AYARLARI ===
+# Cross-platform font: macOS'ta SF Pro, Windows'ta Segoe UI, Linux'ta sistem fontu
+FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif"
+# PyQt için basit font adı - Platform bağımsız
+import sys
+if sys.platform == "darwin":
+    FONT_FAMILY_QT = ".AppleSystemUIFont"  # macOS sistem fontu
+elif sys.platform == "win32":
+    FONT_FAMILY_QT = "Segoe UI"  # Windows
+else:
+    FONT_FAMILY_QT = "Sans"  # Linux
+
 # === DÜĞME SİMGELERİ ===
 ICONS = {
     "add": "➕",
@@ -690,3 +702,36 @@ def get_back_button_style():
             color: {TEXT_PRIMARY};
         }}
     """
+
+
+# === COLORS DICTIONARY (Dashboard uyumu için) ===
+COLORS = {
+    # Background
+    "bg_primary": BG_PRIMARY,
+    "bg_secondary": BG_SECONDARY,
+    "bg_tertiary": BG_TERTIARY,
+    "bg_card": BG_TERTIARY,
+    "bg_hover": BG_HOVER,
+    "bg_selected": BG_SELECTED,
+
+    # Border
+    "border": BORDER,
+    "border_light": BORDER_LIGHT,
+
+    # Text
+    "text_primary": TEXT_PRIMARY,
+    "text_secondary": TEXT_SECONDARY,
+    "text_muted": TEXT_MUTED,
+
+    # Accent/Primary
+    "primary": ACCENT,
+    "primary_hover": ACCENT_HOVER,
+
+    # Status
+    "success": SUCCESS,
+    "warning": WARNING,
+    "danger": ERROR,
+    "error": ERROR,
+    "info": INFO,
+}
+

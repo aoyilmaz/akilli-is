@@ -17,6 +17,7 @@ class AuthService:
     _current_user: Optional[User] = None
     _permissions_cache: Set[str] = set()
     _roles_cache: Set[str] = set()
+    _page_permissions_cache: Set[str] = set()  # Kullanıcı bazlı sayfa izinleri
 
     def __new__(cls):
         if cls._instance is None:
@@ -35,12 +36,14 @@ class AuthService:
         cls._current_user = None
         cls._permissions_cache.clear()
         cls._roles_cache.clear()
+        cls._page_permissions_cache.clear()
 
     @classmethod
     def _cache_permissions(cls) -> None:
         """Kullanıcının izinlerini ve rollerini önbelleğe al"""
         cls._permissions_cache.clear()
         cls._roles_cache.clear()
+        cls._page_permissions_cache.clear()
 
         if cls._current_user is None:
             return
@@ -51,6 +54,11 @@ class AuthService:
             # Her rolün izinlerini ekle
             for perm in role.permissions:
                 cls._permissions_cache.add(perm.code)
+
+        # Kullanıcı bazlı sayfa izinlerini cache'le
+        if hasattr(cls._current_user, 'page_permissions'):
+            for page_perm in cls._current_user.page_permissions:
+                cls._page_permissions_cache.add(page_perm.page_id)
 
     @classmethod
     def get_current_user(cls) -> Optional[User]:
@@ -134,7 +142,9 @@ class AuthService:
     def can_access_page(cls, page_id: str) -> bool:
         """
         Kullanıcının belirli bir sayfaya erişip erişemeyeceğini kontrol et
-        permission_map modülünden PAGE_PERMISSIONS kullanır
+        1. Süper admin her şeye erişebilir
+        2. Kullanıcı bazlı sayfa izni varsa erişebilir
+        3. Rol bazlı izin kontrolü yapılır
         """
         from core.permission_map import PAGE_PERMISSIONS
 
@@ -142,6 +152,10 @@ class AuthService:
             return False
 
         if cls._current_user.is_superuser:
+            return True
+
+        # Kullanıcı bazlı sayfa izni varsa direkt erişim
+        if page_id in cls._page_permissions_cache:
             return True
 
         # Sayfa için gerekli izni al

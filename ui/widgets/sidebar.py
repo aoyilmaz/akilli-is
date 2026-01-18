@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QPointF
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush, QLinearGradient, QPainterPath
 
 from config import APP_NAME, APP_VERSION
@@ -358,12 +358,54 @@ class Sidebar(QFrame):
         self.setup_ui()
         ThemeManager.register_callback(self._on_theme_changed)
 
+        # Bildirim kontrolü için timer (30 saniyede bir)
+        self.notification_timer = QTimer(self)
+        self.notification_timer.timeout.connect(self._check_notifications)
+        self.notification_timer.start(30000)  # 30 saniye
+
+        # İlk kontrol (1 saniye sonra - UI hazır olunca)
+        QTimer.singleShot(1000, self._check_notifications)
+
     def _on_theme_changed(self, theme):
         self._apply_styles()
         for btn in self.menu_buttons.values():
             btn.update_style()
         for btn in self.submenu_buttons.values():
             btn.update_style()
+
+    def _check_notifications(self):
+        """Bildirim sayılarını kontrol et ve badge'leri güncelle"""
+        try:
+            from core.user_context import get_current_user
+            from modules.notifications.services import NotificationService
+
+            user = get_current_user()
+            if not user or not user.user_id:
+                return
+
+            # Modül bazlı bildirim sayılarını al
+            counts = NotificationService.get_module_counts(user.user_id)
+
+            # Menu butonlarının badge'lerini güncelle
+            for module_id, btn in self.menu_buttons.items():
+                badge_count = counts.get(module_id, 0)
+                if btn.badge != badge_count:
+                    btn.badge = badge_count
+                    btn.update()
+
+        except Exception as e:
+            # Bildirim kontrolü hatası uygulamayı etkilememeli
+            print(f"Bildirim kontrolü hatası: {e}")
+
+    def start_notification_timer(self):
+        """Bildirim timer'ını başlat (login sonrası çağrılabilir)"""
+        if not self.notification_timer.isActive():
+            self.notification_timer.start(30000)
+            self._check_notifications()
+
+    def stop_notification_timer(self):
+        """Bildirim timer'ını durdur (logout sonrası çağrılabilir)"""
+        self.notification_timer.stop()
 
     def _apply_styles(self):
         t = get_theme()
