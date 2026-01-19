@@ -114,19 +114,38 @@ python main.py
 
 ## Proje Yapısı
 
-```
+```text
 akilli-is/
-├── core/                   # Çekirdek servisler (Auth, Context, Logging)
-│   ├── company_context.py  # Global firma yönetimi
-│   └── report_service.py   # PDF/HTML rapor motoru
+├── main.py                 # Uygulama giriş noktası ve denetleyici
+├── core/                   # Çekirdek altyapı servisleri
+│   ├── company_context.py  # Aktif firma ve ayar yönetimi (Context)
+│   ├── reporting/          # Rapor motoru ve HTML/PDF şablonları
+│   ├── auth_service.py     # Kimlik doğrulama işlemleri
+│   └── session_manager.py  # Oturum ve audit yönetimi
 ├── database/               # Veritabanı katmanı
-│   └── models/             # ORM (Company, Sales, HR, vb.)
-├── modules/                # İş modülleri (Service & View)
-│   ├── system/             # CompanyService, UserService
-│   ├── sales/              # Satış ve fatura işlemleri
-│   └── hr/                 # Personel ve vardiya işlemleri
-├── ui/                     # UI bileşenleri (Main Window, Sidebar)
-└── assets/                 # Statik dosyalar (Logo, Belgeler)
+│   ├── base.py             # SQLAlchemy bağlantı ve session yönetimi
+│   ├── audit_engine.py     # Değişiklik izleme sistemi
+│   └── models/             # Veritabanı tabloları (ORM Modelleri)
+├── modules/                # İş Modülleri (Service-View Ayrımı)
+│   ├── sales/              # Satış Modülü
+│   │   ├── services/       # İş mantığı (fatura kesme, sipariş onay vb.)
+│   │   └── views/          # UI ekranları (teklif formu, liste vb.)
+│   ├── hr/                 # İnsan Kaynakları (Personel, Vardiya, Kimlik)
+│   ├── inventory/          # Stok ve Depo yönetimi
+│   ├── production/         # Üretim, Reçete ve Operatör Paneli
+│   └── system/             # Firma kartı, Etiket tasarımcısı, Yetkiler
+├── ui/                     # Global UI bileşenleri
+│   ├── main_window.py      # Ana pencere ve sayfa yönlendirme (Routing)
+│   ├── sidebar.py          # Dinamik modüler menü sistemi
+│   └── resources/          # Ortak ikonlar ve görsel kaynaklar
+├── assets/                 # Çalışma zamanı statik dosyaları
+│   ├── company/            # Firma logoları ve kaşeleri
+│   └── photos/             # Personel fotoğrafları
+├── config/                 # Uygulama ve Tema ayarları
+│   ├── settings.py         # Global konfigürasyon
+│   └── theme_manager.py    # Dark/Light tema ve QSS stil yönetimi
+├── alembic/                # Veritabanı migrasyon geçmişi
+└── tests/                  # Birim ve entegrasyon testleri
 ```
 
 ---
