@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: sans-serif; }
+        .header { text-align: center; border-bottom: 2px solid #333; margin-bottom: 20px; }
+        .info { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .totals { float: right; width: 300px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SATIŞ FATURASI</h1>
+        <p>{{ company_name }}</p>
+    </div>
+    
+    <div class="info">
+        <div>
+            <strong>Müşteri:</strong><br>
+            {{ customer_name }}<br>
+            {{ customer_address }}
+        </div>
+        <div>
+            <strong>Fatura No:</strong> {{ invoice_no }}<br>
+            <strong>Tarih:</strong> {{ invoice_date }}<br>
+            <strong>Yazdırma:</strong> {{ print_date }}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Ürün</th>
+                <th>Miktar</th>
+                <th>Birim Fiyat</th>
+                <th>Toplam</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit_price }}</td>
+                <td>{{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <table>
+            <tr><td>Ara Toplam:</td><td>{{ subtotal }}</td></tr>
+            <tr><td>KDV:</td><td>{{ tax_total }}</td></tr>
+            <tr><td><strong>GENEL TOPLAM:</strong></td><td><strong>{{ total }}</strong></td></tr>
+        </table>
+    </div>
+</body>
+</html>

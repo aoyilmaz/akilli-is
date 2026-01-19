@@ -83,11 +83,15 @@ try:
         StockReportsModule,
         StockCountModule,
         UnitModule,
+        LocationManagementPage,
+        WarehouseOperatorPage,
     )
 except ImportError:
     InventoryModule = WarehouseModule = MovementModule = CategoryModule = (
         StockReportsModule
-    ) = StockCountModule = UnitModule = MissingModule
+    ) = StockCountModule = UnitModule = LocationManagementPage = (
+        WarehouseOperatorPage
+    ) = MissingModule
 
 try:
     from modules.production import (
@@ -117,8 +121,9 @@ except ImportError:
 
 try:
     from modules.development.views import DevelopmentModule
+    from modules.development.views.company_card import CompanyCard
 except ImportError:
-    DevelopmentModule = MissingModule
+    DevelopmentModule = CompanyCard = MissingModule
 
 try:
     from modules.system import UserManagement, LabelTemplatesPage, AuditLogViewer
@@ -531,8 +536,10 @@ MENU_DATA = {
             ("Kategoriler", "fa5s.tags", "categories"),
             ("Birimler", "fa5s.ruler", "units"),
             ("Depolar", "fa5s.warehouse", "warehouses"),
+            ("Lokasyonlar", "fa5s.map-marker-alt", "locations"),
             ("Hareketler", "fa5s.exchange-alt", "movements"),
             ("Sayım İşlemleri", "fa5s.clipboard-list", "stock-count"),
+            ("Depocu Paneli", "fa5s.user-cog", "warehouse-operator"),
             ("Raporlar", "fa5s.chart-bar", "stock-reports"),
         ],
     },
@@ -628,6 +635,7 @@ MENU_DATA = {
     "settings": {
         "title": "GELİŞTİRME",
         "items": [
+            ("Firma Kartı", "fa5s.building", "company-card"),
             ("Kullanıcı Yönetimi", "fa5s.users-cog", "users"),
             ("İşlem Geçmişi", "fa5s.history", "audit-logs"),
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
@@ -994,8 +1002,10 @@ class MainWindow(QMainWindow):
         self.pages["categories"] = CategoryModule()
         self.pages["units"] = UnitModule()
         self.pages["warehouses"] = WarehouseModule()
+        self.pages["locations"] = LocationManagementPage()
         self.pages["movements"] = MovementModule()
         self.pages["stock-count"] = StockCountModule()
+        self.pages["warehouse-operator"] = WarehouseOperatorPage()
         self.pages["stock-reports"] = StockReportsModule()
         # Üretim modülü sayfaları
         self.pages["work-orders"] = WorkOrderModule()
@@ -1048,6 +1058,7 @@ class MainWindow(QMainWindow):
         self.pages["users"] = UserManagement()
         self.pages["label-templates"] = LabelTemplatesPage()
         self.pages["audit-logs"] = AuditLogViewer()
+        self.pages["company-card"] = CompanyCard()
 
         # Bakım ve Onarım Modülü
         # Bakım ve Onarım Modülü

@@ -28,6 +28,7 @@ from database.models.sales import (
     InvoiceStatus,
 )
 from database.models.inventory import StockMovementType
+from core.company_context import get_company_context
 
 
 class PriceListService:
@@ -37,9 +38,7 @@ class PriceListService:
         self.session = get_session()
 
     def get_all(
-        self,
-        list_type: PriceListType = None,
-        active_only: bool = True
+        self, list_type: PriceListType = None, active_only: bool = True
     ) -> List[PriceList]:
         """Tüm fiyat listelerini getir"""
         query = self.session.query(PriceList)
@@ -60,11 +59,7 @@ class PriceListService:
 
     def get_by_code(self, code: str) -> Optional[PriceList]:
         """Kod ile fiyat listesi getir"""
-        return (
-            self.session.query(PriceList)
-            .filter(PriceList.code == code)
-            .first()
-        )
+        return self.session.query(PriceList).filter(PriceList.code == code).first()
 
     def get_default(
         self, list_type: PriceListType = PriceListType.SALES
@@ -75,7 +70,7 @@ class PriceListService:
             .filter(
                 PriceList.is_active == True,
                 PriceList.is_default == True,
-                PriceList.list_type == list_type
+                PriceList.list_type == list_type,
             )
             .first()
         )
@@ -94,20 +89,14 @@ class PriceListService:
         # Kalemleri ekle
         if items_data:
             for item_data in items_data:
-                item = PriceListItem(
-                    price_list_id=price_list.id,
-                    **item_data
-                )
+                item = PriceListItem(price_list_id=price_list.id, **item_data)
                 self.session.add(item)
 
         self.session.commit()
         return price_list
 
     def update(
-        self,
-        price_list_id: int,
-        items_data: List[Dict] = None,
-        **kwargs
+        self, price_list_id: int, items_data: List[Dict] = None, **kwargs
     ) -> Optional[PriceList]:
         """Fiyat listesi güncelle"""
         price_list = self.get_by_id(price_list_id)
@@ -130,10 +119,7 @@ class PriceListService:
 
             # Yeni kalemleri ekle
             for item_data in items_data:
-                item = PriceListItem(
-                    price_list_id=price_list.id,
-                    **item_data
-                )
+                item = PriceListItem(price_list_id=price_list.id, **item_data)
                 self.session.add(item)
 
         self.session.commit()
@@ -155,7 +141,7 @@ class PriceListService:
         unit_price: Decimal,
         min_quantity: Decimal = Decimal("0"),
         discount_rate: Decimal = Decimal("0"),
-        notes: str = None
+        notes: str = None,
     ) -> Optional[PriceListItem]:
         """Fiyat listesine kalem ekle"""
         price_list = self.get_by_id(price_list_id)
@@ -168,7 +154,7 @@ class PriceListService:
             unit_price=unit_price,
             min_quantity=min_quantity,
             discount_rate=discount_rate,
-            notes=notes
+            notes=notes,
         )
         self.session.add(item)
         self.session.commit()
@@ -188,10 +174,7 @@ class PriceListService:
         return False
 
     def get_price(
-        self,
-        price_list_id: int,
-        item_id: int,
-        quantity: Decimal = Decimal("1")
+        self, price_list_id: int, item_id: int, quantity: Decimal = Decimal("1")
     ) -> Optional[Decimal]:
         """Fiyat listesinden ürün fiyatı getir (miktar bazlı)"""
         items = (
@@ -199,7 +182,7 @@ class PriceListService:
             .filter(
                 PriceListItem.price_list_id == price_list_id,
                 PriceListItem.item_id == item_id,
-                PriceListItem.min_quantity <= quantity
+                PriceListItem.min_quantity <= quantity,
             )
             .order_by(desc(PriceListItem.min_quantity))
             .all()
@@ -215,17 +198,12 @@ class PriceListService:
         return None
 
     def get_customer_price(
-        self,
-        customer_id: int,
-        item_id: int,
-        quantity: Decimal = Decimal("1")
+        self, customer_id: int, item_id: int, quantity: Decimal = Decimal("1")
     ) -> Optional[Decimal]:
         """Müşteriye özel fiyat getir"""
         # Müşterinin fiyat listesini bul
         customer = (
-            self.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
+            self.session.query(Customer).filter(Customer.id == customer_id).first()
         )
 
         if customer and customer.price_list_id:
@@ -242,6 +220,7 @@ class PriceListService:
 
         # Hiç fiyat listesi yoksa stok kartındaki satış fiyatını döndür
         from database.models.inventory import Item
+
         item = self.session.query(Item).filter(Item.id == item_id).first()
         if item:
             return item.sale_price
@@ -270,8 +249,7 @@ class PriceListService:
     def _clear_default(self, list_type: PriceListType):
         """Varsayılan fiyat listesi işaretini kaldır"""
         self.session.query(PriceList).filter(
-            PriceList.list_type == list_type,
-            PriceList.is_default == True
+            PriceList.list_type == list_type, PriceList.is_default == True
         ).update({"is_default": False})
 
 
@@ -360,11 +338,12 @@ class SalesQuoteService:
     def __init__(self):
         self.session = get_session()
 
-    def get_all(self, status: SalesQuoteStatus = None, customer_id: int = None) -> List[SalesQuote]:
+    def get_all(
+        self, status: SalesQuoteStatus = None, customer_id: int = None
+    ) -> List[SalesQuote]:
         """Tüm teklifleri getir"""
         query = self.session.query(SalesQuote).options(
-            joinedload(SalesQuote.customer),
-            joinedload(SalesQuote.items)
+            joinedload(SalesQuote.customer), joinedload(SalesQuote.items)
         )
         if status:
             query = query.filter(SalesQuote.status == status)
@@ -412,7 +391,9 @@ class SalesQuoteService:
 
         return quote
 
-    def update(self, quote_id: int, items_data: List[Dict] = None, **data) -> Optional[SalesQuote]:
+    def update(
+        self, quote_id: int, items_data: List[Dict] = None, **data
+    ) -> Optional[SalesQuote]:
         """Teklif güncelle"""
         quote = self.get_by_id(quote_id)
         if not quote:
@@ -516,7 +497,7 @@ class SalesQuoteService:
             self.session.query(SalesQuote)
             .filter(
                 SalesQuote.status == SalesQuoteStatus.SENT,
-                SalesQuote.valid_until < today
+                SalesQuote.valid_until < today,
             )
             .update({"status": SalesQuoteStatus.EXPIRED})
         )
@@ -561,11 +542,12 @@ class SalesOrderService:
     def __init__(self):
         self.session = get_session()
 
-    def get_all(self, status: SalesOrderStatus = None, customer_id: int = None) -> List[SalesOrder]:
+    def get_all(
+        self, status: SalesOrderStatus = None, customer_id: int = None
+    ) -> List[SalesOrder]:
         """Tüm siparişleri getir"""
         query = self.session.query(SalesOrder).options(
-            joinedload(SalesOrder.customer),
-            joinedload(SalesOrder.items)
+            joinedload(SalesOrder.customer), joinedload(SalesOrder.items)
         )
         if status:
             query = query.filter(SalesOrder.status == status)
@@ -592,10 +574,12 @@ class SalesOrderService:
         return (
             self.session.query(SalesOrder)
             .filter(
-                SalesOrder.status.in_([
-                    SalesOrderStatus.CONFIRMED,
-                    SalesOrderStatus.PARTIAL,
-                ])
+                SalesOrder.status.in_(
+                    [
+                        SalesOrderStatus.CONFIRMED,
+                        SalesOrderStatus.PARTIAL,
+                    ]
+                )
             )
             .order_by(SalesOrder.delivery_date)
             .all()
@@ -629,7 +613,9 @@ class SalesOrderService:
         quote_service = SalesQuoteService()
         return quote_service.convert_to_order(quote_id)
 
-    def update(self, order_id: int, items_data: List[Dict] = None, **data) -> Optional[SalesOrder]:
+    def update(
+        self, order_id: int, items_data: List[Dict] = None, **data
+    ) -> Optional[SalesOrder]:
         """Sipariş güncelle"""
         order = self.get_by_id(order_id)
         if not order:
@@ -657,7 +643,9 @@ class SalesOrderService:
         self.session.commit()
         return order
 
-    def confirm(self, order_id: int, skip_credit_check: bool = False) -> Optional[SalesOrder]:
+    def confirm(
+        self, order_id: int, skip_credit_check: bool = False
+    ) -> Optional[SalesOrder]:
         """Siparişi onayla"""
         order = self.get_by_id(order_id)
         if not order or order.status != SalesOrderStatus.DRAFT:
@@ -690,14 +678,14 @@ class SalesOrderService:
         """Müşterinin açık bakiyesini hesapla"""
         # Onaylı/bekleyen siparişlerin toplamı
         from sqlalchemy import func
+
         orders_total = (
             self.session.query(func.coalesce(func.sum(SalesOrder.total), 0))
             .filter(
                 SalesOrder.customer_id == customer_id,
-                SalesOrder.status.in_([
-                    SalesOrderStatus.CONFIRMED,
-                    SalesOrderStatus.PARTIAL
-                ])
+                SalesOrder.status.in_(
+                    [SalesOrderStatus.CONFIRMED, SalesOrderStatus.PARTIAL]
+                ),
             )
             .scalar()
         )
@@ -707,11 +695,9 @@ class SalesOrderService:
             self.session.query(func.coalesce(func.sum(Invoice.balance), 0))
             .filter(
                 Invoice.customer_id == customer_id,
-                Invoice.status.in_([
-                    InvoiceStatus.ISSUED,
-                    InvoiceStatus.PARTIAL,
-                    InvoiceStatus.OVERDUE
-                ])
+                Invoice.status.in_(
+                    [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE]
+                ),
             )
             .scalar()
         )
@@ -721,7 +707,10 @@ class SalesOrderService:
     def cancel(self, order_id: int) -> Optional[SalesOrder]:
         """Sipariş iptal"""
         order = self.get_by_id(order_id)
-        if order and order.status in [SalesOrderStatus.DRAFT, SalesOrderStatus.CONFIRMED]:
+        if order and order.status in [
+            SalesOrderStatus.DRAFT,
+            SalesOrderStatus.CONFIRMED,
+        ]:
             order.status = SalesOrderStatus.CANCELLED
             self.session.commit()
         return order
@@ -729,7 +718,10 @@ class SalesOrderService:
     def close(self, order_id: int) -> Optional[SalesOrder]:
         """Sipariş kapat"""
         order = self.get_by_id(order_id)
-        if order and order.status in [SalesOrderStatus.DELIVERED, SalesOrderStatus.PARTIAL]:
+        if order and order.status in [
+            SalesOrderStatus.DELIVERED,
+            SalesOrderStatus.PARTIAL,
+        ]:
             order.status = SalesOrderStatus.CLOSED
             self.session.commit()
         return order
@@ -767,9 +759,11 @@ class SalesOrderService:
         return False
 
     def generate_order_no(self) -> str:
-        """Sipariş numarası üret"""
+        """Sipariş numarası üret - firma ayarlarındaki öneki kullanır"""
         today = date.today()
-        prefix = f"SO{today.strftime('%y%m')}"
+        ctx = get_company_context()
+        base_prefix = ctx.order_prefix or "SIP"
+        prefix = f"{base_prefix}{today.strftime('%y%m')}"
 
         last = (
             self.session.query(SalesOrder)
@@ -781,7 +775,7 @@ class SalesOrderService:
         if last:
             try:
                 num = int(last.order_no[-4:]) + 1
-            except:
+            except Exception:
                 num = 1
         else:
             num = 1
@@ -795,7 +789,9 @@ class DeliveryNoteService:
     def __init__(self):
         self.session = get_session()
 
-    def get_all(self, status: DeliveryNoteStatus = None, customer_id: int = None) -> List[DeliveryNote]:
+    def get_all(
+        self, status: DeliveryNoteStatus = None, customer_id: int = None
+    ) -> List[DeliveryNote]:
         """Tüm irsaliyeleri getir"""
         query = self.session.query(DeliveryNote).options(
             joinedload(DeliveryNote.customer),
@@ -839,10 +835,7 @@ class DeliveryNoteService:
         return delivery
 
     def update(
-        self,
-        delivery_id: int,
-        items_data: List[Dict] = None,
-        **data
+        self, delivery_id: int, items_data: List[Dict] = None, **data
     ) -> Optional[DeliveryNote]:
         """İrsaliye güncelle (sadece taslak durumunda)"""
         delivery = self.get_by_id(delivery_id)
@@ -854,9 +847,7 @@ class DeliveryNoteService:
 
         # Alanları güncelle
         for key, value in data.items():
-            if hasattr(delivery, key) and key not in (
-                "id", "delivery_no", "status"
-            ):
+            if hasattr(delivery, key) and key not in ("id", "delivery_no", "status"):
                 setattr(delivery, key, value)
 
         # Kalemleri güncelle
@@ -867,15 +858,15 @@ class DeliveryNoteService:
 
             # Yeni kalemleri ekle
             for item_data in items_data:
-                item = DeliveryNoteItem(
-                    delivery_note_id=delivery.id, **item_data
-                )
+                item = DeliveryNoteItem(delivery_note_id=delivery.id, **item_data)
                 self.session.add(item)
 
         self.session.commit()
         return delivery
 
-    def create_from_order(self, order_id: int, warehouse_id: int, items_data: List[Dict], **data) -> DeliveryNote:
+    def create_from_order(
+        self, order_id: int, warehouse_id: int, items_data: List[Dict], **data
+    ) -> DeliveryNote:
         """Siparişten irsaliye oluştur"""
         order_service = SalesOrderService()
         order = order_service.get_by_id(order_id)
@@ -935,7 +926,8 @@ class DeliveryNoteService:
 
         # Sadece draft veya shipped durumundakiler tamamlanabilir
         if delivery.status not in (
-            DeliveryNoteStatus.DRAFT, DeliveryNoteStatus.SHIPPED
+            DeliveryNoteStatus.DRAFT,
+            DeliveryNoteStatus.SHIPPED,
         ):
             return None
 
@@ -984,9 +976,11 @@ class DeliveryNoteService:
         return False
 
     def generate_delivery_no(self) -> str:
-        """İrsaliye numarası üret"""
+        """İrsaliye numarası üret - firma ayarlarındaki öneki kullanır"""
         today = date.today()
-        prefix = f"DN{today.strftime('%y%m')}"
+        ctx = get_company_context()
+        base_prefix = ctx.delivery_prefix or "IRS"
+        prefix = f"{base_prefix}{today.strftime('%y%m')}"
 
         last = (
             self.session.query(DeliveryNote)
@@ -998,7 +992,7 @@ class DeliveryNoteService:
         if last:
             try:
                 num = int(last.delivery_no[-4:]) + 1
-            except:
+            except Exception:
                 num = 1
         else:
             num = 1
@@ -1012,7 +1006,9 @@ class InvoiceService:
     def __init__(self):
         self.session = get_session()
 
-    def get_all(self, status: InvoiceStatus = None, customer_id: int = None) -> List[Invoice]:
+    def get_all(
+        self, status: InvoiceStatus = None, customer_id: int = None
+    ) -> List[Invoice]:
         """Tüm faturaları getir"""
         query = self.session.query(Invoice).options(
             joinedload(Invoice.customer),
@@ -1046,7 +1042,7 @@ class InvoiceService:
             self.session.query(Invoice)
             .filter(
                 Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL]),
-                Invoice.due_date < today
+                Invoice.due_date < today,
             )
             .order_by(Invoice.due_date)
             .all()
@@ -1056,7 +1052,11 @@ class InvoiceService:
         """Ödenmemiş faturaları getir"""
         return (
             self.session.query(Invoice)
-            .filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE]))
+            .filter(
+                Invoice.status.in_(
+                    [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE]
+                )
+            )
             .order_by(Invoice.due_date)
             .all()
         )
@@ -1081,10 +1081,7 @@ class InvoiceService:
         return invoice
 
     def update(
-        self,
-        invoice_id: int,
-        items_data: List[Dict] = None,
-        **data
+        self, invoice_id: int, items_data: List[Dict] = None, **data
     ) -> Optional[Invoice]:
         """Fatura güncelle (sadece taslak durumunda)"""
         invoice = self.get_by_id(invoice_id)
@@ -1097,7 +1094,11 @@ class InvoiceService:
         # Alanları güncelle
         for key, value in data.items():
             if hasattr(invoice, key) and key not in (
-                "id", "invoice_no", "status", "paid_amount", "balance"
+                "id",
+                "invoice_no",
+                "status",
+                "paid_amount",
+                "balance",
             ):
                 setattr(invoice, key, value)
 
@@ -1132,7 +1133,7 @@ class InvoiceService:
             self.session.query(Invoice)
             .filter(
                 Invoice.delivery_note_id == delivery_id,
-                Invoice.status != InvoiceStatus.CANCELLED
+                Invoice.status != InvoiceStatus.CANCELLED,
             )
             .first()
         )
@@ -1161,15 +1162,17 @@ class InvoiceService:
             elif di.item and di.item.sale_price:
                 unit_price = di.item.sale_price
 
-            items_data.append({
-                "item_id": di.item_id,
-                "quantity": di.quantity,
-                "unit_id": di.unit_id,
-                "unit_price": unit_price,
-                "tax_rate": tax_rate,
-                "discount_rate": discount_rate,
-                "description": di.notes,
-            })
+            items_data.append(
+                {
+                    "item_id": di.item_id,
+                    "quantity": di.quantity,
+                    "unit_id": di.unit_id,
+                    "unit_price": unit_price,
+                    "tax_rate": tax_rate,
+                    "discount_rate": discount_rate,
+                    "description": di.notes,
+                }
+            )
 
         data["customer_id"] = delivery.customer_id
         data["delivery_note_id"] = delivery.id
@@ -1183,6 +1186,7 @@ class InvoiceService:
         if customer and customer.payment_term_days:
             data["due_date"] = date.today()
             from datetime import timedelta
+
             data["due_date"] = date.today() + timedelta(days=customer.payment_term_days)
 
         return self.create(items_data, **data)
@@ -1197,6 +1201,7 @@ class InvoiceService:
             # Cari hesap hareketi oluştur
             try:
                 from modules.finance.services import AccountTransactionService
+
                 transaction_service = AccountTransactionService()
                 transaction_service.create_from_invoice(invoice)
             except Exception as e:
@@ -1205,10 +1210,15 @@ class InvoiceService:
 
         return invoice
 
-    def record_payment(self, invoice_id: int, amount: Decimal, method: str = None, notes: str = None) -> Optional[Invoice]:
+    def record_payment(
+        self, invoice_id: int, amount: Decimal, method: str = None, notes: str = None
+    ) -> Optional[Invoice]:
         """Ödeme kaydet"""
         invoice = self.get_by_id(invoice_id)
-        if not invoice or invoice.status in [InvoiceStatus.PAID, InvoiceStatus.CANCELLED]:
+        if not invoice or invoice.status in [
+            InvoiceStatus.PAID,
+            InvoiceStatus.CANCELLED,
+        ]:
             return None
 
         invoice.paid_amount = Decimal(str(invoice.paid_amount or 0)) + amount
@@ -1235,7 +1245,7 @@ class InvoiceService:
             self.session.query(Invoice)
             .filter(
                 Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL]),
-                Invoice.due_date < today
+                Invoice.due_date < today,
             )
             .update({"status": InvoiceStatus.OVERDUE})
         )
@@ -1260,9 +1270,11 @@ class InvoiceService:
         return False
 
     def generate_invoice_no(self) -> str:
-        """Fatura numarası üret"""
+        """Fatura numarası üret - firma ayarlarındaki öneki kullanır"""
         today = date.today()
-        prefix = f"INV{today.strftime('%y%m')}"
+        ctx = get_company_context()
+        base_prefix = ctx.invoice_prefix or "FTR"
+        prefix = f"{base_prefix}{today.strftime('%y%m')}"
 
         last = (
             self.session.query(Invoice)
@@ -1274,7 +1286,7 @@ class InvoiceService:
         if last:
             try:
                 num = int(last.invoice_no[-4:]) + 1
-            except:
+            except Exception:
                 num = 1
         else:
             num = 1

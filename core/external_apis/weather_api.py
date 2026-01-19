@@ -10,19 +10,24 @@ from dataclasses import dataclass
 import threading
 
 import requests
+import urllib3
+
+# SSL uyarılarını bastır
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 @dataclass
 class WeatherData:
     """Hava durumu bilgisi"""
+
     city: str
-    condition: str          # Açık, Bulutlu, Yağmurlu, vb.
-    condition_icon: str     # Emoji veya ikon kodu
-    temperature: int        # Celsius
-    feels_like: int         # Hissedilen sıcaklık
-    humidity: int           # Nem yüzdesi
-    wind_speed: int         # Rüzgar hızı (km/s)
-    wind_direction: str     # Rüzgar yönü
+    condition: str  # Açık, Bulutlu, Yağmurlu, vb.
+    condition_icon: str  # Emoji veya ikon kodu
+    temperature: int  # Celsius
+    feels_like: int  # Hissedilen sıcaklık
+    humidity: int  # Nem yüzdesi
+    wind_speed: int  # Rüzgar hızı (km/s)
+    wind_direction: str  # Rüzgar yönü
     updated_at: datetime
 
 
@@ -111,7 +116,9 @@ class WeatherService:
     }
 
     @classmethod
-    def get_weather(cls, city: str = "Istanbul", force_refresh: bool = False) -> Optional[WeatherData]:
+    def get_weather(
+        cls, city: str = "Istanbul", force_refresh: bool = False
+    ) -> Optional[WeatherData]:
         """
         Şehir için hava durumu bilgisi döner
 
@@ -152,9 +159,12 @@ class WeatherService:
             # wttr.in JSON formatı
             url = f"{cls.BASE_URL}/{city}?format=j1"
 
-            response = requests.get(url, timeout=10, headers={
-                "User-Agent": "AkilliIs-ERP/1.0"
-            })
+            response = requests.get(
+                url,
+                timeout=3,
+                headers={"User-Agent": "AkilliIs-ERP/1.0"},
+                verify=False,
+            )
             response.raise_for_status()
 
             data = response.json()
@@ -175,7 +185,7 @@ class WeatherService:
                 humidity=int(current.get("humidity", 0)),
                 wind_speed=int(current.get("windspeedKmph", 0)),
                 wind_direction=current.get("winddir16Point", ""),
-                updated_at=datetime.now()
+                updated_at=datetime.now(),
             )
 
         except requests.RequestException as e:

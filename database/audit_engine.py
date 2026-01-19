@@ -59,10 +59,22 @@ TABLE_TO_MODULE: Dict[str, str] = {
     "sales_orders": "sales",
     "sales_order_items": "sales",
     "invoices": "sales",
+    "delivery_notes": "sales",
     # Satın alma
     "suppliers": "purchasing",
     "purchase_orders": "purchasing",
     "purchase_order_items": "purchasing",
+    "goods_receipts": "purchasing",
+    "goods_receipt_items": "purchasing",
+    "purchase_invoices": "purchasing",
+    # Kalite
+    "inspection_templates": "quality",
+    "inspections": "quality",
+    "non_conformances": "quality",
+    "customer_complaints": "quality",
+    "capas": "quality",
+    # Üretim Ek
+    "production_downtimes": "production",
     # HR
     "employees": "hr",
     "departments": "hr",
@@ -287,7 +299,9 @@ class AuditEngine:
             "record_id": record_id,
             "old_values": old_values,
             "new_values": new_values,
-            "description": self._generate_description(action, table_name, record_id, obj),
+            "description": self._generate_description(
+                action, table_name, record_id, obj
+            ),
         }
 
     def _generate_description(
@@ -301,7 +315,11 @@ class AuditEngine:
                 name = getattr(obj, attr)
                 break
 
-        action_tr = {"CREATE": "oluşturuldu", "UPDATE": "güncellendi", "DELETE": "silindi"}
+        action_tr = {
+            "CREATE": "oluşturuldu",
+            "UPDATE": "güncellendi",
+            "DELETE": "silindi",
+        }
 
         if name:
             return f"{table_name} '{name}' {action_tr.get(action, action)}"

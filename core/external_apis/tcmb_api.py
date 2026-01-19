@@ -11,18 +11,23 @@ from dataclasses import dataclass
 import threading
 
 import requests
+import urllib3
+
+# SSL uyarılarını bastır
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 @dataclass
 class CurrencyRate:
     """Döviz kuru bilgisi"""
-    code: str           # USD, EUR, GBP
-    name: str           # Amerikan Doları, Euro, İngiliz Sterlini
-    buying: float       # Alış kuru
-    selling: float      # Satış kuru
-    effective_buying: float   # Efektif alış
+
+    code: str  # USD, EUR, GBP
+    name: str  # Amerikan Doları, Euro, İngiliz Sterlini
+    buying: float  # Alış kuru
+    selling: float  # Satış kuru
+    effective_buying: float  # Efektif alış
     effective_selling: float  # Efektif satış
-    change: float       # Değişim yüzdesi (önceki güne göre)
+    change: float  # Değişim yüzdesi (önceki güne göre)
 
 
 class TCMBService:
@@ -103,7 +108,7 @@ class TCMBService:
     def _fetch_rates(cls):
         """TCMB'den kurları çeker"""
         try:
-            response = requests.get(cls.BASE_URL, timeout=10)
+            response = requests.get(cls.BASE_URL, timeout=3, verify=False)
             response.raise_for_status()
 
             # XML parse
@@ -142,7 +147,7 @@ class TCMBService:
                     selling=forex_selling,
                     effective_buying=effective_buying,
                     effective_selling=effective_selling,
-                    change=change
+                    change=change,
                 )
 
             cls._cache = new_cache

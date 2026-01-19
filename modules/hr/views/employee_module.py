@@ -36,6 +36,7 @@ from config.styles import (
 )
 from modules.hr.services import HRService
 from modules.hr.views.employee_form import EmployeeFormDialog
+from modules.hr.views.id_card_dialog import IdCardDialog
 
 
 class EmployeeModule(QWidget):
@@ -88,6 +89,13 @@ class EmployeeModule(QWidget):
         filter_row.addWidget(self.dept_combo)
 
         filter_row.addStretch()
+
+        # Kimlik Kartı butonu
+        id_card_btn = QPushButton("🪪 Kimlik Kartı")
+        id_card_btn.setStyleSheet(get_button_style("refresh"))
+        id_card_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        id_card_btn.clicked.connect(self._show_id_card)
+        filter_row.addWidget(id_card_btn)
 
         # Yenile butonu
         refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
@@ -202,3 +210,24 @@ class EmployeeModule(QWidget):
         dialog = EmployeeFormDialog(employee_id=emp_id, parent=self)
         if dialog.exec():
             self.load_data()
+
+    def _show_id_card(self):
+        """Seçili çalışanın kimlik kartını göster"""
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir çalışan seçin.")
+            return
+
+        emp_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+
+        try:
+            service = self._get_service()
+            employee = service.get_employee_by_id(emp_id)
+
+            if employee:
+                dialog = IdCardDialog(employee, parent=self)
+                dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", f"Kimlik kartı açılamadı:\n{str(e)}")
+        finally:
+            self._close_service()

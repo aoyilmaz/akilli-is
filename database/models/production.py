@@ -16,6 +16,7 @@ from sqlalchemy import (
     Enum,
     Index,
     Date,
+    Table,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -61,6 +62,27 @@ class WorkStationType(enum.Enum):
     WORKSTATION = "workstation"
     ASSEMBLY = "assembly"
     MANUAL = "manual"
+
+
+class DowntimeReason(enum.Enum):
+    """Duruş nedenleri"""
+
+    BREAKDOWN = "breakdown"  # Arıza
+    SETUP = "setup"  # Ayar/Hazırlık
+    MATERIAL_WAIT = "material_wait"  # Malzeme Bekleme
+    OP_ABSENCE = "op_absence"  # Operatör Yokluğu
+    POWER_FAILURE = "power_failure"  # Elektrik Kesintisi
+    MEAL_BREAK = "meal_break"  # Yemek Molası
+    QUALITY_ISSUE = "quality_issue"  # Kalite Problemi
+    OTHER = "other"  # Diğer
+
+
+class BackflushMode(enum.Enum):
+    """Malzeme düşüm zamanlaması"""
+
+    ON_START = "on_start"  # Üretim başlangıcında (varsayılan)
+    ON_COMPLETE = "on_complete"  # Üretim tamamlandığında
+    MANUAL = "manual"  # Manuel (kullanıcı tarafından)
 
 
 class BillOfMaterials(BaseModel):
@@ -195,7 +217,7 @@ class WorkStation(BaseModel):
     # Varsayılan operasyon değerleri (otomatik doldurma için)
     default_operation_name = Column(String(200), nullable=True)
     default_setup_time = Column(Integer, default=0)  # dakika
-    default_run_time_per_unit = Column(Numeric(18, 4), default=0)  # dakika/birim
+    default_run_time_per_unit = Column(Numeric(18, 4), default=0)
 
     warehouse = relationship("Warehouse")
 
@@ -203,6 +225,26 @@ class WorkStation(BaseModel):
     is_external = Column(Boolean, default=False)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
     supplier = relationship("Supplier", foreign_keys=[supplier_id])
+
+    # Alternatif İstasyonlar (Many-to-Many self-referential)
+    alternatives = relationship(
+        "WorkStation",
+        secondary="work_station_alternatives",
+        primaryjoin="WorkStation.id == work_station_alternatives.c.station_id",
+        secondaryjoin="WorkStation.id == work_station_alternatives.c.alt_station_id",
+        backref="alternative_for",
+    )
+
+
+# Alternatif İstasyon İlişki Tablosu
+work_station_alternatives = Table(
+    "work_station_alternatives",
+    BaseModel.metadata,
+    Column("station_id", Integer, ForeignKey("work_stations.id"), primary_key=True),
+    Column("alt_station_id", Integer, ForeignKey("work_stations.id"), primary_key=True),
+    Column("priority", Integer, default=1),  # Öncelik sırası
+    Column("efficiency_factor", Numeric(5, 2), default=100),  # Verimlilik faktörü
+)
 
 
 class BOMOperation(BaseModel):
@@ -227,6 +269,19 @@ class BOMOperation(BaseModel):
 
     labor_cost = Column(Numeric(18, 4), default=0)
     machine_cost = Column(Numeric(18, 4), default=0)
+
+    # Operasyon bağımlılığı (Finish-to-Start)
+    predecessor_operation_id = Column(
+        Integer, ForeignKey("bom_operations.id"), nullable=True
+    )
+    predecessor = relationship(
+        "BOMOperation",
+        remote_side="BOMOperation.id",
+        foreign_keys=[predecessor_operation_id],
+    )
+
+    # Operasyon bazlı kalite kontrol
+    requires_qc = Column(Boolean, default=False)  # Operasyon sonunda KK gerekli mi?
 
     bom = relationship("BillOfMaterials", back_populates="operations")
     work_station = relationship("WorkStation")
@@ -290,6 +345,11 @@ class WorkOrder(BaseModel):
     completed_quantity = Column(Numeric(18, 4), default=0)
     scrapped_quantity = Column(Numeric(18, 4), default=0)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
+    # Backflushing: Malzeme düşüm zamanlaması
+    backflush_mode = Column(
+        Enum(BackflushMode), default=BackflushMode.ON_START, nullable=False
+    )
 
     planned_start = Column(DateTime, nullable=True)
     planned_end = Column(DateTime, nullable=True)
@@ -456,8 +516,6 @@ class WorkOrderOperation(BaseModel):
     planned_start = Column(DateTime, nullable=True)
     planned_end = Column(DateTime, nullable=True)
     actual_start = Column(DateTime, nullable=True)
-    planned_end = Column(DateTime, nullable=True)
-    actual_start = Column(DateTime, nullable=True)
     actual_end = Column(DateTime, nullable=True)
 
     # Duraklat/Devam Et için son başlangıç zamanı
@@ -466,9 +524,23 @@ class WorkOrderOperation(BaseModel):
     completed_quantity = Column(Numeric(18, 4), default=0)
     scrapped_quantity = Column(Numeric(18, 4), default=0)
 
+    # Operasyon bazlı kalite kontrol
+    requires_qc = Column(Boolean, default=False)
+    qc_status = Column(String(20), nullable=True)  # pending, passed, failed
+
     work_order = relationship("WorkOrder", back_populates="operations")
     bom_operation = relationship("BOMOperation")
     work_station = relationship("WorkStation")
+
+    # Operasyon bağımlılığı (Finish-to-Start)
+    predecessor_id = Column(
+        Integer, ForeignKey("work_order_operations.id"), nullable=True
+    )
+    predecessor = relationship(
+        "WorkOrderOperation",
+        remote_side="WorkOrderOperation.id",
+        foreign_keys="WorkOrderOperation.predecessor_id",
+    )
 
     # Fason Üretim - Hizmet Alımı Siparişi
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
@@ -493,7 +565,10 @@ class WorkOrderOperationPersonnel(BaseModel):
         ForeignKey("work_order_operations.id", ondelete="CASCADE"),
         nullable=False,
     )
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # User veya Employee ile ilişkilendirme (en az biri olmalı)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
 
     role = Column(String(50), default="operator")  # operator, supervisor
 
@@ -504,10 +579,12 @@ class WorkOrderOperationPersonnel(BaseModel):
 
     operation = relationship("WorkOrderOperation", back_populates="personnel")
     user = relationship("User")
+    employee = relationship("Employee")
 
     __table_args__ = (
         Index("idx_woopp_op", "operation_id"),
         Index("idx_woopp_user", "user_id"),
+        Index("idx_woopp_emp", "employee_id"),
     )
 
 
@@ -538,4 +615,39 @@ class WorkOrderByProduct(BaseModel):
     __table_args__ = (
         Index("idx_wobyprod_wo", "work_order_id"),
         Index("idx_wobyprod_item", "item_id"),
+    )
+
+
+class ProductionDowntime(BaseModel):
+    """Üretim Duruşları Tablosu"""
+
+    __tablename__ = "production_downtimes"
+
+    work_order_id = Column(
+        Integer, ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False
+    )
+    operation_id = Column(
+        Integer, ForeignKey("work_order_operations.id"), nullable=True
+    )
+    work_station_id = Column(Integer, ForeignKey("work_stations.id"), nullable=False)
+
+    reason_code = Column(Enum(DowntimeReason), nullable=False)
+    description = Column(Text, nullable=True)
+
+    start_time = Column(DateTime, nullable=False, default=datetime.utcnow)
+    end_time = Column(DateTime, nullable=True)
+    duration_minutes = Column(Integer, default=0)
+
+    operator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # İlişkiler
+    work_order = relationship("WorkOrder")
+    operation = relationship("WorkOrderOperation")
+    work_station = relationship("WorkStation")
+    operator = relationship("User")
+
+    __table_args__ = (
+        Index("idx_downtime_wo", "work_order_id"),
+        Index("idx_downtime_station", "work_station_id"),
+        Index("idx_downtime_date", "start_time"),
     )

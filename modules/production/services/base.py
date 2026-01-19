@@ -27,6 +27,7 @@ from database.models.production import (
     WorkOrderByProduct,
     WorkOrderStatus,
     WorkOrderOperationPersonnel,
+    BackflushMode,
 )
 from database.models.inventory import (
     Item,
@@ -422,6 +423,102 @@ class WorkStationService:
         self.session.commit()
         return True
 
+    def get_alternatives(self, station_id: int) -> List[WorkStation]:
+        """Bir istasyonun alternatiflerini getir"""
+        station = self.get_by_id(station_id)
+        if not station:
+            return []
+        return station.alternatives
+
+    def add_alternative(
+        self,
+        station_id: int,
+        alt_station_id: int,
+        priority: int = 1,
+        efficiency_factor: float = 100.0,
+    ) -> bool:
+        """İstasyona alternatif ekle"""
+        from database.models.production import work_station_alternatives
+
+        # Aynı istasyon olamaz
+        if station_id == alt_station_id:
+            return False
+
+        # Zaten mevcut mu kontrol et
+        existing = self.session.execute(
+            work_station_alternatives.select().where(
+                work_station_alternatives.c.station_id == station_id,
+                work_station_alternatives.c.alt_station_id == alt_station_id,
+            )
+        ).first()
+
+        if existing:
+            return False
+
+        # Yeni alternatif ekle
+        self.session.execute(
+            work_station_alternatives.insert().values(
+                station_id=station_id,
+                alt_station_id=alt_station_id,
+                priority=priority,
+                efficiency_factor=efficiency_factor,
+            )
+        )
+        self.session.commit()
+        return True
+
+    def remove_alternative(self, station_id: int, alt_station_id: int) -> bool:
+        """Alternatif istasyonu kaldır"""
+        from database.models.production import work_station_alternatives
+
+        self.session.execute(
+            work_station_alternatives.delete().where(
+                work_station_alternatives.c.station_id == station_id,
+                work_station_alternatives.c.alt_station_id == alt_station_id,
+            )
+        )
+        self.session.commit()
+        return True
+
+    def suggest_alternative(
+        self, station_id: int, exclude_busy: bool = True
+    ) -> Optional[WorkStation]:
+        """
+        Arızalı veya meşgul istasyon için alternatif öner.
+        En yüksek öncelikli ve uygun alternatifi döndürür.
+        """
+        from database.models.production import work_station_alternatives
+
+        # Alternatif ilişkilerini öncelik sırasına göre getir
+        alt_rows = self.session.execute(
+            work_station_alternatives.select()
+            .where(work_station_alternatives.c.station_id == station_id)
+            .order_by(work_station_alternatives.c.priority)
+        ).fetchall()
+
+        for row in alt_rows:
+            alt_station = self.get_by_id(row.alt_station_id)
+            if not alt_station or not alt_station.is_active:
+                continue
+
+            # Meşgul kontrolü (opsiyonel)
+            if exclude_busy:
+                # Aktif operasyonu var mı kontrol et
+                active_ops = (
+                    self.session.query(WorkOrderOperation)
+                    .filter(
+                        WorkOrderOperation.work_station_id == alt_station.id,
+                        WorkOrderOperation.status == "in_progress",
+                    )
+                    .count()
+                )
+                if active_ops > 0:
+                    continue
+
+            return alt_station
+
+        return None
+
 
 # ============================================================
 # WORKORDER SERVICE (İş Emri) - STOK ENTEGRASYONLU
@@ -797,6 +894,37 @@ class WorkOrderService:
 
         try:
             # === TRANSACTION BAŞLANGICI ===
+
+            # Backflush: ON_COMPLETE modunda malzeme düşümü
+            if order.backflush_mode == BackflushMode.ON_COMPLETE:
+                source_wh = order.source_warehouse_id
+                if source_wh:
+                    for line in order.lines:
+                        if line.required_quantity > 0:
+                            # Malzeme düşümü
+                            mat_movement = StockMovement(
+                                item_id=line.item_id,
+                                movement_type=StockMovementType.URETIM_GIRIS,
+                                quantity=line.required_quantity,
+                                unit_price=Decimal(0),
+                                total_price=Decimal(0),
+                                from_warehouse_id=source_wh,
+                                document_no=order.order_no,
+                                document_type="work_order_backflush",
+                                description=(
+                                    f"Backflush: {order.order_no} - "
+                                    f"{line.item.code if line.item else ''}"
+                                ),
+                                movement_date=datetime.now(),
+                            )
+                            self.session.add(mat_movement)
+
+                            # Bakiye güncelle
+                            balance = self._get_balance(line.item_id, source_wh)
+                            if balance:
+                                balance.quantity -= line.required_quantity
+                                if balance.quantity < 0:
+                                    balance.quantity = Decimal(0)
 
             # Birim maliyet hesapla
             total_cost = (
@@ -1200,7 +1328,16 @@ class WorkOrderService:
             raise ProductionError("Operasyon zaten devam ediyor!")
 
         # 1. Önceki operasyon tamamlanmış mı kontrol et
-        if op.operation_no > 1:
+        # A) predecessor_id tanımlıysa o kontrol edilir
+        if op.predecessor_id:
+            predecessor = self.session.query(WorkOrderOperation).get(op.predecessor_id)
+            if predecessor and predecessor.status != "completed":
+                raise ProductionError(
+                    f"Önceki operasyon ({predecessor.name}) tamamlanmadan "
+                    f"bu operasyona başlayamazsınız!"
+                )
+        # B) predecessor_id tanımlı değilse, operasyon numarasına göre kontrol
+        elif op.operation_no > 1:
             prev_op = (
                 self.session.query(WorkOrderOperation)
                 .filter_by(
@@ -1210,7 +1347,8 @@ class WorkOrderService:
             )
             if prev_op and prev_op.status != "completed":
                 raise ProductionError(
-                    f"Önceki operasyon ({prev_op.name}) tamamlanmadan bu operasyona başlayamazsınız!"
+                    f"Önceki operasyon ({prev_op.name}) tamamlanmadan "
+                    f"bu operasyona başlayamazsınız!"
                 )
 
         # En az bir personel atanmış mı kontrol et

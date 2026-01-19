@@ -52,6 +52,15 @@ class StockMovementType(enum.Enum):
     IADE_SATIS = "iade_satis"
 
 
+class LocationType(enum.Enum):
+    """Lokasyon türleri"""
+
+    NORMAL = "normal"
+    QUARANTINE = "quarantine"
+    SCRAP = "scrap"
+    TRANSIT = "transit"
+
+
 class Unit(BaseModel):
     """Birim tanımları"""
 
@@ -217,6 +226,7 @@ class Item(BaseModel):
     is_saleable = Column(Boolean, default=True)
     is_producible = Column(Boolean, default=False)
     is_raw_material = Column(Boolean, default=False)
+    is_qc_required = Column(Boolean, default=False)  # Kalite kontrol zorunlu mu?
 
     # === Notlar ===
     purchase_notes = Column(Text, nullable=True)
@@ -357,15 +367,24 @@ class WarehouseLocation(BaseModel):
     name = Column(String(200), nullable=False)
 
     # Lokasyon detayları
-    aisle = Column(String(20), nullable=True)
-    rack = Column(String(20), nullable=True)
-    shelf = Column(String(20), nullable=True)
-    bin = Column(String(20), nullable=True)
+    aisle = Column(String(20), nullable=True)  # Koridor
+    rack = Column(String(20), nullable=True)  # Raf
+    shelf = Column(String(20), nullable=True)  # Kat
+    bin = Column(String(20), nullable=True)  # Hücre
+    location_type = Column(
+        Enum(LocationType), default=LocationType.NORMAL, nullable=False
+    )
+
+    # Barkod ve durum
+    barcode = Column(String(50), unique=True, nullable=True)  # Lokasyon barkodu
+    is_active = Column(Boolean, default=True, nullable=False)
+    priority = Column(Integer, default=0)  # Picking önceliği (düşük = önce)
+    zone = Column(String(50), nullable=True)  # Bölge (Soğuk, Tehlikeli, Normal)
 
     # Kapasite
-    max_weight = Column(Numeric(18, 4), nullable=True)
-    max_volume = Column(Numeric(18, 4), nullable=True)
-    max_items = Column(Integer, nullable=True)
+    max_weight = Column(Numeric(18, 4), nullable=True)  # kg
+    max_volume = Column(Numeric(18, 4), nullable=True)  # m³
+    max_items = Column(Integer, nullable=True)  # Maksimum ürün adedi
 
     # İlişkiler
     warehouse = relationship("Warehouse", back_populates="locations")
@@ -373,6 +392,7 @@ class WarehouseLocation(BaseModel):
     __table_args__ = (
         Index("idx_location_warehouse", "warehouse_id"),
         Index("idx_location_unique", "warehouse_id", "code", unique=True),
+        Index("idx_location_barcode", "barcode"),
     )
 
     @property

@@ -21,6 +21,7 @@ def create_warehouses():
             "description": "PVC granül, reçine, DOTP yağı ve sıvı katkıların bulunduğu ana depo.",
             "warehouse_type": "general",
             "is_production": False,
+            "is_default": True,  # Varsayılan depo
             "locations": ["A-01-01", "A-01-02", "B-01-01", "TANK-01", "SILO-01"],
         },
         {

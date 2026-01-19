@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/PyQt5-5.15+-green.svg" alt="PyQt5">
+  <img src="https://img.shields.io/badge/PyQt6-6.10+-green.svg" alt="PyQt6">
   <img src="https://img.shields.io/badge/PostgreSQL-13+-orange.svg" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
 </p>
@@ -19,128 +19,60 @@
 
 ## Özellikler
 
-- **Modern Arayüz** - Light/Dark tema desteği, kullanıcı dostu PyQt5 arayüzü
-- **Modüler Mimari** - 15+ iş modülü, genişletilebilir yapı
-- **Merkezi Hata Yönetimi** - Veritabanı tabanlı loglama ve UI üzerinden hata takibi
-- **Türkçe** - Tam Türkçe dil desteği
-- **ORM Altyapısı** - SQLAlchemy ile güvenli veritabanı işlemleri
-- **Rol Bazlı Yetkilendirme (RBAC)** - Gelişmiş kullanıcı ve yetki yönetimi
-- **Etiket Tasarımcısı** - WYSIWYG görsel etiket editörü
+- **Modern Arayüz** - Light/Dark tema desteği, Premium görsel tasarım, PyQt6 tabanlı dinamik arayüz
+- **Multi-Company (Çoklu Firma)** - Aynı sistem üzerinde birden fazla firmayı yönetebilme, firma bazlı izole veri yapısı
+- **Merkezi Firma Context** - Tüm modüllerde aktif firma ayarlarının (KDV, numara önekleri, para birimi) otomatik yönetimi
+- **Modüler Mimari** - 15+ entegre iş modülü, mikro-servis yaklaşımıyla genişletilebilir yapı
+- **Gelişmiş Doküman Yönetimi** - Kurumsal kimlik belgeleri (Logo, Kaşe, İmza) ve dinamik belge şablonları (Antetli, Fatura, İrsaliye)
+- **Merkezi Hata Yönetimi** - Veritabanı tabanlı loglama ve UI üzerinden hata takip/çözüm ekranı
+- **Rol Bazlı Yetkilendirme (RBAC)** - Gelişmiş kullanıcı, rol ve detaylı izin yönetimi
+- **Görsel Tasarımcılar** - WYSIWYG etiket editörü ve dinamik rapor tasarım desteği
 
 ---
 
 ## Modüller
 
-### Kullanıcı ve Yetki Yönetimi (System)
+### Sistem ve Geliştirme (System & Development)
 
-- **Kullanıcı Yönetimi:** Kullanıcı ekleme, düzenleme, pasife alma
-- **Rol Yönetimi:** Detaylı rol ve izin tanımları
-- **Güvenlik:** Bcrypt şifreleme ve güvenli oturum yönetimi
-- **Etiket Şablonları:** Görsel etiket tasarımcısı
-
-### Üretim Yönetimi (Production)
-
-- **Reçete (BOM) Yönetimi:** Versiyonlama, revizyon takibi, alt reçete desteği
-- **İş Emirleri:** Stok entegrasyonlu iş emri takibi, malzeme rezervasyonu
-- **İş İstasyonları:** Makine ve tezgah yönetimi
-- **Planlama:** Makine bazlı Gantt şeması, kapasite doluluk takibi
-- **Operatör Paneli:** Üretim sahası için basitleştirilmiş arayüz
-- **Takvim & Vardiya:** Vardiya tanımları, tatil günleri ve net çalışma saati hesaplama
-
-### Satınalma (Purchasing)
-
-- **Tedarikçi Yönetimi:** Cari kartlar, iletişim bilgileri
-- **Talep Yönetimi:** Departman bazlı satınalma talepleri ve onay mekanizması
-- **Sipariş Yönetimi:** Tekliften siparişe dönüşüm, parçalı teslimat desteği
-- **Mal Kabul:** İrsaliye ile depoya giriş, kalite kontrol
-- **Satınalma Faturaları:** Fatura kaydı ve eşleştirme
-
-### Stok Yönetimi (Inventory)
-
-- **Stok Kartları:** Barkod, birim çevrimleri, kritik stok seviyeleri
-- **Hareketler:** Giriş, Çıkış, Transfer, Fire, Sayım Fazlası/Eksiği
-- **Depo Yönetimi:** Çoklu depo ve lokasyon takibi
-- **Maliyetlendirme:** Ağırlıklı Ortalama Maliyet (Moving Average) yöntemi
-- **Stok Sayımı:** Periyodik sayım ve mutabakat
-
-### Satış Yönetimi (Sales)
-
-- **Müşteri Yönetimi:** Cari kartlar, fiyat listeleri, iletişim bilgileri
-- **Teklifler:** Satış teklifi oluşturma, siparişe dönüştürme
-- **Siparişler:** Sipariş takibi, irsaliyeye dönüştürme
-- **İrsaliyeler:** Teslimat irsaliyesi, faturaya dönüştürme
-- **Faturalar:** Satış faturası, ödeme takibi
-- **Fiyat Listeleri:** Müşteri bazlı fiyatlandırma
-
-### Finans (Finance)
-
-- **Cari Hesap Ekstresi:** Müşteri/tedarikçi hesap hareketleri
-- **Tahsilat:** Müşterilerden tahsilat, fatura eşleştirme
-- **Ödeme:** Tedarikçilere ödeme kayıtları
-- **Mutabakat:** Cari hesap mutabakatı
-
-### Muhasebe (Accounting)
-
-- **Hesap Planı:** Tekdüzen hesap planı yapısı
-- **Muhasebe Fişleri:** Yevmiye kayıtları
-- **Raporlar:** Mizan, defteri kebir
+- **Firma Kartı (Multi-Company):** Çoklu firma yönetimi, adres, banka ve iletişim bilgileri
+- **Kurumsal Kimlik:** Logo, kaşe ve imza yönetimi, PDF şablon entegrasyonu
+- **Kullanıcı Yönetimi:** Rol tanımları, detaylı yetki matrisi (Permissions Map)
+- **Etiket Şablonları:** Sürükle-bırak görsel etiket tasarımcısı
+- **Log İzleme:** Sistem hatalarının detaylı traceback ile takibi ve çözümlenmesi
 
 ### İnsan Kaynakları (HR)
 
-- **Personel Yönetimi:** Çalışan kartları, özlük bilgileri
-- **Organizasyon:** Departman ve pozisyon yapısı
-- **İzin Yönetimi:** İzin talepleri ve onay süreci
-- **Vardiya Rotasyonu:** Ekip bazlı vardiya planlama
-- **Devam Takibi:** Giriş/çıkış kayıtları
+- **Personel Yönetimi:** Fotoğraflı çalışan kartları, özlük ve iletişim bilgileri
+- **Kimlik Kartı Sistemi:** QR kodlu, fotoğraflı ve kurumsal logolu personel kimlik basımı
+- **Vardiya ve Organizasyon:** Departman hiyerarşisi, ekip bazlı vardiya rotasyonu
+- **İzin ve Devam:** Giriş/çıkış takibi (PDKS) ve onaylı izin süreci
 
-### Kalite Yönetimi (Quality)
+### Satış Yönetimi (Sales)
 
-- **Kalite Kontrol:** Giriş ve üretim kalite kontrolleri
-- **Uygunsuzluk (NCR):** Uygunsuzluk raporları
-- **Düzeltici/Önleyici Faaliyet (CAPA):** İyileştirme takibi
-- **Müşteri Şikayetleri:** Şikayet yönetimi
-- **Denetim Şablonları:** Özelleştirilebilir kontrol listeleri
+- **Otomatik Numaralandırma:** Firma ayarlarına bağlı otomatik Fatura/İrsaliye/Sipariş numarası üretimi
+- **İşlem Akışı:** Teklif → Sipariş → İrsaliye → Fatura zinciri ile tam izlenebilirlik
+- **Fiyatlandırma:** Müşteri bazlı özel fiyat listeleri ve indirim tanımları
+- **Cari Yönetimi:** Müşteri risk limiti ve bakiye kontrolü
 
-### Malzeme İhtiyaç Planlaması (MRP)
+### Üretim Yönetimi (Production)
 
-- **MRP Çalıştırma:** Otomatik ihtiyaç hesaplama
-- **İhtiyaç Analizi:** Satış ve üretim bazlı analiz
-- **Tedarik Önerileri:** Satınalma/üretim önerileri
-- **BOM Patlatma:** Çok seviyeli reçete açılımı
+- **Reçete (BOM):** Versiyonlu reçeteler, üretim operasyonları ve süre tanımları
+- **Operatör Paneli:** Tablet uyumlu basitleştirilmiş üretim takip ekranı
+- **İş Emirleri:** Malzeme rezervasyonlu ve kapasite planlamalı iş emri yönetimi
+- **Gantt Planlama:** Makine ve personel bazlı sürükle-bırak zaman planlama
 
-### Müşteri İlişkileri Yönetimi (CRM)
+### Stok ve Depo (Inventory)
 
-- **Lead Yönetimi:** Potansiyel müşteri takibi
-- **Fırsatlar:** Satış fırsatı pipeline'ı
-- **Aktiviteler:** Görüşme ve toplantı kayıtları
+- **Çoklu Depo:** Lokasyon bazlı stok takibi, depolar arası transfer
+- **Lot/Seri Takibi:** Üretim ve mal kabulde lot/seri izlenebilirliği
+- **Sayım Yönetimi:** Periyodik ve anlık stok sayım mutabakatı
+- **Maliyet:** Ağırlıklı Ortalama (Moving Average) ile anlık stok maliyet hesabı
 
-### Bakım Yönetimi (Maintenance)
+### Finans ve Muhasebe (Finance & Accounting)
 
-- **Bakım Talepleri:** Arıza ve bakım bildirimleri
-- **Bakım Görevleri:** İş atama ve takip
-- **Periyodik Bakım:** Planlı bakım takvimleri
-
-### Raporlar (Reports)
-
-- **Satış Raporları:** Satış analizi ve trendler
-- **OEE Raporu:** Genel Ekipman Etkinliği
-- **Stok Yaşlandırma:** Stok devir analizi
-- **Alacak Yaşlandırma:** Vade analizi
-- **Tedarikçi Performansı:** Tedarikçi değerlendirme
-
-### Geliştirme Araçları (Development)
-
-- **Error Handler:** Hataların detaylı traceback ile veritabanına kaydı
-- **Log İzleme:** Hata kayıtlarını filtreleme, inceleme ve çözümleme ekranı
-- **Migration:** Alembic ile veritabanı şema versiyonlama
-
----
-
-## Planlanan Özellikler
-
-- E-Fatura / E-Arşiv Entegrasyonu
-- Barkod Okuyucu Entegrasyonu
-- Mobil Uygulama (Depo operasyonları)
+- **Cari Hesaplar:** Borç/Alacak takibi, hesap ekstreleri
+- **Muhasebe:** Tekdüzen hesap planı, otomatik yevmiye fişi üretimi
+- **Tahsilat/Ödeme:** Banka ve kasa entegrasyonlu nakit akışı yönetimi
 
 ---
 
@@ -149,8 +81,8 @@
 ### Gereksinimler
 
 - Python 3.10+
-- PostgreSQL 13+
-- PyQt5
+- PostgreSQL 13+ (veya SQLite3)
+- PyQt6
 
 ### Adımlar
 
@@ -166,21 +98,15 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 # 3. Bağımlılıkları yükleyin
 pip install -r requirements.txt
 
-# 4. Veritabanını oluşturun (PostgreSQL)
-createdb akilli_is
-
-# 5. .env dosyasını ayarlayın
+# 4. Veritabanını yapılandırın
 cp .env.example .env
-# .env dosyasındaki DATABASE_URL'i kendi ayarlarınıza göre güncelleyin
+# .env içindeki DATABASE_URL'i güncelleyin
 
-# 6. Tabloları oluşturun ve Migration'ları çalıştırın
+# 5. Migration ve Başlangıç Verileri
 python -m alembic upgrade head
+python init_db.py  # Varsayılan: admin / admin123
 
-# 7. Başlangıç verilerini yükleyin (admin kullanıcısı dahil)
-python init_db.py
-# Varsayılan kullanıcı: admin / admin123
-
-# 8. Uygulamayı başlatın
+# 6. Uygulamayı başlatın
 python main.py
 ```
 
@@ -190,38 +116,17 @@ python main.py
 
 ```
 akilli-is/
-├── main.py                 # Uygulama giriş noktası
-├── init_db.py              # Veritabanı başlatma
-├── alembic/                # Veritabanı migrasyonları
-├── config/                 # Ayarlar ve tema
-│   ├── settings.py
-│   ├── styles.py
-│   └── theme_manager.py
-├── core/                   # Çekirdek servisler
-│   ├── auth_service.py
-│   ├── permission_map.py
-│   ├── export_manager.py
-│   └── label_manager.py
+├── core/                   # Çekirdek servisler (Auth, Context, Logging)
+│   ├── company_context.py  # Global firma yönetimi
+│   └── report_service.py   # PDF/HTML rapor motoru
 ├── database/               # Veritabanı katmanı
-│   ├── base.py
-│   └── models/             # ORM modelleri
-├── modules/                # İş modülleri
-│   ├── production/
-│   ├── sales/
-│   ├── purchasing/
-│   ├── inventory/
-│   ├── hr/
-│   ├── quality/
-│   ├── finance/
-│   ├── accounting/
-│   ├── mrp/
-│   ├── crm/
-│   ├── maintenance/
-│   ├── reports/
-│   └── system/
-└── ui/                     # UI bileşenleri
-    ├── main_window.py
-    └── widgets/
+│   └── models/             # ORM (Company, Sales, HR, vb.)
+├── modules/                # İş modülleri (Service & View)
+│   ├── system/             # CompanyService, UserService
+│   ├── sales/              # Satış ve fatura işlemleri
+│   └── hr/                 # Personel ve vardiya işlemleri
+├── ui/                     # UI bileşenleri (Main Window, Sidebar)
+└── assets/                 # Statik dosyalar (Logo, Belgeler)
 ```
 
 ---

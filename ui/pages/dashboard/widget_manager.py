@@ -8,7 +8,11 @@ from typing import Dict, List, Optional, Type, Any
 from dataclasses import dataclass
 
 from database.base import get_session
-from database.models.dashboard import DashboardWidget, RoleDefaultLayout, UserDashboardLayout
+from database.models.dashboard import (
+    DashboardWidget,
+    RoleDefaultLayout,
+    UserDashboardLayout,
+)
 from core.user_context import UserContext
 
 from .widgets.base import BaseWidget, WidgetConfig
@@ -17,6 +21,7 @@ from .widgets.base import BaseWidget, WidgetConfig
 @dataclass
 class WidgetDefinition:
     """Widget tanım bilgileri"""
+
     code: str
     name: str
     description: str
@@ -61,7 +66,9 @@ class WidgetManager:
             widget_class: BaseWidget'tan türetilmiş widget sınıfı
         """
         if not widget_class.widget_code:
-            raise ValueError(f"Widget sınıfı {widget_class.__name__} için widget_code tanımlı değil")
+            raise ValueError(
+                f"Widget sınıfı {widget_class.__name__} için widget_code tanımlı değil"
+            )
 
         cls._registry[widget_class.widget_code] = widget_class
 
@@ -80,7 +87,7 @@ class WidgetManager:
         cls,
         widget_code: str,
         config: Optional[WidgetConfig] = None,
-        edit_mode: bool = False
+        edit_mode: bool = False,
     ) -> Optional[BaseWidget]:
         """
         Widget kodu ile yeni widget oluşturur
@@ -106,7 +113,9 @@ class WidgetManager:
             return None
 
     @classmethod
-    def get_available_widgets(cls, user_context: Optional[UserContext] = None) -> List[WidgetDefinition]:
+    def get_available_widgets(
+        cls, user_context: Optional[UserContext] = None
+    ) -> List[WidgetDefinition]:
         """
         Kullanıcının erişebildiği widget listesini döner
 
@@ -126,14 +135,14 @@ class WidgetManager:
             definition = WidgetDefinition(
                 code=code,
                 name=widget_class.widget_name,
-                description=getattr(widget_class, 'widget_description', ''),
+                description=getattr(widget_class, "widget_description", ""),
                 widget_type=widget_class.widget_type,
-                icon=getattr(widget_class, 'widget_icon', 'puzzle-piece'),
+                icon=getattr(widget_class, "widget_icon", "puzzle-piece"),
                 default_size=widget_class.default_size,
                 min_size=widget_class.min_size,
                 max_size=widget_class.max_size,
                 required_permission=widget_class.required_permission,
-                widget_class=widget_class
+                widget_class=widget_class,
             )
             available.append(definition)
 
@@ -144,9 +153,12 @@ class WidgetManager:
         """Veritabanından widget tanımlarını getirir"""
         session = get_session()
         try:
-            return session.query(DashboardWidget).filter(
-                DashboardWidget.is_active == True
-            ).order_by(DashboardWidget.sort_order).all()
+            return (
+                session.query(DashboardWidget)
+                .filter(DashboardWidget.is_active == True)
+                .order_by(DashboardWidget.sort_order)
+                .all()
+            )
         finally:
             session.close()
 
@@ -163,10 +175,14 @@ class WidgetManager:
         """
         session = get_session()
         try:
-            user_layout = session.query(UserDashboardLayout).filter(
-                UserDashboardLayout.user_id == user_id,
-                UserDashboardLayout.is_active == True
-            ).first()
+            user_layout = (
+                session.query(UserDashboardLayout)
+                .filter(
+                    UserDashboardLayout.user_id == user_id,
+                    UserDashboardLayout.is_active == True,
+                )
+                .first()
+            )
 
             if user_layout:
                 return user_layout.layout
@@ -188,10 +204,14 @@ class WidgetManager:
         """
         session = get_session()
         try:
-            role_layout = session.query(RoleDefaultLayout).filter(
-                RoleDefaultLayout.role_id == role_id,
-                RoleDefaultLayout.is_active == True
-            ).first()
+            role_layout = (
+                session.query(RoleDefaultLayout)
+                .filter(
+                    RoleDefaultLayout.role_id == role_id,
+                    RoleDefaultLayout.is_active == True,
+                )
+                .first()
+            )
 
             if role_layout:
                 return role_layout.layout
@@ -230,6 +250,7 @@ class WidgetManager:
             session = get_session()
             try:
                 from database.models.user import Role
+
                 role_name = next(iter(user_context.roles))
                 role = session.query(Role).filter(Role.code == role_name).first()
                 if role:
@@ -243,7 +264,9 @@ class WidgetManager:
         return cls.get_default_layout(user_context)
 
     @classmethod
-    def get_default_layout(cls, user_context: Optional[UserContext] = None) -> Dict[str, Any]:
+    def get_default_layout(
+        cls, user_context: Optional[UserContext] = None
+    ) -> Dict[str, Any]:
         """
         Sistem varsayılan düzenini oluşturur
 
@@ -256,66 +279,71 @@ class WidgetManager:
         widgets = []
 
         # Temel widget'lar - herkes görebilir
-        widgets.extend([
-            {
-                "widget_code": "weather",
-                "position": {"row": 0, "col": 3},
-                "size": {"width": 1, "height": 1},
-                "config": {"city": "Istanbul"}
-            },
-            {
-                "widget_code": "currency_rates",
-                "position": {"row": 0, "col": 0},
-                "size": {"width": 2, "height": 1},
-                "config": {"currencies": ["USD", "EUR", "GBP"]}
-            },
-            {
-                "widget_code": "notifications",
-                "position": {"row": 1, "col": 3},
-                "size": {"width": 1, "height": 2},
-                "config": {}
-            },
-            {
-                "widget_code": "quick_actions",
-                "position": {"row": 0, "col": 2},
-                "size": {"width": 1, "height": 1},
-                "config": {}
-            },
-        ])
+        # NOT: Harici API gerektiren widget'lar şu an devre dışı
+        widgets.extend(
+            [
+                # {
+                #     "widget_code": "weather",
+                #     "position": {"row": 0, "col": 3},
+                #     "size": {"width": 1, "height": 1},
+                #     "config": {"city": "Istanbul"}
+                # },
+                # {
+                #     "widget_code": "currency_rates",
+                #     "position": {"row": 0, "col": 0},
+                #     "size": {"width": 2, "height": 1},
+                #     "config": {"currencies": ["USD", "EUR", "GBP"]}
+                # },
+                {
+                    "widget_code": "notifications",
+                    "position": {"row": 0, "col": 3},
+                    "size": {"width": 1, "height": 2},
+                    "config": {},
+                },
+                {
+                    "widget_code": "quick_actions",
+                    "position": {"row": 0, "col": 0},
+                    "size": {"width": 1, "height": 1},
+                    "config": {},
+                },
+            ]
+        )
 
         # İzne bağlı widget'lar
         if user_context:
             permissions = user_context.permissions or []
 
             if "sales.view" in permissions or user_context.is_superuser:
-                widgets.append({
-                    "widget_code": "stat_sales_today",
-                    "position": {"row": 1, "col": 0},
-                    "size": {"width": 1, "height": 1},
-                    "config": {}
-                })
+                widgets.append(
+                    {
+                        "widget_code": "stat_sales_today",
+                        "position": {"row": 1, "col": 0},
+                        "size": {"width": 1, "height": 1},
+                        "config": {},
+                    }
+                )
 
             if "inventory.view" in permissions or user_context.is_superuser:
-                widgets.append({
-                    "widget_code": "stat_low_stock",
-                    "position": {"row": 1, "col": 1},
-                    "size": {"width": 1, "height": 1},
-                    "config": {}
-                })
+                widgets.append(
+                    {
+                        "widget_code": "stat_low_stock",
+                        "position": {"row": 1, "col": 1},
+                        "size": {"width": 1, "height": 1},
+                        "config": {},
+                    }
+                )
 
             if "production.view" in permissions or user_context.is_superuser:
-                widgets.append({
-                    "widget_code": "stat_open_work_orders",
-                    "position": {"row": 1, "col": 2},
-                    "size": {"width": 1, "height": 1},
-                    "config": {}
-                })
+                widgets.append(
+                    {
+                        "widget_code": "stat_open_work_orders",
+                        "position": {"row": 1, "col": 2},
+                        "size": {"width": 1, "height": 1},
+                        "config": {},
+                    }
+                )
 
-        return {
-            "version": "1.0",
-            "grid_columns": 4,
-            "widgets": widgets
-        }
+        return {"version": "1.0", "grid_columns": 4, "widgets": widgets}
 
     @classmethod
     def save_user_layout(cls, user_id: int, layout: Dict[str, Any]) -> bool:
@@ -331,17 +359,16 @@ class WidgetManager:
         """
         session = get_session()
         try:
-            existing = session.query(UserDashboardLayout).filter(
-                UserDashboardLayout.user_id == user_id
-            ).first()
+            existing = (
+                session.query(UserDashboardLayout)
+                .filter(UserDashboardLayout.user_id == user_id)
+                .first()
+            )
 
             if existing:
                 existing.layout = layout
             else:
-                new_layout = UserDashboardLayout(
-                    user_id=user_id,
-                    layout=layout
-                )
+                new_layout = UserDashboardLayout(user_id=user_id, layout=layout)
                 session.add(new_layout)
 
             session.commit()
@@ -392,17 +419,16 @@ class WidgetManager:
         """
         session = get_session()
         try:
-            existing = session.query(RoleDefaultLayout).filter(
-                RoleDefaultLayout.role_id == role_id
-            ).first()
+            existing = (
+                session.query(RoleDefaultLayout)
+                .filter(RoleDefaultLayout.role_id == role_id)
+                .first()
+            )
 
             if existing:
                 existing.layout = layout
             else:
-                new_layout = RoleDefaultLayout(
-                    role_id=role_id,
-                    layout=layout
-                )
+                new_layout = RoleDefaultLayout(role_id=role_id, layout=layout)
                 session.add(new_layout)
 
             session.commit()

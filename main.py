@@ -38,28 +38,27 @@ class ApplicationController:
         self._db_session = None
 
     def start(self):
-        """Uygulama akışını başlat: Splash -> Login -> MainWindow"""
+        """Uygulama akışını başlat: Doğrudan MainWindow (Splash/Login bypass)"""
         # Audit engine'i başlat
         audit_engine.init_listeners()
         print("✓ Audit engine başlatıldı")
 
-        self._show_splash()
+        # Splash ve Login bypass - doğrudan ana pencere
+        self._setup_dev_user_context()
+        self._show_main_window()
 
     def _show_splash(self):
-        """Splash screen göster"""
-        from ui.screens import SplashScreen
-
-        self.splash = SplashScreen()
-        self.splash.finished.connect(self._on_splash_finished)
-        self.splash.start()
+        """Splash screen göster (ŞU AN DEVRE DIŞI)"""
+        # from ui.screens import SplashScreen
+        # self.splash = SplashScreen()
+        # self.splash.finished.connect(self._on_splash_finished)
+        # self.splash.start()
+        pass  # Splash devre dışı
 
     def _on_splash_finished(self):
-        """Splash tamamlandığında ana pencereyi göster (Login devre dışı)"""
+        """Splash tamamlandığında ana pencereyi göster (ŞU AN KULLANILMIYOR)"""
         self.splash = None
-
-        # Login bypass edildiğinde dev kullanıcı context'i ayarla
         self._setup_dev_user_context()
-
         self._show_main_window()
 
     def _setup_dev_user_context(self):
@@ -97,6 +96,7 @@ class ApplicationController:
 
         # User context'i ayarla
         from database.base import get_session
+
         db = get_session()
         try:
             context = create_user_context(user)

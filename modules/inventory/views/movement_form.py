@@ -29,6 +29,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QDateTime, QStringListModel
 
 from database.models import StockMovementType
 
+
 class MovementFormPage(QWidget):
     """Stok hareket formu"""
 
@@ -153,6 +154,23 @@ class MovementFormPage(QWidget):
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(16, 12, 16, 12)
         add_layout.setSpacing(12)
+
+        # Barkod girişi
+        add_layout.addWidget(QLabel("Barkod:"))
+        self.barcode_input = QLineEdit()
+        self.barcode_input.setPlaceholderText("Barkod okutun...")
+        self.barcode_input.setMaximumWidth(150)
+        self.barcode_input.returnPressed.connect(self._on_barcode_scan)
+        self.barcode_input.setStyleSheet(
+            """
+            QLineEdit {
+                border: 2px solid #3b82f6;
+                border-radius: 4px;
+                padding: 4px 8px;
+            }
+        """
+        )
+        add_layout.addWidget(self.barcode_input)
 
         # Stok seçimi
         add_layout.addWidget(QLabel("Stok:"))
@@ -282,6 +300,35 @@ class MovementFormPage(QWidget):
         """
         )
 
+    def _on_barcode_scan(self):
+        """Barkod okutulduğunda ürünü bul ve seç"""
+        barcode = self.barcode_input.text().strip()
+        if not barcode:
+            return
+
+        # Barkod ile ürün ara
+        found = False
+        for i in range(self.item_combo.count()):
+            item_id = self.item_combo.itemData(i)
+            item = self.items_data.get(item_id)
+            if item:
+                # Kod veya barkod eşleşmesi
+                item_code = item.get("code", "")
+                item_barcode = item.get("barcode", "")
+                if barcode.upper() in [item_code.upper(), item_barcode]:
+                    self.item_combo.setCurrentIndex(i)
+                    found = True
+                    break
+
+        if found:
+            self.barcode_input.clear()
+            self.qty_input.setFocus()
+        else:
+            QMessageBox.warning(
+                self, "Bulunamadı", f"'{barcode}' barkoduna ait ürün bulunamadı!"
+            )
+            self.barcode_input.selectAll()
+
     def load_items(self, items: list):
         """Stok kartlarını yükle"""
         self.items_data = {}
@@ -292,6 +339,7 @@ class MovementFormPage(QWidget):
                 "id": item.id,
                 "code": item.code,
                 "name": item.name,
+                "barcode": item.barcode or "",
                 "unit_code": item.unit.code if item.unit else "ADET",
                 "unit_id": item.unit_id,
             }

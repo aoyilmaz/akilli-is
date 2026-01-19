@@ -20,6 +20,8 @@ from .stock_count_form import StockCountFormPage
 from .stock_count_module import StockCountModule
 from .unit_management import UnitManagementPage
 from .unit_module import UnitModule
+from .location_management import LocationManagementPage
+from .warehouse_operator import WarehouseOperatorPage
 
 __all__ = [
     "StockListPage",
@@ -40,4 +42,6 @@ __all__ = [
     "StockCountModule",
     "UnitManagementPage",
     "UnitModule",
+    "LocationManagementPage",
+    "WarehouseOperatorPage",
 ]

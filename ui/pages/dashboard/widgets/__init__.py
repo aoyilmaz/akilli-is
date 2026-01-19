@@ -16,6 +16,7 @@ from .notification_widget import NotificationWidget
 from .quick_action_widget import QuickActionWidget
 from .currency_widget import CurrencyWidget
 from .weather_widget import WeatherWidget
+from .expiry_widget import ExpiryAlertWidget
 
 __all__ = [
     # Base
@@ -29,6 +30,7 @@ __all__ = [
     "OpenWorkOrdersWidget",
     # List widgets
     "NotificationWidget",
+    "ExpiryAlertWidget",
     # Action widgets
     "QuickActionWidget",
     # External data widgets

@@ -306,3 +306,29 @@ class Attendance(BaseModel):
 
     def __repr__(self):
         return f"<Attendance(employee_id={self.employee_id}, date={self.date}, status={self.status.value})>"
+
+
+class Payroll(BaseModel):
+    """Maaş Tahakkuk Tablosu"""
+
+    __tablename__ = "payrolls"
+
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+
+    base_salary = Column(Numeric(15, 2), nullable=False)
+    overtime_pay = Column(Numeric(15, 2), default=0)
+    bonus = Column(Numeric(15, 2), default=0)
+    deductions = Column(Numeric(15, 2), default=0)
+    net_salary = Column(Numeric(15, 2), nullable=False)
+
+    is_paid = Column(Boolean, default=False)
+    paid_date = Column(Date, nullable=True)
+
+    employee = relationship("Employee")
+
+    __table_args__ = (
+        Index("idx_payroll_period", "period_year", "period_month"),
+        Index("idx_payroll_emp", "employee_id"),
+    )

@@ -332,20 +332,18 @@ class DashboardPage(QWidget):
         except ImportError as e:
             print(f"Stat widget import hatası: {e}")
 
-        # Dış veri widget'ları
-        try:
-            from .widgets.weather_widget import WeatherWidget
+        # Dış veri widget'ları (ŞU AN DEVRE DIŞI - API timeout sorunları)
+        # try:
+        #     from .widgets.weather_widget import WeatherWidget
+        #     WidgetManager.register(WeatherWidget)
+        # except ImportError as e:
+        #     print(f"Weather widget import hatası: {e}")
 
-            WidgetManager.register(WeatherWidget)
-        except ImportError as e:
-            print(f"Weather widget import hatası: {e}")
-
-        try:
-            from .widgets.currency_widget import CurrencyWidget
-
-            WidgetManager.register(CurrencyWidget)
-        except ImportError as e:
-            print(f"Currency widget import hatası: {e}")
+        # try:
+        #     from .widgets.currency_widget import CurrencyWidget
+        #     WidgetManager.register(CurrencyWidget)
+        # except ImportError as e:
+        #     print(f"Currency widget import hatası: {e}")
 
         # Liste widget'ları
         try:

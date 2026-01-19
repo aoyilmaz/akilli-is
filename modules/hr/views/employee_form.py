@@ -18,8 +18,11 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QWidget,
     QGroupBox,
+    QFileDialog,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtGui import QPixmap
 
 from config.styles import (
     BG_PRIMARY,
@@ -40,6 +43,7 @@ class EmployeeFormDialog(QDialog):
         super().__init__(parent)
         self.employee_id = employee_id
         self.service = HRService()
+        self.photo_path = None  # Seçilen fotoğraf dosyası
         self.setup_ui()
         self.load_combos()
         if employee_id:
@@ -55,9 +59,14 @@ class EmployeeFormDialog(QDialog):
         # Tab widget
         tabs = QTabWidget()
 
-        # Temel Bilgiler Tab
+        # Temel Bilgiler Tab - 2 kolonlu layout
         basic_tab = QWidget()
-        basic_layout = QFormLayout(basic_tab)
+        basic_main_layout = QHBoxLayout(basic_tab)
+        basic_main_layout.setSpacing(20)
+
+        # Sol taraf - Form alanları
+        form_widget = QWidget()
+        basic_layout = QFormLayout(form_widget)
         basic_layout.setSpacing(12)
 
         self.employee_no = QLineEdit()
@@ -90,6 +99,42 @@ class EmployeeFormDialog(QDialog):
         self.gender.addItem("Kadın", Gender.FEMALE)
         self.gender.addItem("Diğer", Gender.OTHER)
         basic_layout.addRow("Cinsiyet:", self.gender)
+
+        basic_main_layout.addWidget(form_widget, stretch=1)
+
+        # Sağ taraf - Fotoğraf alanı
+        photo_group = QGroupBox("Fotoğraf")
+        photo_layout = QVBoxLayout(photo_group)
+        photo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.photo_label = QLabel()
+        self.photo_label.setFixedSize(120, 150)
+        self.photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.photo_label.setStyleSheet(
+            """
+            QLabel {
+                background-color: #1e293b;
+                border: 2px dashed #475569;
+                border-radius: 8px;
+                color: #64748b;
+            }
+        """
+        )
+        self.photo_label.setText("👤\nFotoğraf")
+        photo_layout.addWidget(self.photo_label)
+
+        photo_btn_layout = QHBoxLayout()
+        select_photo_btn = QPushButton("📂 Seç")
+        select_photo_btn.clicked.connect(self._select_photo)
+        photo_btn_layout.addWidget(select_photo_btn)
+
+        clear_photo_btn = QPushButton("🗑 Kaldır")
+        clear_photo_btn.clicked.connect(self._clear_photo)
+        photo_btn_layout.addWidget(clear_photo_btn)
+
+        photo_layout.addLayout(photo_btn_layout)
+
+        basic_main_layout.addWidget(photo_group)
 
         tabs.addTab(basic_tab, "Temel Bilgiler")
 
@@ -272,6 +317,10 @@ class EmployeeFormDialog(QDialog):
                     if idx >= 0:
                         self.shift_team.setCurrentIndex(idx)
 
+                # Mevcut fotoğrafı yükle
+                if emp.photo:
+                    self._load_existing_photo(emp.photo)
+
         except Exception as e:
             QMessageBox.warning(self, "Hata", f"Çalışan yüklenirken hata: {str(e)}")
 
@@ -312,14 +361,82 @@ class EmployeeFormDialog(QDialog):
                 data["employee_no"] = self.employee_no.text().strip()
 
             if self.employee_id:
-                self.service.update_employee(self.employee_id, data)
+                emp = self.service.update_employee(self.employee_id, data)
             else:
-                self.service.create_employee(data)
+                emp = self.service.create_employee(data)
+
+            # Fotoğrafı kaydet
+            if self.photo_path and emp:
+                self._save_photo(emp.employee_no)
 
             self.accept()
 
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Kayıt sırasında hata: {str(e)}")
+
+    def _select_photo(self):
+        """Fotoğraf dosyası seç"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Fotoğraf Seç", "", "Resim Dosyaları (*.jpg *.jpeg *.png *.bmp)"
+        )
+
+        if file_path:
+            self.photo_path = file_path
+            self._show_photo_preview(file_path)
+
+    def _show_photo_preview(self, path: str):
+        """Fotoğraf önizlemesini göster"""
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            scaled = pixmap.scaled(
+                120,
+                150,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.photo_label.setPixmap(scaled)
+
+    def _clear_photo(self):
+        """Fotoğrafı kaldır"""
+        self.photo_path = None
+        self.photo_label.clear()
+        self.photo_label.setText("👤\nFotoğraf")
+
+    def _save_photo(self, employee_no: str):
+        """Fotoğrafı kaydet"""
+        import os
+        import shutil
+
+        # Hedef klasör
+        photo_dir = os.path.join("assets", "photos", "employees")
+        os.makedirs(photo_dir, exist_ok=True)
+
+        # Uzantıyı al
+        ext = os.path.splitext(self.photo_path)[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png"]:
+            ext = ".jpg"
+
+        # Hedef dosya
+        filename = f"{employee_no}{ext}"
+        dest_path = os.path.join(photo_dir, filename)
+
+        # Kopyala
+        shutil.copy2(self.photo_path, dest_path)
+
+        # Veritabanını güncelle
+        if self.employee_id:
+            self.service.update_employee(self.employee_id, {"photo": filename})
+
+    def _load_existing_photo(self, photo_filename: str):
+        """Mevcut fotoğrafı yükle"""
+        import os
+
+        if not photo_filename:
+            return
+
+        photo_path = os.path.join("assets", "photos", "employees", photo_filename)
+        if os.path.exists(photo_path):
+            self._show_photo_preview(photo_path)
 
     def closeEvent(self, event):
         self.service.close()
