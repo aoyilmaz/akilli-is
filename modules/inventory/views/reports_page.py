@@ -23,7 +23,6 @@ from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config import COLORS
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 
 
 class StockReportsPage(QWidget):
@@ -41,34 +40,37 @@ class StockReportsPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("📊 Stok Raporları")
-        header_layout.addWidget(title)
+        self.header = PageHeader(
+            title="Stok Raporları",
+            icon="📊",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            show_export=True,
+            parent=self,
+        )
 
-        header_layout.addStretch()
+        # Yazdır butonu
+        print_btn = QPushButton("🖨 Yazdır")
+        print_btn.setProperty("class", "btn-secondary")
+        print_btn.setFixedHeight(36)
 
-        # Dışa aktar
-        export_btn = QPushButton(f"{ICONS['export']} Excel'e Aktar")
-        export_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        export_btn.setStyleSheet(get_button_style("export"))
-        header_layout.addWidget(export_btn)
+        # Header'a yazdır butonunu ekle
+        h_layout = self.header.header_layout()
+        if self.header.refresh_btn:
+            # Refresh butonundan önce ekle
+            idx = h_layout.indexOf(self.header.refresh_btn)
+            h_layout.insertWidget(idx, print_btn)
+        else:
+            h_layout.addWidget(print_btn)
 
-        # Yazdır
-        print_btn = QPushButton(f"{ICONS['print']} Yazdır")
-        print_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        print_btn.setStyleSheet(get_button_style("print"))
-        header_layout.addWidget(print_btn)
+        # Sinyalleri bağla
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # === Özet Kartlar ===
         cards_layout = QHBoxLayout()

@@ -24,24 +24,37 @@ from PyQt6.QtGui import QFont
 from modules.production.services import WorkOrderService, WorkStationService
 
 
-# === STİLLER ===
-MAIN_BG = "#0f172a"
-CARD_BG = "#1e293b"
-BORDER_COLOR = "#334155"
-TEXT_PRIMARY = "#f8fafc"
-TEXT_SECONDARY = "#94a3b8"
-TEXT_MUTED = "#64748b"
+from config.styles import (
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+)
 
-# Buton renkleri
-GREEN = "#10b981"
-GREEN_HOVER = "#059669"
-YELLOW = "#f59e0b"
-YELLOW_HOVER = "#d97706"
-RED = "#ef4444"
-RED_HOVER = "#dc2626"
-BLUE = "#3b82f6"
-BLUE_HOVER = "#2563eb"
-TEAL = "#0d9488"
+
+# Compatibility Mappings
+MAIN_BG = BG_PRIMARY
+CARD_BG = BG_SECONDARY
+BORDER_COLOR = BORDER
+# TEXT_PRIMARY, TEXT_MUTED are imported
+TEXT_SECONDARY = TEXT_MUTED
+
+GREEN = SUCCESS
+GREEN_HOVER = SUCCESS
+YELLOW = WARNING
+YELLOW_HOVER = WARNING
+RED = ERROR
+RED_HOVER = ERROR
+BLUE = ACCENT
+BLUE_HOVER = ACCENT
+TEAL = "#0d9488"  # Keeping specific teal if needed, or map to ACCENT
 TEAL_HOVER = "#0f766e"
 
 
@@ -51,14 +64,12 @@ def make_btn_style(bg, hover):
         background-color: {bg};
         color: white;
         border: none;
-        border-radius: 12px;
-        font-size: 20px;
+        border-radius: 8px;
+        font-size: 16px;
         font-weight: bold;
-        padding: 16px;
+        padding: 10px;
     }}
     QPushButton:hover {{ background-color: {hover}; }}
-    QPushButton:pressed {{ background-color: {hover}; }}
-    QPushButton:disabled {{ background-color: #475569; color: #94a3b8; }}
     """
 
 
@@ -77,21 +88,24 @@ class StationSelectDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
 
+        # Dialog styling
+        self.setStyleSheet(f"background-color: {BG_PRIMARY}; color: {TEXT_PRIMARY};")
+
         title = QLabel("🏭 İstasyon Seçin")
         title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         layout.addWidget(title)
 
         self.station_list = QListWidget()
         self.station_list.setStyleSheet(
-            """
-            QListWidget { 
-                background: #1e293b; border: none; font-size: 16px; 
-            }
-            QListWidget::item { 
+            f"""
+            QListWidget {{ 
+                background: {BG_SECONDARY}; border: 1px solid {BORDER}; font-size: 16px; 
+            }}
+            QListWidget::item {{ 
                 padding: 16px; margin: 4px; 
-                background: #334155; border-radius: 8px; 
-            }
-            QListWidget::item:selected { background: #3b82f6; }
+                background: {BG_TERTIARY}; border-radius: 8px; 
+            }}
+            QListWidget::item:selected {{ background: {ACCENT}; }}
         """
         )
         for s in self.stations:
@@ -118,20 +132,6 @@ class StationSelectDialog(QDialog):
 class OperatorPanel(QWidget):
     """
     Operatör Paneli - Tablet Optimize
-
-    Düzen:
-    ┌─────────────────────────────────────────────────────┐
-    │ [Makine: XXX] [İş Emri: YYY]  [Personel: ZZZ]  [?] │  <- Header
-    ├─────────────────────────────────────────────────────┤
-    │  ┌─────────────┐  ┌──────────────────────────────┐ │
-    │  │ İŞ LİSTESİ  │  │      AKTİF OPERASYON         │ │
-    │  │             │  │                              │ │
-    │  │ • İş 1      │  │   ⏱ 00:45:30                 │ │
-    │  │ • İş 2      │  │                              │ │
-    │  │ • İş 3      │  │  [BAŞLAT] [DURAKLAT]         │ │
-    │  │             │  │  [HURDA]  [BİTİR]            │ │
-    │  └─────────────┘  └──────────────────────────────┘ │
-    └─────────────────────────────────────────────────────┘
     """
 
     def __init__(self, parent=None):
@@ -149,7 +149,39 @@ class OperatorPanel(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        self.setStyleSheet(f"background-color: {MAIN_BG}; color: {TEXT_PRIMARY};")
+        # Inject custom styles for this panel
+        self.setStyleSheet(
+            f"""
+            QWidget {{ background-color: {BG_PRIMARY}; color: {TEXT_PRIMARY}; }}
+            
+            QFrame[class="panel-header"] {{ background-color: {BG_SECONDARY}; border-bottom: 1px solid {BORDER}; }}
+            QFrame[class="panel-card"] {{ background-color: {BG_SECONDARY}; border: 1px solid {BORDER}; border-radius: 12px; }}
+            QListWidget[class="panel-list"] {{ background-color: {BG_PRIMARY}; border: none; border-radius: 8px; }}
+            
+            /* Buttons */
+            QPushButton[class="btn-large-green"] {{ background-color: {SUCCESS}; color: white; border-radius: 8px; font-weight: bold; font-size: 18px; }}
+            QPushButton[class="btn-large-yellow"] {{ background-color: {WARNING}; color: white; border-radius: 8px; font-weight: bold; font-size: 18px; }}
+            QPushButton[class="btn-large-red"] {{ background-color: {ERROR}; color: white; border-radius: 8px; font-weight: bold; font-size: 18px; }}
+            QPushButton[class="btn-large-teal"] {{ background-color: {ACCENT}; color: white; border-radius: 8px; font-weight: bold; font-size: 18px; }}
+            QPushButton[class="btn-secondary"] {{ background-color: {BG_TERTIARY}; color: {TEXT_PRIMARY}; border: 1px solid {BORDER}; border-radius: 8px; padding: 8px; }}
+            QPushButton[class="btn-icon-circle"] {{ background-color: {BG_TERTIARY}; border-radius: 18px; border: 1px solid {BORDER}; }}
+            
+            QLabel[class="label-blue"] {{ color: {ACCENT}; font-weight: bold; }}
+            QLabel[class="label-green"] {{ color: {SUCCESS}; font-weight: bold; }}
+            QLabel[class="label-muted"] {{ color: {TEXT_MUTED}; }}
+            QLabel[class="warning-box"] {{ background-color: {ERROR}20; color: {ERROR}; padding: 10px; border-radius: 6px; }}
+            QFrame[class="timer-frame"] {{ background-color: {BG_TERTIARY}; border-radius: 12px; border: 1px solid {BORDER}; }}
+            QLabel[class="timer-label"] {{ color: {TEXT_PRIMARY}; font-weight: bold; }}
+            
+            QLineEdit[class="barcode-input"] {{ 
+                background-color: {BG_TERTIARY}; 
+                border: 1px solid {BORDER}; 
+                border-radius: 6px; 
+                padding: 8px; 
+                color: {TEXT_PRIMARY};
+            }}
+        """
+        )
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(12, 8, 12, 8)
@@ -158,27 +190,20 @@ class OperatorPanel(QWidget):
         # === HEADER BAR ===
         header = QFrame()
         header.setFixedHeight(50)
-        header.setStyleSheet(
-            f"""
-            QFrame {{ 
-                background-color: {CARD_BG}; 
-                border-radius: 10px; 
-            }}
-        """
-        )
+        header.setProperty("class", "panel-header")
         h_layout = QHBoxLayout(header)
         h_layout.setContentsMargins(16, 0, 16, 0)
 
         # Makine bilgisi
         self.station_label = QLabel("🏭 Makine: -")
         self.station_label.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
-        self.station_label.setStyleSheet(f"color: {BLUE};")
+        self.station_label.setProperty("class", "label-blue")
         h_layout.addWidget(self.station_label)
 
         # İş emri bilgisi
         self.order_label = QLabel("📋 İş Emri: -")
         self.order_label.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
-        self.order_label.setStyleSheet(f"color: {GREEN};")
+        self.order_label.setProperty("class", "label-green")
         h_layout.addWidget(self.order_label)
 
         h_layout.addStretch()
@@ -187,34 +212,14 @@ class OperatorPanel(QWidget):
         self.barcode_input = QLineEdit()
         self.barcode_input.setPlaceholderText("📷 Barkod / İş Emri No")
         self.barcode_input.setFixedWidth(200)
-        self.barcode_input.setStyleSheet(
-            f"""
-            QLineEdit {{ 
-                background: {MAIN_BG}; 
-                border: 1px solid {BORDER_COLOR}; 
-                border-radius: 6px;
-                padding: 8px 12px;
-                color: white;
-                font-size: 13px;
-            }}
-        """
-        )
+        self.barcode_input.setProperty("class", "barcode-input")
         self.barcode_input.returnPressed.connect(self._on_barcode_scan)
         h_layout.addWidget(self.barcode_input)
 
         # İstasyon değiştir
         change_btn = QPushButton("⚙")
         change_btn.setFixedSize(36, 36)
-        change_btn.setStyleSheet(
-            f"""
-            QPushButton {{ 
-                background: {BORDER_COLOR}; 
-                border-radius: 18px; 
-                font-size: 16px;
-            }}
-            QPushButton:hover {{ background: #475569; }}
-        """
-        )
+        change_btn.setProperty("class", "btn-icon-circle")
         change_btn.clicked.connect(self._select_station)
         h_layout.addWidget(change_btn)
 
@@ -227,14 +232,7 @@ class OperatorPanel(QWidget):
         # --- SOL: İş Listesi ---
         left_panel = QFrame()
         left_panel.setFixedWidth(280)
-        left_panel.setStyleSheet(
-            f"""
-            QFrame {{ 
-                background-color: {CARD_BG}; 
-                border-radius: 12px; 
-            }}
-        """
-        )
+        left_panel.setProperty("class", "panel-card")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(8)
@@ -244,24 +242,7 @@ class OperatorPanel(QWidget):
         left_layout.addWidget(left_title)
 
         self.job_list = QListWidget()
-        self.job_list.setStyleSheet(
-            f"""
-            QListWidget {{ 
-                background: transparent; 
-                border: none; 
-            }}
-            QListWidget::item {{ 
-                padding: 12px; 
-                margin: 2px 0; 
-                background: {MAIN_BG}; 
-                border-radius: 8px;
-                font-size: 13px;
-            }}
-            QListWidget::item:selected {{ 
-                background: {BLUE}; 
-            }}
-        """
-        )
+        self.job_list.setProperty("class", "panel-list")
         self.job_list.itemClicked.connect(self._on_job_selected)
         left_layout.addWidget(self.job_list)
 
@@ -269,14 +250,7 @@ class OperatorPanel(QWidget):
 
         # --- ORTA: Aktif Operasyon ---
         center_panel = QFrame()
-        center_panel.setStyleSheet(
-            f"""
-            QFrame {{ 
-                background-color: {CARD_BG}; 
-                border-radius: 12px; 
-            }}
-        """
-        )
+        center_panel.setProperty("class", "panel-card")
         center_layout = QVBoxLayout(center_panel)
         center_layout.setContentsMargins(16, 12, 16, 12)
         center_layout.setSpacing(8)
@@ -284,28 +258,19 @@ class OperatorPanel(QWidget):
         # Operasyon başlığı
         self.op_title = QLabel("Operasyon seçin...")
         self.op_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        self.op_title.setStyleSheet(f"color: {TEXT_SECONDARY};")
+        self.op_title.setProperty("class", "label-muted")
         center_layout.addWidget(self.op_title)
 
         # Operasyon detay
         self.op_detail = QLabel("")
         self.op_detail.setFont(QFont("Segoe UI", 12))
-        self.op_detail.setStyleSheet(f"color: {TEXT_MUTED};")
+        self.op_detail.setProperty("class", "label-muted")
         self.op_detail.setWordWrap(True)
         center_layout.addWidget(self.op_detail)
 
         # Uyarı kutusu
         self.warning_box = QLabel()
-        self.warning_box.setStyleSheet(
-            f"""
-            background: rgba(245, 158, 11, 0.15);
-            border: 2px solid {YELLOW};
-            border-radius: 8px;
-            padding: 10px;
-            color: {YELLOW};
-            font-size: 12px;
-        """
-        )
+        self.warning_box.setProperty("class", "warning-box")
         self.warning_box.setWordWrap(True)
         self.warning_box.hide()
         center_layout.addWidget(self.warning_box)
@@ -314,19 +279,14 @@ class OperatorPanel(QWidget):
 
         # Timer
         timer_frame = QFrame()
-        timer_frame.setStyleSheet(
-            f"""
-            background: {MAIN_BG}; 
-            border-radius: 12px;
-        """
-        )
+        timer_frame.setProperty("class", "timer-frame")
         timer_layout = QVBoxLayout(timer_frame)
         timer_layout.setContentsMargins(20, 12, 20, 12)
 
         self.timer_label = QLabel("00:00:00")
         self.timer_label.setFont(QFont("Segoe UI", 56, QFont.Weight.Bold))
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.timer_label.setStyleSheet(f"color: {RED};")
+        self.timer_label.setProperty("class", "timer-label")
         timer_layout.addWidget(self.timer_label)
 
         center_layout.addWidget(timer_frame)
@@ -338,26 +298,26 @@ class OperatorPanel(QWidget):
         btn_grid.setSpacing(10)
 
         self.btn_start = QPushButton("▶ BAŞLAT")
-        self.btn_start.setStyleSheet(make_btn_style(GREEN, GREEN_HOVER))
+        self.btn_start.setProperty("class", "btn-large-green")
         self.btn_start.setMinimumHeight(55)
         self.btn_start.clicked.connect(self._start_operation)
         btn_grid.addWidget(self.btn_start, 0, 0)
 
         self.btn_pause = QPushButton("⏸ DURAKLAT")
-        self.btn_pause.setStyleSheet(make_btn_style(YELLOW, YELLOW_HOVER))
+        self.btn_pause.setProperty("class", "btn-large-yellow")
         self.btn_pause.setMinimumHeight(55)
         self.btn_pause.clicked.connect(self._pause_operation)
         self.btn_pause.hide()
         btn_grid.addWidget(self.btn_pause, 0, 0)
 
         self.btn_scrap = QPushButton("🗑 HURDA")
-        self.btn_scrap.setStyleSheet(make_btn_style(RED, RED_HOVER))
+        self.btn_scrap.setProperty("class", "btn-large-red")
         self.btn_scrap.setMinimumHeight(55)
         self.btn_scrap.clicked.connect(self._report_scrap)
         btn_grid.addWidget(self.btn_scrap, 0, 1)
 
         self.btn_finish = QPushButton("✅ BİTİR")
-        self.btn_finish.setStyleSheet(make_btn_style(TEAL, TEAL_HOVER))
+        self.btn_finish.setProperty("class", "btn-large-teal")
         self.btn_finish.setMinimumHeight(55)
         self.btn_finish.clicked.connect(self._finish_operation)
         btn_grid.addWidget(self.btn_finish, 1, 0, 1, 2)
@@ -369,14 +329,7 @@ class OperatorPanel(QWidget):
         # --- SAĞ: Personel ---
         right_panel = QFrame()
         right_panel.setFixedWidth(220)
-        right_panel.setStyleSheet(
-            f"""
-            QFrame {{ 
-                background-color: {CARD_BG}; 
-                border-radius: 12px; 
-            }}
-        """
-        )
+        right_panel.setProperty("class", "panel-card")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(12, 12, 12, 12)
         right_layout.setSpacing(8)
@@ -388,57 +341,18 @@ class OperatorPanel(QWidget):
         # Personel sicil girişi
         self.personnel_input = QLineEdit()
         self.personnel_input.setPlaceholderText("Sicil No...")
-        self.personnel_input.setStyleSheet(
-            f"""
-            QLineEdit {{ 
-                background: {MAIN_BG}; 
-                border: 1px solid {BORDER_COLOR}; 
-                border-radius: 6px;
-                padding: 10px;
-                color: white;
-                font-size: 14px;
-            }}
-        """
-        )
+        self.personnel_input.setProperty("class", "barcode-input")
         self.personnel_input.returnPressed.connect(self._add_personnel_by_id)
         right_layout.addWidget(self.personnel_input)
 
         # Personel listesi
         self.personnel_list = QListWidget()
-        self.personnel_list.setStyleSheet(
-            f"""
-            QListWidget {{ 
-                background: transparent; 
-                border: none; 
-            }}
-            QListWidget::item {{ 
-                padding: 10px; 
-                margin: 2px 0; 
-                background: {MAIN_BG}; 
-                border-radius: 6px;
-                font-size: 12px;
-            }}
-            QListWidget::item:selected {{ 
-                background: {BLUE}; 
-            }}
-        """
-        )
+        self.personnel_list.setProperty("class", "panel-list")
         right_layout.addWidget(self.personnel_list)
 
         # Personel çıkar butonu
         remove_btn = QPushButton("➖ Çıkar")
-        remove_btn.setStyleSheet(
-            f"""
-            QPushButton {{ 
-                background: {BORDER_COLOR}; 
-                color: white;
-                border-radius: 8px; 
-                padding: 10px;
-                font-size: 13px;
-            }}
-            QPushButton:hover {{ background: #475569; }}
-        """
-        )
+        remove_btn.setProperty("class", "btn-secondary")
         remove_btn.clicked.connect(self._remove_personnel)
         right_layout.addWidget(remove_btn)
 

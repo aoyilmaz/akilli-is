@@ -253,3 +253,54 @@ from database.models.company import (
     BankAccountType,
     ProductionType,
 )
+
+# Performans Değerlendirme Modülü
+from database.models.performance import (
+    EvaluationPeriodType,
+    EvaluationStatus,
+    CompetencyCategory,
+    PerformanceRating,
+    EvaluationPeriod,
+    Competency,
+    PerformanceEvaluation,
+    CompetencyScore,
+    PerformanceGoal,
+)
+
+# Eğitim Takibi Modülü
+from database.models.training import (
+    TrainingStatus,
+    TrainingType,
+    CertificateStatus,
+    Training,
+    TrainingSession,
+    TrainingParticipant,
+    EmployeeCertificate,
+)
+
+# Özlük Dosyası ve İzin Hakediş Modülü
+from database.models.personnel import (
+    DocumentType,
+    DocumentStatus,
+    LeaveEntitlementType,
+    EmployeeDocument,
+    LeaveEntitlementRule,
+    LeaveBalance,
+)
+
+# Taşıma Birimi (SSCC) Modülü
+from database.models.transport_unit import (
+    TransportUnit,
+    TransportUnitItem,
+    TransportUnitType,
+    TransportUnitStatus,
+)
+
+__all__.extend(
+    [
+        "TransportUnit",
+        "TransportUnitItem",
+        "TransportUnitType",
+        "TransportUnitStatus",
+    ]
+)

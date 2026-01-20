@@ -1,14 +1,8 @@
-"""
-Akıllı İş - Üretim OEE Raporu
-"""
-
-from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QFrame,
     QTableWidget,
     QTableWidgetItem,
@@ -21,19 +15,12 @@ from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
     ACCENT,
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
-    get_input_style,
 )
+
 
 class ProductionOEEPage(QWidget):
     """Üretim performans (OEE) raporu sayfası"""
@@ -49,31 +36,39 @@ class ProductionOEEPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Filtreler
-        filter_frame = QFrame()
-        filter_layout = QHBoxLayout(filter_frame)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        lbl1 = QLabel("Başlangıç:")
-        filter_layout.addWidget(lbl1)
+        self.header = PageHeader(
+            title="Üretim OEE Raporu",
+            icon="🏭",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        # Filtreler (Header'a taşı)
+        h_layout = self.header.header_layout()
+
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Başlangıç:"))
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.start_date)
+        self.start_date.setFixedHeight(36)
+        h_layout.addWidget(self.start_date)
 
-        lbl2 = QLabel("Bitiş:")
-        filter_layout.addWidget(lbl2)
+        h_layout.addSpacing(8)
+        h_layout.addWidget(QLabel("Bitiş:"))
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.end_date)
+        self.end_date.setFixedHeight(36)
+        h_layout.addWidget(self.end_date)
 
-        filter_layout.addStretch()
-
-        refresh_btn = QPushButton("Yenile")
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        filter_layout.addWidget(refresh_btn)
-
-        layout.addWidget(filter_frame)
+        layout.addWidget(self.header)
 
         # OEE Kartları
         cards_layout = QHBoxLayout()
@@ -87,9 +82,7 @@ class ProductionOEEPage(QWidget):
         components_layout = QVBoxLayout()
         components_layout.setSpacing(8)
 
-        self.availability_bar = self._create_metric_bar(
-            "Kullanılabilirlik", SUCCESS
-        )
+        self.availability_bar = self._create_metric_bar("Kullanılabilirlik", SUCCESS)
         components_layout.addWidget(self.availability_bar)
 
         self.performance_bar = self._create_metric_bar("Performans", ACCENT)
@@ -208,6 +201,7 @@ class ProductionOEEPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
+
     def load_data(self, data: dict):
         # OEE değeri
         oee = data.get("oee", 0)
@@ -220,6 +214,10 @@ class ProductionOEEPage(QWidget):
             color = WARNING
         else:
             color = ERROR
+
+        self.oee_value.setStyleSheet(
+            f"color: {color}; font-size: 24px; font-weight: bold;"
+        )
         # Bileşenler
         self._update_metric_bar(self.availability_bar, data.get("availability", 0))
         self._update_metric_bar(self.performance_bar, data.get("performance", 0))

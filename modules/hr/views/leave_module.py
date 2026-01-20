@@ -165,37 +165,39 @@ class LeaveModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("İzin Talepleri")
-        header.addWidget(title)
-        header.addStretch()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        new_btn = QPushButton(f"{ICONS['add']} Yeni İzin Talebi")
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.clicked.connect(self._new_leave)
-        header.addWidget(new_btn)
+        self.header = PageHeader(
+            title="İzin Talepleri",
+            icon="🏖️",
+            show_search=False,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni İzin Talebi",
+            parent=self,
+        )
+        self.header.add_clicked.connect(self._new_leave)
 
-        layout.addLayout(header)
+        # Filtreleri header'a ekle
+        h_layout = self.header.header_layout()
 
         # Filtre
-        filter_row = QHBoxLayout()
-
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Durum:"))
         self.status_combo = QComboBox()
         self.status_combo.setFixedWidth(150)
+        self.status_combo.setFixedHeight(36)
         self.status_combo.addItem("Tüm Durumlar", None)
         for status, label in LEAVE_STATUS_LABELS.items():
             self.status_combo.addItem(label, status)
         self.status_combo.currentIndexChanged.connect(self.load_data)
-        filter_row.addWidget(self.status_combo)
+        h_layout.addWidget(self.status_combo)
 
-        filter_row.addStretch()
-
-        layout.addLayout(filter_row)
+        layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()

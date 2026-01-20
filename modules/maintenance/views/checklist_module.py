@@ -4,17 +4,14 @@ Bakım Modülü - Kontrol Listeleri
 
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QFormLayout,
     QLineEdit,
-    QTextEdit,
     QComboBox,
     QMessageBox,
     QDialog,
@@ -38,41 +35,54 @@ class ChecklistEditorWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        self.btn_new = QPushButton("Yeni Şablon")
-        self.btn_new.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 8px 16px; border-radius: 4px;"
+        self.header = PageHeader(
+            title="Kontrol Listesi Şablonları",
+            icon="📋",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Şablon",
+            parent=self,
         )
-        self.btn_new.clicked.connect(self.create_checklist)
-        btn_layout.addWidget(self.btn_new)
+        self.header.add_clicked.connect(self.create_checklist)
+        self.header.refresh_clicked.connect(self.refresh_data)
+
+        # Header Layout - Butonlar
+        h_layout = self.header.header_layout()
+        h_layout.addStretch()
 
         self.btn_edit = QPushButton("Düzenle")
         self.btn_edit.clicked.connect(self.edit_checklist)
-        btn_layout.addWidget(self.btn_edit)
+        self.btn_edit.setFixedHeight(36)
+        h_layout.addWidget(self.btn_edit)
 
         self.btn_duplicate = QPushButton("Kopyala")
         self.btn_duplicate.clicked.connect(self.duplicate_checklist)
-        btn_layout.addWidget(self.btn_duplicate)
+        self.btn_duplicate.setFixedHeight(36)
+        h_layout.addWidget(self.btn_duplicate)
 
         self.btn_delete = QPushButton("Sil")
         self.btn_delete.setStyleSheet(
-            "background-color: #ef4444; color: white; padding: 8px 16px; border-radius: 4px;"
+            "background-color: #ef4444; color: white; padding: 0 16px; border-radius: 4px;"
         )
+        self.btn_delete.setFixedHeight(36)
         self.btn_delete.clicked.connect(self.delete_checklist)
-        btn_layout.addWidget(self.btn_delete)
+        h_layout.addWidget(self.btn_delete)
 
-        btn_layout.addStretch()
-        self.layout.addLayout(btn_layout)
+        self.layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels([
-            "Şablon Adı", "Ekipman", "Bakım Türü", "Madde Sayısı"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            ["Şablon Adı", "Ekipman", "Bakım Türü", "Madde Sayısı"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.doubleClicked.connect(self.edit_checklist)
@@ -88,16 +98,20 @@ class ChecklistEditorWidget(MaintenanceBaseWidget):
             self.table.setItem(i, 0, QTableWidgetItem(cl.name))
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, cl.id)
 
-            self.table.setItem(i, 1, QTableWidgetItem(
-                cl.equipment.name if cl.equipment else "Genel"
-            ))
+            self.table.setItem(
+                i, 1, QTableWidgetItem(cl.equipment.name if cl.equipment else "Genel")
+            )
 
-            type_text = {
-                MaintenanceType.BREAKDOWN: "Arıza",
-                MaintenanceType.PREVENTIVE: "Periyodik",
-                MaintenanceType.PREDICTIVE: "Kestirimci",
-                MaintenanceType.CALIBRATION: "Kalibrasyon",
-            }.get(cl.maintenance_type, "-") if cl.maintenance_type else "Tümü"
+            type_text = (
+                {
+                    MaintenanceType.BREAKDOWN: "Arıza",
+                    MaintenanceType.PREVENTIVE: "Periyodik",
+                    MaintenanceType.PREDICTIVE: "Kestirimci",
+                    MaintenanceType.CALIBRATION: "Kalibrasyon",
+                }.get(cl.maintenance_type, "-")
+                if cl.maintenance_type
+                else "Tümü"
+            )
             self.table.setItem(i, 2, QTableWidgetItem(type_text))
 
             item_count = len(cl.items) if cl.items else 0
@@ -134,8 +148,7 @@ class ChecklistEditorWidget(MaintenanceBaseWidget):
         try:
             new_checklist = self.service.duplicate_checklist(checklist_id)
             QMessageBox.information(
-                self, "Başarılı",
-                f"Şablon kopyalandı: {new_checklist.name}"
+                self, "Başarılı", f"Şablon kopyalandı: {new_checklist.name}"
             )
             self.refresh_data()
         except Exception as e:
@@ -250,7 +263,8 @@ class ChecklistDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
@@ -276,10 +290,10 @@ class ChecklistDialog(QDialog):
         if cl.items:
             for item in sorted(cl.items, key=lambda x: x.order_no or 0):
                 list_item = QListWidgetItem(item.description)
-                list_item.setData(Qt.ItemDataRole.UserRole, {
-                    "id": item.id,
-                    "is_required": item.is_required
-                })
+                list_item.setData(
+                    Qt.ItemDataRole.UserRole,
+                    {"id": item.id, "is_required": item.is_required},
+                )
                 if item.is_required:
                     list_item.setText(f"[Zorunlu] {item.description}")
                 self.items_list.addItem(list_item)
@@ -294,11 +308,10 @@ class ChecklistDialog(QDialog):
         display_text = f"[Zorunlu] {text}" if is_required else text
 
         list_item = QListWidgetItem(display_text)
-        list_item.setData(Qt.ItemDataRole.UserRole, {
-            "id": None,  # Yeni madde
-            "is_required": is_required,
-            "description": text
-        })
+        list_item.setData(
+            Qt.ItemDataRole.UserRole,
+            {"id": None, "is_required": is_required, "description": text},  # Yeni madde
+        )
         self.items_list.addItem(list_item)
         self.inp_item.clear()
 
@@ -318,6 +331,7 @@ class ChecklistDialog(QDialog):
 
         # Basit düzenleme için input dialog
         from PyQt6.QtWidgets import QInputDialog
+
         text = data.get("description") or current_item.text().replace("[Zorunlu] ", "")
         new_text, ok = QInputDialog.getText(
             self, "Madde Düzenle", "Açıklama:", text=text
@@ -326,7 +340,9 @@ class ChecklistDialog(QDialog):
         if ok and new_text:
             data["description"] = new_text
             current_item.setData(Qt.ItemDataRole.UserRole, data)
-            display_text = f"[Zorunlu] {new_text}" if data.get("is_required") else new_text
+            display_text = (
+                f"[Zorunlu] {new_text}" if data.get("is_required") else new_text
+            )
             current_item.setText(display_text)
 
     def accept(self):
@@ -345,17 +361,20 @@ class ChecklistDialog(QDialog):
             for i in range(self.items_list.count()):
                 item = self.items_list.item(i)
                 data = item.data(Qt.ItemDataRole.UserRole)
-                items.append({
-                    "description": data.get("description") or item.text().replace("[Zorunlu] ", ""),
-                    "is_required": data.get("is_required", True),
-                    "order_no": i + 1
-                })
+                items.append(
+                    {
+                        "description": data.get("description")
+                        or item.text().replace("[Zorunlu] ", ""),
+                        "is_required": data.get("is_required", True),
+                        "order_no": i + 1,
+                    }
+                )
 
             checklist_data = {
                 "name": name,
                 "equipment_id": self.cmb_equipment.currentData(),
                 "maintenance_type": self.cmb_type.currentData(),
-                "items": items
+                "items": items,
             }
 
             if self.checklist:

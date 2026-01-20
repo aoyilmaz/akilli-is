@@ -47,55 +47,81 @@ class EquipmentListWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # Base widget'tan gelen başlığı temizle
+        if self.layout.count() > 0:
+            item = self.layout.itemAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
 
-        self.btn_add = QPushButton("Yeni Ekipman")
-        self.btn_add.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 8px 16px; border-radius: 4px;"
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Ekipman Yönetimi",
+            icon="🏭",
+            show_search=False,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni Ekipman",
+            parent=self,
         )
-        self.btn_add.clicked.connect(self.show_add_dialog)
-        btn_layout.addWidget(self.btn_add)
+        self.header.add_clicked.connect(self.show_add_dialog)
 
+        h_layout = self.header.header_layout()
+
+        # Düzenle Butonu
         self.btn_edit = QPushButton("Düzenle")
-        self.btn_edit.setStyleSheet("padding: 8px 16px;")
+        self.btn_edit.setFixedSize(100, 36)
+        self.btn_edit.setProperty("class", "btn-secondary")
         self.btn_edit.clicked.connect(self.show_edit_dialog)
-        btn_layout.addWidget(self.btn_edit)
+        h_layout.addWidget(self.btn_edit)
 
+        # Detay Butonu
         self.btn_detail = QPushButton("Detay")
-        self.btn_detail.setStyleSheet(
-            "background-color: #6366f1; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
+        self.btn_detail.setFixedSize(100, 36)
+        self.btn_detail.setProperty("class", "btn-secondary")
         self.btn_detail.clicked.connect(self.show_detail_dialog)
-        btn_layout.addWidget(self.btn_detail)
+        h_layout.addWidget(self.btn_detail)
 
+        # Pasife Al Butonu
         self.btn_delete = QPushButton("Pasife Al")
-        self.btn_delete.setStyleSheet(
-            "background-color: #ef4444; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
+        self.btn_delete.setFixedSize(100, 36)
+        self.btn_delete.setProperty("class", "btn-danger")
         self.btn_delete.clicked.connect(self.delete_equipment)
-        btn_layout.addWidget(self.btn_delete)
+        h_layout.addWidget(self.btn_delete)
 
-        btn_layout.addStretch()
-
-        # Filtre
+        # Filtre (Durum)
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Durum:"))
         self.cmb_filter = QComboBox()
         self.cmb_filter.addItem("Tümü", None)
         self.cmb_filter.addItem("Aktif", True)
         self.cmb_filter.addItem("Pasif", False)
+        self.cmb_filter.setFixedWidth(100)
+        self.cmb_filter.setFixedHeight(36)
         self.cmb_filter.currentIndexChanged.connect(self.refresh_data)
-        btn_layout.addWidget(QLabel("Durum:"))
-        btn_layout.addWidget(self.cmb_filter)
+        h_layout.addWidget(self.cmb_filter)
 
-        self.layout.addLayout(btn_layout)
+        self.layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ["Kod", "İsim", "Marka/Model", "Lokasyon", "Kritiklik", "Çalışma Saati", "Durum", "Son Bakım"]
+            [
+                "Kod",
+                "İsim",
+                "Marka/Model",
+                "Lokasyon",
+                "Kritiklik",
+                "Çalışma Saati",
+                "Durum",
+                "Son Bakım",
+            ]
         )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.doubleClicked.connect(self.show_detail_dialog)
@@ -114,11 +140,15 @@ class EquipmentListWidget(MaintenanceBaseWidget):
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, eq.id)
 
             self.table.setItem(i, 1, QTableWidgetItem(eq.name))
-            self.table.setItem(i, 2, QTableWidgetItem(f"{eq.brand or ''} {eq.model or ''}".strip()))
+            self.table.setItem(
+                i, 2, QTableWidgetItem(f"{eq.brand or ''} {eq.model or ''}".strip())
+            )
             self.table.setItem(i, 3, QTableWidgetItem(eq.location or "-"))
 
             # Kritiklik - renkli
-            crit_item = QTableWidgetItem(eq.criticality.value if eq.criticality else "-")
+            crit_item = QTableWidgetItem(
+                eq.criticality.value if eq.criticality else "-"
+            )
             if eq.criticality == CriticalityLevel.CRITICAL:
                 crit_item.setBackground(Qt.GlobalColor.red)
                 crit_item.setForeground(Qt.GlobalColor.white)
@@ -138,9 +168,13 @@ class EquipmentListWidget(MaintenanceBaseWidget):
 
             # Son bakım
             last_maintenance = self.service.get_last_maintenance_date(eq.id)
-            self.table.setItem(i, 7, QTableWidgetItem(
-                last_maintenance.strftime("%d.%m.%Y") if last_maintenance else "-"
-            ))
+            self.table.setItem(
+                i,
+                7,
+                QTableWidgetItem(
+                    last_maintenance.strftime("%d.%m.%Y") if last_maintenance else "-"
+                ),
+            )
 
     def get_selected_equipment_id(self) -> Optional[int]:
         """Seçili ekipman ID'sini döndürür"""
@@ -230,7 +264,8 @@ class EquipmentDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
@@ -374,9 +409,19 @@ class EquipmentDialog(QDialog):
 
         # Satınalma
         if eq.purchase_date:
-            self.date_purchase.setDate(QDate(eq.purchase_date.year, eq.purchase_date.month, eq.purchase_date.day))
+            self.date_purchase.setDate(
+                QDate(
+                    eq.purchase_date.year, eq.purchase_date.month, eq.purchase_date.day
+                )
+            )
         if eq.warranty_end_date:
-            self.date_warranty.setDate(QDate(eq.warranty_end_date.year, eq.warranty_end_date.month, eq.warranty_end_date.day))
+            self.date_warranty.setDate(
+                QDate(
+                    eq.warranty_end_date.year,
+                    eq.warranty_end_date.month,
+                    eq.warranty_end_date.day,
+                )
+            )
         if eq.supplier_id:
             idx = self.cmb_supplier.findData(eq.supplier_id)
             if idx >= 0:
@@ -454,13 +499,15 @@ class EquipmentDetailDialog(QDialog):
             CriticalityLevel.HIGH: "#f97316",
             CriticalityLevel.CRITICAL: "#ef4444",
         }
-        crit_label.setStyleSheet(f"""
+        crit_label.setStyleSheet(
+            f"""
             background-color: {crit_colors.get(self.equipment.criticality, '#gray')};
             color: white;
             padding: 4px 12px;
             border-radius: 4px;
             font-weight: bold;
-        """)
+        """
+        )
         header.addWidget(crit_label)
         header.addStretch()
         main_layout.addLayout(header)
@@ -502,46 +549,80 @@ class EquipmentDetailDialog(QDialog):
 
         kpis = self.service.get_equipment_kpis(self.equipment_id)
 
-        kpi_layout.addWidget(self._create_kpi_card(
-            "MTBF", f"{kpis.get('mtbf', 0):.1f} saat", "Arızalar Arası Ortalama Süre", "#3b82f6"
-        ))
-        kpi_layout.addWidget(self._create_kpi_card(
-            "MTTR", f"{kpis.get('mttr', 0):.1f} saat", "Ortalama Onarım Süresi", "#f97316"
-        ))
-        kpi_layout.addWidget(self._create_kpi_card(
-            "Kullanılabilirlik", f"{kpis.get('availability', 100):.1f}%", "Son 30 Gün", "#22c55e"
-        ))
-        kpi_layout.addWidget(self._create_kpi_card(
-            "Toplam Maliyet", f"₺{kpis.get('total_cost', 0):,.2f}", "Tüm Zamanlar", "#8b5cf6"
-        ))
+        kpi_layout.addWidget(
+            self._create_kpi_card(
+                "MTBF",
+                f"{kpis.get('mtbf', 0):.1f} saat",
+                "Arızalar Arası Ortalama Süre",
+                "#3b82f6",
+            )
+        )
+        kpi_layout.addWidget(
+            self._create_kpi_card(
+                "MTTR",
+                f"{kpis.get('mttr', 0):.1f} saat",
+                "Ortalama Onarım Süresi",
+                "#f97316",
+            )
+        )
+        kpi_layout.addWidget(
+            self._create_kpi_card(
+                "Kullanılabilirlik",
+                f"{kpis.get('availability', 100):.1f}%",
+                "Son 30 Gün",
+                "#22c55e",
+            )
+        )
+        kpi_layout.addWidget(
+            self._create_kpi_card(
+                "Toplam Maliyet",
+                f"₺{kpis.get('total_cost', 0):,.2f}",
+                "Tüm Zamanlar",
+                "#8b5cf6",
+            )
+        )
 
         layout.addLayout(kpi_layout)
 
         # Ekipman Bilgileri
         info_group = QGroupBox("Ekipman Bilgileri")
         info_layout = QFormLayout(info_group)
-        info_layout.addRow("Marka/Model:", QLabel(f"{self.equipment.brand or '-'} / {self.equipment.model or '-'}"))
+        info_layout.addRow(
+            "Marka/Model:",
+            QLabel(f"{self.equipment.brand or '-'} / {self.equipment.model or '-'}"),
+        )
         info_layout.addRow("Seri No:", QLabel(self.equipment.serial_number or "-"))
         info_layout.addRow("Lokasyon:", QLabel(self.equipment.location or "-"))
-        info_layout.addRow("Çalışma Saati:", QLabel(f"{self.equipment.running_hours or 0:.1f} saat"))
-        info_layout.addRow("Garanti Bitiş:", QLabel(
-            self.equipment.warranty_end_date.strftime("%d.%m.%Y") if self.equipment.warranty_end_date else "-"
-        ))
+        info_layout.addRow(
+            "Çalışma Saati:", QLabel(f"{self.equipment.running_hours or 0:.1f} saat")
+        )
+        info_layout.addRow(
+            "Garanti Bitiş:",
+            QLabel(
+                self.equipment.warranty_end_date.strftime("%d.%m.%Y")
+                if self.equipment.warranty_end_date
+                else "-"
+            ),
+        )
         layout.addWidget(info_group)
 
         layout.addStretch()
 
-    def _create_kpi_card(self, title: str, value: str, subtitle: str, color: str) -> QWidget:
+    def _create_kpi_card(
+        self, title: str, value: str, subtitle: str, color: str
+    ) -> QWidget:
         """KPI kartı widget'ı oluşturur"""
         card = QWidget()
-        card.setStyleSheet(f"""
+        card.setStyleSheet(
+            f"""
             QWidget {{
                 background-color: white;
                 border: 1px solid #e5e7eb;
                 border-radius: 8px;
                 padding: 16px;
             }}
-        """)
+        """
+        )
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 16, 16, 16)
 
@@ -564,10 +645,12 @@ class EquipmentDetailDialog(QDialog):
 
         self.history_table = QTableWidget()
         self.history_table.setColumnCount(6)
-        self.history_table.setHorizontalHeaderLabels([
-            "İş Emri No", "Tarih", "Tür", "Açıklama", "Teknisyen", "Maliyet"
-        ])
-        self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.history_table.setHorizontalHeaderLabels(
+            ["İş Emri No", "Tarih", "Tür", "Açıklama", "Teknisyen", "Maliyet"]
+        )
+        self.history_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         layout.addWidget(self.history_table)
 
         # Veri yükle
@@ -575,17 +658,29 @@ class EquipmentDetailDialog(QDialog):
         self.history_table.setRowCount(len(history))
         for i, wo in enumerate(history):
             self.history_table.setItem(i, 0, QTableWidgetItem(wo.order_no))
-            self.history_table.setItem(i, 1, QTableWidgetItem(
-                wo.completed_date.strftime("%d.%m.%Y") if wo.completed_date else "-"
-            ))
-            self.history_table.setItem(i, 2, QTableWidgetItem(
-                wo.request.maintenance_type.value if wo.request else "-"
-            ))
+            self.history_table.setItem(
+                i,
+                1,
+                QTableWidgetItem(
+                    wo.completed_date.strftime("%d.%m.%Y") if wo.completed_date else "-"
+                ),
+            )
+            self.history_table.setItem(
+                i,
+                2,
+                QTableWidgetItem(
+                    wo.request.maintenance_type.value if wo.request else "-"
+                ),
+            )
             self.history_table.setItem(i, 3, QTableWidgetItem(wo.description or "-"))
-            self.history_table.setItem(i, 4, QTableWidgetItem(
-                wo.assigned_to.full_name if wo.assigned_to else "-"
-            ))
-            self.history_table.setItem(i, 5, QTableWidgetItem(f"₺{wo.total_cost or 0:,.2f}"))
+            self.history_table.setItem(
+                i,
+                4,
+                QTableWidgetItem(wo.assigned_to.full_name if wo.assigned_to else "-"),
+            )
+            self.history_table.setItem(
+                i, 5, QTableWidgetItem(f"₺{wo.total_cost or 0:,.2f}")
+            )
 
     def setup_parts_tab(self):
         layout = QVBoxLayout(self.tab_parts)
@@ -600,10 +695,12 @@ class EquipmentDetailDialog(QDialog):
 
         self.parts_table = QTableWidget()
         self.parts_table.setColumnCount(4)
-        self.parts_table.setHorizontalHeaderLabels([
-            "Parça Kodu", "Parça Adı", "Min. Miktar", "Mevcut Stok"
-        ])
-        self.parts_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.parts_table.setHorizontalHeaderLabels(
+            ["Parça Kodu", "Parça Adı", "Min. Miktar", "Mevcut Stok"]
+        )
+        self.parts_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         layout.addWidget(self.parts_table)
 
         self.refresh_parts()
@@ -612,11 +709,17 @@ class EquipmentDetailDialog(QDialog):
         parts = self.service.get_equipment_spare_parts(self.equipment_id)
         self.parts_table.setRowCount(len(parts))
         for i, part in enumerate(parts):
-            self.parts_table.setItem(i, 0, QTableWidgetItem(part.item.code if part.item else "-"))
-            self.parts_table.setItem(i, 1, QTableWidgetItem(part.item.name if part.item else "-"))
+            self.parts_table.setItem(
+                i, 0, QTableWidgetItem(part.item.code if part.item else "-")
+            )
+            self.parts_table.setItem(
+                i, 1, QTableWidgetItem(part.item.name if part.item else "-")
+            )
             self.parts_table.setItem(i, 2, QTableWidgetItem(str(part.min_quantity)))
             # Mevcut stok
-            stock = self.service.get_item_total_stock(part.item_id) if part.item_id else 0
+            stock = (
+                self.service.get_item_total_stock(part.item_id) if part.item_id else 0
+            )
             stock_item = QTableWidgetItem(str(stock))
             if stock < float(part.min_quantity):
                 stock_item.setForeground(Qt.GlobalColor.red)
@@ -624,34 +727,44 @@ class EquipmentDetailDialog(QDialog):
 
     def add_spare_part(self):
         # TODO: Implement spare part add dialog
-        QMessageBox.information(self, "Bilgi", "Yedek parça ekleme ekranı henüz hazır değil.")
+        QMessageBox.information(
+            self, "Bilgi", "Yedek parça ekleme ekranı henüz hazır değil."
+        )
 
     def setup_downtime_tab(self):
         layout = QVBoxLayout(self.tab_downtime)
 
         self.downtime_table = QTableWidget()
         self.downtime_table.setColumnCount(5)
-        self.downtime_table.setHorizontalHeaderLabels([
-            "Başlangıç", "Bitiş", "Süre (dk)", "Sebep", "İş Emri"
-        ])
-        self.downtime_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.downtime_table.setHorizontalHeaderLabels(
+            ["Başlangıç", "Bitiş", "Süre (dk)", "Sebep", "İş Emri"]
+        )
+        self.downtime_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         layout.addWidget(self.downtime_table)
 
         # Veri yükle
         downtimes = self.service.get_equipment_downtimes(self.equipment_id)
         self.downtime_table.setRowCount(len(downtimes))
         for i, dt in enumerate(downtimes):
-            self.downtime_table.setItem(i, 0, QTableWidgetItem(
-                dt.start_time.strftime("%d.%m.%Y %H:%M")
-            ))
-            self.downtime_table.setItem(i, 1, QTableWidgetItem(
-                dt.end_time.strftime("%d.%m.%Y %H:%M") if dt.end_time else "Devam Ediyor"
-            ))
+            self.downtime_table.setItem(
+                i, 0, QTableWidgetItem(dt.start_time.strftime("%d.%m.%Y %H:%M"))
+            )
+            self.downtime_table.setItem(
+                i,
+                1,
+                QTableWidgetItem(
+                    dt.end_time.strftime("%d.%m.%Y %H:%M")
+                    if dt.end_time
+                    else "Devam Ediyor"
+                ),
+            )
             duration = dt.duration_minutes
-            self.downtime_table.setItem(i, 2, QTableWidgetItem(
-                f"{duration:.0f}" if duration else "-"
-            ))
+            self.downtime_table.setItem(
+                i, 2, QTableWidgetItem(f"{duration:.0f}" if duration else "-")
+            )
             self.downtime_table.setItem(i, 3, QTableWidgetItem(dt.reason or "-"))
-            self.downtime_table.setItem(i, 4, QTableWidgetItem(
-                dt.work_order.order_no if dt.work_order else "-"
-            ))
+            self.downtime_table.setItem(
+                i, 4, QTableWidgetItem(dt.work_order.order_no if dt.work_order else "-")
+            )

@@ -30,6 +30,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTime, QDate
 from PyQt6.QtGui import QColor
 
+from config.styles import ACCENT
+
 
 class ShiftDialog(QDialog):
     """Vardiya ekleme/düzenleme dialogu"""
@@ -218,7 +220,7 @@ class TeamDialog(QDialog):
     def __init__(self, team_data: dict = None, parent=None):
         super().__init__(parent)
         self.team_data = team_data
-        self.selected_color = "#6366f1"
+        self.selected_color = ACCENT
         self.setWindowTitle("Ekip Ekle" if not team_data else "Ekip Düzenle")
         self.setMinimumWidth(400)
         self.setup_ui()
@@ -299,7 +301,7 @@ class TeamDialog(QDialog):
             return
         self.code_input.setText(self.team_data.get("code", ""))
         self.name_input.setText(self.team_data.get("name", ""))
-        self.selected_color = self.team_data.get("color", "#6366f1")
+        self.selected_color = self.team_data.get("color", ACCENT)
         self._update_color_button()
         self.color_label.setText(self.selected_color)
         self.desc_input.setText(self.team_data.get("description", "") or "")
@@ -341,12 +343,19 @@ class CalendarModule(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("📅 Üretim Takvimi")
-        header.addWidget(title)
-        header.addStretch()
-        layout.addLayout(header)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Üretim Takvimi",
+            icon="📅",
+            show_search=False,
+            show_refresh=False,
+            show_add=False,
+            parent=self,
+        )
+
+        layout.addWidget(self.header)
 
         # Tabs
         self.tabs = QTabWidget()
@@ -388,6 +397,10 @@ class CalendarModule(QWidget):
         self.shifts_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch
         )
+        self.shifts_table.horizontalHeader().setSectionResizeMode(
+            5, QHeaderView.ResizeMode.Fixed
+        )
+        self.shifts_table.setColumnWidth(5, 80)
         self.shifts_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -426,6 +439,10 @@ class CalendarModule(QWidget):
         self.teams_table.horizontalHeader().setSectionResizeMode(
             3, QHeaderView.ResizeMode.Stretch
         )
+        self.teams_table.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.Fixed
+        )
+        self.teams_table.setColumnWidth(4, 80)
         self.teams_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -531,6 +548,10 @@ class CalendarModule(QWidget):
         self.holidays_table.horizontalHeader().setSectionResizeMode(
             2, QHeaderView.ResizeMode.Stretch
         )
+        self.holidays_table.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.Fixed
+        )
+        self.holidays_table.setColumnWidth(4, 80)
         self.holidays_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -642,7 +663,7 @@ class CalendarModule(QWidget):
             for row, shift in enumerate(shifts):
                 # Kod
                 code_item = QTableWidgetItem(shift.code)
-                code_item.setForeground(QColor("#818cf8"))
+                code_item.setForeground(QColor(ACCENT))
                 code_item.setData(Qt.ItemDataRole.UserRole, shift.id)
                 self.shifts_table.setItem(row, 0, code_item)
 

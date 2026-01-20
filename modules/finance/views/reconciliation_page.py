@@ -23,16 +23,11 @@ from decimal import Decimal
 from config.styles import (
     BG_PRIMARY,
     BG_SECONDARY,
-    BG_TERTIARY,
     BORDER,
     TEXT_PRIMARY,
-    TEXT_MUTED,
     ACCENT,
-    SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
 )
 
 
@@ -53,22 +48,28 @@ class ReconciliationPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("Mutabakat")
-        header_layout.addWidget(title)
+        self.header = PageHeader(
+            title="Mutabakat",
+            icon="🤝",
+            show_search=False,
+            show_refresh=False,
+            show_add=False,
+            parent=self,
+        )
 
-        header_layout.addStretch()
+        h_layout = self.header.header_layout()
 
-        # Yazdir butonu
-        print_btn = QPushButton("🖨️ Yazdir")
-        print_btn.setFixedHeight(42)
-        print_btn.setStyleSheet(get_button_style("print"))
+        # Yazdir butonu - Header içine
+        print_btn = QPushButton("🖨️ Yazdır")
+        print_btn.setFixedSize(100, 36)
+        print_btn.setProperty("class", "btn-secondary")
         print_btn.clicked.connect(self._on_print)
-        header_layout.addWidget(print_btn)
+        h_layout.addWidget(print_btn)
 
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # Filtre alani
         filter_group = QGroupBox("Cari Secimi")
@@ -106,7 +107,7 @@ class ReconciliationPage(QWidget):
         # Sorgula butonu
         query_btn = QPushButton("🔍 Sorgula")
         query_btn.setFixedSize(110, 42)
-        query_btn.setStyleSheet(get_button_style("search"))
+        query_btn.setProperty("class", "btn-primary")
         query_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(query_btn, alignment=Qt.AlignmentFlag.AlignBottom)
 

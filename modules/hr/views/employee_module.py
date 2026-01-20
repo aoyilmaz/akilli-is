@@ -5,12 +5,10 @@ Akıllı İş - Çalışan Yönetim Modülü
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QLineEdit,
     QComboBox,
     QMessageBox,
     QLabel,
@@ -52,59 +50,49 @@ class EmployeeModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Başlık
-        header = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("Çalışan Listesi")
-        header.addWidget(title)
+        self.header = PageHeader(
+            title="Çalışan Listesi",
+            icon="👥",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Çalışan",
+            parent=self,
+        )
+        self.header.add_clicked.connect(self._new_employee)
+        self.header.refresh_clicked.connect(self.load_data)
+        self.header.search_changed.connect(self.load_data)
 
-        header.addStretch()
+        # Arama kutusuna erişim gerektiği için (search_input aslında headerdaki search bar)
+        # load_data metodu `self.search_input.text()` kullanıyor.
+        # Bu yüzden property olarak header search'e yönlendirebiliriz veya load_data'yı güncelleyebiliriz.
+        # En temizi load_data'da self.header.search_bar.text() kullanmak.
 
-        # Yeni çalışan
-        new_btn = QPushButton(f"{ICONS['add']} Yeni Çalışan")
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.clicked.connect(self._new_employee)
-        header.addWidget(new_btn)
-
-        layout.addLayout(header)
-
-        # Filtre satırı
-        filter_row = QHBoxLayout()
-
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Ara (isim, sicil no, email)...")
-        self.search_input.setFixedWidth(300)
-        self.search_input.textChanged.connect(self.load_data)
-        filter_row.addWidget(self.search_input)
-
-        # Departman filtresi
-        self.dept_combo = QComboBox()
-        self.dept_combo.setFixedWidth(200)
-        self.dept_combo.currentIndexChanged.connect(self.load_data)
-        filter_row.addWidget(self.dept_combo)
-
-        filter_row.addStretch()
+        h_layout = self.header.header_layout()
 
         # Kimlik Kartı butonu
         id_card_btn = QPushButton("🪪 Kimlik Kartı")
-        id_card_btn.setStyleSheet(get_button_style("refresh"))
-        id_card_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        id_card_btn.setFixedSize(140, 36)
+        id_card_btn.setProperty("class", "btn-secondary")
         id_card_btn.clicked.connect(self._show_id_card)
-        filter_row.addWidget(id_card_btn)
+        h_layout.addWidget(id_card_btn)
 
-        # Yenile butonu
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.clicked.connect(self.load_data)
-        filter_row.addWidget(refresh_btn)
+        # Departman filtresi
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Departman:"))
+        self.dept_combo = QComboBox()
+        self.dept_combo.setFixedWidth(200)
+        self.dept_combo.setFixedHeight(36)
+        self.dept_combo.currentIndexChanged.connect(self.load_data)
+        h_layout.addWidget(self.dept_combo)
 
-        layout.addLayout(filter_row)
+        layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
@@ -151,7 +139,7 @@ class EmployeeModule(QWidget):
                     self.dept_combo.addItem(dept.name, dept.id)
 
             # Filtreler
-            search = self.search_input.text().strip() or None
+            search = self.header.search_input.text().strip() or None
             dept_id = self.dept_combo.currentData()
 
             employees = service.get_all_employees(

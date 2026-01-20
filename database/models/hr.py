@@ -308,8 +308,18 @@ class Attendance(BaseModel):
         return f"<Attendance(employee_id={self.employee_id}, date={self.date}, status={self.status.value})>"
 
 
+class PayrollStatus(enum.Enum):
+    """Bordro durumu"""
+
+    DRAFT = "draft"  # Taslak
+    CALCULATED = "calculated"  # Hesaplandı
+    APPROVED = "approved"  # Onaylandı
+    PAID = "paid"  # Ödendi
+    CANCELLED = "cancelled"  # İptal
+
+
 class Payroll(BaseModel):
-    """Maaş Tahakkuk Tablosu"""
+    """Maaş Tahakkuk Tablosu - Genişletilmiş"""
 
     __tablename__ = "payrolls"
 
@@ -317,18 +327,62 @@ class Payroll(BaseModel):
     period_year = Column(Integer, nullable=False)
     period_month = Column(Integer, nullable=False)
 
+    # Brüt ve Net Maaş
     base_salary = Column(Numeric(15, 2), nullable=False)
-    overtime_pay = Column(Numeric(15, 2), default=0)
-    bonus = Column(Numeric(15, 2), default=0)
-    deductions = Column(Numeric(15, 2), default=0)
+    gross_salary = Column(Numeric(15, 2), nullable=True)  # Brüt maaş
     net_salary = Column(Numeric(15, 2), nullable=False)
 
+    # SGK Kesintileri
+    sgk_employee = Column(Numeric(15, 2), default=0)  # SGK işçi payı (%14)
+    sgk_employer = Column(Numeric(15, 2), default=0)  # SGK işveren payı (%20.5)
+    unemployment_employee = Column(Numeric(15, 2), default=0)  # İşsizlik işçi (%1)
+    unemployment_employer = Column(Numeric(15, 2), default=0)  # İşsizlik işveren (%2)
+
+    # Vergiler
+    income_tax = Column(Numeric(15, 2), default=0)  # Gelir vergisi
+    stamp_tax = Column(Numeric(15, 2), default=0)  # Damga vergisi (%0.759)
+    cumulative_tax_base = Column(Numeric(18, 2), default=0)  # Kümülatif matrah
+
+    # Ek ödemeler
+    overtime_pay = Column(Numeric(15, 2), default=0)  # Fazla mesai
+    bonus = Column(Numeric(15, 2), default=0)  # Prim/ikramiye
+    deductions = Column(Numeric(15, 2), default=0)  # Diğer kesintiler
+
+    # Puantaj verileri
+    total_work_days = Column(Integer, default=0)  # Çalışılan gün
+    absent_days = Column(Integer, default=0)  # Devamsızlık günü
+    late_count = Column(Integer, default=0)  # Geç kalma sayısı
+    overtime_hours = Column(Numeric(6, 2), default=0)  # Fazla mesai saat
+
+    # Durum
+    status = Column(Enum(PayrollStatus), default=PayrollStatus.DRAFT)
+
+    # Ödeme bilgileri
     is_paid = Column(Boolean, default=False)
     paid_date = Column(Date, nullable=True)
 
+    # Muhasebe entegrasyonu
+    journal_entry_id = Column(Integer, ForeignKey("journal_entries.id"), nullable=True)
+
+    # Açıklama
+    notes = Column(Text, nullable=True)
+
+    # İlişkiler
     employee = relationship("Employee")
+    journal_entry = relationship("JournalEntry", foreign_keys=[journal_entry_id])
 
     __table_args__ = (
         Index("idx_payroll_period", "period_year", "period_month"),
         Index("idx_payroll_emp", "employee_id"),
+        Index("idx_payroll_status", "status"),
+        Index(
+            "idx_payroll_unique",
+            "employee_id",
+            "period_year",
+            "period_month",
+            unique=True,
+        ),
     )
+
+    def __repr__(self):
+        return f"<Payroll {self.employee_id} {self.period_year}/{self.period_month}>"

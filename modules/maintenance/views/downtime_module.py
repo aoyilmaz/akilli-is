@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QFormLayout,
-    QLineEdit,
     QTextEdit,
     QComboBox,
     QMessageBox,
@@ -41,36 +40,45 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
         self.timer.start(60000)  # Her dakika
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        self.btn_start = QPushButton("Duruş Başlat")
-        self.btn_start.setStyleSheet(
-            "background-color: #ef4444; color: white; padding: 8px 16px; border-radius: 4px;"
+        self.header = PageHeader(
+            title="Duruş Takibi",
+            icon="⏳",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Duruş Başlat",
+            parent=self,
         )
-        self.btn_start.clicked.connect(self.start_downtime)
-        btn_layout.addWidget(self.btn_start)
+        self.header.add_clicked.connect(self.start_downtime)
+        self.header.refresh_clicked.connect(self.refresh_data)
 
-        self.btn_end = QPushButton("Seçili Duruşu Bitir")
-        self.btn_end.setStyleSheet(
-            "background-color: #22c55e; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
-        self.btn_end.clicked.connect(self.end_downtime)
-        btn_layout.addWidget(self.btn_end)
+        # Header Layout - Butonlar ve Filtreler
+        h_layout = self.header.header_layout()
 
-        btn_layout.addStretch()
-
-        # Filtre
+        h_layout.addWidget(QLabel("Göster:"))
         self.cmb_filter = QComboBox()
         self.cmb_filter.addItem("Aktif Duruşlar", "active")
         self.cmb_filter.addItem("Bugün", "today")
         self.cmb_filter.addItem("Bu Hafta", "week")
         self.cmb_filter.addItem("Tümü", "all")
+        self.cmb_filter.setFixedHeight(36)
         self.cmb_filter.currentIndexChanged.connect(self.refresh_data)
-        btn_layout.addWidget(QLabel("Göster:"))
-        btn_layout.addWidget(self.cmb_filter)
+        h_layout.addWidget(self.cmb_filter)
 
-        self.layout.addLayout(btn_layout)
+        h_layout.addStretch()
+
+        self.btn_end = QPushButton("Seçili Duruşu Bitir")
+        self.btn_end.setStyleSheet(
+            "background-color: #22c55e; color: white; padding: 0 16px; border-radius: 4px;"
+        )
+        self.btn_end.setFixedHeight(36)
+        self.btn_end.clicked.connect(self.end_downtime)
+        h_layout.addWidget(self.btn_end)
+
+        self.layout.addWidget(self.header)
 
         # Aktif duruş özet kartları
         self.active_summary_layout = QHBoxLayout()
@@ -79,10 +87,12 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([
-            "Ekipman", "Başlangıç", "Bitiş", "Süre", "Sebep", "İş Emri", "Durum"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            ["Ekipman", "Başlangıç", "Bitiş", "Süre", "Sebep", "İş Emri", "Durum"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.layout.addWidget(self.table)
@@ -133,14 +143,16 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
     def _create_active_downtime_card(self, downtime) -> QWidget:
         """Aktif duruş kartı oluştur"""
         card = QGroupBox()
-        card.setStyleSheet("""
+        card.setStyleSheet(
+            """
             QGroupBox {
                 background-color: #fef2f2;
                 border: 2px solid #ef4444;
                 border-radius: 8px;
                 padding: 8px;
             }
-        """)
+        """
+        )
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(8, 8, 8, 8)
@@ -171,18 +183,22 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
         self.table.setRowCount(len(downtimes))
 
         for i, dt in enumerate(downtimes):
-            self.table.setItem(i, 0, QTableWidgetItem(
-                dt.equipment.name if dt.equipment else "-"
-            ))
+            self.table.setItem(
+                i, 0, QTableWidgetItem(dt.equipment.name if dt.equipment else "-")
+            )
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, dt.id)
 
-            self.table.setItem(i, 1, QTableWidgetItem(
-                dt.start_time.strftime("%d.%m.%Y %H:%M")
-            ))
+            self.table.setItem(
+                i, 1, QTableWidgetItem(dt.start_time.strftime("%d.%m.%Y %H:%M"))
+            )
 
-            self.table.setItem(i, 2, QTableWidgetItem(
-                dt.end_time.strftime("%d.%m.%Y %H:%M") if dt.end_time else "-"
-            ))
+            self.table.setItem(
+                i,
+                2,
+                QTableWidgetItem(
+                    dt.end_time.strftime("%d.%m.%Y %H:%M") if dt.end_time else "-"
+                ),
+            )
 
             # Süre hesapla
             if dt.end_time:
@@ -207,16 +223,18 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
                 "quality_issue": "Kalite Sorunu",
                 "other": "Diğer",
             }
-            self.table.setItem(i, 4, QTableWidgetItem(
-                reason_labels.get(dt.reason, dt.reason or "-")
-            ))
+            self.table.setItem(
+                i, 4, QTableWidgetItem(reason_labels.get(dt.reason, dt.reason or "-"))
+            )
 
-            self.table.setItem(i, 5, QTableWidgetItem(
-                dt.work_order.order_no if dt.work_order else "-"
-            ))
+            self.table.setItem(
+                i, 5, QTableWidgetItem(dt.work_order.order_no if dt.work_order else "-")
+            )
 
             # Durum
-            status_item = QTableWidgetItem("Devam Ediyor" if not dt.end_time else "Tamamlandı")
+            status_item = QTableWidgetItem(
+                "Devam Ediyor" if not dt.end_time else "Tamamlandı"
+            )
             if not dt.end_time:
                 status_item.setForeground(Qt.GlobalColor.red)
             else:
@@ -330,8 +348,7 @@ class DowntimeStartDialog(QDialog):
         work_orders = self.service.get_active_work_orders()
         for wo in work_orders:
             self.cmb_work_order.addItem(
-                f"{wo.order_no} - {wo.equipment.name if wo.equipment else ''}",
-                wo.id
+                f"{wo.order_no} - {wo.equipment.name if wo.equipment else ''}", wo.id
             )
         form.addRow("Bağlı İş Emri:", self.cmb_work_order)
 
@@ -363,7 +380,7 @@ class DowntimeStartDialog(QDialog):
                 reason=reason,
                 start_time=self.dt_start.dateTime().toPyDateTime(),
                 work_order_id=self.cmb_work_order.currentData(),
-                notes=self.txt_notes.toPlainText().strip() or None
+                notes=self.txt_notes.toPlainText().strip() or None,
             )
             super().accept()
         except Exception as e:

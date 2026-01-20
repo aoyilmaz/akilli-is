@@ -1,154 +1,74 @@
 """
 Akıllı İş - Tedarikçi Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QStyle,
-    QApplication,
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QFrame,
-    QLineEdit,
-    QHeaderView,
-    QAbstractItemView,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+from PyQt6.QtCore import Qt, pyqtSignal
+
+from ui.components import (
+    BaseListPage,
+    ColumnConfig,
+    create_view_button,
+    create_edit_button,
+    create_delete_button,
+)
 
 
-class SupplierListPage(QWidget):
-    """Tedarikçi listesi sayfası"""
-
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
+class SupplierListPage(BaseListPage):
+    """Tedarikçi listesi sayfası."""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.suppliers = []
-        self.setup_ui()
-
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        header_layout = QHBoxLayout()
-
-        title = QLabel("🏢 Tedarikçiler")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Ara... (kod, ad, vergi no)")
-        self.search_input.setFixedWidth(300)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
-
-        # Yenile butonu
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        # Yeni ekle butonu
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Tedarikçi")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
-
-        layout.addLayout(header_layout)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.total_card = self._create_stat_card("📊", "Toplam", "0", "#6366f1")
-        stats_layout.addWidget(self.total_card)
-
-        self.active_card = self._create_stat_card("✅", "Aktif", "0", "#10b981")
-        stats_layout.addWidget(self.active_card)
-
-        self.with_orders_card = self._create_stat_card(
-            "📦", "Siparişli", "0", "#f59e0b"
-        )
-        stats_layout.addWidget(self.with_orders_card)
-
-        self.credit_card = self._create_stat_card("💳", "Toplam Limit", "₺0", "#3b82f6")
-        stats_layout.addWidget(self.credit_card)
-
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "Kod",
-                "Tedarikçi Adı",
-                "Telefon",
-                "E-posta",
-                "Şehir",
-                "Vade (Gün)",
-                "Puan",
+        columns = [
+            ColumnConfig("code", "Kod", width=100),
+            ColumnConfig("name", "Tedarikçi Adı", width=200, stretch=True),
+            ColumnConfig("phone", "Telefon", width=130),
+            ColumnConfig("email", "E-posta", width=180),
+            ColumnConfig("city", "Şehir", width=100),
+            ColumnConfig("payment_term", "Vade (Gün)", width=80),
+            ColumnConfig("rating", "Puan", width=80),
+            ColumnConfig(
+                "actions",
                 "İşlemler",
-            ]
+                width=120,
+                resizable=False,
+                movable=False,
+                hideable=False,
+            ),
+        ]
+
+        super().__init__(
+            title="Tedarikçiler",
+            icon="🏢",
+            table_id="suppliers",
+            columns=columns,
+            show_stats=True,
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Tedarikçi",
+            search_placeholder="Ara... (kod, ad, vergi no)",
+            parent=parent,
         )
 
-        # Tablo stili
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
+        self.suppliers = []
+        self._setup_stat_cards()
 
-        # Kolon genişlikleri
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
-
-        self.table.setColumnWidth(0, 100)
-        self.table.setColumnWidth(2, 130)
-        self.table.setColumnWidth(3, 180)
-        self.table.setColumnWidth(4, 100)
-        self.table.setColumnWidth(5, 80)
-        self.table.setColumnWidth(6, 80)
-        self.table.setColumnWidth(7, 150)
-
-        self.table.doubleClicked.connect(self._on_double_click)
-
-        layout.addWidget(self.table)
-
-    def _create_stat_card(
-        self, icon: str, title: str, value: str, color: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(f"{icon} {title}", value, color)
-
-    def _update_card(self, card: MiniStatCard, value: str):
-        """Kart değerini güncelle"""
-        card.update_value(value)
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
+        self.add_stat_card("active", "Aktif", "0", "#10b981", "✅")
+        self.add_stat_card("with_orders", "Siparişli", "0", "#f59e0b", "📦")
+        self.add_stat_card("credit", "Toplam Limit", "₺0", "#3b82f6", "💳")
 
     def load_data(self, suppliers: list):
-        """Verileri yükle"""
         self.suppliers = suppliers
-        self.table.setRowCount(0)
+        self.clear_table()
 
         total = len(suppliers)
         active = 0
@@ -159,125 +79,82 @@ class SupplierListPage(QWidget):
                 active += 1
             total_credit += float(sup.get("credit_limit", 0) or 0)
 
-        self._update_card(self.total_card, str(total))
-        self._update_card(self.active_card, str(active))
-        self._update_card(self.credit_card, f"₺{total_credit:,.0f}")
+        self.update_stat_card("total", str(total))
+        self.update_stat_card("active", str(active))
+        self.update_stat_card("credit", f"₺{total_credit:,.0f}")
 
+        self.table.setRowCount(len(suppliers))
         for row, sup in enumerate(suppliers):
-            self.table.insertRow(row)
+            self._populate_row(row, sup)
 
-            # Kod
-            code_item = QTableWidgetItem(sup.get("code", ""))
-            code_item.setData(Qt.ItemDataRole.UserRole, sup.get("id"))
-            self.table.setItem(row, 0, code_item)
+    def _populate_row(self, row: int, sup: dict):
+        visible_cols = self.table.get_visible_columns()
 
-            # Ad
-            self.table.setItem(row, 1, QTableWidgetItem(sup.get("name", "")))
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "code":
+                item = QTableWidgetItem(sup.get("code", ""))
+                item.setData(Qt.ItemDataRole.UserRole, sup.get("id"))
+                self.table.setItem(row, col_idx, item)
 
-            # Telefon
-            self.table.setItem(row, 2, QTableWidgetItem(sup.get("phone", "") or "-"))
+            elif col_key == "name":
+                self.table.setItem(row, col_idx, QTableWidgetItem(sup.get("name", "")))
 
-            # E-posta
-            self.table.setItem(row, 3, QTableWidgetItem(sup.get("email", "") or "-"))
+            elif col_key == "phone":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(sup.get("phone", "") or "-")
+                )
 
-            # Şehir
-            self.table.setItem(row, 4, QTableWidgetItem(sup.get("city", "") or "-"))
+            elif col_key == "email":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(sup.get("email", "") or "-")
+                )
 
-            # Vade
-            vade = sup.get("payment_term_days", 0) or 0
-            self.table.setItem(row, 5, QTableWidgetItem(str(vade)))
+            elif col_key == "city":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(sup.get("city", "") or "-")
+                )
 
-            # Puan
-            rating = sup.get("rating", 0) or 0
-            stars = "⭐" * rating if rating > 0 else "-"
-            self.table.setItem(row, 6, QTableWidgetItem(stars))
+            elif col_key == "payment_term":
+                vade = sup.get("payment_term_days", 0) or 0
+                self.table.setItem(row, col_idx, QTableWidgetItem(str(vade)))
 
-            # İşlem butonları
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 4, 4, 4)
-            btn_layout.setSpacing(4)
+            elif col_key == "rating":
+                rating = sup.get("rating", 0) or 0
+                stars = "⭐" * rating if rating > 0 else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(stars))
 
-            style = QApplication.style()
+            elif col_key == "actions":
+                self._add_action_buttons(row, col_idx, sup.get("id"))
 
-            view_btn = QPushButton()
-            view_btn.setIcon(
-                style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
-            )
-            view_btn.setIconSize(QSize(16, 16))
-            view_btn.setFixedSize(32, 28)
-            view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(
-                lambda checked, id=sup.get("id"): self.view_clicked.emit(id)
-            )
-            btn_layout.addWidget(view_btn)
+        self.table.setRowHeight(row, 52)
 
-            edit_btn = QPushButton()
-            edit_btn.setIcon(
-                style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
-            )
-            edit_btn.setIconSize(QSize(16, 16))
-            edit_btn.setFixedSize(32, 28)
-            edit_btn.setToolTip("Düzenle")
-            edit_btn.clicked.connect(
-                lambda checked, id=sup.get("id"): self.edit_clicked.emit(id)
-            )
-            btn_layout.addWidget(edit_btn)
+    def _add_action_buttons(self, row: int, col: int, supplier_id: int):
+        btn_widget = QWidget()
+        btn_widget.setProperty("class", "action-button-group")
+        btn_layout = QHBoxLayout(btn_widget)
+        btn_layout.setContentsMargins(4, 4, 4, 4)
+        btn_layout.setSpacing(4)
 
-            del_btn = QPushButton()
-            del_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
-            del_btn.setIconSize(QSize(16, 16))
-            del_btn.setFixedSize(32, 28)
-            del_btn.setToolTip("Sil")
-            del_btn.clicked.connect(
-                lambda checked, id=sup.get("id"): self._confirm_delete(id)
-            )
-            btn_layout.addWidget(del_btn)
+        view_btn = create_view_button()
+        view_btn.clicked.connect(
+            lambda checked, sid=supplier_id: self.view_clicked.emit(sid)
+        )
+        btn_layout.addWidget(view_btn)
 
-            self.table.setCellWidget(row, 7, btn_widget)
-            self.table.setRowHeight(row, 56)
+        edit_btn = create_edit_button()
+        edit_btn.clicked.connect(
+            lambda checked, sid=supplier_id: self.edit_clicked.emit(sid)
+        )
+        btn_layout.addWidget(edit_btn)
 
-    def _action_btn_style(self, color: str) -> str:
-        return f"""
-            QPushButton {{
-                background-color: {color}20;
-                border: 1px solid {color}50;
-                border-radius: 6px;
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: {color}40;
-            }}
-        """
+        del_btn = create_delete_button()
+        del_btn.clicked.connect(
+            lambda checked, sid=supplier_id: self._confirm_delete(sid)
+        )
+        btn_layout.addWidget(del_btn)
 
-    def _on_search(self, text: str):
-        """Arama"""
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = False
-            for col in range(6):  # İlk 6 kolon
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
-            self.table.setRowHidden(row, not match)
-
-    def _on_double_click(self, index):
-        """Çift tıklama"""
-        row = index.row()
-        item = self.table.item(row, 0)
-        if item:
-            supplier_id = item.data(Qt.ItemDataRole.UserRole)
-            if supplier_id:
-                self.view_clicked.emit(supplier_id)
+        self.table.setCellWidget(row, col, btn_widget)
 
     def _confirm_delete(self, supplier_id: int):
-        """Silme onayı"""
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu tedarikçiyi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.confirm_delete("tedarikçi"):
             self.delete_clicked.emit(supplier_id)

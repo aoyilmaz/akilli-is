@@ -15,19 +15,12 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QTextEdit,
     QMessageBox,
-    QLabel,
     QComboBox,
 )
 from PyQt6.QtCore import Qt
 
 from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BORDER,
-    TEXT_PRIMARY,
-    ACCENT,
     get_button_style,
-    get_title_style,
     BTN_HEIGHT_NORMAL,
     ICONS,
 )
@@ -174,22 +167,26 @@ class PositionModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("Pozisyon Listesi")
-        header.addWidget(title)
-        header.addStretch()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        new_btn = QPushButton(f"{ICONS['add']} Yeni Pozisyon")
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.clicked.connect(self._new_position)
-        header.addWidget(new_btn)
+        self.header = PageHeader(
+            title="Pozisyon Listesi",
+            icon="👔",
+            show_search=False,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni Pozisyon",
+            parent=self,
+        )
+        self.header.add_clicked.connect(self._new_position)
+        self.header.show_refresh = True
+        self.header.refresh_clicked.connect(self.load_data)
 
-        layout.addLayout(header)
+        layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()

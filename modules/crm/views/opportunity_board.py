@@ -5,14 +5,10 @@ from PyQt6.QtWidgets import (
     QLabel,
     QScrollArea,
     QFrame,
-    QPushButton,
-    QGridLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDrag, QPixmap
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from database.models.crm import OpportunityStage
-from modules.development import ErrorHandler
 
 
 class KanbanCard(QFrame):
@@ -191,20 +187,10 @@ class OpportunityBoard(QWidget):
         main_layout = QVBoxLayout(self)
 
         # Toolbar
-        toolbar = QHBoxLayout()
-        btn_refresh = QPushButton("Yenile")
-        btn_refresh.clicked.connect(self.refresh_clicked.emit)
+        # PageHeader kullanıldığı için buradaki butonları kaldırıyoruz
+        # Sinyaller OpportunityModule tarafından header'a bağlanacak
 
-        btn_add = QPushButton("+ Yeni Fırsat")
-        btn_add.setStyleSheet(
-            "background-color: #007acc; color: white; border: none; padding: 6px 12px; border-radius: 4px;"
-        )
-        btn_add.clicked.connect(self.add_clicked.emit)
-
-        toolbar.addStretch()
-        toolbar.addWidget(btn_refresh)
-        toolbar.addWidget(btn_add)
-        main_layout.addLayout(toolbar)
+        # Kanban Board Scroll Area (Yatay Kaydırma)
 
         # Kanban Board Scroll Area (Yatay Kaydırma)
         scroll = QScrollArea()

@@ -7,31 +7,21 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QFrame,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QAbstractItemView,
     QComboBox,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
-    ACCENT,
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
-    get_input_style,
 )
 
 
@@ -49,25 +39,31 @@ class StockAgingPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Filtre
-        filter_frame = QFrame()
-        filter_layout = QHBoxLayout(filter_frame)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        lbl = QLabel("Depo:")
-        filter_layout.addWidget(lbl)
+        self.header = PageHeader(
+            title="Stok Yaşlandırma",
+            icon="⏳",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        # Filtre
+        h_layout = self.header.header_layout()
+
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Depo:"))
         self.warehouse_combo = QComboBox()
         self.warehouse_combo.addItem("Tüm Depolar", None)
         self.warehouse_combo.setMinimumWidth(150)
-        filter_layout.addWidget(self.warehouse_combo)
+        self.warehouse_combo.setFixedHeight(36)
+        h_layout.addWidget(self.warehouse_combo)
 
-        filter_layout.addStretch()
-
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        filter_layout.addWidget(refresh_btn)
-
-        layout.addWidget(filter_frame)
+        layout.addWidget(self.header)
 
         # Yaşlandırma kartları
         cards_layout = QHBoxLayout()

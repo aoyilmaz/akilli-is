@@ -1,34 +1,36 @@
 """
 Akıllı İş - İş Emirleri Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QFrame,
-    QAbstractItemView,
+    QComboBox,
     QMenu,
     QMessageBox,
-    QComboBox,
-    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
 from core.export_manager import ExportManager
 from core.label_manager import LabelManager
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class WorkOrderListPage(QWidget):
-    """İş emirleri listesi"""
+    """İş emirleri listesi."""
 
+    # Sinyaller
     new_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
     view_clicked = pyqtSignal(int)
@@ -36,29 +38,56 @@ class WorkOrderListPage(QWidget):
     status_change_requested = pyqtSignal(int, str)
     refresh_requested = pyqtSignal()
 
+    STATUS_DISPLAY = {
+        "draft": ("📝 Taslak", "#94a3b8"),
+        "planned": ("📅 Planlandı", "#3b82f6"),
+        "released": ("🚀 Serbest", "#8b5cf6"),
+        "in_progress": ("🔄 Üretimde", "#f59e0b"),
+        "completed": ("✅ Tamamlandı", "#10b981"),
+        "closed": ("🔒 Kapatıldı", "#64748b"),
+        "cancelled": ("❌ İptal", "#ef4444"),
+    }
+
+    PRIORITY_DISPLAY = {
+        "low": ("Düşük", "#64748b"),
+        "normal": ("Normal", "#3b82f6"),
+        "high": ("Yüksek", "#f59e0b"),
+        "urgent": ("Acil", "#ef4444"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
-        header_layout = QHBoxLayout()
+        # Header
+        self.header = PageHeader(
+            title="İş Emirleri",
+            icon="📋",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            show_export=True,
+            add_text="Yeni İş Emri",
+            search_placeholder="İş emri ara...",
+            parent=self,
+        )
 
-        title_layout = QVBoxLayout()
-        title = QLabel("📋 İş Emirleri")
-        subtitle = QLabel("Üretim iş emirlerini yönetin ve takip edin")
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        # Export menüsüne etiket ekleme
+        if self.header.export_btn:
+            export_menu = ExportManager.create_export_menu(self, self._get_export_data)
+            export_menu.addSeparator()
+            label_action = QAction("🏷️ Etiket Bas", self)
+            label_action.triggered.connect(self._print_labels)
+            export_menu.addAction(label_action)
+            self.header.export_btn.setMenu(export_menu)
 
-        header_layout.addStretch()
-
-        # Durum filtresi
-        header_layout.addWidget(QLabel("Durum:"))
+        # Filtre ekle
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
         self.status_combo.addItem("📝 Taslak", "draft")
@@ -67,228 +96,172 @@ class WorkOrderListPage(QWidget):
         self.status_combo.addItem("🔄 Üretimde", "in_progress")
         self.status_combo.addItem("✅ Tamamlandı", "completed")
         self.status_combo.addItem("🔒 Kapatıldı", "closed")
+        self.status_combo.setMinimumWidth(140)
         self.status_combo.currentIndexChanged.connect(
             lambda: self.refresh_requested.emit()
         )
-        header_layout.addWidget(self.status_combo)
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 İş emri ara...")
-        self.search_input.setFixedWidth(200)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, QLabel("Durum:"))
+            h_layout.insertWidget(idx + 1, self.status_combo)
 
-        # Dışa Aktar
-        export_btn = QPushButton(f"{ICONS['export']} Dışa Aktar")
-        export_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        export_btn.setStyleSheet(get_button_style("export"))
+        layout.addWidget(self.header)
 
-        export_menu = ExportManager.create_export_menu(self, self._get_export_data)
-        export_menu.addSeparator()
-        label_action = QAction("🏷️ Etiket Bas", self)
-        label_action.triggered.connect(self._print_labels)
-        export_menu.addAction(label_action)
+        # İstatistik kartları
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
 
-        export_btn.setMenu(export_menu)
-        header_layout.addWidget(export_btn)
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("📋 Toplam", "0", "#6366f1")
+        self.stat_cards["in_progress"] = MiniStatCard("🔄 Üretimde", "0", "#f59e0b")
+        self.stat_cards["completed"] = MiniStatCard("✅ Tamamlanan", "0", "#10b981")
+        self.stat_cards["delayed"] = MiniStatCard("⚠️ Geciken", "0", "#ef4444")
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        for card in self.stat_cards.values():
+            stats_layout.addWidget(card)
+        stats_layout.addStretch()
+        layout.addLayout(stats_layout)
 
-        # Yeni İş Emri
-        new_btn = QPushButton(f"{ICONS['add']} Yeni İş Emri")
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.clicked.connect(self.new_clicked.emit)
-        header_layout.addWidget(new_btn)
+        # Tablo
+        columns = [
+            ColumnConfig("order_no", "İş Emri No", width=120),
+            ColumnConfig("item_name", "Mamul", width=180, stretch=True),
+            ColumnConfig("quantity", "Miktar", width=100),
+            ColumnConfig("start", "Planlanan Başlangıç", width=140),
+            ColumnConfig("end", "Planlanan Bitiş", width=140),
+            ColumnConfig("progress", "İlerleme", width=100),
+            ColumnConfig("priority", "Öncelik", width=90),
+            ColumnConfig("status", "Durum", width=110),
+        ]
 
-        layout.addLayout(header_layout)
-
-        # === Özet Kartlar ===
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
-
-        self.total_card = self._create_card("📋 Toplam", "0", "#6366f1")
-        cards_layout.addWidget(self.total_card)
-
-        self.in_progress_card = self._create_card("🔄 Üretimde", "0", "#f59e0b")
-        cards_layout.addWidget(self.in_progress_card)
-
-        self.completed_card = self._create_card("✅ Tamamlanan", "0", "#10b981")
-        cards_layout.addWidget(self.completed_card)
-
-        self.delayed_card = self._create_card("⚠️ Geciken", "0", "#ef4444")
-        cards_layout.addWidget(self.delayed_card)
-
-        layout.addLayout(cards_layout)
-
-        # === Tablo ===
-        self.table = QTableWidget()
-        self._setup_table()
+        self.table = EnhancedTableWidget(
+            table_id="work_orders",
+            columns=columns,
+            parent=self,
+        )
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.table)
 
-        # === Alt Bilgi ===
+        # Alt bilgi
         self.count_label = QLabel("Toplam: 0 iş emri")
         layout.addWidget(self.count_label)
 
-    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _setup_table(self):
-        columns = [
-            ("İş Emri No", 120),
-            ("Mamul", 180),
-            ("Miktar", 100),
-            ("Planlanan Başlangıç", 140),
-            ("Planlanan Bitiş", 140),
-            ("İlerleme", 100),
-            ("Öncelik", 90),
-            ("Durum", 110),
-        ]
-
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.table.setColumnWidth(i, width)
-
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self._show_context_menu)
-        self.table.doubleClicked.connect(self._on_double_click)
+    def _connect_signals(self):
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.new_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
+        self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, work_orders: list):
-        """İş emirlerini yükle"""
         self.table.setRowCount(len(work_orders))
-
-        status_display = {
-            "draft": ("📝 Taslak", "#94a3b8"),
-            "planned": ("📅 Planlandı", "#3b82f6"),
-            "released": ("🚀 Serbest", "#8b5cf6"),
-            "in_progress": ("🔄 Üretimde", "#f59e0b"),
-            "completed": ("✅ Tamamlandı", "#10b981"),
-            "closed": ("🔒 Kapatıldı", "#64748b"),
-            "cancelled": ("❌ İptal", "#ef4444"),
-        }
-
-        priority_display = {
-            "low": ("Düşük", "#64748b"),
-            "normal": ("Normal", "#3b82f6"),
-            "high": ("Yüksek", "#f59e0b"),
-            "urgent": ("Acil", "#ef4444"),
-        }
-
-        total_count = len(work_orders)
-        in_progress_count = 0
-        completed_count = 0
-        delayed_count = 0
-
-        from datetime import datetime
+        visible_cols = self.table.get_visible_columns()
 
         now = datetime.now()
+        in_progress_count = completed_count = delayed_count = 0
 
         for row, wo in enumerate(work_orders):
-            # İş Emri No
-            no_item = QTableWidgetItem(wo.get("order_no", ""))
-            no_item.setData(Qt.ItemDataRole.UserRole, wo.get("id"))
-            no_item.setForeground(QColor("#818cf8"))
-            self.table.setItem(row, 0, no_item)
+            self._populate_row(row, wo, visible_cols, now)
 
-            # Mamul
-            self.table.setItem(row, 1, QTableWidgetItem(wo.get("item_name", "-")))
-
-            # Miktar
-            planned = wo.get("planned_quantity", 0)
-            completed = wo.get("completed_quantity", 0)
-            qty_text = f"{completed:,.0f} / {planned:,.0f}"
-            qty_item = QTableWidgetItem(qty_text)
-            qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 2, qty_item)
-
-            # Planlanan Başlangıç
-            start = wo.get("planned_start")
-            start_text = start.strftime("%d.%m.%Y %H:%M") if start else "-"
-            self.table.setItem(row, 3, QTableWidgetItem(start_text))
-
-            # Planlanan Bitiş
-            end = wo.get("planned_end")
-            end_text = end.strftime("%d.%m.%Y %H:%M") if end else "-"
-            end_item = QTableWidgetItem(end_text)
-
-            # Gecikme kontrolü
             status = wo.get("status", "draft")
-            if end and status in ["planned", "released", "in_progress"] and end < now:
-                end_item.setForeground(QColor("#ef4444"))
-                delayed_count += 1
-            self.table.setItem(row, 4, end_item)
-
-            # İlerleme
-            progress = wo.get("progress_rate", 0)
-            progress_item = QTableWidgetItem(f"%{progress:.0f}")
-            progress_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if progress >= 100:
-                progress_item.setForeground(QColor("#10b981"))
-            elif progress > 0:
-                progress_item.setForeground(QColor("#f59e0b"))
-            self.table.setItem(row, 5, progress_item)
-
-            # Öncelik
-            priority = wo.get("priority", "normal")
-            priority_text, priority_color = priority_display.get(
-                priority, ("Normal", "#3b82f6")
-            )
-            priority_item = QTableWidgetItem(priority_text)
-            priority_item.setForeground(QColor(priority_color))
-            priority_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 6, priority_item)
-
-            # Durum
-            status_text, status_color = status_display.get(status, ("?", "#ffffff"))
-            status_item = QTableWidgetItem(status_text)
-            status_item.setForeground(QColor(status_color))
-            self.table.setItem(row, 7, status_item)
-
-            # İstatistikler
             if status == "in_progress":
                 in_progress_count += 1
             elif status in ["completed", "closed"]:
                 completed_count += 1
 
+            end = wo.get("planned_end")
+            if end and status in ["planned", "released", "in_progress"] and end < now:
+                delayed_count += 1
+
         # Kartları güncelle
-        self._update_card(self.total_card, str(total_count))
-        self._update_card(self.in_progress_card, str(in_progress_count))
-        self._update_card(self.completed_card, str(completed_count))
-        self._update_card(self.delayed_card, str(delayed_count))
+        self.stat_cards["total"].update_value(str(len(work_orders)))
+        self.stat_cards["in_progress"].update_value(str(in_progress_count))
+        self.stat_cards["completed"].update_value(str(completed_count))
+        self.stat_cards["delayed"].update_value(str(delayed_count))
 
         self.count_label.setText(f"Toplam: {len(work_orders)} iş emri")
 
-    def _update_card(self, card: MiniStatCard, value: str):
-        card.update_value(value)
+    def _populate_row(self, row: int, wo: dict, visible_cols: list, now):
+        wo_id = wo.get("id")
+
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "order_no":
+                item = QTableWidgetItem(wo.get("order_no", ""))
+                item.setData(Qt.ItemDataRole.UserRole, wo_id)
+                item.setForeground(QColor("#818cf8"))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "item_name":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(wo.get("item_name", "-"))
+                )
+
+            elif col_key == "quantity":
+                planned = wo.get("planned_quantity", 0)
+                completed = wo.get("completed_quantity", 0)
+                qty_text = f"{completed:,.0f} / {planned:,.0f}"
+                item = QTableWidgetItem(qty_text)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "start":
+                start = wo.get("planned_start")
+                start_text = start.strftime("%d.%m.%Y %H:%M") if start else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(start_text))
+
+            elif col_key == "end":
+                end = wo.get("planned_end")
+                end_text = end.strftime("%d.%m.%Y %H:%M") if end else "-"
+                item = QTableWidgetItem(end_text)
+                status = wo.get("status", "draft")
+                if (
+                    end
+                    and status in ["planned", "released", "in_progress"]
+                    and end < now
+                ):
+                    item.setForeground(QColor("#ef4444"))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "progress":
+                progress = wo.get("progress_rate", 0)
+                item = QTableWidgetItem(f"%{progress:.0f}")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if progress >= 100:
+                    item.setForeground(QColor("#10b981"))
+                elif progress > 0:
+                    item.setForeground(QColor("#f59e0b"))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "priority":
+                priority = wo.get("priority", "normal")
+                text, color = self.PRIORITY_DISPLAY.get(priority, ("Normal", "#3b82f6"))
+                item = QTableWidgetItem(text)
+                item.setForeground(QColor(color))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "status":
+                status = wo.get("status", "draft")
+                text, color = self.STATUS_DISPLAY.get(status, ("?", "#ffffff"))
+                item = QTableWidgetItem(text)
+                item.setForeground(QColor(color))
+                self.table.setItem(row, col_idx, item)
+
+        self.table.setRowHeight(row, 48)
 
     def get_status_filter(self) -> str:
         return self.status_combo.currentData()
 
     def _on_search(self, text: str):
+        text = text.lower()
         for row in range(self.table.rowCount()):
-            match = False
-            for col in range(self.table.columnCount()):
-                item = self.table.item(row, col)
-                if item and text.lower() in item.text().lower():
-                    match = True
-                    break
+            match = any(
+                self.table.item(row, col)
+                and text in self.table.item(row, col).text().lower()
+                for col in range(self.table.columnCount())
+            )
             self.table.setRowHidden(row, not match)
 
     def _show_context_menu(self, position):
@@ -297,14 +270,13 @@ class WorkOrderListPage(QWidget):
             return
 
         wo_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        status_text = self.table.item(row, 7).text()
+        status_text = self.table.item(row, 7).text() if self.table.item(row, 7) else ""
 
         menu = QMenu(self)
         view_action = QAction("👁 Görüntüle", self)
         view_action.triggered.connect(lambda: self.view_clicked.emit(wo_id))
         menu.addAction(view_action)
 
-        # Taslak ise düzenlenebilir
         if "Taslak" in status_text:
             edit_action = QAction("✏️ Düzenle", self)
             edit_action.triggered.connect(lambda: self.edit_clicked.emit(wo_id))
@@ -312,7 +284,6 @@ class WorkOrderListPage(QWidget):
 
         menu.addSeparator()
 
-        # Durum değişiklikleri
         if "Taslak" in status_text:
             plan_action = QAction("📅 Planla", self)
             plan_action.triggered.connect(
@@ -350,17 +321,12 @@ class WorkOrderListPage(QWidget):
 
         menu.addSeparator()
 
-        # Sadece taslak silinebilir
         if "Taslak" in status_text:
             delete_action = QAction("🗑 Sil", self)
             delete_action.triggered.connect(lambda: self._confirm_delete(wo_id))
             menu.addAction(delete_action)
 
         menu.exec(self.table.viewport().mapToGlobal(position))
-
-    def _on_double_click(self, index):
-        wo_id = self.table.item(index.row(), 0).data(Qt.ItemDataRole.UserRole)
-        self.view_clicked.emit(wo_id)
 
     def _confirm_delete(self, wo_id: int):
         reply = QMessageBox.question(

@@ -1,5 +1,6 @@
 """
 Akıllı İş - İş İstasyonları Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
@@ -7,170 +8,117 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QFrame,
-    QAbstractItemView,
     QMenu,
     QMessageBox,
-    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class WorkStationListPage(QWidget):
-    """İş istasyonları listesi"""
+    """İş istasyonları listesi."""
 
+    # Sinyaller
     new_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
     copy_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
+    TYPE_DISPLAY = {
+        "machine": ("⚙️ Makine", "#3b82f6"),
+        "workstation": ("🔧 İş İstasyonu", "#10b981"),
+        "assembly": ("🔩 Montaj Hattı", "#f59e0b"),
+        "manual": ("✋ Manuel", "#8b5cf6"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
-        header_layout = QHBoxLayout()
+        # Header
+        self.header = PageHeader(
+            title="İş İstasyonları",
+            icon="🏭",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni İstasyon",
+            search_placeholder="İstasyon ara...",
+            parent=self,
+        )
+        layout.addWidget(self.header)
 
-        title_layout = QVBoxLayout()
-        title = QLabel("🏭 İş İstasyonları")
-        subtitle = QLabel("Makine ve iş istasyonlarını yönetin")
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        # İstatistik kartları
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
 
-        header_layout.addStretch()
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("🏭 Toplam", "0", "#6366f1")
+        self.stat_cards["machine"] = MiniStatCard("⚙️ Makine", "0", "#3b82f6")
+        self.stat_cards["workstation"] = MiniStatCard("🔧 İş İstasyonu", "0", "#10b981")
+        self.stat_cards["assembly"] = MiniStatCard("🔩 Montaj Hattı", "0", "#f59e0b")
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 İstasyon ara...")
-        self.search_input.setFixedWidth(200)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        for card in self.stat_cards.values():
+            stats_layout.addWidget(card)
+        stats_layout.addStretch()
+        layout.addLayout(stats_layout)
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        # Tablo
+        columns = [
+            ColumnConfig("code", "Kod", width=100),
+            ColumnConfig("name", "İstasyon Adı", width=200, stretch=True),
+            ColumnConfig("station_type", "Tür", width=120),
+            ColumnConfig("capacity_per_hour", "Kapasite/Saat", width=110),
+            ColumnConfig("efficiency_rate", "Verimlilik", width=100),
+            ColumnConfig("hourly_rate", "Saatlik Maliyet", width=120),
+            ColumnConfig("location", "Konum", width=150),
+            ColumnConfig("is_active", "Durum", width=100),
+        ]
 
-        # Yeni İstasyon
-        new_btn = QPushButton(f"{ICONS['add']} Yeni İstasyon")
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.clicked.connect(self.new_clicked.emit)
-        header_layout.addWidget(new_btn)
-
-        layout.addLayout(header_layout)
-
-        # === Özet Kartlar ===
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
-
-        self.total_card = self._create_card("🏭 Toplam İstasyon", "0", "#6366f1")
-        cards_layout.addWidget(self.total_card)
-
-        self.machine_card = self._create_card("⚙️ Makine", "0", "#3b82f6")
-        cards_layout.addWidget(self.machine_card)
-
-        self.workstation_card = self._create_card("🔧 İş İstasyonu", "0", "#10b981")
-        cards_layout.addWidget(self.workstation_card)
-
-        self.assembly_card = self._create_card("🔩 Montaj Hattı", "0", "#f59e0b")
-        cards_layout.addWidget(self.assembly_card)
-
-        layout.addLayout(cards_layout)
-
-        # === Tablo ===
-        self.table = QTableWidget()
-        self._setup_table()
+        self.table = EnhancedTableWidget(
+            table_id="work_station_list",
+            columns=columns,
+            parent=self,
+        )
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.table)
 
-        # === Alt Bilgi ===
+        # Alt bilgi
         self.count_label = QLabel("Toplam: 0 istasyon")
         layout.addWidget(self.count_label)
 
-    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _setup_table(self):
-        columns = [
-            ("Kod", 100),
-            ("İstasyon Adı", 200),
-            ("Tür", 120),
-            ("Kapasite/Saat", 110),
-            ("Verimlilik", 100),
-            ("Saatlik Maliyet", 120),
-            ("Konum", 150),
-            ("Durum", 100),
-        ]
-
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.table.setColumnWidth(i, width)
-
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self._show_context_menu)
-        self.table.doubleClicked.connect(self._on_double_click)
+    def _connect_signals(self):
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.new_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
+        self.table.row_double_clicked.connect(self.edit_clicked.emit)
 
     def load_data(self, stations: list):
-        """İstasyon listesini yükle"""
         self.table.setRowCount(len(stations))
+        visible_cols = self.table.get_visible_columns()
 
-        type_display = {
-            "machine": ("⚙️ Makine", "#3b82f6"),
-            "workstation": ("🔧 İş İstasyonu", "#10b981"),
-            "assembly": ("🔩 Montaj Hattı", "#f59e0b"),
-            "manual": ("✋ Manuel", "#8b5cf6"),
-        }
-
-        total = len(stations)
-        machine_count = 0
-        workstation_count = 0
-        assembly_count = 0
+        machine_count = workstation_count = assembly_count = 0
 
         for row, station in enumerate(stations):
-            # Kod
-            code_item = QTableWidgetItem(station.get("code", ""))
-            code_item.setData(Qt.ItemDataRole.UserRole, station.get("id"))
-            code_item.setForeground(QColor("#818cf8"))
-            self.table.setItem(row, 0, code_item)
+            self._populate_row(row, station, visible_cols)
 
-            # İstasyon Adı
-            self.table.setItem(row, 1, QTableWidgetItem(station.get("name", "")))
-
-            # Tür
             station_type = station.get("station_type", "machine")
-            type_text, type_color = type_display.get(station_type, ("?", "#ffffff"))
-            type_item = QTableWidgetItem(type_text)
-            type_item.setForeground(QColor(type_color))
-            self.table.setItem(row, 2, type_item)
-
-            # İstatistik say
             if station_type == "machine":
                 machine_count += 1
             elif station_type == "workstation":
@@ -178,63 +126,84 @@ class WorkStationListPage(QWidget):
             elif station_type == "assembly":
                 assembly_count += 1
 
-            # Kapasite/Saat
-            capacity = station.get("capacity_per_hour", 0)
-            capacity_item = QTableWidgetItem(f"{capacity:,.0f}" if capacity else "-")
-            capacity_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 3, capacity_item)
-
-            # Verimlilik
-            efficiency = station.get("efficiency_rate", 100)
-            eff_item = QTableWidgetItem(f"%{efficiency:.0f}")
-            eff_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if efficiency >= 90:
-                eff_item.setForeground(QColor("#10b981"))
-            elif efficiency >= 70:
-                eff_item.setForeground(QColor("#f59e0b"))
-            else:
-                eff_item.setForeground(QColor("#ef4444"))
-            self.table.setItem(row, 4, eff_item)
-
-            # Saatlik Maliyet
-            hourly_rate = station.get("hourly_rate", 0)
-            rate_item = QTableWidgetItem(f"₺{hourly_rate:,.2f}")
-            rate_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 5, rate_item)
-
-            # Konum
-            location = station.get("location", "") or station.get("warehouse_name", "")
-            self.table.setItem(row, 6, QTableWidgetItem(location or "-"))
-
-            # Durum
-            is_active = station.get("is_active", True)
-            status_text = "✅ Aktif" if is_active else "❌ Pasif"
-            status_color = "#10b981" if is_active else "#ef4444"
-            status_item = QTableWidgetItem(status_text)
-            status_item.setForeground(QColor(status_color))
-            self.table.setItem(row, 7, status_item)
-
         # Kartları güncelle
-        self._update_card(self.total_card, str(total))
-        self._update_card(self.machine_card, str(machine_count))
-        self._update_card(self.workstation_card, str(workstation_count))
-        self._update_card(self.assembly_card, str(assembly_count))
+        self.stat_cards["total"].update_value(str(len(stations)))
+        self.stat_cards["machine"].update_value(str(machine_count))
+        self.stat_cards["workstation"].update_value(str(workstation_count))
+        self.stat_cards["assembly"].update_value(str(assembly_count))
 
-        self.count_label.setText(f"Toplam: {total} istasyon")
+        self.count_label.setText(f"Toplam: {len(stations)} istasyon")
 
-    def _update_card(self, card: MiniStatCard, value: str):
-        card.update_value(value)
+    def _populate_row(self, row: int, station: dict, visible_cols: list):
+        station_id = station.get("id")
+
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "code":
+                item = QTableWidgetItem(station.get("code", ""))
+                item.setData(Qt.ItemDataRole.UserRole, station_id)
+                item.setForeground(QColor("#818cf8"))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "name":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(station.get("name", ""))
+                )
+
+            elif col_key == "station_type":
+                stype = station.get("station_type", "machine")
+                text, color = self.TYPE_DISPLAY.get(stype, ("?", "#ffffff"))
+                item = QTableWidgetItem(text)
+                item.setForeground(QColor(color))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "capacity_per_hour":
+                capacity = station.get("capacity_per_hour", 0)
+                item = QTableWidgetItem(f"{capacity:,.0f}" if capacity else "-")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "efficiency_rate":
+                efficiency = station.get("efficiency_rate", 100)
+                item = QTableWidgetItem(f"%{efficiency:.0f}")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if efficiency >= 90:
+                    item.setForeground(QColor("#10b981"))
+                elif efficiency >= 70:
+                    item.setForeground(QColor("#f59e0b"))
+                else:
+                    item.setForeground(QColor("#ef4444"))
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "hourly_rate":
+                rate = station.get("hourly_rate", 0)
+                item = QTableWidgetItem(f"₺{rate:,.2f}")
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "location":
+                loc = station.get("location", "") or station.get("warehouse_name", "")
+                self.table.setItem(row, col_idx, QTableWidgetItem(loc or "-"))
+
+            elif col_key == "is_active":
+                is_active = station.get("is_active", True)
+                text = "✅ Aktif" if is_active else "❌ Pasif"
+                color = "#10b981" if is_active else "#ef4444"
+                item = QTableWidgetItem(text)
+                item.setForeground(QColor(color))
+                self.table.setItem(row, col_idx, item)
+
+        self.table.setRowHeight(row, 48)
 
     def _on_search(self, text: str):
+        text = text.lower()
         for row in range(self.table.rowCount()):
-            match = False
-            for col in range(self.table.columnCount()):
-                item = self.table.item(row, col)
-                if item and text.lower() in item.text().lower():
-                    match = True
-                    break
+            match = any(
+                self.table.item(row, col)
+                and text in self.table.item(row, col).text().lower()
+                for col in range(self.table.columnCount())
+            )
             self.table.setRowHidden(row, not match)
 
     def _show_context_menu(self, position):
@@ -245,6 +214,7 @@ class WorkStationListPage(QWidget):
         station_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
 
         menu = QMenu(self)
+
         edit_action = QAction("✏️ Düzenle", self)
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(station_id))
         menu.addAction(edit_action)
@@ -260,10 +230,6 @@ class WorkStationListPage(QWidget):
         menu.addAction(delete_action)
 
         menu.exec(self.table.viewport().mapToGlobal(position))
-
-    def _on_double_click(self, index):
-        station_id = self.table.item(index.row(), 0).data(Qt.ItemDataRole.UserRole)
-        self.edit_clicked.emit(station_id)
 
     def _confirm_delete(self, station_id: int):
         reply = QMessageBox.question(

@@ -18,8 +18,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QTabWidget,
     QCheckBox,
-    QScrollArea,
-    QGridLayout,
     QFormLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -47,25 +45,34 @@ class StockFormPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
-        header_layout = QHBoxLayout()
-
-        back_btn = QPushButton("← Geri")
-        back_btn.clicked.connect(self.cancelled.emit)
-        header_layout.addWidget(back_btn)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
         title_text = "Stok Kartı Düzenle" if self.is_edit_mode else "Yeni Stok Kartı"
-        title = QLabel(title_text)
-        header_layout.addWidget(title)
 
-        header_layout.addStretch()
+        self.header = PageHeader(
+            title=title_text,
+            show_back=True,
+            show_search=False,
+            show_refresh=False,
+            show_add=False,  # Add butonu yerine Kaydet kullanacağız
+            parent=self,
+        )
 
         # Kaydet butonu
         save_btn = QPushButton("💾 Kaydet")
+        save_btn.setProperty("class", "btn-primary")
+        save_btn.setFixedHeight(36)
         save_btn.clicked.connect(self._on_save)
-        header_layout.addWidget(save_btn)
 
-        layout.addLayout(header_layout)
+        # Header'a kaydet butonunu ekle
+        h_layout = self.header.header_layout()
+        h_layout.addWidget(save_btn)
+
+        # Sinyalleri bağla
+        self.header.back_clicked.connect(self.cancelled.emit)
+
+        layout.addWidget(self.header)
 
         # === Tab Widget ===
         self.tabs = QTabWidget()

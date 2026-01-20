@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QFormLayout,
-    QLineEdit,
     QTextEdit,
     QComboBox,
     QMessageBox,
@@ -22,13 +21,11 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QTabWidget,
     QGroupBox,
-    QSpinBox,
     QDoubleSpinBox,
     QDateTimeEdit,
     QFileDialog,
     QListWidget,
     QListWidgetItem,
-    QCheckBox,
 )
 from PyQt6.QtCore import Qt, QDateTime
 
@@ -49,48 +46,79 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # Base widget'tan gelen başlığı temizle
+        if self.layout.count() > 0:
+            item = self.layout.itemAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
 
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="İş Emri Yönetimi",
+            icon="🔧",
+            show_search=False,
+            show_refresh=False,
+            show_add=False,  # Custom add butonu kullanacagiz
+            parent=self,
+        )
+
+        h_layout = self.header.header_layout()
+
+        # Yeni İş Emri
         self.btn_new = QPushButton("Yeni İş Emri")
-        self.btn_new.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
+        self.btn_new.setFixedSize(120, 36)
+        self.btn_new.setProperty("class", "btn-primary")
         self.btn_new.clicked.connect(self.show_create_dialog)
-        btn_layout.addWidget(self.btn_new)
+        h_layout.addWidget(self.btn_new)
 
+        # Detay / İşlem Yap
         self.btn_detail = QPushButton("Detay / İşlem Yap")
-        self.btn_detail.setStyleSheet(
-            "background-color: #6366f1; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
+        self.btn_detail.setFixedSize(140, 36)
+        self.btn_detail.setProperty("class", "btn-secondary")
         self.btn_detail.clicked.connect(self.open_details)
-        btn_layout.addWidget(self.btn_detail)
+        h_layout.addWidget(self.btn_detail)
 
-        btn_layout.addStretch()
-
-        # Filtreler
+        # Filtreler (Durum)
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Durum:"))
         self.cmb_status = QComboBox()
         self.cmb_status.addItem("Aktifler", "active")
         self.cmb_status.addItem("Tümü", "all")
         self.cmb_status.addItem("Tamamlananlar", "completed")
+        self.cmb_status.setFixedWidth(120)
+        self.cmb_status.setFixedHeight(36)
         self.cmb_status.currentIndexChanged.connect(self.refresh_data)
-        btn_layout.addWidget(QLabel("Durum:"))
-        btn_layout.addWidget(self.cmb_status)
+        h_layout.addWidget(self.cmb_status)
 
-        self.layout.addLayout(btn_layout)
+        self.layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "İş Emri No", "Ekipman", "Talep No", "Öncelik", "Durum",
-            "Planlanan", "Atanan", "Maliyet"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            [
+                "İş Emri No",
+                "Ekipman",
+                "Talep No",
+                "Öncelik",
+                "Durum",
+                "Planlanan",
+                "Atanan",
+                "Maliyet",
+            ]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.doubleClicked.connect(self.open_details)
         self.layout.addWidget(self.table)
+
+        # Tablo stilini güncellemek gerekebilir ama base styles kullanıyor sanırım.
+        # Manuel stil tanımları varsa kaldıralım (yok gibi).
 
         self.refresh_data()
 
@@ -109,12 +137,12 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
             self.table.setItem(i, 0, QTableWidgetItem(wo.order_no))
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, wo.id)
 
-            self.table.setItem(i, 1, QTableWidgetItem(
-                wo.equipment.name if wo.equipment else "-"
-            ))
-            self.table.setItem(i, 2, QTableWidgetItem(
-                wo.request.request_no if wo.request else "-"
-            ))
+            self.table.setItem(
+                i, 1, QTableWidgetItem(wo.equipment.name if wo.equipment else "-")
+            )
+            self.table.setItem(
+                i, 2, QTableWidgetItem(wo.request.request_no if wo.request else "-")
+            )
 
             # Öncelik - renkli
             priority_item = QTableWidgetItem(wo.priority.value.capitalize())
@@ -124,7 +152,9 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
                 MaintenancePriority.HIGH: Qt.GlobalColor.darkYellow,
                 MaintenancePriority.CRITICAL: Qt.GlobalColor.red,
             }
-            priority_item.setForeground(priority_colors.get(wo.priority, Qt.GlobalColor.black))
+            priority_item.setForeground(
+                priority_colors.get(wo.priority, Qt.GlobalColor.black)
+            )
             self.table.setItem(i, 3, priority_item)
 
             # Durum - renkli
@@ -145,13 +175,21 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
                 status_item.setForeground(Qt.GlobalColor.gray)
             self.table.setItem(i, 4, status_item)
 
-            self.table.setItem(i, 5, QTableWidgetItem(
-                wo.planned_start_date.strftime("%d.%m.%Y") if wo.planned_start_date else "-"
-            ))
+            self.table.setItem(
+                i,
+                5,
+                QTableWidgetItem(
+                    wo.planned_start_date.strftime("%d.%m.%Y")
+                    if wo.planned_start_date
+                    else "-"
+                ),
+            )
 
-            self.table.setItem(i, 6, QTableWidgetItem(
-                wo.assigned_to.full_name if wo.assigned_to else "-"
-            ))
+            self.table.setItem(
+                i,
+                6,
+                QTableWidgetItem(wo.assigned_to.full_name if wo.assigned_to else "-"),
+            )
 
             self.table.setItem(i, 7, QTableWidgetItem(f"₺{wo.total_cost or 0:,.2f}"))
 
@@ -194,7 +232,9 @@ class WorkOrderDialog(QDialog):
         if request_id:
             request = service.get_request_by_id(request_id)
             if request:
-                info_label = QLabel(f"Talep No: {request.request_no} - {request.equipment.name}")
+                info_label = QLabel(
+                    f"Talep No: {request.request_no} - {request.equipment.name}"
+                )
                 info_label.setStyleSheet(
                     "background-color: #dbeafe; padding: 8px; border-radius: 4px; color: #1e40af;"
                 )
@@ -267,7 +307,8 @@ class WorkOrderDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
@@ -312,8 +353,7 @@ class WorkOrderDialog(QDialog):
             )
 
             QMessageBox.information(
-                self, "Başarılı",
-                f"İş emri oluşturuldu: {wo.order_no}"
+                self, "Başarılı", f"İş emri oluşturuldu: {wo.order_no}"
             )
             super().accept()
         except Exception as e:
@@ -336,7 +376,9 @@ class WorkOrderDetailsDialog(QDialog):
 
         # Başlık ve durum
         header = QHBoxLayout()
-        title = QLabel(f"{self.wo.order_no} - {self.wo.equipment.name if self.wo.equipment else ''}")
+        title = QLabel(
+            f"{self.wo.order_no} - {self.wo.equipment.name if self.wo.equipment else ''}"
+        )
         title.setStyleSheet("font-size: 18px; font-weight: bold;")
         header.addWidget(title)
 
@@ -350,13 +392,15 @@ class WorkOrderDetailsDialog(QDialog):
         }.get(self.wo.status, (self.wo.status.value, "#gray"))
 
         status_label = QLabel(status_text[0])
-        status_label.setStyleSheet(f"""
+        status_label.setStyleSheet(
+            f"""
             background-color: {status_text[1]};
             color: white;
             padding: 4px 12px;
             border-radius: 4px;
             font-weight: bold;
-        """)
+        """
+        )
         header.addWidget(status_label)
         header.addStretch()
         main_layout.addLayout(header)
@@ -390,13 +434,17 @@ class WorkOrderDetailsDialog(QDialog):
 
         if self.wo.status in [WorkOrderStatus.DRAFT, WorkOrderStatus.ASSIGNED]:
             btn_start = QPushButton("İşi Başlat")
-            btn_start.setStyleSheet("background-color: #007acc; color: white; padding: 10px 20px;")
+            btn_start.setStyleSheet(
+                "background-color: #007acc; color: white; padding: 10px 20px;"
+            )
             btn_start.clicked.connect(self.start_work)
             btn_layout.addWidget(btn_start)
 
         if self.wo.status == WorkOrderStatus.IN_PROGRESS:
             btn_complete = QPushButton("İşi Tamamla")
-            btn_complete.setStyleSheet("background-color: #22c55e; color: white; padding: 10px 20px;")
+            btn_complete.setStyleSheet(
+                "background-color: #22c55e; color: white; padding: 10px 20px;"
+            )
             btn_complete.clicked.connect(self.complete_work)
             btn_layout.addWidget(btn_complete)
 
@@ -415,29 +463,50 @@ class WorkOrderDetailsDialog(QDialog):
         info_group = QGroupBox("İş Emri Bilgileri")
         form = QFormLayout(info_group)
 
-        form.addRow("Ekipman:", QLabel(self.wo.equipment.name if self.wo.equipment else "-"))
-        form.addRow("Bağlı Talep:", QLabel(
-            self.wo.request.request_no if self.wo.request else "-"
-        ))
-        form.addRow("Atanan:", QLabel(
-            self.wo.assigned_to.full_name if self.wo.assigned_to else "-"
-        ))
+        form.addRow(
+            "Ekipman:", QLabel(self.wo.equipment.name if self.wo.equipment else "-")
+        )
+        form.addRow(
+            "Bağlı Talep:",
+            QLabel(self.wo.request.request_no if self.wo.request else "-"),
+        )
+        form.addRow(
+            "Atanan:",
+            QLabel(self.wo.assigned_to.full_name if self.wo.assigned_to else "-"),
+        )
         form.addRow("Öncelik:", QLabel(self.wo.priority.value.capitalize()))
 
         # Tarihler
-        form.addRow("Planlanan Başlangıç:", QLabel(
-            self.wo.planned_start_date.strftime("%d.%m.%Y %H:%M") if self.wo.planned_start_date else "-"
-        ))
-        form.addRow("Gerçek Başlangıç:", QLabel(
-            self.wo.actual_start_date.strftime("%d.%m.%Y %H:%M") if self.wo.actual_start_date else "-"
-        ))
-        form.addRow("Tamamlanma:", QLabel(
-            self.wo.completed_date.strftime("%d.%m.%Y %H:%M") if self.wo.completed_date else "-"
-        ))
+        form.addRow(
+            "Planlanan Başlangıç:",
+            QLabel(
+                self.wo.planned_start_date.strftime("%d.%m.%Y %H:%M")
+                if self.wo.planned_start_date
+                else "-"
+            ),
+        )
+        form.addRow(
+            "Gerçek Başlangıç:",
+            QLabel(
+                self.wo.actual_start_date.strftime("%d.%m.%Y %H:%M")
+                if self.wo.actual_start_date
+                else "-"
+            ),
+        )
+        form.addRow(
+            "Tamamlanma:",
+            QLabel(
+                self.wo.completed_date.strftime("%d.%m.%Y %H:%M")
+                if self.wo.completed_date
+                else "-"
+            ),
+        )
 
         # Süre bilgileri
         form.addRow("Tahmini Süre:", QLabel(f"{self.wo.estimated_hours or 0:.1f} saat"))
-        form.addRow("Gerçekleşen Süre:", QLabel(f"{self.wo.actual_hours or 0:.1f} saat"))
+        form.addRow(
+            "Gerçekleşen Süre:", QLabel(f"{self.wo.actual_hours or 0:.1f} saat")
+        )
 
         layout.addWidget(info_group)
 
@@ -459,8 +528,12 @@ class WorkOrderDetailsDialog(QDialog):
         # Maliyet özeti
         cost_group = QGroupBox("Maliyet Özeti")
         cost_layout = QFormLayout(cost_group)
-        cost_layout.addRow("Malzeme Maliyeti:", QLabel(f"₺{self.wo.material_cost or 0:,.2f}"))
-        cost_layout.addRow("İşçilik Maliyeti:", QLabel(f"₺{self.wo.labor_cost or 0:,.2f}"))
+        cost_layout.addRow(
+            "Malzeme Maliyeti:", QLabel(f"₺{self.wo.material_cost or 0:,.2f}")
+        )
+        cost_layout.addRow(
+            "İşçilik Maliyeti:", QLabel(f"₺{self.wo.labor_cost or 0:,.2f}")
+        )
         cost_layout.addRow("Toplam:", QLabel(f"₺{self.wo.total_cost or 0:,.2f}"))
         layout.addWidget(cost_group)
 
@@ -472,13 +545,17 @@ class WorkOrderDetailsDialog(QDialog):
             return
 
         self.checklist_widget = QListWidget()
-        checklist_results = self.service.get_work_order_checklist_results(self.work_order_id)
+        checklist_results = self.service.get_work_order_checklist_results(
+            self.work_order_id
+        )
 
         for result in checklist_results:
             item = QListWidgetItem(result.checklist_item.description)
             item.setData(Qt.ItemDataRole.UserRole, result.id)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked if result.is_checked else Qt.CheckState.Unchecked)
+            item.setCheckState(
+                Qt.CheckState.Checked if result.is_checked else Qt.CheckState.Unchecked
+            )
             self.checklist_widget.addItem(item)
 
         self.checklist_widget.itemChanged.connect(self.on_checklist_item_changed)
@@ -496,7 +573,11 @@ class WorkOrderDetailsDialog(QDialog):
         layout = QVBoxLayout(self.tab_parts)
 
         # Butonlar
-        if self.wo.status not in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED, WorkOrderStatus.CLOSED]:
+        if self.wo.status not in [
+            WorkOrderStatus.COMPLETED,
+            WorkOrderStatus.CANCELLED,
+            WorkOrderStatus.CLOSED,
+        ]:
             btn_layout = QHBoxLayout()
             btn_add = QPushButton("Stoktan Parça Ekle")
             btn_add.clicked.connect(self.show_add_part_dialog)
@@ -513,10 +594,12 @@ class WorkOrderDetailsDialog(QDialog):
         # Parça tablosu
         self.parts_table = QTableWidget()
         self.parts_table.setColumnCount(5)
-        self.parts_table.setHorizontalHeaderLabels([
-            "Parça Kodu", "Parça Adı", "Miktar", "Birim Maliyet", "Toplam"
-        ])
-        self.parts_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.parts_table.setHorizontalHeaderLabels(
+            ["Parça Kodu", "Parça Adı", "Miktar", "Birim Maliyet", "Toplam"]
+        )
+        self.parts_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         layout.addWidget(self.parts_table)
 
         self.refresh_parts()
@@ -525,17 +608,25 @@ class WorkOrderDetailsDialog(QDialog):
         parts = self.wo.parts
         self.parts_table.setRowCount(len(parts))
         for i, part in enumerate(parts):
-            self.parts_table.setItem(i, 0, QTableWidgetItem(
-                part.item.code if part.item else "-"
-            ))
-            self.parts_table.setItem(i, 1, QTableWidgetItem(
-                part.item.name if part.item else "-"
-            ))
-            self.parts_table.setItem(i, 2, QTableWidgetItem(
-                f"{part.quantity} {part.unit.code if part.unit else ''}"
-            ))
-            self.parts_table.setItem(i, 3, QTableWidgetItem(f"₺{part.unit_cost or 0:,.2f}"))
-            self.parts_table.setItem(i, 4, QTableWidgetItem(f"₺{part.total_cost or 0:,.2f}"))
+            self.parts_table.setItem(
+                i, 0, QTableWidgetItem(part.item.code if part.item else "-")
+            )
+            self.parts_table.setItem(
+                i, 1, QTableWidgetItem(part.item.name if part.item else "-")
+            )
+            self.parts_table.setItem(
+                i,
+                2,
+                QTableWidgetItem(
+                    f"{part.quantity} {part.unit.code if part.unit else ''}"
+                ),
+            )
+            self.parts_table.setItem(
+                i, 3, QTableWidgetItem(f"₺{part.unit_cost or 0:,.2f}")
+            )
+            self.parts_table.setItem(
+                i, 4, QTableWidgetItem(f"₺{part.total_cost or 0:,.2f}")
+            )
 
     def setup_attachments_tab(self):
         layout = QVBoxLayout(self.tab_attachments)
@@ -574,9 +665,7 @@ class WorkOrderDetailsDialog(QDialog):
         notes = self.txt_notes.toPlainText()
         try:
             self.service.complete_work_order(
-                self.work_order_id,
-                notes=notes,
-                actual_hours=hours
+                self.work_order_id, notes=notes, actual_hours=hours
             )
             QMessageBox.information(self, "Bilgi", "İş emri tamamlandı.")
             self.accept()
@@ -586,18 +675,22 @@ class WorkOrderDetailsDialog(QDialog):
     def _get_labor_hours(self):
         """İşçilik saati giriş dialogu"""
         from PyQt6.QtWidgets import QInputDialog
+
         hours, ok = QInputDialog.getDouble(
-            self, "İşçilik Saati",
+            self,
+            "İşçilik Saati",
             "Toplam çalışma süresi (saat):",
-            value=1.0, min=0.1, max=100, decimals=1
+            value=1.0,
+            min=0.1,
+            max=100,
+            decimals=1,
         )
         return hours, ok
 
     def save_notes(self):
         try:
             self.service.update_work_order_notes(
-                self.work_order_id,
-                self.txt_notes.toPlainText()
+                self.work_order_id, self.txt_notes.toPlainText()
             )
             QMessageBox.information(self, "Bilgi", "Notlar kaydedildi.")
         except Exception as e:
@@ -610,18 +703,19 @@ class WorkOrderDetailsDialog(QDialog):
             self.refresh_parts()
 
     def create_purchase_request(self):
-        QMessageBox.information(self, "Bilgi", "Satınalma talebi oluşturma ekranı açılacak.")
+        QMessageBox.information(
+            self, "Bilgi", "Satınalma talebi oluşturma ekranı açılacak."
+        )
         # TODO: Implement
 
     def add_attachment(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Dosya Seç", "",
-            "Tüm Dosyalar (*.*)"
+            self, "Dosya Seç", "", "Tüm Dosyalar (*.*)"
         )
         if file_path:
             try:
-                file_name = file_path.split('/')[-1]
-                file_type = file_name.split('.')[-1] if '.' in file_name else 'unknown'
+                file_name = file_path.split("/")[-1]
+                file_type = file_name.split(".")[-1] if "." in file_name else "unknown"
                 self.service.add_work_order_attachment(
                     self.work_order_id, file_path, file_name, file_type
                 )

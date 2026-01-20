@@ -4,16 +4,13 @@ Bakım Modülü - Arıza/Bakım Talepleri
 
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QFormLayout,
-    QLineEdit,
     QTextEdit,
     QComboBox,
     QMessageBox,
@@ -23,8 +20,9 @@ from PyQt6.QtWidgets import (
     QGroupBox,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
 
+from PyQt6.QtGui import QColor
+from config.styles import get_button_style, SUCCESS, INFO, WARNING, ERROR
 from modules.maintenance.views.base import MaintenanceBaseWidget
 from database.models.maintenance import (
     MaintenancePriority,
@@ -41,58 +39,70 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        self.btn_new = QPushButton("Yeni Arıza Bildirimi")
-        self.btn_new.setStyleSheet(
-            "background-color: #eab308; color: black; padding: 8px 16px; border-radius: 4px;"
+        self.header = PageHeader(
+            title="Arıza/Bakım Talepleri",
+            icon="🔧",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Arıza Bildirimi",
+            parent=self,
         )
-        self.btn_new.clicked.connect(self.show_request_dialog)
-        btn_layout.addWidget(self.btn_new)
+        self.header.add_clicked.connect(self.show_request_dialog)
+        self.header.refresh_clicked.connect(self.refresh_data)
 
-        self.btn_new_wo = QPushButton("Seçiliden İş Emri Oluştur")
-        self.btn_new_wo.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
-        self.btn_new_wo.clicked.connect(self.create_work_order_from_request)
-        btn_layout.addWidget(self.btn_new_wo)
-
-        self.btn_close = QPushButton("Talebi Kapat")
-        self.btn_close.setStyleSheet(
-            "background-color: #22c55e; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
-        self.btn_close.clicked.connect(self.close_request)
-        btn_layout.addWidget(self.btn_close)
-
-        btn_layout.addStretch()
+        # Header Layout - Butonlar ve Filtreler
+        h_layout = self.header.header_layout()
 
         # Filtreler
+        h_layout.addWidget(QLabel("Durum:"))
         self.cmb_status = QComboBox()
         self.cmb_status.addItem("Bekleyenler", "pending")
         self.cmb_status.addItem("Tümü", "all")
         self.cmb_status.addItem("Çözülenler", "resolved")
+        self.cmb_status.setFixedHeight(36)
         self.cmb_status.currentIndexChanged.connect(self.refresh_data)
-        btn_layout.addWidget(QLabel("Durum:"))
-        btn_layout.addWidget(self.cmb_status)
+        h_layout.addWidget(self.cmb_status)
 
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Öncelik:"))
         self.cmb_priority = QComboBox()
         self.cmb_priority.addItem("Tüm Öncelikler", None)
         for p in MaintenancePriority:
             self.cmb_priority.addItem(p.value.capitalize(), p)
+        self.cmb_priority.setFixedHeight(36)
         self.cmb_priority.currentIndexChanged.connect(self.refresh_data)
-        btn_layout.addWidget(QLabel("Öncelik:"))
-        btn_layout.addWidget(self.cmb_priority)
+        h_layout.addWidget(self.cmb_priority)
 
-        self.layout.addLayout(btn_layout)
+        h_layout.addStretch()
+
+        # Custom Butonlar
+        self.btn_new_wo = QPushButton("Seçiliden İş Emri Oluştur")
+        self.btn_new_wo.setStyleSheet(get_button_style("primary"))
+        self.btn_new_wo.setFixedHeight(36)
+        self.btn_new_wo.clicked.connect(self.create_work_order_from_request)
+        h_layout.addWidget(self.btn_new_wo)
+
+        self.btn_close = QPushButton("Talebi Kapat")
+        self.btn_close.setStyleSheet(get_button_style("success"))
+        self.btn_close.setFixedHeight(36)
+        self.btn_close.clicked.connect(self.close_request)
+        h_layout.addWidget(self.btn_close)
+
+        self.layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([
-            "Talep No", "Ekipman", "Tarih", "Öncelik", "Tür", "Durum", "Bildiren"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            ["Talep No", "Ekipman", "Tarih", "Öncelik", "Tür", "Durum", "Bildiren"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.layout.addWidget(self.table)
@@ -115,39 +125,45 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
             self.table.setItem(i, 0, QTableWidgetItem(req.request_no))
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, req.id)
 
-            self.table.setItem(i, 1, QTableWidgetItem(
-                req.equipment.name if req.equipment else "-"
-            ))
-            self.table.setItem(i, 2, QTableWidgetItem(
-                req.request_date.strftime("%d.%m.%Y %H:%M")
-            ))
+            self.table.setItem(
+                i, 1, QTableWidgetItem(req.equipment.name if req.equipment else "-")
+            )
+            self.table.setItem(
+                i, 2, QTableWidgetItem(req.request_date.strftime("%d.%m.%Y %H:%M"))
+            )
 
             # Öncelik - renkli
             priority_item = QTableWidgetItem(req.priority.value.capitalize())
             priority_colors = {
-                MaintenancePriority.LOW: Qt.GlobalColor.darkGreen,
-                MaintenancePriority.NORMAL: Qt.GlobalColor.blue,
-                MaintenancePriority.HIGH: Qt.GlobalColor.darkYellow,
-                MaintenancePriority.CRITICAL: Qt.GlobalColor.red,
+                MaintenancePriority.LOW: QColor(SUCCESS),
+                MaintenancePriority.NORMAL: QColor(INFO),
+                MaintenancePriority.HIGH: QColor(WARNING),
+                MaintenancePriority.CRITICAL: QColor(ERROR),
             }
-            priority_item.setForeground(priority_colors.get(req.priority, Qt.GlobalColor.black))
+            priority_item.setForeground(priority_colors.get(req.priority, QColor(INFO)))
             self.table.setItem(i, 3, priority_item)
 
-            self.table.setItem(i, 4, QTableWidgetItem(req.maintenance_type.value.capitalize()))
+            self.table.setItem(
+                i, 4, QTableWidgetItem(req.maintenance_type.value.capitalize())
+            )
 
             # Durum - renkli
-            status_item = QTableWidgetItem(req.status.value.replace("_", " ").capitalize())
+            status_item = QTableWidgetItem(
+                req.status.value.replace("_", " ").capitalize()
+            )
             if req.status == MaintenanceStatus.RESOLVED:
-                status_item.setForeground(Qt.GlobalColor.darkGreen)
+                status_item.setForeground(QColor(SUCCESS))
             elif req.status == MaintenanceStatus.IN_PROGRESS:
-                status_item.setForeground(Qt.GlobalColor.blue)
+                status_item.setForeground(QColor(INFO))
             elif req.status == MaintenanceStatus.WAITING_PARTS:
-                status_item.setForeground(Qt.GlobalColor.darkYellow)
+                status_item.setForeground(QColor(WARNING))
             self.table.setItem(i, 5, status_item)
 
-            self.table.setItem(i, 6, QTableWidgetItem(
-                req.reported_by.full_name if req.reported_by else "-"
-            ))
+            self.table.setItem(
+                i,
+                6,
+                QTableWidgetItem(req.reported_by.full_name if req.reported_by else "-"),
+            )
 
     def get_selected_request_id(self) -> Optional[int]:
         current_row = self.table.currentRow()
@@ -168,6 +184,7 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
 
         # WorkOrderDialog'u import et ve request_id ile aç
         from modules.maintenance.views.work_order_module import WorkOrderDialog
+
         dialog = WorkOrderDialog(self.service, self, request_id=request_id)
         if dialog.exec():
             self.refresh_data()
@@ -251,7 +268,9 @@ class RequestDialog(QDialog):
         form.addRow("Öncelik:", self.cmb_priority)
 
         self.txt_desc = QTextEdit()
-        self.txt_desc.setPlaceholderText("Arıza/bakım açıklaması... Ne oldu? Ne zaman fark edildi?")
+        self.txt_desc.setPlaceholderText(
+            "Arıza/bakım açıklaması... Ne oldu? Ne zaman fark edildi?"
+        )
         self.txt_desc.setMinimumHeight(100)
         form.addRow("Açıklama*:", self.txt_desc)
 
@@ -273,7 +292,8 @@ class RequestDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
@@ -281,8 +301,7 @@ class RequestDialog(QDialog):
 
     def select_photo(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Fotoğraf Seç", "",
-            "Resim Dosyaları (*.png *.jpg *.jpeg *.bmp)"
+            self, "Fotoğraf Seç", "", "Resim Dosyaları (*.png *.jpg *.jpeg *.bmp)"
         )
         if file_path:
             self.attachment_path = file_path

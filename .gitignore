@@ -39,7 +39,22 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/
 test_output.html
 test_output.pdf
 *.html_backup
 *.pdf_backup
+
+# AI Tools & Meta
+.claude/
+CLAUDE.md
+.antigravityignore
+.repomixignore
+.github/
+
+# TLDR
+.tldr/
+.tldrignore
+
+# Misc
+.env.example

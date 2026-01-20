@@ -54,29 +54,30 @@ class AccountStatementListPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
+        # Header - PageHeader kullanimi
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("Cari Hesap Ekstresi")
-        header_layout.addWidget(title)
+        self.header = PageHeader(
+            title="Cari Hesap Ekstresi",
+            icon="📋",
+            show_search=False,
+            show_refresh=False,  # Custom refresh kullanacagiz
+            show_add=False,
+            show_export=True,
+            parent=self,
+        )
+        self.header.export_clicked.connect(self._on_export)
 
-        header_layout.addStretch()
+        # Custom Refresh Button to Header
+        h_layout = self.header.header_layout()
 
-        # Yenile butonu
         refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setFixedHeight(42)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
+        refresh_btn.setProperty("class", "btn-refresh")
+        refresh_btn.setFixedHeight(36)
         refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        h_layout.insertWidget(h_layout.count() - 1, refresh_btn)  # Before Export
 
-        # Excel'e aktar
-        export_btn = QPushButton("📊 Excel'e Aktar")
-        export_btn.setFixedHeight(42)
-        export_btn.setStyleSheet(get_button_style("export"))
-        export_btn.clicked.connect(self._on_export)
-        header_layout.addWidget(export_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # Filtre alani
         filter_group = QGroupBox("Filtreler")
@@ -261,6 +262,15 @@ class AccountStatementListPage(QWidget):
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
         card.setFixedSize(180, 80)
+        card.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: {BG_SECONDARY};
+                border: 1px solid {BORDER};
+                border-radius: 8px;
+            }}
+        """
+        )
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(4)

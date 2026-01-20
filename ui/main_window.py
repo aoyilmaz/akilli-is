@@ -85,6 +85,7 @@ try:
         UnitModule,
         LocationManagementPage,
         WarehouseOperatorPage,
+        SSCCModule,
     )
 except ImportError:
     InventoryModule = WarehouseModule = MovementModule = CategoryModule = (
@@ -120,10 +121,10 @@ except ImportError:
     ) = MissingModule
 
 try:
-    from modules.development.views import DevelopmentModule
+    from modules.development.views import DevelopmentModule, ThemeSettingsPage
     from modules.development.views.company_card import CompanyCard
 except ImportError:
-    DevelopmentModule = CompanyCard = MissingModule
+    DevelopmentModule = CompanyCard = ThemeSettingsPage = MissingModule
 
 try:
     from modules.system import UserManagement, LabelTemplatesPage, AuditLogViewer
@@ -198,9 +199,15 @@ try:
     from modules.hr.views.leave_module import LeaveModule
     from modules.hr.views.org_chart_module import OrgChartModule
     from modules.hr.views.shift_team_overview import ShiftTeamOverview
+    from modules.hr.views.attendance_module import AttendanceModule
+    from modules.hr.views.performance_module import PerformanceModule
+    from modules.hr.views.training_module import TrainingModule
+    from modules.hr.views.personnel_module import PersonnelModule
+    from modules.hr.views.hr_dashboard_module import HRDashboardModule
+    from modules.hr.views.shift_planning_module import ShiftPlanningModule
 except ImportError:
     EmployeeModule = DepartmentModule = PositionModule = LeaveModule = MissingModule
-    OrgChartModule = ShiftTeamOverview = MissingModule
+    OrgChartModule = ShiftTeamOverview = AttendanceModule = MissingModule
 
 try:
     from modules.maintenance.views import (
@@ -539,6 +546,7 @@ MENU_DATA = {
             ("Lokasyonlar", "fa5s.map-marker-alt", "locations"),
             ("Hareketler", "fa5s.exchange-alt", "movements"),
             ("Sayım İşlemleri", "fa5s.clipboard-list", "stock-count"),
+            ("Taşıma Birimleri (SSCC)", "fa5s.pallet", "sscc-units"),
             ("Depocu Paneli", "fa5s.user-cog", "warehouse-operator"),
             ("Raporlar", "fa5s.chart-bar", "stock-reports"),
         ],
@@ -614,12 +622,18 @@ MENU_DATA = {
     "hr": {
         "title": "İNSAN KAYNAKLARI",
         "items": [
+            ("İK Dashboard", "fa5s.tachometer-alt", "hr-dashboard"),
             ("Çalışanlar", "fa5s.user-tie", "employees"),
             ("Departmanlar", "fa5s.building", "departments"),
             ("Pozisyonlar", "fa5s.id-badge", "positions"),
+            ("Puantaj", "fa5s.clock", "attendance"),
             ("İzin Yönetimi", "fa5s.calendar-check", "leaves"),
             ("Organizasyon", "fa5s.sitemap", "org-chart"),
             ("Vardiya Ekipleri", "fa5s.users-cog", "shift-teams"),
+            ("Performans", "fa5s.chart-line", "performance"),
+            ("Eğitim", "fa5s.graduation-cap", "trainings"),
+            ("Özlük Dosyası", "fa5s.folder-open", "personnel"),
+            ("Vardiya Planlama", "fa5s.calendar-week", "shift-planning"),
         ],
     },
     "reports": {
@@ -637,6 +651,7 @@ MENU_DATA = {
         "items": [
             ("Firma Kartı", "fa5s.building", "company-card"),
             ("Kullanıcı Yönetimi", "fa5s.users-cog", "users"),
+            ("Tema Ayarları", "fa5s.palette", "theme-settings"),
             ("İşlem Geçmişi", "fa5s.history", "audit-logs"),
             ("Genel Ayarlar", "fa5s.sliders-h", "settings"),
             ("Yazdırma Şablonları", "fa5s.print", "label-templates"),
@@ -1004,6 +1019,8 @@ class MainWindow(QMainWindow):
         self.pages["warehouses"] = WarehouseModule()
         self.pages["locations"] = LocationManagementPage()
         self.pages["movements"] = MovementModule()
+        self.pages["item-movements"] = MovementModule()
+        self.pages["sscc-units"] = SSCCModule()
         self.pages["stock-count"] = StockCountModule()
         self.pages["warehouse-operator"] = WarehouseOperatorPage()
         self.pages["stock-reports"] = StockReportsModule()
@@ -1051,11 +1068,18 @@ class MainWindow(QMainWindow):
         self.pages["departments"] = DepartmentModule()
         self.pages["positions"] = PositionModule()
         self.pages["leaves"] = LeaveModule()
+        self.pages["attendance"] = AttendanceModule()
         self.pages["org-chart"] = OrgChartModule()
         self.pages["shift-teams"] = ShiftTeamOverview()
+        self.pages["performance"] = PerformanceModule()
+        self.pages["trainings"] = TrainingModule()
+        self.pages["personnel"] = PersonnelModule()
+        self.pages["hr-dashboard"] = HRDashboardModule()
+        self.pages["shift-planning"] = ShiftPlanningModule()
         # Sistem ayarları
         self.pages["settings"] = PlaceholderPage("Ayarlar", "")
         self.pages["users"] = UserManagement()
+        self.pages["theme-settings"] = ThemeSettingsPage()
         self.pages["label-templates"] = LabelTemplatesPage()
         self.pages["audit-logs"] = AuditLogViewer()
         self.pages["company-card"] = CompanyCard()
@@ -1248,40 +1272,230 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self):
         t = get_theme()
+        # Font ölçeğini al
+        font_multiplier = ThemeManager.get_font_scale_multiplier()
+        base_font = int(t.font_size * font_multiplier)
+        small_font = int(t.font_size_small * font_multiplier)
+
         self.setStyleSheet(
             f"""
         QMainWindow, #CentralWidget {{ background-color: {t.bg_primary}; }}
-        QWidget {{ color: #cccccc; font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif; font-size: 13px; }}
-        
-        #TitleBar {{ background-color: #3c3c3c; border-bottom: 1px solid #3e3e42; }}
-        #SearchInput {{ background-color: #252526; border: 1px solid #3e3e42; border-radius: 3px; color: #cccccc; padding: 1px 10px; height: 22px; }}
-        #SearchInput:focus {{ border: 1px solid #007acc; background-color: #3c3c3c; }}
-        QPushButton#BtnClose:hover {{ background-color: #e81123; color: white; }}
-        QPushButton#BtnMaximize:hover, QPushButton#BtnMinimize:hover {{ background-color: #4c4c4c; }}
-        
+        QWidget {{
+            color: {t.text_primary};
+            font-family: {t.font_family};
+            font-size: {base_font}px;
+        }}
+
+        #TitleBar {{
+            background-color: {t.bg_secondary};
+            border-bottom: 1px solid {t.border};
+        }}
+        #SearchInput {{
+            background-color: {t.bg_tertiary};
+            border: 1px solid {t.border};
+            border-radius: 3px;
+            color: {t.text_primary};
+            padding: 1px 10px;
+            height: 22px;
+        }}
+        #SearchInput:focus {{
+            border: 1px solid {t.accent_primary};
+            background-color: {t.bg_hover};
+        }}
+        QPushButton#BtnClose:hover {{
+            background-color: {t.error};
+            color: white;
+        }}
+        QPushButton#BtnMaximize:hover, QPushButton#BtnMinimize:hover {{
+            background-color: {t.bg_hover};
+        }}
+
         QPushButton#BtnToggle {{ background: transparent; border: none; }}
-        QPushButton#BtnToggle:checked {{ background-color: #333333; }}
-        
-        #ActivityBar {{ background-color: #333333; border-right: 1px solid #252526; min-width: 50px; max-width: 50px; }}
-        #ActivityBar QPushButton {{ border: none; background-color: transparent; padding: 10px; border-left: 2px solid transparent; }}
-        #ActivityBar QPushButton:hover {{ background-color: #2a2d2e; }}
-        #ActivityBar QPushButton:pressed {{ border-left: 2px solid #007acc; background-color: #1e1e1e; }}
-        
-        #SideBar {{ background-color: #252526; border-right: 1px solid #3e3e42; }}
-        QTreeWidget {{ background-color: #252526; border: none; outline: none; }}
-        QTreeWidget::item {{ padding: 6px; color: #cccccc; border: none; }}
-        QTreeWidget::item:hover {{ background-color: #2a2d2e; }}
-        QTreeWidget::item:selected {{ background-color: #37373d; color: white; border-left: 2px solid #007acc; }}
-        
-        QTabWidget::pane {{ border: none; background-color: #1e1e1e; border-top: 1px solid #3e3e42; }}
-        QTabBar::tab {{ background: #2d2d2d; color: #969696; padding: 6px 15px; border-right: 1px solid #252526; border-top: 1px solid transparent; min-width: 100px; height: 20px; }}
-        QTabBar::tab:selected {{ background: #1e1e1e; color: white; border-top: 1px solid #007acc; }}
-        QTabBar::tab:hover {{ background: #2d2d2d; color: white; }}
+        QPushButton#BtnToggle:checked {{ background-color: {t.bg_tertiary}; }}
+
+        #ActivityBar {{
+            background-color: {t.bg_tertiary};
+            border-right: 1px solid {t.border};
+            min-width: 50px;
+            max-width: 50px;
+        }}
+        #ActivityBar QPushButton {{
+            border: none;
+            background-color: transparent;
+            padding: 10px;
+            border-left: 2px solid transparent;
+        }}
+        #ActivityBar QPushButton:hover {{
+            background-color: {t.bg_hover};
+        }}
+        #ActivityBar QPushButton:pressed {{
+            border-left: 2px solid {t.accent_primary};
+            background-color: {t.bg_primary};
+        }}
+
+        #SideBar {{
+            background-color: {t.sidebar_bg};
+            border-right: 1px solid {t.border};
+        }}
+        QTreeWidget {{
+            background-color: {t.sidebar_bg};
+            border: none;
+            outline: none;
+        }}
+        QTreeWidget::item {{
+            padding: 6px;
+            color: {t.text_primary};
+            border: none;
+        }}
+        QTreeWidget::item:hover {{
+            background-color: {t.bg_hover};
+        }}
+        QTreeWidget::item:selected {{
+            background-color: {t.bg_selected};
+            color: white;
+            border-left: 2px solid {t.accent_primary};
+        }}
+
+        QTabWidget::pane {{
+            border: none;
+            background-color: {t.bg_primary};
+            border-top: 1px solid {t.border};
+        }}
+        QTabBar::tab {{
+            background: {t.bg_tertiary};
+            color: {t.text_muted};
+            padding: 6px 15px;
+            border-right: 1px solid {t.border};
+            border-top: 1px solid transparent;
+            min-width: 100px;
+            height: 20px;
+        }}
+        QTabBar::tab:selected {{
+            background: {t.bg_primary};
+            color: {t.text_primary};
+            border-top: 1px solid {t.accent_primary};
+        }}
+        QTabBar::tab:hover {{
+            background: {t.bg_tertiary};
+            color: {t.text_primary};
+        }}
         QTabBar::close-button {{ width: 0px; height: 0px; }}
         QTabBar::close-button:selected {{ width: 16px; height: 16px; margin-left: 5px; }}
-        
-        QStatusBar {{ background-color: #5e3b8e; color: white; border-top: 1px solid #3e3e42; min-height: 22px; }}
-        QStatusBar QLabel {{ background: transparent; font-size: 11px; }}
+
+        QStatusBar {{
+            background-color: {t.accent_primary};
+            color: white;
+            border-top: 1px solid {t.border};
+            min-height: 22px;
+        }}
+        QStatusBar QLabel {{
+            background: transparent;
+            font-size: {small_font}px;
+        }}
+
+        /* Genel widget stilleri */
+        QScrollArea {{ background: transparent; border: none; }}
+        QFrame {{ background-color: {t.bg_secondary}; }}
+        QLabel {{ background: transparent; border: none; }}
+        QPushButton {{
+            background-color: {t.bg_tertiary};
+            border: 1px solid {t.border};
+            border-radius: {t.radius_small}px;
+            padding: 6px 12px;
+            color: {t.text_primary};
+        }}
+        QPushButton:hover {{
+            background-color: {t.bg_hover};
+            border-color: {t.accent_primary};
+        }}
+        QPushButton:pressed {{
+            background-color: {t.bg_selected};
+        }}
+
+        QLineEdit, QTextEdit, QPlainTextEdit {{
+            background-color: {t.input_bg};
+            border: 1px solid {t.border};
+            border-radius: {t.radius_small}px;
+            padding: 6px;
+            color: {t.text_primary};
+        }}
+        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+            border-color: {t.accent_primary};
+        }}
+
+        QComboBox {{
+            background-color: {t.input_bg};
+            border: 1px solid {t.border};
+            border-radius: {t.radius_small}px;
+            padding: 6px;
+            color: {t.text_primary};
+        }}
+        QComboBox:hover {{
+            border-color: {t.accent_primary};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 20px;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {t.bg_secondary};
+            border: 1px solid {t.border};
+            selection-background-color: {t.bg_selected};
+        }}
+
+        QTableWidget, QTableView {{
+            background-color: {t.bg_primary};
+            alternate-background-color: {t.bg_secondary};
+            border: 1px solid {t.border};
+            gridline-color: {t.border};
+            color: {t.text_primary};
+        }}
+        QTableWidget::item:selected, QTableView::item:selected {{
+            background-color: {t.bg_selected};
+            color: white;
+        }}
+        QHeaderView::section {{
+            background-color: {t.bg_tertiary};
+            color: {t.text_primary};
+            padding: 6px;
+            border: none;
+            border-right: 1px solid {t.border};
+            border-bottom: 1px solid {t.border};
+        }}
+
+        QScrollBar:vertical {{
+            background: {t.bg_secondary};
+            width: 10px;
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {t.bg_tertiary};
+            border-radius: 5px;
+            min-height: 30px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: {t.border_light};
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+        }}
+
+        QScrollBar:horizontal {{
+            background: {t.bg_secondary};
+            height: 10px;
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: {t.bg_tertiary};
+            border-radius: 5px;
+            min-width: 30px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background: {t.border_light};
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0px;
+        }}
         """
         )
 

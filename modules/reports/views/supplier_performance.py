@@ -7,8 +7,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QFrame,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -20,18 +18,12 @@ from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
     ACCENT,
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
 )
+
 
 class SupplierPerformancePage(QWidget):
     """Tedarikçi performans raporu sayfası"""
@@ -47,44 +39,42 @@ class SupplierPerformancePage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Başlık
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        info = QLabel(
-            "Tedarikçi performansları mal kabul verilerine göre hesaplanır"
+        self.header = PageHeader(
+            title="Tedarikçi Performansı",
+            icon="🏆",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
         )
-        header_layout.addWidget(info)
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
 
-        header_layout.addStretch()
+        # Info mesajını header'a ekle
+        h_layout = self.header.header_layout()
+        h_layout.addSpacing(16)
+        info = QLabel("Tedarikçi performansları mal kabul verilerine göre hesaplanır")
+        info.setStyleSheet("color: #888; font-style: italic;")
+        h_layout.addWidget(info)
 
-        refresh_btn = QPushButton("Yenile")
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # Özet kartlar
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(16)
 
-        self.total_suppliers_card = self._create_card(
-            "Toplam Tedarikçi", "0", ACCENT
-        )
+        self.total_suppliers_card = self._create_card("Toplam Tedarikçi", "0", ACCENT)
         cards_layout.addWidget(self.total_suppliers_card)
 
-        self.top_performer_card = self._create_card(
-            "En İyi Performans", "-", SUCCESS
-        )
+        self.top_performer_card = self._create_card("En İyi Performans", "-", SUCCESS)
         cards_layout.addWidget(self.top_performer_card)
 
-        self.avg_quality_card = self._create_card(
-            "Ort. Kalite Puanı", "0%", WARNING
-        )
+        self.avg_quality_card = self._create_card("Ort. Kalite Puanı", "0%", WARNING)
         cards_layout.addWidget(self.avg_quality_card)
 
-        self.total_receipts_card = self._create_card(
-            "Toplam Mal Kabul", "0", "#8b5cf6"
-        )
+        self.total_receipts_card = self._create_card("Toplam Mal Kabul", "0", "#8b5cf6")
         cards_layout.addWidget(self.total_receipts_card)
 
         layout.addLayout(cards_layout)
@@ -124,6 +114,7 @@ class SupplierPerformancePage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
+
     def load_data(self, data: list):
         # Özet kartları güncelle
         total = len(data)
@@ -203,6 +194,10 @@ class SupplierPerformancePage(QWidget):
                 bar_color = WARNING
             else:
                 bar_color = ERROR
+
+            bar.setStyleSheet(
+                f"QProgressBar::chunk {{ background-color: {bar_color}; }}"
+            )
             bar_layout.addWidget(bar)
 
             self.table.setCellWidget(row, 6, bar_widget)

@@ -1,34 +1,32 @@
 """
 Akıllı İş - Satın Alma Siparişleri Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QLabel,
+    QVBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QFrame,
-    QLineEdit,
-    QHeaderView,
-    QAbstractItemView,
-    QMessageBox,
     QComboBox,
-    QStyle,
-    QApplication,
+    QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtCore import Qt, pyqtSignal
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class PurchaseOrderListPage(QWidget):
-    """Satın alma siparişleri listesi"""
+    """Satın alma siparişleri listesi."""
 
+    # Sinyaller
     add_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
@@ -38,25 +36,40 @@ class PurchaseOrderListPage(QWidget):
     create_receipt_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
+    STATUS_LABELS = {
+        "draft": ("🔵 Taslak", "#64748b"),
+        "sent": ("📤 Gönderildi", "#3b82f6"),
+        "confirmed": ("✅ Onaylandı", "#10b981"),
+        "partial": ("🟡 Kısmi", "#f59e0b"),
+        "received": ("🟢 Teslim", "#10b981"),
+        "closed": ("⚫ Kapalı", "#475569"),
+        "cancelled": ("🔴 İptal", "#ef4444"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.orders = []
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
         # Header
-        header_layout = QHBoxLayout()
+        self.header = PageHeader(
+            title="Satın Alma Siparişleri",
+            icon="📦",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Sipariş",
+            search_placeholder="Ara... (sipariş no, tedarikçi)",
+            parent=self,
+        )
 
-        title = QLabel("📦 Satın Alma Siparişleri")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        # Durum filtresi
+        # Filtre ekle
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
         self.status_filter.addItem("🔵 Taslak", "draft")
@@ -66,293 +79,199 @@ class PurchaseOrderListPage(QWidget):
         self.status_filter.addItem("🟢 Teslim Alındı", "received")
         self.status_filter.addItem("⚫ Kapatıldı", "closed")
         self.status_filter.addItem("🔴 İptal", "cancelled")
-        self.status_filter.setStyleSheet(self._combo_style())
         self.status_filter.setMinimumWidth(160)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        header_layout.addWidget(self.status_filter)
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Ara... (sipariş no, tedarikçi)")
-        self.search_input.setFixedWidth(250)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        # Yeni sipariş
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Sipariş")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # İstatistik kartları
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(12)
 
-        self.total_card = self._create_stat_card("📊", "Toplam", "0", "#6366f1")
-        stats_layout.addWidget(self.total_card)
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
+        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
+        self.stat_cards["open"] = MiniStatCard("📤 Açık", "0", "#f59e0b")
+        self.stat_cards["received"] = MiniStatCard("🟢 Teslim", "0", "#10b981")
+        self.stat_cards["amount"] = MiniStatCard("💰 Tutar", "₺0", "#8b5cf6")
 
-        self.draft_card = self._create_stat_card("🔵", "Taslak", "0", "#64748b")
-        stats_layout.addWidget(self.draft_card)
-
-        self.open_card = self._create_stat_card("📤", "Açık", "0", "#f59e0b")
-        stats_layout.addWidget(self.open_card)
-
-        self.received_card = self._create_stat_card("🟢", "Teslim", "0", "#10b981")
-        stats_layout.addWidget(self.received_card)
-
-        self.total_amount_card = self._create_stat_card(
-            "💰", "Toplam Tutar", "₺0", "#8b5cf6"
-        )
-        stats_layout.addWidget(self.total_amount_card)
-
+        for card in self.stat_cards.values():
+            stats_layout.addWidget(card)
         stats_layout.addStretch()
         layout.addLayout(stats_layout)
 
         # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(9)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "Sipariş No",
-                "Tarih",
-                "Tedarikçi",
-                "Teslim Tarihi",
-                "Kalem",
-                "Tutar",
-                "Durum",
-                "Teslim %",
+        columns = [
+            ColumnConfig("order_no", "Sipariş No", width=120),
+            ColumnConfig("date", "Tarih", width=90),
+            ColumnConfig("supplier", "Tedarikçi", width=200, stretch=True),
+            ColumnConfig("delivery_date", "Teslim Tarihi", width=90),
+            ColumnConfig("items", "Kalem", width=50),
+            ColumnConfig("total", "Tutar", width=110),
+            ColumnConfig("status", "Durum", width=110),
+            ColumnConfig("received_rate", "Teslim %", width=70),
+            ColumnConfig(
+                "actions",
                 "İşlemler",
-            ]
+                width=180,
+                resizable=False,
+                movable=False,
+                hideable=False,
+            ),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="purchase_orders",
+            columns=columns,
+            parent=self,
         )
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
-
-        self.table.setColumnWidth(0, 120)
-        self.table.setColumnWidth(1, 90)
-        self.table.setColumnWidth(3, 90)
-        self.table.setColumnWidth(4, 50)
-        self.table.setColumnWidth(5, 110)
-        self.table.setColumnWidth(6, 110)
-        self.table.setColumnWidth(7, 70)
-        self.table.setColumnWidth(8, 180)
-
-        self.table.doubleClicked.connect(self._on_double_click)
-
         layout.addWidget(self.table)
 
-    def _create_stat_card(
-        self, icon: str, title: str, value: str, color: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(f"{icon} {title}", value, color)
-
-    def _update_card(self, card: MiniStatCard, value: str):
-        """Kart değerini güncelle"""
-        card.update_value(value)
-
-    def _combo_style(self):
-        return """
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; width: 30px; }
-            QComboBox::down-arrow {
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """
+    def _connect_signals(self):
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
+        self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, orders: list):
-        """Verileri yükle"""
         self.orders = orders
         self._apply_filter()
 
     def _apply_filter(self):
         status_filter = self.status_filter.currentData()
-
         filtered = self.orders
         if status_filter:
             filtered = [o for o in self.orders if o.get("status") == status_filter]
-
         self._display_data(filtered)
         self._update_stats()
 
     def _display_data(self, orders: list):
-        self.table.setRowCount(0)
-
-        status_labels = {
-            "draft": ("🔵 Taslak", "#64748b"),
-            "sent": ("📤 Gönderildi", "#3b82f6"),
-            "confirmed": ("✅ Onaylandı", "#10b981"),
-            "partial": ("🟡 Kısmi", "#f59e0b"),
-            "received": ("🟢 Teslim", "#10b981"),
-            "closed": ("⚫ Kapalı", "#475569"),
-            "cancelled": ("🔴 İptal", "#ef4444"),
-        }
+        self.table.setRowCount(len(orders))
+        visible_cols = self.table.get_visible_columns()
 
         for row, order in enumerate(orders):
-            self.table.insertRow(row)
+            self._populate_row(row, order, visible_cols)
 
-            # Sipariş No
-            no_item = QTableWidgetItem(order.get("order_no", ""))
-            no_item.setData(Qt.ItemDataRole.UserRole, order.get("id"))
-            self.table.setItem(row, 0, no_item)
+    def _populate_row(self, row: int, order: dict, visible_cols: list):
+        order_id = order.get("id")
 
-            # Tarih
-            order_date = order.get("order_date")
-            if order_date:
-                if isinstance(order_date, date):
-                    date_str = order_date.strftime("%d.%m.%Y")
-                else:
-                    date_str = str(order_date)
-            else:
-                date_str = "-"
-            self.table.setItem(row, 1, QTableWidgetItem(date_str))
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "order_no":
+                item = QTableWidgetItem(order.get("order_no", ""))
+                item.setData(Qt.ItemDataRole.UserRole, order_id)
+                self.table.setItem(row, col_idx, item)
 
-            # Tedarikçi
-            self.table.setItem(
-                row, 2, QTableWidgetItem(order.get("supplier_name", "") or "-")
+            elif col_key == "date":
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(self._format_date(order.get("order_date"))),
+                )
+
+            elif col_key == "supplier":
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(order.get("supplier_name", "") or "-"),
+                )
+
+            elif col_key == "delivery_date":
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(self._format_date(order.get("delivery_date"))),
+                )
+
+            elif col_key == "items":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(str(order.get("total_items", 0)))
+                )
+
+            elif col_key == "total":
+                total = order.get("total", 0) or 0
+                currency = order.get("currency", "TRY")
+                symbol = {"TRY": "₺", "USD": "$", "EUR": "€"}.get(currency, "₺")
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(f"{symbol}{float(total):,.2f}")
+                )
+
+            elif col_key == "status":
+                status = order.get("status", "draft")
+                label, _ = self.STATUS_LABELS.get(status, ("Taslak", "#64748b"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(label))
+
+            elif col_key == "received_rate":
+                rate = order.get("received_rate", 0) or 0
+                self.table.setItem(row, col_idx, QTableWidgetItem(f"%{int(rate)}"))
+
+            elif col_key == "actions":
+                self._add_action_buttons(row, col_idx, order)
+
+        self.table.setRowHeight(row, 52)
+
+    def _format_date(self, dt) -> str:
+        if dt:
+            if isinstance(dt, date):
+                return dt.strftime("%d.%m.%Y")
+            return str(dt)
+        return "-"
+
+    def _add_action_buttons(self, row: int, col: int, order: dict):
+        btn_widget = QWidget()
+        btn_widget.setProperty("class", "action-button-group")
+        btn_layout = QHBoxLayout(btn_widget)
+        btn_layout.setContentsMargins(2, 2, 2, 2)
+        btn_layout.setSpacing(2)
+
+        order_id = order.get("id")
+        status = order.get("status", "draft")
+
+        # Görüntüle
+        view_btn = QPushButton("👁")
+        view_btn.setFixedSize(28, 26)
+        view_btn.clicked.connect(
+            lambda checked, oid=order_id: self.view_clicked.emit(oid)
+        )
+        btn_layout.addWidget(view_btn)
+
+        if status == "draft":
+            edit_btn = QPushButton("✏")
+            edit_btn.setFixedSize(28, 26)
+            edit_btn.clicked.connect(
+                lambda checked, oid=order_id: self.edit_clicked.emit(oid)
             )
+            btn_layout.addWidget(edit_btn)
 
-            # Teslim Tarihi
-            delivery_date = order.get("delivery_date")
-            if delivery_date:
-                if isinstance(delivery_date, date):
-                    del_str = delivery_date.strftime("%d.%m.%Y")
-                else:
-                    del_str = str(delivery_date)
-            else:
-                del_str = "-"
-            self.table.setItem(row, 3, QTableWidgetItem(del_str))
-
-            # Kalem
-            self.table.setItem(
-                row, 4, QTableWidgetItem(str(order.get("total_items", 0)))
+            send_btn = QPushButton("📤")
+            send_btn.setFixedSize(28, 26)
+            send_btn.setToolTip("Tedarikçiye Gönder")
+            send_btn.clicked.connect(
+                lambda checked, oid=order_id: self.send_clicked.emit(oid)
             )
+            btn_layout.addWidget(send_btn)
 
-            # Tutar
-            total = order.get("total", 0) or 0
-            currency = order.get("currency", "TRY")
-            symbol = {"TRY": "₺", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "₺")
-            self.table.setItem(row, 5, QTableWidgetItem(f"{symbol}{float(total):,.2f}"))
-
-            # Durum
-            status = order.get("status", "draft")
-            status_text, _ = status_labels.get(status, ("Taslak", "#64748b"))
-            self.table.setItem(row, 6, QTableWidgetItem(status_text))
-
-            # Teslim %
-            received_rate = order.get("received_rate", 0) or 0
-            self.table.setItem(row, 7, QTableWidgetItem(f"%{int(received_rate)}"))
-
-            # İşlem butonları
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 4, 4, 4)
-            btn_layout.setSpacing(4)
-
-            order_id = order.get("id")
-            order_status = order.get("status", "draft")
-            style = QApplication.style()
-
-            # Görüntüle
-            view_btn = QPushButton()
-            view_btn.setIcon(
-                style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
+            del_btn = QPushButton("🗑")
+            del_btn.setFixedSize(28, 26)
+            del_btn.clicked.connect(
+                lambda checked, oid=order_id: self._confirm_delete(oid)
             )
-            view_btn.setIconSize(QSize(16, 16))
-            view_btn.setFixedSize(32, 28)
-            view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(
-                lambda checked, id=order_id: self.view_clicked.emit(id)
+            btn_layout.addWidget(del_btn)
+
+        elif status in ["sent", "confirmed", "partial"]:
+            receive_btn = QPushButton("📥")
+            receive_btn.setFixedSize(28, 26)
+            receive_btn.setToolTip("Mal Kabul Oluştur")
+            receive_btn.clicked.connect(
+                lambda checked, oid=order_id: self.create_receipt_clicked.emit(oid)
             )
-            btn_layout.addWidget(view_btn)
+            btn_layout.addWidget(receive_btn)
 
-            if order_status == "draft":
-                # Düzenle
-                edit_btn = QPushButton()
-                edit_btn.setIcon(
-                    style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
-                )
-                edit_btn.setIconSize(QSize(16, 16))
-                edit_btn.setFixedSize(32, 28)
-                edit_btn.setToolTip("Düzenle")
-                edit_btn.clicked.connect(
-                    lambda checked, id=order_id: self.edit_clicked.emit(id)
-                )
-                btn_layout.addWidget(edit_btn)
-
-                # Gönder
-                send_btn = QPushButton()
-                send_btn.setIcon(
-                    style.standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)
-                )
-                send_btn.setIconSize(QSize(16, 16))
-                send_btn.setFixedSize(32, 28)
-                send_btn.setToolTip("Tedarikçiye Gönder")
-                send_btn.clicked.connect(
-                    lambda checked, id=order_id: self.send_clicked.emit(id)
-                )
-                btn_layout.addWidget(send_btn)
-
-                # Sil
-                del_btn = QPushButton()
-                del_btn.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
-                del_btn.setIconSize(QSize(16, 16))
-                del_btn.setFixedSize(32, 28)
-                del_btn.setToolTip("Sil")
-                del_btn.clicked.connect(
-                    lambda checked, id=order_id: self._confirm_delete(id)
-                )
-                btn_layout.addWidget(del_btn)
-
-            elif order_status in ["sent", "confirmed", "partial"]:
-                # Mal Kabul
-                receive_btn = QPushButton()
-                receive_btn.setIcon(
-                    style.standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
-                )
-                receive_btn.setIconSize(QSize(16, 16))
-                receive_btn.setFixedSize(32, 28)
-                receive_btn.setToolTip("Mal Kabul Oluştur")
-                receive_btn.clicked.connect(
-                    lambda checked, id=order_id: self.create_receipt_clicked.emit(id)
-                )
-                btn_layout.addWidget(receive_btn)
-
-            self.table.setCellWidget(row, 8, btn_widget)
-            self.table.setRowHeight(row, 56)
+        self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):
         total = len(self.orders)
@@ -367,46 +286,24 @@ class PurchaseOrderListPage(QWidget):
         )
         total_amount = sum(float(o.get("total", 0) or 0) for o in self.orders)
 
-        self._update_card(self.total_card, str(total))
-        self._update_card(self.draft_card, str(draft))
-        self._update_card(self.open_card, str(open_orders))
-        self._update_card(self.received_card, str(received))
-        self._update_card(self.total_amount_card, f"₺{total_amount:,.0f}")
-
-    def _action_btn_style(self, color: str) -> str:
-        return f"""
-            QPushButton {{
-                background-color: {color}20;
-                border: 1px solid {color}50;
-                border-radius: 6px;
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: {color}40;
-            }}
-        """
+        self.stat_cards["total"].update_value(str(total))
+        self.stat_cards["draft"].update_value(str(draft))
+        self.stat_cards["open"].update_value(str(open_orders))
+        self.stat_cards["received"].update_value(str(received))
+        self.stat_cards["amount"].update_value(f"₺{total_amount:,.0f}")
 
     def _on_search(self, text: str):
         text = text.lower()
         for row in range(self.table.rowCount()):
-            match = False
-            for col in range(6):
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
+            match = any(
+                self.table.item(row, col)
+                and text in self.table.item(row, col).text().lower()
+                for col in range(self.table.columnCount() - 1)
+            )
             self.table.setRowHidden(row, not match)
 
     def _on_filter_changed(self):
         self._apply_filter()
-
-    def _on_double_click(self, index):
-        row = index.row()
-        item = self.table.item(row, 0)
-        if item:
-            order_id = item.data(Qt.ItemDataRole.UserRole)
-            if order_id:
-                self.view_clicked.emit(order_id)
 
     def _confirm_delete(self, order_id: int):
         reply = QMessageBox.question(

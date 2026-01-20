@@ -27,6 +27,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 
 from database.models.inventory import LocationType
+from config.styles import TEXT_SECONDARY, ERROR
 
 
 class LocationManagementPage(QWidget):
@@ -45,46 +46,53 @@ class LocationManagementPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("📍 Lokasyon Yönetimi")
-        header.addWidget(title)
-        header.addStretch()
-        layout.addLayout(header)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        # Filtre bar
-        filter_frame = QFrame()
-        filter_layout = QHBoxLayout(filter_frame)
-        filter_layout.setContentsMargins(16, 12, 16, 12)
-        filter_layout.setSpacing(12)
+        self.header = PageHeader(
+            title="Lokasyon Yönetimi",
+            icon="📍",
+            show_search=True,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni Lokasyon",
+            search_placeholder="Kod veya barkod...",
+            parent=self,
+        )
 
-        # Depo seçimi
-        filter_layout.addWidget(QLabel("Depo:"))
+        # Depo seçimi combobox
         self.warehouse_combo = QComboBox()
         self.warehouse_combo.setMinimumWidth(200)
+        self.warehouse_combo.setFixedHeight(36)
         self.warehouse_combo.currentIndexChanged.connect(self.on_warehouse_changed)
-        filter_layout.addWidget(self.warehouse_combo)
 
-        # Arama
-        filter_layout.addWidget(QLabel("Ara:"))
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Kod veya barkod...")
-        self.search_input.setMaximumWidth(200)
-        self.search_input.textChanged.connect(self.filter_locations)
-        filter_layout.addWidget(self.search_input)
-
-        filter_layout.addStretch()
-
-        # Butonlar
-        self.add_btn = QPushButton("➕ Yeni Lokasyon")
-        self.add_btn.clicked.connect(self.add_location)
-        filter_layout.addWidget(self.add_btn)
-
+        # Toplu oluştur butonu
         self.bulk_btn = QPushButton("📦 Toplu Oluştur")
+        self.bulk_btn.setProperty("class", "btn-secondary")
+        self.bulk_btn.setFixedHeight(36)
         self.bulk_btn.clicked.connect(self.bulk_create)
-        filter_layout.addWidget(self.bulk_btn)
 
-        layout.addWidget(filter_frame)
+        # Header'a widget'ları ekle
+        h_layout = self.header.header_layout()
+        if self.header.search_input:
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, QLabel("Depo:"))
+            h_layout.insertWidget(idx + 1, self.warehouse_combo)
+
+        # Toplu oluştur butonunu ekle (add butonundan önce)
+        if self.header.add_btn:
+            idx = h_layout.indexOf(self.header.add_btn)
+            h_layout.insertWidget(idx, self.bulk_btn)
+
+        # Sinyalleri bağla
+        self.header.add_clicked.connect(self.add_location)
+        self.header.search_changed.connect(self.filter_locations)
+
+        # Arama kutusunu referans olarak sakla
+        self.search_input = self.header.search_input
+        self.add_btn = self.header.add_btn
+
+        layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
@@ -208,26 +216,36 @@ class LocationManagementPage(QWidget):
             self.table.setItem(row, 9, QTableWidgetItem(status))
 
             # İşlem butonları
-            btn_layout = QHBoxLayout()
-            edit_btn = QPushButton("✏️")
-            edit_btn.setFixedSize(30, 30)
-            edit_btn.setProperty("location_id", loc.id)
+            btn_widget = QWidget()
+            btn_widget.setProperty("class", "action-button-group")
+            btn_layout = QHBoxLayout(btn_widget)
+            btn_layout.setContentsMargins(4, 4, 4, 4)
+            btn_layout.setSpacing(4)
+
+            edit_btn = QPushButton("✏")
+            edit_btn.setFixedSize(28, 26)
+            edit_btn.setProperty("class", "action-edit")
+            edit_btn.setToolTip("Düzenle")
+            edit_btn.setStyleSheet(
+                f"background-color: transparent; border: none; font-size: 16px; color: {TEXT_SECONDARY};"
+            )
             edit_btn.clicked.connect(
                 lambda checked, lid=loc.id: self.edit_location(lid)
             )
+            btn_layout.addWidget(edit_btn)
 
             del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(30, 30)
+            del_btn.setFixedSize(28, 26)
+            del_btn.setProperty("class", "action-delete")
+            del_btn.setToolTip("Sil")
+            del_btn.setStyleSheet(
+                f"background-color: transparent; border: none; font-size: 16px; color: {ERROR};"
+            )
             del_btn.clicked.connect(
                 lambda checked, lid=loc.id: self.delete_location(lid)
             )
-
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 0, 4, 0)
-            btn_layout.setSpacing(4)
-            btn_layout.addWidget(edit_btn)
             btn_layout.addWidget(del_btn)
+
             self.table.setCellWidget(row, 10, btn_widget)
 
         self.status_label.setText(f"Toplam: {len(self.locations)} lokasyon")

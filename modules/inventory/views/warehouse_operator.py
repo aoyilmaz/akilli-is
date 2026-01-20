@@ -78,14 +78,7 @@ class WarehouseOperatorPage(QWidget):
         """Üst bilgi bar"""
         frame = QFrame()
         frame.setFixedHeight(60)
-        frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: #1e3a5f;
-                border-radius: 8px;
-            }
-        """
-        )
+        frame.setProperty("class", "panel-header")
 
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(16, 8, 16, 8)
@@ -93,18 +86,17 @@ class WarehouseOperatorPage(QWidget):
         # Logo/Başlık
         title = QLabel("🏭 DEPOCU PANELİ")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setStyleSheet("color: white;")
         layout.addWidget(title)
 
         layout.addStretch()
 
         # Kullanıcı ve depo bilgisi
         self.user_label = QLabel("Kullanıcı: -")
-        self.user_label.setStyleSheet("color: #94a3b8;")
+        self.user_label.setProperty("class", "label-muted")
         layout.addWidget(self.user_label)
 
         self.warehouse_label = QLabel("Depo: -")
-        self.warehouse_label.setStyleSheet("color: #94a3b8;")
+        self.warehouse_label.setProperty("class", "label-muted")
         layout.addWidget(self.warehouse_label)
 
         # Depo seçimi
@@ -147,7 +139,7 @@ class WarehouseOperatorPage(QWidget):
         # Bekleyen görevler özeti
         self.task_summary = QLabel("Bekleyen Görevler: 0 | Bugün Tamamlanan: 0")
         self.task_summary.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.task_summary.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        self.task_summary.setProperty("class", "label-muted")
         layout.addWidget(self.task_summary)
 
         return widget
@@ -156,24 +148,7 @@ class WarehouseOperatorPage(QWidget):
         """Büyük menü butonu"""
         btn = QPushButton()
         btn.setMinimumSize(200, 150)
-        btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #1e293b;
-                border: 2px solid #334155;
-                border-radius: 12px;
-                padding: 16px;
-                text-align: center;
-            }
-            QPushButton:hover {
-                background-color: #334155;
-                border-color: #3b82f6;
-            }
-            QPushButton:pressed {
-                background-color: #1e40af;
-            }
-        """
-        )
+        btn.setProperty("class", "menu-button-large")
 
         # Layout içinde icon, title, desc
         layout = QVBoxLayout(btn)
@@ -187,13 +162,12 @@ class WarehouseOperatorPage(QWidget):
         title_label = QLabel(title)
         title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("color: white;")
         layout.addWidget(title_label)
 
         desc_label = QLabel(desc)
         desc_label.setFont(QFont("Arial", 10))
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setStyleSheet("color: #94a3b8;")
+        desc_label.setProperty("class", "label-muted")
         layout.addWidget(desc_label)
 
         return btn
@@ -307,27 +281,12 @@ class PutawayScreen(BaseOperationScreen):
 
         # Ürün bilgisi
         self.product_info = QLabel("Henüz ürün okutulmadı")
-        self.product_info.setStyleSheet(
-            """
-            padding: 16px;
-            background-color: #1e293b;
-            border-radius: 8px;
-            font-size: 14px;
-        """
-        )
+        self.product_info.setProperty("class", "info-box")
         self.content_layout.addWidget(self.product_info)
 
         # Lokasyon önerisi
         self.location_suggest = QLabel("Önerilen Lokasyon: -")
-        self.location_suggest.setStyleSheet(
-            """
-            padding: 16px;
-            background-color: #166534;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-        """
-        )
+        self.location_suggest.setProperty("class", "success-box")
         self.content_layout.addWidget(self.location_suggest)
 
         # Hedef lokasyon
@@ -355,18 +314,7 @@ class PutawayScreen(BaseOperationScreen):
         # Onayla butonu
         confirm_btn = QPushButton("✅ Yerleştirmeyi Onayla")
         confirm_btn.setMinimumHeight(50)
-        confirm_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #166534;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #15803d;
-            }
-        """
-        )
+        confirm_btn.setProperty("class", "btn-large-green")
         confirm_btn.clicked.connect(self.confirm_putaway)
         self.content_layout.addWidget(confirm_btn)
 
@@ -406,14 +354,7 @@ class PickingScreen(BaseOperationScreen):
 
         # Mevcut görev
         self.current_task = QLabel("Lokasyon: -\nÜrün: -\nMiktar: -")
-        self.current_task.setStyleSheet(
-            """
-            padding: 16px;
-            background-color: #1e293b;
-            border-radius: 8px;
-            font-size: 16px;
-        """
-        )
+        self.current_task.setProperty("class", "info-box")
         self.content_layout.addWidget(self.current_task)
 
         # Barkod okuma
@@ -434,7 +375,7 @@ class PickingScreen(BaseOperationScreen):
 
         confirm_btn = QPushButton("✅ Toplandı")
         confirm_btn.setMinimumHeight(50)
-        confirm_btn.setStyleSheet("background-color: #166534;")
+        confirm_btn.setProperty("class", "btn-large-green")
         btn_layout.addWidget(confirm_btn)
 
         self.content_layout.addLayout(btn_layout)
@@ -497,7 +438,7 @@ class TransferScreen(BaseOperationScreen):
         # Transfer butonu
         transfer_btn = QPushButton("🔄 Transfer Et")
         transfer_btn.setMinimumHeight(50)
-        transfer_btn.setStyleSheet("background-color: #1e40af;")
+        transfer_btn.setProperty("class", "btn-primary")
         transfer_btn.clicked.connect(self.do_transfer)
         self.content_layout.addWidget(transfer_btn)
 
@@ -566,7 +507,7 @@ class CountScreen(BaseOperationScreen):
         # Kaydet
         save_btn = QPushButton("💾 Sayımı Kaydet")
         save_btn.setMinimumHeight(50)
-        save_btn.setStyleSheet("background-color: #166534;")
+        save_btn.setProperty("class", "btn-large-green")
         save_btn.clicked.connect(self.save_count)
         self.content_layout.addWidget(save_btn)
 

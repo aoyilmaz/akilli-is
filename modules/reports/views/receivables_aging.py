@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QFrame,
     QTableWidget,
     QTableWidgetItem,
@@ -19,18 +18,11 @@ from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
-    ACCENT,
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
 )
+
 
 class ReceivablesAgingPage(QWidget):
     """Alacak yaşlandırma raporu sayfası"""
@@ -46,21 +38,29 @@ class ReceivablesAgingPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Başlık
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
+        self.header = PageHeader(
+            title="Alacak Yaşlandırma",
+            icon="📉",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        # Info mesajını header'a ekle
+        h_layout = self.header.header_layout()
+        h_layout.addSpacing(16)
         info = QLabel(
             "Vadesi geçmiş ve açık faturalar müşteri bazında gruplandırılmıştır"
         )
-        header_layout.addWidget(info)
+        info.setStyleSheet("color: #888; font-style: italic;")
+        h_layout.addWidget(info)
 
-        header_layout.addStretch()
-
-        refresh_btn = QPushButton("Yenile")
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # Yaşlandırma kartları
         cards_layout = QHBoxLayout()
@@ -109,7 +109,9 @@ class ReceivablesAgingPage(QWidget):
         )
         layout.addWidget(self.table)
 
-    def _create_card(self, title: str, value: str, color: str, subtitle: str) -> MiniStatCard:
+    def _create_card(
+        self, title: str, value: str, color: str, subtitle: str
+    ) -> MiniStatCard:
         """Dashboard tarzı istatistik kartı"""
         return MiniStatCard(title, value, color)
 
@@ -128,6 +130,7 @@ class ReceivablesAgingPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
+
     def load_data(self, data: dict):
         groups = data.get("groups", {})
 

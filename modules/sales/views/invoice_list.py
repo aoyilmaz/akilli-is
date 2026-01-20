@@ -1,31 +1,36 @@
 """
 Akıllı İş - Faturalar Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QLabel,
+    QVBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QFrame,
-    QLineEdit,
-    QHeaderView,
-    QAbstractItemView,
-    QMessageBox,
     QComboBox,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class InvoiceListPage(QWidget):
-    """Faturalar listesi"""
+    """
+    Faturalar listesi sayfası.
+    Filtre özelliği nedeniyle doğrudan BaseListPage yerine
+    özelleştirilmiş bir yapı kullanır.
+    """
 
+    # Sinyaller
     add_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
@@ -35,25 +40,41 @@ class InvoiceListPage(QWidget):
     cancel_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
+    # Durum etiketleri
+    STATUS_LABELS = {
+        "draft": ("🔵 Taslak", "#64748b"),
+        "issued": ("📤 Kesildi", "#3b82f6"),
+        "partial_paid": ("🟡 Kısmi Ödendi", "#f59e0b"),
+        "paid": ("🟢 Ödendi", "#10b981"),
+        "overdue": ("🔴 Vadesi Geçti", "#ef4444"),
+        "cancelled": ("⚫ İptal", "#475569"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.invoices = []
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
+        """UI yapısını oluştur"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
+        # Page Header (arama ve butonlar için)
+        self.header = PageHeader(
+            title="Faturalar",
+            icon="📄",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Fatura",
+            search_placeholder="Ara... (fatura no, müşteri)",
+            parent=self,
+        )
 
-        title = QLabel("📄 Faturalar")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        # Durum filtresi
+        # Filtreyi header'a ekle (search'ten önce)
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
         self.status_filter.addItem("🔵 Taslak", "draft")
@@ -62,135 +83,74 @@ class InvoiceListPage(QWidget):
         self.status_filter.addItem("🟢 Ödendi", "paid")
         self.status_filter.addItem("🔴 Vadesi Geçti", "overdue")
         self.status_filter.addItem("⚫ İptal", "cancelled")
-        self.status_filter.setStyleSheet(self._combo_style())
         self.status_filter.setMinimumWidth(160)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        header_layout.addWidget(self.status_filter)
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Ara... (fatura no, müşteri)")
-        self.search_input.setFixedWidth(250)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        # Header layout'unu özelleştir
+        # Search input'tan önce filter ekle
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
 
-        # Yenile butonu
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        # Yeni ekle butonu
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Fatura")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # İstatistik kartları
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(12)
 
-        self.total_card = self._create_stat_card("📊", "Toplam", "0", "#6366f1")
-        stats_layout.addWidget(self.total_card)
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
+        stats_layout.addWidget(self.stat_cards["total"])
 
-        self.draft_card = self._create_stat_card("🔵", "Taslak", "0", "#64748b")
-        stats_layout.addWidget(self.draft_card)
+        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
+        stats_layout.addWidget(self.stat_cards["draft"])
 
-        self.issued_card = self._create_stat_card("📤", "Kesildi", "0", "#3b82f6")
-        stats_layout.addWidget(self.issued_card)
+        self.stat_cards["issued"] = MiniStatCard("📤 Kesildi", "0", "#3b82f6")
+        stats_layout.addWidget(self.stat_cards["issued"])
 
-        self.paid_card = self._create_stat_card("🟢", "Ödendi", "0", "#10b981")
-        stats_layout.addWidget(self.paid_card)
+        self.stat_cards["paid"] = MiniStatCard("🟢 Ödendi", "0", "#10b981")
+        stats_layout.addWidget(self.stat_cards["paid"])
 
-        self.overdue_card = self._create_stat_card("🔴", "Vadesi Geçti", "0", "#ef4444")
-        stats_layout.addWidget(self.overdue_card)
+        self.stat_cards["overdue"] = MiniStatCard("🔴 Vadesi Geçti", "0", "#ef4444")
+        stats_layout.addWidget(self.stat_cards["overdue"])
 
         stats_layout.addStretch()
         layout.addLayout(stats_layout)
 
         # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(9)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "Fatura No",
-                "Tarih",
-                "Müşteri",
-                "Toplam Tutar",
-                "Ödenen",
-                "Kalan",
-                "Vade",
-                "Durum",
+        columns = [
+            ColumnConfig("invoice_no", "Fatura No", width=120),
+            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("customer", "Müşteri", width=200, stretch=True),
+            ColumnConfig("total", "Toplam Tutar", width=110),
+            ColumnConfig("paid", "Ödenen", width=100),
+            ColumnConfig("remaining", "Kalan", width=100),
+            ColumnConfig("due_date", "Vade", width=100),
+            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig(
+                "actions",
                 "İşlemler",
-            ]
+                width=180,
+                resizable=False,
+                movable=False,
+                hideable=False,
+            ),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="invoices",
+            columns=columns,
+            parent=self,
         )
-
-        # Tablo stili
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-
-        # Kolon genişlikleri
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
-
-        self.table.setColumnWidth(0, 120)
-        self.table.setColumnWidth(1, 100)
-        self.table.setColumnWidth(3, 110)
-        self.table.setColumnWidth(4, 100)
-        self.table.setColumnWidth(5, 100)
-        self.table.setColumnWidth(6, 100)
-        self.table.setColumnWidth(7, 120)
-        self.table.setColumnWidth(8, 180)
-
-        self.table.doubleClicked.connect(self._on_double_click)
-
         layout.addWidget(self.table)
 
-    def _create_stat_card(
-        self, icon: str, title: str, value: str, color: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(f"{icon} {title}", value, color)
-
-    def _update_card(self, card: MiniStatCard, value: str):
-        """Kart değerini güncelle"""
-        card.update_value(value)
-
-    def _combo_style(self):
-        return """
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; width: 30px; }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """
+    def _connect_signals(self):
+        """Sinyalleri bağla"""
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
+        self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, invoices: list):
         """Verileri yükle"""
@@ -210,142 +170,143 @@ class InvoiceListPage(QWidget):
 
     def _display_data(self, invoices: list):
         """Tabloya verileri yükle"""
-        self.table.setRowCount(0)
-
-        status_labels = {
-            "draft": ("🔵 Taslak", "#64748b"),
-            "issued": ("📤 Kesildi", "#3b82f6"),
-            "partial_paid": ("🟡 Kısmi Ödendi", "#f59e0b"),
-            "paid": ("🟢 Ödendi", "#10b981"),
-            "overdue": ("🔴 Vadesi Geçti", "#ef4444"),
-            "cancelled": ("⚫ İptal", "#475569"),
-        }
+        self.table.setRowCount(len(invoices))
+        visible_cols = self.table.get_visible_columns()
 
         for row, inv in enumerate(invoices):
-            self.table.insertRow(row)
+            self._populate_row(row, inv, visible_cols)
 
-            # Fatura No
-            no_item = QTableWidgetItem(inv.get("invoice_no", ""))
-            no_item.setData(Qt.ItemDataRole.UserRole, inv.get("id"))
-            self.table.setItem(row, 0, no_item)
+    def _populate_row(self, row: int, inv: dict, visible_cols: list):
+        """Tek satırı doldur"""
+        inv_id = inv.get("id")
 
-            # Tarih
-            inv_date = inv.get("invoice_date")
-            if inv_date:
-                if isinstance(inv_date, date):
-                    date_str = inv_date.strftime("%d.%m.%Y")
-                else:
-                    date_str = str(inv_date)
-            else:
-                date_str = "-"
-            self.table.setItem(row, 1, QTableWidgetItem(date_str))
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "invoice_no":
+                item = QTableWidgetItem(inv.get("invoice_no", ""))
+                item.setData(Qt.ItemDataRole.UserRole, inv_id)
+                self.table.setItem(row, col_idx, item)
 
-            # Müşteri
-            self.table.setItem(
-                row, 2, QTableWidgetItem(inv.get("customer_name", "") or "-")
+            elif col_key == "date":
+                inv_date = inv.get("invoice_date")
+                date_str = self._format_date(inv_date)
+                self.table.setItem(row, col_idx, QTableWidgetItem(date_str))
+
+            elif col_key == "customer":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(inv.get("customer_name", "") or "-")
+                )
+
+            elif col_key == "total":
+                total = inv.get("total_amount", 0) or 0
+                self.table.setItem(row, col_idx, QTableWidgetItem(f"{total:,.2f}"))
+
+            elif col_key == "paid":
+                paid = inv.get("paid_amount", 0) or 0
+                self.table.setItem(row, col_idx, QTableWidgetItem(f"{paid:,.2f}"))
+
+            elif col_key == "remaining":
+                total = inv.get("total_amount", 0) or 0
+                paid = inv.get("paid_amount", 0) or 0
+                remaining = total - paid
+                item = QTableWidgetItem(f"{remaining:,.2f}")
+                if remaining > 0:
+                    item.setForeground(Qt.GlobalColor.red)
+                self.table.setItem(row, col_idx, item)
+
+            elif col_key == "due_date":
+                due_date = inv.get("due_date")
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(self._format_date(due_date))
+                )
+
+            elif col_key == "status":
+                status = inv.get("status", "draft")
+                status_text, _ = self.STATUS_LABELS.get(status, ("Taslak", "#64748b"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(status_text))
+
+            elif col_key == "actions":
+                self._add_action_buttons(row, col_idx, inv)
+
+        self.table.setRowHeight(row, 52)
+
+    def _format_date(self, dt) -> str:
+        """Tarihi formatla"""
+        if dt:
+            if isinstance(dt, date):
+                return dt.strftime("%d.%m.%Y")
+            return str(dt)
+        return "-"
+
+    def _add_action_buttons(self, row: int, col: int, inv: dict):
+        """İşlem butonlarını ekle"""
+        btn_widget = QWidget()
+        btn_widget.setProperty("class", "action-button-group")
+        btn_layout = QHBoxLayout(btn_widget)
+        btn_layout.setContentsMargins(2, 2, 2, 2)
+        btn_layout.setSpacing(2)
+
+        inv_id = inv.get("id")
+        status = inv.get("status", "draft")
+
+        # Görüntüle
+        view_btn = QPushButton("👁")
+        view_btn.setFixedSize(28, 26)
+        view_btn.setToolTip("Görüntüle")
+        view_btn.clicked.connect(
+            lambda checked, iid=inv_id: self.view_clicked.emit(iid)
+        )
+        btn_layout.addWidget(view_btn)
+
+        # Düzenle (sadece taslak)
+        if status == "draft":
+            edit_btn = QPushButton("✏")
+            edit_btn.setFixedSize(28, 26)
+            edit_btn.setToolTip("Düzenle")
+            edit_btn.clicked.connect(
+                lambda checked, iid=inv_id: self.edit_clicked.emit(iid)
             )
+            btn_layout.addWidget(edit_btn)
 
-            # Toplam Tutar
-            total = inv.get("total_amount", 0) or 0
-            self.table.setItem(row, 3, QTableWidgetItem(f"{total:,.2f}"))
-
-            # Ödenen
-            paid = inv.get("paid_amount", 0) or 0
-            self.table.setItem(row, 4, QTableWidgetItem(f"{paid:,.2f}"))
-
-            # Kalan
-            remaining = total - paid
-            remaining_item = QTableWidgetItem(f"{remaining:,.2f}")
-            if remaining > 0:
-                remaining_item.setForeground(Qt.GlobalColor.red)
-            self.table.setItem(row, 5, remaining_item)
-
-            # Vade Tarihi
-            due_date = inv.get("due_date")
-            if due_date:
-                if isinstance(due_date, date):
-                    due_str = due_date.strftime("%d.%m.%Y")
-                else:
-                    due_str = str(due_date)
-            else:
-                due_str = "-"
-            self.table.setItem(row, 6, QTableWidgetItem(due_str))
-
-            # Durum
-            status = inv.get("status", "draft")
-            status_text, _ = status_labels.get(status, ("Taslak", "#64748b"))
-            status_item = QTableWidgetItem(status_text)
-            self.table.setItem(row, 7, status_item)
-
-            # İşlem butonları
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 4, 4, 4)
-            btn_layout.setSpacing(4)
-
-            inv_id = inv.get("id")
-            inv_status = inv.get("status", "draft")
-
-            # Görüntüle
-            view_btn = QPushButton("Gör")
-            view_btn.setFixedSize(40, 28)
-            view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(
-                lambda checked, id=inv_id: self.view_clicked.emit(id)
+            # Fatura Kes
+            issue_btn = QPushButton("📤")
+            issue_btn.setFixedSize(28, 26)
+            issue_btn.setToolTip("Fatura Kes")
+            issue_btn.clicked.connect(
+                lambda checked, iid=inv_id: self.issue_clicked.emit(iid)
             )
-            btn_layout.addWidget(view_btn)
+            btn_layout.addWidget(issue_btn)
 
-            # Düzenle (sadece taslak)
-            if inv_status == "draft":
-                edit_btn = QPushButton("Düz")
-                edit_btn.setFixedSize(40, 28)
-                edit_btn.setToolTip("Düzenle")
-                edit_btn.clicked.connect(
-                    lambda checked, id=inv_id: self.edit_clicked.emit(id)
-                )
-                btn_layout.addWidget(edit_btn)
+        # Ödeme Kaydet
+        if status in ["issued", "partial_paid", "overdue"]:
+            pay_btn = QPushButton("💳")
+            pay_btn.setFixedSize(28, 26)
+            pay_btn.setToolTip("Ödeme Kaydet")
+            pay_btn.clicked.connect(
+                lambda checked, iid=inv_id: self.payment_clicked.emit(iid)
+            )
+            btn_layout.addWidget(pay_btn)
 
-                # Kes
-                issue_btn = QPushButton("Gön")
-                issue_btn.setFixedSize(40, 28)
-                issue_btn.setToolTip("Fatura Kes")
-                issue_btn.clicked.connect(
-                    lambda checked, id=inv_id: self.issue_clicked.emit(id)
-                )
-                btn_layout.addWidget(issue_btn)
+        # İptal
+        if status in ["draft", "issued"]:
+            cancel_btn = QPushButton("❌")
+            cancel_btn.setFixedSize(28, 26)
+            cancel_btn.setToolTip("İptal Et")
+            cancel_btn.clicked.connect(
+                lambda checked, iid=inv_id: self.cancel_clicked.emit(iid)
+            )
+            btn_layout.addWidget(cancel_btn)
 
-            # Ödeme Kaydet (issued, partial_paid, overdue)
-            if inv_status in ["issued", "partial_paid", "overdue"]:
-                payment_btn = QPushButton("Öde")
-                payment_btn.setFixedSize(40, 28)
-                payment_btn.setToolTip("Ödeme Kaydet")
-                payment_btn.clicked.connect(
-                    lambda checked, id=inv_id: self.payment_clicked.emit(id)
-                )
-                btn_layout.addWidget(payment_btn)
+        # Sil (sadece taslak)
+        if status == "draft":
+            del_btn = QPushButton("🗑")
+            del_btn.setFixedSize(28, 26)
+            del_btn.setToolTip("Sil")
+            del_btn.clicked.connect(
+                lambda checked, iid=inv_id: self._confirm_delete(iid)
+            )
+            btn_layout.addWidget(del_btn)
 
-            # İptal (sadece taslak veya issued)
-            if inv_status in ["draft", "issued"]:
-                cancel_btn = QPushButton("İpt")
-                cancel_btn.setFixedSize(40, 28)
-                cancel_btn.setToolTip("İptal Et")
-                cancel_btn.clicked.connect(
-                    lambda checked, id=inv_id: self.cancel_clicked.emit(id)
-                )
-                btn_layout.addWidget(cancel_btn)
-
-            # Sil (sadece taslak)
-            if inv_status == "draft":
-                del_btn = QPushButton("Sil")
-                del_btn.setFixedSize(40, 28)
-                del_btn.setToolTip("Sil")
-                del_btn.clicked.connect(
-                    lambda checked, id=inv_id: self._confirm_delete(id)
-                )
-                btn_layout.addWidget(del_btn)
-
-            self.table.setCellWidget(row, 8, btn_widget)
-            self.table.setRowHeight(row, 56)
+        self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):
         """İstatistikleri güncelle"""
@@ -355,31 +316,18 @@ class InvoiceListPage(QWidget):
         paid = sum(1 for i in self.invoices if i.get("status") == "paid")
         overdue = sum(1 for i in self.invoices if i.get("status") == "overdue")
 
-        self._update_card(self.total_card, str(total))
-        self._update_card(self.draft_card, str(draft))
-        self._update_card(self.issued_card, str(issued))
-        self._update_card(self.paid_card, str(paid))
-        self._update_card(self.overdue_card, str(overdue))
-
-    def _action_btn_style(self, color: str) -> str:
-        return f"""
-            QPushButton {{
-                background-color: {color}20;
-                border: 1px solid {color}50;
-                border-radius: 6px;
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: {color}40;
-            }}
-        """
+        self.stat_cards["total"].update_value(str(total))
+        self.stat_cards["draft"].update_value(str(draft))
+        self.stat_cards["issued"].update_value(str(issued))
+        self.stat_cards["paid"].update_value(str(paid))
+        self.stat_cards["overdue"].update_value(str(overdue))
 
     def _on_search(self, text: str):
-        """Arama"""
+        """Tabloda arama yap"""
         text = text.lower()
         for row in range(self.table.rowCount()):
             match = False
-            for col in range(7):
+            for col in range(self.table.columnCount() - 1):
                 item = self.table.item(row, col)
                 if item and text in item.text().lower():
                     match = True
@@ -387,17 +335,8 @@ class InvoiceListPage(QWidget):
             self.table.setRowHidden(row, not match)
 
     def _on_filter_changed(self):
-        """Filtre değişti"""
+        """Filtre değiştiğinde"""
         self._apply_filter()
-
-    def _on_double_click(self, index):
-        """Çift tıklama"""
-        row = index.row()
-        item = self.table.item(row, 0)
-        if item:
-            inv_id = item.data(Qt.ItemDataRole.UserRole)
-            if inv_id:
-                self.view_clicked.emit(inv_id)
 
     def _confirm_delete(self, inv_id: int):
         """Silme onayı"""

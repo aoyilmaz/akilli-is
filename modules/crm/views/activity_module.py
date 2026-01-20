@@ -19,12 +19,35 @@ class ActivityModule(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Aktivite Takibi",
+            icon="📅",
+            show_search=False,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni Aktivite",
+            parent=self,
+        )
+        self.header.add_clicked.connect(self._show_add_form)
+
+        # Refresh
+        self.header.show_refresh = True
+        self.header.refresh_clicked.connect(self._load_data)
+
+        layout.addWidget(self.header)
+
         self.stack = QStackedWidget()
 
         # Zaman Çizelgesi
         self.timeline_page = ActivityTimeline()
-        self.timeline_page.add_clicked.connect(self._show_add_form)
+        # Toolbar kaldırıldığı için sinyalleri buraya bağlamaya gerek yok (add_clicked vb. header'dan geliyor)
+        # Ama kart tıklama eventi timeline'dan geliyor
         self.timeline_page.card_clicked.connect(self._show_edit_form)
+        # Refresh sinyalini timeline da tetikleyebilir mi? Toolbar olmadığı için hayır, ama kodda kalsın.
         self.timeline_page.refresh_clicked.connect(self._load_data)
 
         self.stack.addWidget(self.timeline_page)

@@ -6,29 +6,36 @@ from datetime import datetime
 from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QMessageBox
 from PyQt6.QtCore import pyqtSignal
 
-from modules.inventory.services import StockMovementService, ItemService, WarehouseService
+from modules.inventory.services import (
+    StockMovementService,
+    ItemService,
+    WarehouseService,
+    UnitService,
+)
 from modules.inventory.views.movement_list import MovementListPage
 from modules.inventory.views.movement_form import MovementFormPage
 
+
 class MovementModule(QWidget):
     """Stok hareketleri modülü"""
-    
+
     page_title = "Stok Hareketleri"
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.movement_service = None
         self.item_service = None
         self.warehouse_service = None
+        self.unit_service = None  # Dual-Unit için
         self.setup_ui()
         self.load_data()
-        
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.stack = QStackedWidget()
-        
+
         # Liste sayfası
         self.list_page = MovementListPage()
         self.list_page.add_entry_clicked.connect(lambda: self.show_form("entry"))
@@ -36,9 +43,9 @@ class MovementModule(QWidget):
         self.list_page.add_transfer_clicked.connect(lambda: self.show_form("transfer"))
         self.list_page.refresh_requested.connect(self.load_data)
         self.stack.addWidget(self.list_page)
-        
+
         layout.addWidget(self.stack)
-        
+
     def _get_services(self):
         if self.movement_service is None:
             self.movement_service = StockMovementService()
@@ -46,7 +53,9 @@ class MovementModule(QWidget):
             self.item_service = ItemService()
         if self.warehouse_service is None:
             self.warehouse_service = WarehouseService()
-            
+        if self.unit_service is None:
+            self.unit_service = UnitService()
+
     def _close_services(self):
         if self.movement_service:
             self.movement_service.close()
@@ -57,18 +66,22 @@ class MovementModule(QWidget):
         if self.warehouse_service:
             self.warehouse_service.close()
             self.warehouse_service = None
-            
+        if self.unit_service:
+            self.unit_service.close()
+            self.unit_service = None
+
     def load_data(self):
         try:
             self._get_services()
-            
+
             filters = self.list_page.get_filters()
-            
+
             # Hareket türü filtresi
             movement_type = None
             type_filter = filters.get("movement_type")
             if type_filter:
                 from database.models import StockMovementType
+
                 type_map = {
                     "giris": StockMovementType.GIRIS,
                     "cikis": StockMovementType.CIKIS,
@@ -77,75 +90,84 @@ class MovementModule(QWidget):
                     "satis": StockMovementType.SATIS,
                 }
                 movement_type = type_map.get(type_filter)
-            
+
             movements = self.movement_service.get_movements(
                 movement_type=movement_type,
-                start_date=datetime.combine(filters.get("start_date"), datetime.min.time()),
+                start_date=datetime.combine(
+                    filters.get("start_date"), datetime.min.time()
+                ),
                 end_date=datetime.combine(filters.get("end_date"), datetime.max.time()),
-                limit=500
+                limit=500,
             )
-            
+
             # Keyword filtresi
             keyword = filters.get("keyword", "").lower()
             if keyword:
-                movements = [m for m in movements 
-                            if keyword in (m.item_code or "").lower()
-                            or keyword in (m.document_no or "").lower()
-                            or keyword in (m.item_name or "").lower()]
-            
+                movements = [
+                    m
+                    for m in movements
+                    if keyword in (m.item_code or "").lower()
+                    or keyword in (m.document_no or "").lower()
+                    or keyword in (m.item_name or "").lower()
+                ]
+
             self.list_page.load_data(movements)
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Veriler yüklenirken hata:\n{str(e)}")
         finally:
             self._close_services()
-            
+
     def show_form(self, movement_type: str):
         """Form göster"""
         try:
             self._get_services()
-            
+
             # Mevcut formu kaldır
             if self.stack.count() > 1:
                 old = self.stack.widget(1)
                 self.stack.removeWidget(old)
                 old.deleteLater()
-            
+
             # Yeni form
             form = MovementFormPage(movement_type)
             form.saved.connect(self.save_movement)
             form.cancelled.connect(self.show_list)
-            
+
             # Stok kartlarını yükle
             items = self.item_service.get_all()
             form.load_items(items)
-            
-            # Depoları yükle
+
+            # Depolari yükle
             warehouses = self.warehouse_service.get_all()
             form.load_warehouses(warehouses)
-            
+
+            # Birimleri yükle (Dual-Unit için)
+            units = self.unit_service.get_all()
+            form.load_units(units)
+
             self.stack.addWidget(form)
             self.stack.setCurrentIndex(1)
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Form açılırken hata:\n{str(e)}")
         finally:
             self._close_services()
-            
+
     def show_list(self):
         self.stack.setCurrentIndex(0)
         self.load_data()
-        
+
     def save_movement(self, data: dict):
         """Hareketi kaydet"""
         try:
             self._get_services()
-            
+
             lines = data.pop("lines", [])
             movement_type = data.pop("movement_type")
             from_warehouse_id = data.pop("from_warehouse_id", None)
             to_warehouse_id = data.pop("to_warehouse_id", None)
-            
+
             # Her satır için hareket oluştur
             for line in lines:
                 self.movement_service.create_movement(
@@ -159,11 +181,14 @@ class MovementModule(QWidget):
                     document_no=data.get("document_no"),
                     document_type="manual",
                     description=data.get("description"),
+                    # Dual-Unit
+                    secondary_quantity=line.get("secondary_quantity"),
+                    secondary_unit_id=line.get("secondary_unit_id"),
                 )
-            
+
             QMessageBox.information(self, "Başarılı", f"{len(lines)} satır kaydedildi!")
             self.show_list()
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Kaydetme hatası:\n{str(e)}")
         finally:

@@ -5,19 +5,14 @@ Akıllı İş - Organizasyon Şeması Modülü
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
     QHeaderView,
     QComboBox,
-    QFrame,
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
 
-from config.themes import get_theme, ThemeManager
 from modules.hr.services import HRService
 
 
@@ -30,82 +25,36 @@ class OrgChartModule(QWidget):
         super().__init__(parent)
         self.service = HRService()
         self.setup_ui()
-        self._apply_theme()
-        ThemeManager.register_callback(self._on_theme_changed)
-
-    def _on_theme_changed(self, theme):
-        self._apply_theme()
-
-    def _apply_theme(self):
-        t = get_theme()
-        self.setStyleSheet(
-            f"""
-            QWidget {{
-                background-color: {t.bg_primary};
-                color: {t.text_primary};
-            }}
-            QTreeWidget {{
-                background-color: {t.bg_secondary};
-                border: 1px solid {t.border};
-                border-radius: 8px;
-                color: {t.text_primary};
-            }}
-            QTreeWidget::item {{
-                padding: 6px;
-            }}
-            QTreeWidget::item:hover {{
-                background-color: {t.bg_hover};
-            }}
-            QTreeWidget::item:selected {{
-                background-color: {t.accent_primary}20;
-            }}
-            QPushButton {{
-                background-color: {t.bg_secondary};
-                border: 1px solid {t.border};
-                border-radius: 6px;
-                padding: 8px 16px;
-                color: {t.text_primary};
-            }}
-            QPushButton:hover {{
-                background-color: {t.bg_hover};
-            }}
-            QComboBox {{
-                background-color: {t.bg_secondary};
-                border: 1px solid {t.border};
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: {t.text_primary};
-            }}
-            QLabel {{
-                background: transparent;
-            }}
-        """
-        )
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("🏢 Organizasyon Şeması")
-        title.setFont(QFont("", 16, QFont.Weight.Bold))
-        header.addWidget(title)
-        header.addStretch()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        # Görünüm seçimi
+        self.header = PageHeader(
+            title="Organizasyon Şeması",
+            icon="🏢",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self._load_data)
+
+        # Header Layout - View Combo
+        h_layout = self.header.header_layout()
+
         self.view_combo = QComboBox()
         self.view_combo.addItem("Departmana Göre", "department")
         self.view_combo.addItem("Yöneticiye Göre", "manager")
+        self.view_combo.setFixedHeight(36)
         self.view_combo.currentIndexChanged.connect(self._load_data)
-        header.addWidget(self.view_combo)
+        h_layout.addWidget(self.view_combo)
 
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.clicked.connect(self._load_data)
-        header.addWidget(refresh_btn)
-
-        layout.addLayout(header)
+        layout.addWidget(self.header)
 
         # Ağaç görünümü
         self.tree = QTreeWidget()

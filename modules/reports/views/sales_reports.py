@@ -1,16 +1,8 @@
-"""
-Akilli Is - Satis Raporlari Sayfasi
-"""
-
-from datetime import date, timedelta
-from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QFrame,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -20,25 +12,14 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from PyQt6.QtGui import QColor
 from ui.components.stat_cards import MiniStatCard
 
 from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BG_HOVER,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
-    ACCENT,
     SUCCESS,
     WARNING,
+    ACCENT,
+    # Diğerleri kullanılmıyorsa kaldırdım
     ERROR,
-    get_table_style,
-    get_tab_style,
-    get_input_style,
-    get_button_style,
 )
 
 
@@ -53,33 +34,42 @@ class SalesReportsPage(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Filtreler
-        filter_frame = QFrame()
-        filter_layout = QHBoxLayout(filter_frame)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        filter_layout.addWidget(QLabel("Baslangic:"))
+        self.header = PageHeader(
+            title="Satış Raporları",
+            icon="📈",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        # Filtreler
+        h_layout = self.header.header_layout()
+
+        h_layout.addSpacing(16)
+        h_layout.addWidget(QLabel("Başlangıç:"))
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.start_date)
+        self.start_date.setFixedHeight(36)
+        h_layout.addWidget(self.start_date)
 
-        filter_layout.addWidget(QLabel("Bitis:"))
+        h_layout.addSpacing(8)
+        h_layout.addWidget(QLabel("Bitiş:"))
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.end_date)
+        self.end_date.setFixedHeight(36)
+        h_layout.addWidget(self.end_date)
 
-        filter_layout.addStretch()
-
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        filter_layout.addWidget(refresh_btn)
-
-        layout.addWidget(filter_frame)
+        layout.addWidget(self.header)
 
         # Ozet kartlar
         cards_layout = QHBoxLayout()

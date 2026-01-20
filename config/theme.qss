@@ -239,10 +239,12 @@ QPushButton[class="action"]:hover {
 QLineEdit {
     background-color: #3c3c3c;
     border: 1px solid #3e3e42;
-    border-radius: 4px;
-    padding: 8px 12px;
+    border-radius: 6px;
+    padding: 0px 12px;
     color: #cccccc;
     selection-background-color: #094771;
+    height: 36px;
+    max-height: 36px;
 }
 
 QLineEdit:focus {
@@ -278,9 +280,11 @@ QTextEdit:focus, QPlainTextEdit:focus {
 QSpinBox, QDoubleSpinBox {
     background-color: #3c3c3c;
     border: 1px solid #3e3e42;
-    border-radius: 4px;
-    padding: 8px 12px;
+    border-radius: 6px;
+    padding: 0px 12px;
     color: #cccccc;
+    height: 36px;
+    max-height: 36px;
 }
 
 QSpinBox:focus, QDoubleSpinBox:focus {
@@ -306,10 +310,12 @@ QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
 QComboBox {
     background-color: #3c3c3c;
     border: 1px solid #3e3e42;
-    border-radius: 4px;
-    padding: 8px 12px;
+    border-radius: 6px;
+    padding: 0px 12px;
     color: #cccccc;
     min-width: 100px;
+    height: 36px;
+    max-height: 36px;
 }
 
 QComboBox:focus {
@@ -354,9 +360,11 @@ QComboBox QAbstractItemView::item:hover {
 QDateEdit, QTimeEdit, QDateTimeEdit {
     background-color: #3c3c3c;
     border: 1px solid #3e3e42;
-    border-radius: 4px;
-    padding: 8px 12px;
+    border-radius: 6px;
+    padding: 0px 12px;
     color: #cccccc;
+    height: 36px;
+    max-height: 36px;
 }
 
 QDateEdit:focus, QTimeEdit:focus, QDateTimeEdit:focus {
@@ -841,5 +849,648 @@ QLabel[class="trend-up"] {
 QLabel[class="trend-down"] {
     color: #f14c4c;
     font-size: 12px;
+}
+
+/* ========================================
+   PAGE HEADER COMPONENT
+   Tutarlı sayfa başlığı bileşeni
+   ======================================== */
+
+QWidget[class="page-header"] {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* Header çubuk stili - depocu paneli tarzı */
+QFrame[class="header-bar"] {
+    background-color: #2b2b2b;
+    border-radius: 10px;
+    border: 1px solid #3e3e42;
+}
+
+QWidget[class="page-header"] QLabel[class="page-title"] {
+    font-size: 18px;
+    font-weight: bold;
+    color: #e0e0e0;
+    background: transparent;
+}
+
+QWidget[class="page-header"] QLineEdit[class="search-input"] {
+    background-color: #3c3c3c;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 0px 12px;
+    color: #cccccc;
+    height: 36px;
+    max-height: 36px;
+}
+
+QWidget[class="page-header"] QLineEdit[class="search-input"]:focus {
+    border-color: #007acc;
+}
+
+/* ========================================
+   ENHANCED TABLE COMPONENT
+   Gelişmiş tablo bileşeni stilleri
+   ======================================== */
+
+QTableWidget[class="enhanced-table"] {
+    background-color: #1e1e1e;
+    alternate-background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    gridline-color: #3e3e42;
+    selection-background-color: #094771;
+    selection-color: #ffffff;
+}
+
+QTableWidget[class="enhanced-table"]::item {
+    padding: 10px 8px;
+    border-bottom: 1px solid #3e3e42;
+}
+
+QTableWidget[class="enhanced-table"]::item:selected {
+    background-color: #094771;
+    color: #ffffff;
+}
+
+QTableWidget[class="enhanced-table"]::item:hover {
+    background-color: #2a2d2e;
+}
+
+QTableWidget[class="enhanced-table"] QHeaderView::section {
+    background-color: #252526;
+    color: #969696;
+    font-weight: 600;
+    padding: 12px 8px;
+    border: none;
+    border-bottom: 2px solid #3e3e42;
+    border-right: 1px solid #3e3e42;
+}
+
+QTableWidget[class="enhanced-table"] QHeaderView::section:hover {
+    background-color: #2a2d2e;
+    color: #cccccc;
+}
+
+QTableWidget[class="enhanced-table"] QHeaderView::section:last {
+    border-right: none;
+}
+
+/* Column menu styling */
+QMenu[class="column-menu"] {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QMenu[class="column-menu"]::item {
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+QMenu[class="column-menu"]::item:selected {
+    background-color: #094771;
+}
+
+QMenu[class="column-menu"]::indicator {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+}
+
+QMenu[class="column-menu"]::indicator:checked {
+    background-color: #007acc;
+    border-radius: 3px;
+}
+
+/* ========================================
+   STANDARD BUTTON CLASSES
+   QSS class tabanlı düğme stilleri
+   ======================================== */
+
+QPushButton[class="btn-primary"] {
+    background-color: #007acc;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-primary"]:hover {
+    background-color: #1177bb;
+}
+
+QPushButton[class="btn-primary"]:pressed {
+    background-color: #005a9e;
+}
+
+QPushButton[class="btn-primary"]:disabled {
+    background-color: #3e3e42;
+    color: #6e6e6e;
+}
+
+QPushButton[class="btn-add"] {
+    background-color: #22c55e;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-add"]:hover {
+    background-color: #16a34a;
+}
+
+QPushButton[class="btn-add"]:pressed {
+    background-color: #15803d;
+}
+
+QPushButton[class="btn-refresh"] {
+    background-color: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-refresh"]:hover {
+    background-color: #2563eb;
+}
+
+QPushButton[class="btn-refresh"]:pressed {
+    background-color: #1d4ed8;
+}
+
+QPushButton[class="btn-export"] {
+    background-color: #10b981;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-export"]:hover {
+    background-color: #059669;
+}
+
+QPushButton[class="btn-filter"] {
+    background-color: #06b6d4;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-filter"]:hover {
+    background-color: #0891b2;
+}
+
+QPushButton[class="btn-danger"] {
+    background-color: #f14c4c;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: white;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-danger"]:hover {
+    background-color: #d73a3a;
+}
+
+QPushButton[class="btn-secondary"] {
+    background-color: #3c3c3c;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 0px 16px;
+    color: #cccccc;
+    font-weight: 500;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-secondary"]:hover {
+    background-color: #4c4c4c;
+    border-color: #5a5a5a;
+}
+
+/* ========================================
+   GLASSMORPHISM CARDS
+   Modern cam efektli kartlar
+   ======================================== */
+
+QFrame[class="glass-card"] {
+    background-color: rgba(37, 37, 38, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+QFrame[class="glass-card"]:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+QFrame[class="glass-card-accent"] {
+    background-color: rgba(0, 122, 204, 0.15);
+    border: 1px solid rgba(0, 122, 204, 0.3);
+    border-radius: 12px;
+}
+
+/* ========================================
+   FORM DIALOG COMPONENT
+   Tutarlı form dialog stilleri
+   ======================================== */
+
+QDialog[class="form-dialog"] {
+    background-color: #252526;
+    border-radius: 12px;
+}
+
+QDialog[class="form-dialog"] QLabel[class="form-label"] {
+    color: #969696;
+    font-weight: 500;
+    font-size: 12px;
+    background: transparent;
+}
+
+QDialog[class="form-dialog"] QLabel[class="form-title"] {
+    color: #cccccc;
+    font-weight: bold;
+    font-size: 18px;
+    background: transparent;
+}
+
+QDialog[class="form-dialog"] QLineEdit,
+QDialog[class="form-dialog"] QComboBox,
+QDialog[class="form-dialog"] QSpinBox,
+QDialog[class="form-dialog"] QDoubleSpinBox,
+QDialog[class="form-dialog"] QDateEdit {
+    background-color: #3c3c3c;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-height: 20px;
+    color: #cccccc;
+}
+
+QDialog[class="form-dialog"] QLineEdit:focus,
+QDialog[class="form-dialog"] QComboBox:focus,
+QDialog[class="form-dialog"] QSpinBox:focus,
+QDialog[class="form-dialog"] QDoubleSpinBox:focus,
+QDialog[class="form-dialog"] QDateEdit:focus {
+    border-color: #007acc;
+}
+
+QDialog[class="form-dialog"] QTextEdit {
+    background-color: #3c3c3c;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #cccccc;
+}
+
+QDialog[class="form-dialog"] QTextEdit:focus {
+    border-color: #007acc;
+}
+
+/* Form section divider */
+QFrame[class="form-section"] {
+    background-color: transparent;
+    border-top: 1px solid #3e3e42;
+    margin-top: 16px;
+    padding-top: 16px;
+}
+
+QLabel[class="form-section-title"] {
+    color: #cccccc;
+    font-weight: 600;
+    font-size: 14px;
+    background: transparent;
+}
+
+/* ========================================
+   ACTION BUTTON GROUP
+   Tablo işlem butonları
+   ======================================== */
+
+QWidget[class="action-button-group"] {
+    background: transparent;
+}
+
+QWidget[class="action-button-group"] QPushButton {
+    background-color: rgba(60, 60, 60, 0.5);
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
+}
+
+QWidget[class="action-button-group"] QPushButton:hover {
+    background-color: rgba(80, 80, 80, 0.7);
+    border-color: #5a5a5a;
+}
+
+QWidget[class="action-button-group"] QPushButton[class="action-view"]:hover {
+    background-color: rgba(0, 122, 204, 0.3);
+    border-color: #007acc;
+}
+
+QWidget[class="action-button-group"] QPushButton[class="action-edit"]:hover {
+    background-color: rgba(78, 201, 176, 0.3);
+    border-color: #4ec9b0;
+}
+
+QWidget[class="action-button-group"] QPushButton[class="action-delete"]:hover {
+    background-color: rgba(241, 76, 76, 0.3);
+    border-color: #f14c4c;
+}
+
+/* ========================================
+   FORM VE PANEL STİLLERİ
+   ======================================== */
+
+/* Card - Ana kart stili */
+QFrame[class="card"] {
+    background-color: rgba(37, 37, 38, 0.8);
+    border: 1px solid #3e3e42;
+    border-radius: 12px;
+}
+
+/* Card Secondary - İkincil kart stili */
+QFrame[class="card-secondary"] {
+    background-color: rgba(37, 37, 38, 0.5);
+    border: 1px solid #3e3e42;
+    border-radius: 12px;
+}
+
+/* Barcode Input - Barkod girişi */
+QLineEdit[class="barcode-input"] {
+    border: 2px solid #007acc;
+    border-radius: 6px;
+    padding: 6px 10px;
+    background-color: #1e1e1e;
+    color: #ffffff;
+    font-size: 13px;
+}
+
+QLineEdit[class="barcode-input"]:focus {
+    border-color: #1177bb;
+    background-color: #252526;
+}
+
+/* Enhanced Table - Gelişmiş tablo stili */
+QTableWidget[class="enhanced-table"] {
+    background-color: rgba(30, 30, 30, 0.5);
+    border: 1px solid #3e3e42;
+    border-radius: 12px;
+}
+
+QTableWidget[class="enhanced-table"]::item {
+    padding: 8px;
+    border-bottom: 1px solid #3e3e42;
+}
+
+QTableWidget[class="enhanced-table"] QHeaderView::section {
+    background-color: #252526;
+    color: #969696;
+    font-weight: 600;
+    padding: 10px 8px;
+    border: none;
+    border-bottom: 1px solid #3e3e42;
+}
+
+/* ========================================
+   OPERATÖR PANELİ STİLLERİ
+   ======================================== */
+
+/* Büyük butonlar - Tablet optimize */
+QPushButton[class="btn-large-green"] {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 16px;
+}
+
+QPushButton[class="btn-large-green"]:hover {
+    background-color: #059669;
+}
+
+QPushButton[class="btn-large-yellow"] {
+    background-color: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 16px;
+}
+
+QPushButton[class="btn-large-yellow"]:hover {
+    background-color: #d97706;
+}
+
+QPushButton[class="btn-large-red"] {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 16px;
+}
+
+QPushButton[class="btn-large-red"]:hover {
+    background-color: #dc2626;
+}
+
+QPushButton[class="btn-large-teal"] {
+    background-color: #0d9488;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 16px;
+}
+
+QPushButton[class="btn-large-teal"]:hover {
+    background-color: #0f766e;
+}
+
+/* Panel kartları */
+QFrame[class="panel-card"] {
+    background-color: #252526;
+    border-radius: 12px;
+}
+
+/* Panel header */
+QFrame[class="panel-header"] {
+    background-color: #252526;
+    border-radius: 10px;
+}
+
+/* Timer frame */
+QFrame[class="timer-frame"] {
+    background-color: #1e1e1e;
+    border-radius: 12px;
+}
+
+/* Panel liste stili */
+QListWidget[class="panel-list"] {
+    background: transparent;
+    border: none;
+}
+
+QListWidget[class="panel-list"]::item {
+    padding: 12px;
+    margin: 2px 0;
+    background: #1e1e1e;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+QListWidget[class="panel-list"]::item:selected {
+    background: #007acc;
+}
+
+/* ========================================
+   LABEL STİLLERİ
+   ======================================== */
+
+QLabel[class="label-blue"] {
+    color: #3b82f6;
+}
+
+QLabel[class="label-green"] {
+    color: #10b981;
+}
+
+QLabel[class="label-muted"] {
+    color: #94a3b8;
+}
+
+QLabel[class="timer-label"] {
+    color: #ef4444;
+}
+
+/* ========================================
+   INFO VE UYARI KUTULARI
+   ======================================== */
+
+QLabel[class="info-box"] {
+    padding: 16px;
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+QLabel[class="success-box"] {
+    padding: 16px;
+    background-color: rgba(16, 185, 129, 0.2);
+    border: 2px solid #10b981;
+    border-radius: 8px;
+    color: #10b981;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QLabel[class="warning-box"] {
+    padding: 10px;
+    background-color: rgba(245, 158, 11, 0.15);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    color: #f59e0b;
+    font-size: 12px;
+}
+
+/* ========================================
+   MENÜ BUTONLARI
+   ======================================== */
+
+QPushButton[class="menu-button-large"] {
+    background-color: #252526;
+    border: 2px solid #3e3e42;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+QPushButton[class="menu-button-large"]:hover {
+    background-color: #3e3e42;
+    border-color: #007acc;
+}
+
+QPushButton[class="menu-button-large"]:pressed {
+    background-color: #094771;
+}
+
+/* İkon butonlar */
+QPushButton[class="btn-icon-circle"] {
+    background: #3e3e42;
+    border-radius: 18px;
+    font-size: 16px;
+    border: none;
+}
+
+QPushButton[class="btn-icon-circle"]:hover {
+    background: #4c4c4c;
+}
+
+/* Secondary buton - operator panel için */
+QPushButton[class="btn-secondary"] {
+    background: #3e3e42;
+    color: white;
+    border-radius: 6px;
+    padding: 0px 16px;
+    font-size: 13px;
+    border: none;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-secondary"]:hover {
+    background: #4c4c4c;
+}
+
+/* Primary buton - operator panel için */
+QPushButton[class="btn-primary"] {
+    background-color: #007acc;
+    color: white;
+    border-radius: 6px;
+    padding: 0px 16px;
+    font-size: 13px;
+    border: none;
+    height: 36px;
+    max-height: 36px;
+}
+
+QPushButton[class="btn-primary"]:hover {
+    background-color: #1177bb;
 }
 

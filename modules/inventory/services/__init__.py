@@ -6,5 +6,7 @@ from .base import (
     StockMovementService,
     NegativeStockError,
     DuplicateCodeError,
+    ServiceBase,
 )
+from .sscc_service import SSCCService
 from .stock_quality_bridge import StockQualityService

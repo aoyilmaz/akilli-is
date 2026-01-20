@@ -24,6 +24,7 @@ from PyQt6.QtGui import QColor
 from config.styles import (
     BG_PRIMARY,
     BG_SECONDARY,
+    BG_TERTIARY,
     BORDER,
     TEXT_PRIMARY,
     TEXT_MUTED,
@@ -31,8 +32,6 @@ from config.styles import (
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
     BTN_HEIGHT_NORMAL,
     ICONS,
 )
@@ -55,45 +54,65 @@ class JournalListWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        # Filtreler
-        filter_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Yevmiye Defteri",
+            icon="📒",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,  # Eğer ekleme butonu gerekiyorsa True yapın
+            parent=self,
+        )
+
+        h_layout = self.header.header_layout()
+
+        # Filtreler - Header içine
 
         # Başlangıç tarihi
         start_label = QLabel("Başlangıç:")
-        filter_layout.addWidget(start_label)
+        h_layout.addWidget(start_label)
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addMonths(-1))
         self.start_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.start_date)
+        self.start_date.setFixedWidth(110)
+        self.start_date.setFixedHeight(36)
+        h_layout.addWidget(self.start_date)
 
         # Bitiş tarihi
         end_label = QLabel("Bitiş:")
-        filter_layout.addWidget(end_label)
+        h_layout.addWidget(end_label)
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
-        filter_layout.addWidget(self.end_date)
+        self.end_date.setFixedWidth(110)
+        self.end_date.setFixedHeight(36)
+        h_layout.addWidget(self.end_date)
 
         # Durum
         status_label = QLabel("Durum:")
-        filter_layout.addWidget(status_label)
+        h_layout.addWidget(status_label)
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
         self.status_combo.addItem("Taslak", JournalEntryStatus.DRAFT)
         self.status_combo.addItem("İşlenmiş", JournalEntryStatus.POSTED)
         self.status_combo.addItem("İptal", JournalEntryStatus.CANCELLED)
-        filter_layout.addWidget(self.status_combo)
-
-        filter_layout.addStretch()
+        self.status_combo.setFixedWidth(120)
+        self.status_combo.setFixedHeight(36)
+        h_layout.addWidget(self.status_combo)
 
         # Filtrele butonu
         filter_btn = QPushButton(f"{ICONS['filter']} Filtrele")
-        filter_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        filter_btn.setStyleSheet(get_button_style("filter"))
+        filter_btn.setFixedHeight(36)
+        filter_btn.setProperty("class", "btn-secondary")
         filter_btn.clicked.connect(lambda: self.refresh_requested.emit())
-        filter_layout.addWidget(filter_btn)
+        h_layout.addWidget(filter_btn)
 
-        layout.addLayout(filter_layout)
+        # Refresh sinyali
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()

@@ -5,23 +5,18 @@ Akıllı İş - Kategori Listesi Sayfası
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
     QPushButton,
-    QLineEdit,
     QTreeWidget,
     QTreeWidgetItem,
-    QFrame,
-    QAbstractItemView,
     QMenu,
     QMessageBox,
     QHeaderView,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QAction, QIcon
+from PyQt6.QtGui import QColor, QAction
 
 from config import COLORS
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 
 
 class CategoryListPage(QWidget):
@@ -43,59 +38,47 @@ class CategoryListPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title_layout = QVBoxLayout()
-        title = QLabel("Stok Kategorileri")
-        subtitle = QLabel("Hiyerarşik kategori yapısını yönetin")
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        self.header = PageHeader(
+            title="Stok Kategorileri",
+            icon="📂",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Kategori",
+            search_placeholder="Kategori ara...",
+            parent=self,
+        )
 
-        header_layout.addStretch()
-
-        # Genişlet/Daralt
+        # Özel butonları ekle (Genişlet/Daralt)
         expand_btn = QPushButton("📂 Tümünü Aç")
-        expand_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        expand_btn.setStyleSheet(get_button_style("secondary"))
+        expand_btn.setProperty("class", "btn-secondary")
+        expand_btn.setFixedHeight(36)
         expand_btn.clicked.connect(lambda: self.tree.expandAll())
-        header_layout.addWidget(expand_btn)
 
         collapse_btn = QPushButton("📁 Tümünü Kapat")
-        collapse_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        collapse_btn.setStyleSheet(get_button_style("secondary"))
+        collapse_btn.setProperty("class", "btn-secondary")
+        collapse_btn.setFixedHeight(36)
         collapse_btn.clicked.connect(lambda: self.tree.collapseAll())
-        header_layout.addWidget(collapse_btn)
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        # Header'a butonları ekle (arama kutusundan önce)
+        h_layout = self.header.header_layout()
+        if self.header.search_input:
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, expand_btn)
+            h_layout.insertWidget(idx + 1, collapse_btn)
 
-        # Yeni ekle
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Kategori")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
+        # Sinyalleri bağla
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._filter_tree)
 
-        layout.addLayout(header_layout)
+        # Arama kutusunu referans olarak sakla
+        self.search_input = self.header.search_input
 
-        # === Arama ===
-        search_frame = QFrame()
-        search_layout = QHBoxLayout(search_frame)
-        search_layout.setContentsMargins(16, 12, 16, 12)
-
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Kategori ara...")
-        self.search_input.textChanged.connect(self._filter_tree)
-        search_layout.addWidget(self.search_input)
-        search_layout.addStretch()
-
-        layout.addWidget(search_frame)
+        layout.addWidget(self.header)
 
         # === Ağaç Görünümü ===
         self.tree = QTreeWidget()

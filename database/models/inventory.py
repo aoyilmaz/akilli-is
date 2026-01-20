@@ -433,10 +433,16 @@ class StockBalance(BaseModel):
     unit_cost = Column(Numeric(18, 4), default=0)
     total_cost = Column(Numeric(18, 4), default=0)
 
+    # === İkincil Birim Takibi (Dual-Unit) ===
+    # Örn: 10 koli = 150 kg gibi paralel birim takibi
+    secondary_quantity = Column(Numeric(18, 4), nullable=True)
+    secondary_unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
     # İlişkiler
     item = relationship("Item", back_populates="stock_balances")
     warehouse = relationship("Warehouse", back_populates="stock_balances")
     location = relationship("WarehouseLocation")
+    secondary_unit = relationship("Unit", foreign_keys=[secondary_unit_id])
 
     __table_args__ = (
         Index("idx_balance_item_warehouse", "item_id", "warehouse_id"),
@@ -493,6 +499,11 @@ class StockMovement(BaseModel):
     currency_id = Column(Integer, ForeignKey("currencies.id"), nullable=True)
     exchange_rate = Column(Numeric(18, 6), default=1)
 
+    # === İkincil Birim Takibi (Dual-Unit) ===
+    # Örn: 10 koli girişi yaparken aynı anda 150 kg takibi
+    secondary_quantity = Column(Numeric(18, 4), nullable=True)
+    secondary_unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
     # === Lot/Seri Bilgileri ===
     lot_number = Column(String(100), nullable=True)
     serial_number = Column(String(100), nullable=True)
@@ -522,7 +533,8 @@ class StockMovement(BaseModel):
     )
     from_location = relationship("WarehouseLocation", foreign_keys=[from_location_id])
     to_location = relationship("WarehouseLocation", foreign_keys=[to_location_id])
-    unit = relationship("Unit")
+    unit = relationship("Unit", foreign_keys=[unit_id])
+    secondary_unit = relationship("Unit", foreign_keys=[secondary_unit_id])
     currency = relationship("Currency")
 
     __table_args__ = (

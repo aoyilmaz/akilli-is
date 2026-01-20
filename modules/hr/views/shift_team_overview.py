@@ -172,74 +172,26 @@ class ShiftTeamOverview(QWidget):
         self.service = HRService()
         self.team_service = None
         self.setup_ui()
-        self._apply_theme()
-        ThemeManager.register_callback(self._on_theme_changed)
-
-    def _on_theme_changed(self, theme):
-        self._apply_theme()
-
-    def _apply_theme(self):
-        t = get_theme()
-        self.setStyleSheet(
-            f"""
-            QWidget {{
-                background-color: {t.bg_primary};
-                color: {t.text_primary};
-            }}
-            QTabWidget::pane {{
-                border: 1px solid {t.border};
-                border-radius: 8px;
-                background-color: {t.bg_secondary};
-            }}
-            QTabBar::tab {{
-                background-color: {t.bg_tertiary};
-                color: {t.text_muted};
-                padding: 8px 16px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-            }}
-            QTabBar::tab:selected {{
-                background-color: {t.bg_secondary};
-                color: {t.text_primary};
-            }}
-            QTableWidget {{
-                background-color: {t.bg_secondary};
-                border: 1px solid {t.border};
-                border-radius: 8px;
-            }}
-            QPushButton {{
-                background-color: {t.bg_secondary};
-                border: 1px solid {t.border};
-                border-radius: 6px;
-                padding: 8px 16px;
-                color: {t.text_primary};
-            }}
-            QPushButton:hover {{
-                background-color: {t.bg_hover};
-            }}
-            QLabel {{
-                background: transparent;
-            }}
-        """
-        )
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # Başlık
-        header = QHBoxLayout()
-        title = QLabel("👥 Vardiya Ekipleri")
-        title.setFont(QFont("", 16, QFont.Weight.Bold))
-        header.addWidget(title)
-        header.addStretch()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.clicked.connect(self._load_data)
-        header.addWidget(refresh_btn)
+        self.header = PageHeader(
+            title="Vardiya Ekipleri",
+            icon="👥",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self._load_data)
 
-        layout.addLayout(header)
+        layout.addWidget(self.header)
 
         # Tab widget - her ekip için bir sekme
         self.tabs = QTabWidget()
@@ -247,7 +199,9 @@ class ShiftTeamOverview(QWidget):
 
         # Özet
         self.summary_label = QLabel()
-        layout.addWidget(self.summary_label)
+        h_layout = self.header.header_layout()
+        h_layout.addStretch()
+        h_layout.addWidget(self.summary_label)
 
     def showEvent(self, event):
         super().showEvent(event)

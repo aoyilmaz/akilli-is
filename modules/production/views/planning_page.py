@@ -532,42 +532,49 @@ class ProductionPlanningPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("📅 Üretim Planlama")
-        header_layout.addWidget(title)
+        self.header = PageHeader(
+            title="Üretim Planlama",
+            icon="📅",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
 
-        header_layout.addStretch()
+        h_layout = self.header.header_layout()
 
         # Navigasyon
         nav_layout = QHBoxLayout()
         nav_layout.setSpacing(8)
 
         prev_btn = QPushButton("◀")
-        prev_btn.setFixedSize(32, 32)
+        prev_btn.setFixedSize(32, 36)
         prev_btn.clicked.connect(self._prev_period)
         nav_layout.addWidget(prev_btn)
 
         today_btn = QPushButton("Bugün")
+        today_btn.setFixedHeight(36)
         today_btn.clicked.connect(self._go_today)
         nav_layout.addWidget(today_btn)
 
         next_btn = QPushButton("▶")
-        next_btn.setFixedSize(32, 32)
+        next_btn.setFixedSize(32, 36)
         next_btn.clicked.connect(self._next_period)
         nav_layout.addWidget(next_btn)
 
         self.period_label = QLabel("")
         nav_layout.addWidget(self.period_label)
 
-        header_layout.addLayout(nav_layout)
+        h_layout.addLayout(nav_layout)
 
         # Görünüm seçici
-        header_layout.addSpacing(16)
+        h_layout.addSpacing(16)
 
         view_label = QLabel("Görünüm:")
-        header_layout.addWidget(view_label)
+        h_layout.addWidget(view_label)
 
         self.view_combo = QComboBox()
         self.view_combo.addItem("1 Hafta", 7)
@@ -575,23 +582,28 @@ class ProductionPlanningPage(QWidget):
         self.view_combo.addItem("1 Ay", 30)
         self.view_combo.addItem("2 Ay", 60)
         self.view_combo.setCurrentIndex(1)
+        self.view_combo.setFixedHeight(36)
         self.view_combo.currentIndexChanged.connect(self._on_view_changed)
-        header_layout.addWidget(self.view_combo)
+        h_layout.addWidget(self.view_combo)
 
         # Zoom
-        header_layout.addSpacing(8)
+        h_layout.addSpacing(8)
         zoom_label = QLabel("Zoom:")
-        header_layout.addWidget(zoom_label)
+        h_layout.addWidget(zoom_label)
 
         self.zoom_combo = QComboBox()
         self.zoom_combo.addItem("Küçük", 30)
         self.zoom_combo.addItem("Normal", 60)
         self.zoom_combo.addItem("Büyük", 90)
         self.zoom_combo.setCurrentIndex(1)
+        self.zoom_combo.setFixedHeight(36)
         self.zoom_combo.currentIndexChanged.connect(self._on_zoom_changed)
-        header_layout.addWidget(self.zoom_combo)
+        h_layout.addWidget(self.zoom_combo)
 
-        layout.addLayout(header_layout)
+        # Refresh sinyali
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        layout.addWidget(self.header)
 
         # Bilgi kartları
         cards_layout = QHBoxLayout()

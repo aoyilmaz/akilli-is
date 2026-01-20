@@ -1,8 +1,9 @@
 """
 Akıllı İş - Stok Hareketleri Listesi
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget,
@@ -10,95 +11,99 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QLineEdit,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QFrame,
     QComboBox,
-    QAbstractItemView,
-    QMenu,
     QDateEdit,
-    QMessageBox,
+    QMenu,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor, QAction
 
 from config import COLORS
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
 from database.models import StockMovementType
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class MovementListPage(QWidget):
-    """Stok hareketleri listesi"""
+    """Stok hareketleri listesi."""
 
-    add_entry_clicked = pyqtSignal()  # Giriş fişi
-    add_exit_clicked = pyqtSignal()  # Çıkış fişi
-    add_transfer_clicked = pyqtSignal()  # Transfer fişi
+    # Sinyaller
+    add_entry_clicked = pyqtSignal()
+    add_exit_clicked = pyqtSignal()
+    add_transfer_clicked = pyqtSignal()
     view_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
+    TYPE_NAMES = {
+        StockMovementType.GIRIS: ("📥 Giriş", COLORS["success"]),
+        StockMovementType.CIKIS: ("📤 Çıkış", COLORS["error"]),
+        StockMovementType.SATIN_ALMA: ("🛒 Satın Alma", COLORS["success"]),
+        StockMovementType.SATIS: ("💰 Satış", COLORS["error"]),
+        StockMovementType.URETIM_GIRIS: ("🏭 Üretim Giriş", COLORS["success"]),
+        StockMovementType.URETIM_CIKIS: ("🏭 Üretim Çıkış", COLORS["error"]),
+        StockMovementType.TRANSFER: ("🔄 Transfer", COLORS["info"]),
+        StockMovementType.SAYIM_FAZLA: ("➕ Sayım Fazla", COLORS["success"]),
+        StockMovementType.SAYIM_EKSIK: ("➖ Sayım Eksik", COLORS["error"]),
+        StockMovementType.FIRE: ("🔥 Fire", COLORS["warning"]),
+        StockMovementType.IADE_ALIS: ("↩️ Alış İade", COLORS["error"]),
+        StockMovementType.IADE_SATIS: ("↩️ Satış İade", COLORS["success"]),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Başlık ===
+        # Header - özel butonlar gerektiği için manuel oluşturulacak
         header_layout = QHBoxLayout()
 
-        title_layout = QVBoxLayout()
-        title = QLabel("Stok Hareketleri")
-        subtitle = QLabel("Stok giriş, çıkış ve transfer işlemlerini yönetin")
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-        header_layout.addLayout(title_layout)
+        self.header = PageHeader(
+            title="Stok Hareketleri",
+            icon="📦",
+            show_search=True,
+            show_refresh=True,
+            search_placeholder="Stok kodu, belge no ile ara...",
+            parent=self,
+        )
 
-        header_layout.addStretch()
-
-        # Butonlar
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
+        # Özel butonları ekle
         entry_btn = QPushButton("📥 Giriş Fişi")
-        entry_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        entry_btn.setStyleSheet(get_button_style("add"))
+        entry_btn.setProperty("class", "btn-add")
+        entry_btn.setFixedHeight(36)
         entry_btn.clicked.connect(self.add_entry_clicked.emit)
-        header_layout.addWidget(entry_btn)
 
         exit_btn = QPushButton("📤 Çıkış Fişi")
-        exit_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        exit_btn.setStyleSheet(get_button_style("danger"))
+        exit_btn.setProperty("class", "btn-danger")
+        exit_btn.setFixedHeight(36)
         exit_btn.clicked.connect(self.add_exit_clicked.emit)
-        header_layout.addWidget(exit_btn)
 
         transfer_btn = QPushButton("🔄 Transfer")
-        transfer_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        transfer_btn.setStyleSheet(get_button_style("primary"))
+        transfer_btn.setProperty("class", "btn-primary")
+        transfer_btn.setFixedHeight(36)
         transfer_btn.clicked.connect(self.add_transfer_clicked.emit)
-        header_layout.addWidget(transfer_btn)
 
-        layout.addLayout(header_layout)
+        # Header'a butonları ekle
+        h_layout = self.header.header_layout()
+        h_layout.addWidget(entry_btn)
+        h_layout.addWidget(exit_btn)
+        h_layout.addWidget(transfer_btn)
 
-        # === Filtreler ===
-        filter_frame = QFrame()
-        filter_layout = QHBoxLayout(filter_frame)
-        filter_layout.setContentsMargins(16, 12, 16, 12)
-        filter_layout.setSpacing(16)
+        layout.addWidget(self.header)
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Stok kodu, belge no ile ara...")
-        self.search_input.setMinimumWidth(250)
-        filter_layout.addWidget(self.search_input)
+        # Filtreler
+        filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(12)
 
-        # Hareket türü
         filter_layout.addWidget(QLabel("Tür:"))
         self.type_combo = QComboBox()
         self.type_combo.addItem("Tümü", None)
@@ -107,169 +112,94 @@ class MovementListPage(QWidget):
         self.type_combo.addItem("🔄 Transfer", "transfer")
         self.type_combo.addItem("🛒 Satın Alma", "satin_alma")
         self.type_combo.addItem("💰 Satış", "satis")
+        self.type_combo.setMinimumWidth(130)
+        self.type_combo.setFixedHeight(36)
         filter_layout.addWidget(self.type_combo)
 
-        # Tarih aralığı
         filter_layout.addWidget(QLabel("Tarih:"))
-
         self.start_date = QDateEdit()
         self.start_date.setDate(QDate.currentDate().addDays(-30))
         self.start_date.setCalendarPopup(True)
         filter_layout.addWidget(self.start_date)
 
         filter_layout.addWidget(QLabel("-"))
-
         self.end_date = QDateEdit()
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
         filter_layout.addWidget(self.end_date)
 
-        # Filtrele butonu
-        filter_btn = QPushButton(f"{ICONS['filter']} Filtrele")
-        filter_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        filter_btn.setStyleSheet(get_button_style("filter"))
+        filter_btn = QPushButton("🔍 Filtrele")
+        filter_btn.setProperty("class", "btn-filter")
         filter_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(filter_btn)
 
         filter_layout.addStretch()
+        layout.addLayout(filter_layout)
 
-        layout.addWidget(filter_frame)
+        # İstatistik kartları
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
 
-        # === Tablo ===
-        self.table = QTableWidget()
-        self._setup_table()
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
+        self.stat_cards["in"] = MiniStatCard("📥 Giriş", "₺0", "#10b981")
+        self.stat_cards["out"] = MiniStatCard("📤 Çıkış", "₺0", "#ef4444")
+
+        for card in self.stat_cards.values():
+            stats_layout.addWidget(card)
+        stats_layout.addStretch()
+        layout.addLayout(stats_layout)
+
+        # Tablo
+        columns = [
+            ColumnConfig("date", "Tarih", width=140),
+            ColumnConfig("document_no", "Belge No", width=120),
+            ColumnConfig("type", "Tür", width=100),
+            ColumnConfig("item_code", "Stok Kodu", width=100),
+            ColumnConfig("item_name", "Stok Adı", width=200, stretch=True),
+            ColumnConfig("quantity", "Miktar", width=90),
+            ColumnConfig("unit", "Birim", width=60),
+            ColumnConfig("unit_price", "Birim Fiyat", width=100),
+            ColumnConfig("total", "Toplam", width=110),
+            ColumnConfig("from_wh", "Kaynak", width=100),
+            ColumnConfig("to_wh", "Hedef", width=100),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="stock_movements",
+            columns=columns,
+            parent=self,
+        )
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.table)
 
-        # === Alt Bilgi ===
+        # Alt bilgi
         footer_layout = QHBoxLayout()
         self.count_label = QLabel("Toplam: 0 hareket")
         footer_layout.addWidget(self.count_label)
-
         footer_layout.addStretch()
-
         self.total_label = QLabel("Giriş: ₺0 | Çıkış: ₺0")
         footer_layout.addWidget(self.total_label)
-
         layout.addLayout(footer_layout)
 
-    def _setup_table(self):
-        columns = [
-            ("Tarih", 140),
-            ("Belge No", 120),
-            ("Tür", 100),
-            ("Stok Kodu", 100),
-            ("Stok Adı", 200),
-            ("Miktar", 90),
-            ("Birim", 60),
-            ("Birim Fiyat", 100),
-            ("Toplam", 110),
-            ("Kaynak", 100),
-            ("Hedef", 100),
-        ]
-
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 4:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.table.setColumnWidth(i, width)
-
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self._show_context_menu)
+    def _connect_signals(self):
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.search_changed.connect(lambda: self.refresh_requested.emit())
+        self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, movements: list):
         self.table.setRowCount(len(movements))
-
-        type_names = {
-            StockMovementType.GIRIS: ("📥 Giriş", COLORS["success"]),
-            StockMovementType.CIKIS: ("📤 Çıkış", COLORS["error"]),
-            StockMovementType.SATIN_ALMA: ("🛒 Satın Alma", COLORS["success"]),
-            StockMovementType.SATIS: ("💰 Satış", COLORS["error"]),
-            StockMovementType.URETIM_GIRIS: ("🏭 Üretim Giriş", COLORS["success"]),
-            StockMovementType.URETIM_CIKIS: ("🏭 Üretim Çıkış", COLORS["error"]),
-            StockMovementType.TRANSFER: ("🔄 Transfer", COLORS["info"]),
-            StockMovementType.SAYIM_FAZLA: ("➕ Sayım Fazla", COLORS["success"]),
-            StockMovementType.SAYIM_EKSIK: ("➖ Sayım Eksik", COLORS["error"]),
-            StockMovementType.FIRE: ("🔥 Fire", COLORS["warning"]),
-            StockMovementType.IADE_ALIS: ("↩️ Alış İade", COLORS["error"]),
-            StockMovementType.IADE_SATIS: ("↩️ Satış İade", COLORS["success"]),
-        }
+        visible_cols = self.table.get_visible_columns()
 
         total_in = Decimal(0)
         total_out = Decimal(0)
 
         for row, mov in enumerate(movements):
-            # Tarih
-            date_str = (
-                mov.movement_date.strftime("%d.%m.%Y %H:%M")
-                if mov.movement_date
-                else "-"
-            )
-            date_item = QTableWidgetItem(date_str)
-            date_item.setData(Qt.ItemDataRole.UserRole, mov.id)
-            self.table.setItem(row, 0, date_item)
-
-            # Belge No
-            self.table.setItem(row, 1, QTableWidgetItem(mov.document_no or "-"))
-
-            # Tür
-            type_text, type_color = type_names.get(mov.movement_type, ("?", "#ffffff"))
-            type_item = QTableWidgetItem(type_text)
-            type_item.setForeground(QColor(type_color))
-            self.table.setItem(row, 2, type_item)
-
-            # Stok Kodu
-            code_item = QTableWidgetItem(mov.item_code or "-")
-            code_item.setForeground(QColor("#818cf8"))
-            self.table.setItem(row, 3, code_item)
-
-            # Stok Adı
-            self.table.setItem(row, 4, QTableWidgetItem(mov.item_name or "-"))
-
-            # Miktar
-            qty = mov.quantity or Decimal(0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 5, qty_item)
-
-            # Birim
-            unit_text = mov.unit.code if mov.unit else "-"
-            self.table.setItem(row, 6, QTableWidgetItem(unit_text))
-
-            # Birim Fiyat
-            price = mov.unit_price or Decimal(0)
-            price_item = QTableWidgetItem(f"₺{price:,.2f}")
-            price_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 7, price_item)
-
-            # Toplam
-            total = mov.total_price or Decimal(0)
-            total_item = QTableWidgetItem(f"₺{total:,.2f}")
-            total_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 8, total_item)
-
-            # Kaynak depo
-            from_wh = mov.from_warehouse.code if mov.from_warehouse else "-"
-            self.table.setItem(row, 9, QTableWidgetItem(from_wh))
-
-            # Hedef depo
-            to_wh = mov.to_warehouse.code if mov.to_warehouse else "-"
-            self.table.setItem(row, 10, QTableWidgetItem(to_wh))
+            self._populate_row(row, mov, visible_cols)
 
             # Toplamları hesapla
+            total = mov.total_price or Decimal(0)
             if mov.movement_type in [
                 StockMovementType.GIRIS,
                 StockMovementType.SATIN_ALMA,
@@ -281,12 +211,92 @@ class MovementListPage(QWidget):
             else:
                 total_out += total
 
+        # Kartları güncelle
+        self.stat_cards["total"].update_value(str(len(movements)))
+        self.stat_cards["in"].update_value(f"₺{total_in:,.2f}")
+        self.stat_cards["out"].update_value(f"₺{total_out:,.2f}")
+
         self.count_label.setText(f"Toplam: {len(movements)} hareket")
         self.total_label.setText(f"Giriş: ₺{total_in:,.2f} | Çıkış: ₺{total_out:,.2f}")
 
+    def _populate_row(self, row: int, mov, visible_cols: list):
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "date":
+                date_str = (
+                    mov.movement_date.strftime("%d.%m.%Y %H:%M")
+                    if mov.movement_date
+                    else "-"
+                )
+                cell = QTableWidgetItem(date_str)
+                cell.setData(Qt.ItemDataRole.UserRole, mov.id)
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "document_no":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(mov.document_no or "-")
+                )
+
+            elif col_key == "type":
+                type_text, type_color = self.TYPE_NAMES.get(
+                    mov.movement_type, ("?", "#ffffff")
+                )
+                cell = QTableWidgetItem(type_text)
+                cell.setForeground(QColor(type_color))
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "item_code":
+                cell = QTableWidgetItem(mov.item_code or "-")
+                cell.setForeground(QColor("#818cf8"))
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "item_name":
+                self.table.setItem(row, col_idx, QTableWidgetItem(mov.item_name or "-"))
+
+            elif col_key == "quantity":
+                qty = mov.quantity or Decimal(0)
+                cell = QTableWidgetItem(f"{qty:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "unit":
+                unit_text = mov.unit.code if mov.unit else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(unit_text))
+
+            elif col_key == "unit_price":
+                price = mov.unit_price or Decimal(0)
+                cell = QTableWidgetItem(f"₺{price:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "total":
+                total = mov.total_price or Decimal(0)
+                cell = QTableWidgetItem(f"₺{total:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "from_wh":
+                from_wh = mov.from_warehouse.code if mov.from_warehouse else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(from_wh))
+
+            elif col_key == "to_wh":
+                to_wh = mov.to_warehouse.code if mov.to_warehouse else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(to_wh))
+
+        self.table.setRowHeight(row, 48)
+
     def get_filters(self) -> dict:
         return {
-            "keyword": self.search_input.text().strip(),
+            "keyword": (
+                self.header.search_input.text().strip()
+                if self.header.search_input
+                else ""
+            ),
             "movement_type": self.type_combo.currentData(),
             "start_date": self.start_date.date().toPyDate(),
             "end_date": self.end_date.date().toPyDate(),

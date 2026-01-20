@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Küçük ve Orta Ölçekli İşletmeler için Modern ERP Sistemi</strong>
+  <strong>Orta ve Büyük Ölçekli İşletmeler için Modern ERP Sistemi</strong>
 </p>
 
 <p align="center">

@@ -19,10 +19,35 @@ class OpportunityModule(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Fırsat Yönetimi",
+            icon="💰",
+            show_search=False,
+            show_refresh=False,
+            show_add=True,
+            add_text="Yeni Fırsat",
+            parent=self,
+        )
+        self.header.add_clicked.connect(self._show_add_form)
+
+        # Toolbar'daki Yenile butonu yerine header refresh butonu
+        # PageHeader default refresh butonu yoksa layout'a ekleyebiliriz
+        # PageHeader constructor'da show_refresh=True yapsak daha temiz
+        self.header.show_refresh = True
+        self.header.refresh_clicked.connect(self._load_data)
+
+        layout.addWidget(self.header)
+
         self.stack = QStackedWidget()
 
         # Kanban Panosu
         self.board_page = OpportunityBoard()
+        # Board içindeki toolbar kaldırılacak, bu yüzden sinyalleri buraya değil header'a bağlıyoruz
+        # Ancak board page double click gibi sinyalleri korumalı
         self.board_page.add_clicked.connect(self._show_add_form)
         self.board_page.card_clicked.connect(self._show_edit_form)
         self.board_page.refresh_clicked.connect(self._load_data)

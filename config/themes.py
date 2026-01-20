@@ -279,10 +279,10 @@ AURORA_NOVA_THEME = Theme(
 )
 
 
-# === VS CODE DARK TEMA (Global tema ile uyumlu) ===
-VSCODE_DARK_THEME = Theme(
-    name="vscode_dark",
-    display_name="VS Code Dark",
+# === DARK TEMA (Koyu Görünüm) ===
+DARK_THEME = Theme(
+    name="dark",
+    display_name="Dark",
     # VS Code Dark colors
     bg_primary="#1e1e1e",
     bg_secondary="#252526",
@@ -325,23 +325,74 @@ VSCODE_DARK_THEME = Theme(
 )
 
 
-# Tema koleksiyonu - VS Code Dark varsayılan
+# === LIGHT TEMA (Açık Görünüm) ===
+LIGHT_THEME = Theme(
+    name="light",
+    display_name="Light",
+    # Açık arka plan renkleri (Slate-50 tabanlı)
+    bg_primary="#f8fafc",  # Ana zemin (Slate-50)
+    bg_secondary="#ffffff",  # Kart/Panel zemini (White)
+    bg_tertiary="#f1f5f9",  # Hover/Input zemini (Slate-100)
+    bg_hover="#e2e8f0",  # Hover (Slate-200)
+    bg_selected="#0ea5e9",  # Seçili (Sky-500)
+    # Kenar çizgileri
+    border="#e2e8f0",  # Yumuşak sınır (Slate-200)
+    border_light="#f1f5f9",  # Çok hafif sınır (Slate-100)
+    # Metin renkleri
+    text_primary="#334155",  # Ana metin (Slate-700)
+    text_secondary="#64748b",  # İkincil metin (Slate-500)
+    text_muted="#94a3b8",  # Silik metin (Slate-400)
+    text_accent="#0284c7",  # Vurgulu metin (Sky-600)
+    # Accent - Sky/Blue tonları
+    accent_primary="#0ea5e9",  # Sky-500
+    accent_secondary="#0284c7",  # Sky-600
+    accent_gradient_start="#0ea5e9",
+    accent_gradient_end="#0284c7",
+    # Durum renkleri (Pastel tonlar tercih edildi)
+    success="#10b981",  # Emerald-500
+    warning="#f59e0b",  # Amber-500
+    error="#ef4444",  # Red-500
+    info="#3b82f6",  # Blue-500
+    # Özel alanlar
+    sidebar_bg="#ffffff",  # Sidebar beyaz
+    header_bg="#ffffff",  # Header beyaz
+    card_bg="#ffffff",  # Kartlar beyaz
+    input_bg="#f8fafc",  # Inputlar hafif gri
+    # Font
+    font_family="Inter, Segoe UI, Arial, sans-serif",
+    font_size=13,
+    font_size_small=11,
+    font_size_large=15,
+    font_size_title=22,
+    # Radius (Biraz daha yumuşak köşeler)
+    radius_small=6,
+    radius_medium=8,
+    radius_large=12,
+)
+
+
+# Tema koleksiyonu - Dark varsayılan
 THEMES: Dict[str, Theme] = {
-    "vscode_dark": VSCODE_DARK_THEME,
-    "pyerp_pro": PYERP_PRO_THEME,
-    "one_dark_pro": ONE_DARK_PRO_THEME,
+    "light": LIGHT_THEME,
     "dark": DARK_THEME,
-    "material_ocean": MATERIAL_OCEAN_THEME,
-    "aurora_nova": AURORA_NOVA_THEME,
+}
+
+# Font ölçekleri
+FONT_SCALES = {
+    "small": 0.85,
+    "normal": 1.0,
+    "large": 1.15,
 }
 
 
 class ThemeManager:
-    """Tema yöneticisi"""
+    """Tema yöneticisi - Tema ve font ölçeği yönetimi"""
 
     _instance = None
-    _current_theme: Theme = VSCODE_DARK_THEME  # VS Code Dark varsayılan
+    _current_theme: Theme = DARK_THEME  # Dark varsayılan
+    _font_scale: str = "normal"  # küçük, normal, büyük
     _callbacks = []
+    _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -349,18 +400,86 @@ class ThemeManager:
         return cls._instance
 
     @classmethod
+    def initialize(cls):
+        """QSettings'ten kayıtlı ayarları yükle"""
+        if cls._initialized:
+            return
+        try:
+            from PyQt6.QtCore import QSettings
+
+            settings = QSettings("AkilliIs", "ERP")
+
+            # Kayıtlı temayı yükle
+            saved_theme = settings.value("theme/name", "vscode_dark")
+            if saved_theme in THEMES:
+                cls._current_theme = THEMES[saved_theme]
+
+            # Kayıtlı font ölçeğini yükle
+            saved_scale = settings.value("theme/font_scale", "normal")
+            if saved_scale in FONT_SCALES:
+                cls._font_scale = saved_scale
+
+            cls._initialized = True
+        except Exception as e:
+            print(f"ThemeManager başlatma hatası: {e}")
+
+    @classmethod
     def get_theme(cls) -> Theme:
         return cls._current_theme
 
     @classmethod
-    def set_theme(cls, theme_name: str):
+    def set_theme(cls, theme_name: str, save: bool = True):
+        """Temayı değiştir ve opsiyonel olarak kaydet"""
         if theme_name in THEMES:
             cls._current_theme = THEMES[theme_name]
+            if save:
+                cls._save_settings()
             cls._notify_callbacks()
+
+    @classmethod
+    def get_font_scale(cls) -> str:
+        """Aktif font ölçeğini döndür (small, normal, large)"""
+        return cls._font_scale
+
+    @classmethod
+    def get_font_scale_multiplier(cls) -> float:
+        """Font ölçek çarpanını döndür"""
+        return FONT_SCALES.get(cls._font_scale, 1.0)
+
+    @classmethod
+    def set_font_scale(cls, scale: str, save: bool = True):
+        """Font ölçeğini değiştir (small, normal, large)"""
+        if scale in FONT_SCALES:
+            cls._font_scale = scale
+            if save:
+                cls._save_settings()
+            cls._notify_callbacks()
+
+    @classmethod
+    def _save_settings(cls):
+        """Ayarları QSettings'e kaydet"""
+        try:
+            from PyQt6.QtCore import QSettings
+
+            settings = QSettings("AkilliIs", "ERP")
+            settings.setValue("theme/name", cls._current_theme.name)
+            settings.setValue("theme/font_scale", cls._font_scale)
+            settings.sync()
+        except Exception as e:
+            print(f"Tema ayarları kaydedilemedi: {e}")
 
     @classmethod
     def get_available_themes(cls) -> Dict[str, str]:
         return {name: theme.display_name for name, theme in THEMES.items()}
+
+    @classmethod
+    def get_available_font_scales(cls) -> Dict[str, str]:
+        """Kullanılabilir font ölçeklerini döndür"""
+        return {
+            "small": "Küçük",
+            "normal": "Normal",
+            "large": "Büyük",
+        }
 
     @classmethod
     def register_callback(cls, callback):

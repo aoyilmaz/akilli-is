@@ -23,25 +23,16 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QAction
+from PyQt6.QtGui import QColor, QAction, QIcon
 
 from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BG_HOVER,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
     ACCENT,
     SUCCESS,
-    WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
-    get_input_style,
-    BTN_HEIGHT_NORMAL,
-    ICONS,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BORDER,
+    TEXT_PRIMARY,
 )
 
 
@@ -223,29 +214,38 @@ class UnitManagementPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Baslik ===
-        header_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("Birim Yonetimi")
-        header_layout.addWidget(title)
+        self.header = PageHeader(
+            title="Birim Yönetimi",
+            icon="📏",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Birim",
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self._add_unit)
 
-        header_layout.addStretch()
+        # Custom Action Button for Header
+        h_layout = self.header.header_layout()
 
-        # Yenile
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        # Add Stretch to push buttons to right (if not already there)
+        # PageHeader usually handles this, but let's be safe or just add to the layout
 
-        # Yeni birim
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Birim")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self._add_unit)
-        header_layout.addWidget(add_btn)
+        new_conv_btn = QPushButton("Yeni Dönüşüm")
+        new_conv_btn.setProperty("class", "btn-secondary")
+        new_conv_btn.setIcon(QIcon(":/icons/exchange.png"))  # Optional if icon exists
+        new_conv_btn.clicked.connect(self._add_conversion)
 
-        layout.addLayout(header_layout)
+        # Insert before the standard ADD button if possible, or append
+        h_layout.insertWidget(
+            h_layout.count() - 2, new_conv_btn
+        )  # Approximate position
+
+        layout.addWidget(self.header)
 
         # === Iki Bolum ===
         content_layout = QHBoxLayout()
@@ -253,38 +253,52 @@ class UnitManagementPage(QWidget):
 
         # Sol: Birimler
         units_frame = QFrame()
+        units_frame.setObjectName("unitsFrame")
+        units_frame.setStyleSheet(
+            f"#unitsFrame {{ border: 1px solid {BORDER}; border-radius: 8px; background-color: {BG_SECONDARY}; }}"
+        )
         units_layout = QVBoxLayout(units_frame)
-        units_layout.setContentsMargins(16, 16, 16, 16)
+        units_layout.setContentsMargins(0, 0, 0, 0)
+        units_layout.setSpacing(0)
 
-        units_header = QLabel("Birimler")
+        units_header = QLabel("  Birimler")
+        units_header.setFixedHeight(40)
+        units_header.setStyleSheet(
+            f"background-color: {BG_TERTIARY}; border-top-left-radius: 8px; border-top-right-radius: 8px; color: {TEXT_PRIMARY}; font-weight: bold; padding-left: 10px; border-bottom: 1px solid {BORDER};"
+        )
         units_layout.addWidget(units_header)
 
         self.units_table = QTableWidget()
         self._setup_units_table()
+        self.units_table.setStyleSheet(
+            "border: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;"
+        )
         units_layout.addWidget(self.units_table)
 
         content_layout.addWidget(units_frame, 2)
 
         # Sag: Donusumler
         conv_frame = QFrame()
+        conv_frame.setObjectName("convFrame")
+        conv_frame.setStyleSheet(
+            f"#convFrame {{ border: 1px solid {BORDER}; border-radius: 8px; background-color: {BG_SECONDARY}; }}"
+        )
         conv_layout = QVBoxLayout(conv_frame)
-        conv_layout.setContentsMargins(16, 16, 16, 16)
+        conv_layout.setContentsMargins(0, 0, 0, 0)
+        conv_layout.setSpacing(0)
 
-        conv_header_layout = QHBoxLayout()
-        conv_header = QLabel("Birim Donusumleri")
-        conv_header_layout.addWidget(conv_header)
-
-        conv_header_layout.addStretch()
-
-        add_conv_btn = QPushButton("+")
-        add_conv_btn.setFixedSize(32, 32)
-        add_conv_btn.clicked.connect(self._add_conversion)
-        conv_header_layout.addWidget(add_conv_btn)
-
-        conv_layout.addLayout(conv_header_layout)
+        conv_header = QLabel("  Birim Dönüşümleri")
+        conv_header.setFixedHeight(40)
+        conv_header.setStyleSheet(
+            f"background-color: {BG_TERTIARY}; border-top-left-radius: 8px; border-top-right-radius: 8px; color: {TEXT_PRIMARY}; font-weight: bold; padding-left: 10px; border-bottom: 1px solid {BORDER};"
+        )
+        conv_layout.addWidget(conv_header)
 
         self.conv_table = QTableWidget()
         self._setup_conv_table()
+        self.conv_table.setStyleSheet(
+            "border: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;"
+        )
         conv_layout.addWidget(self.conv_table)
 
         content_layout.addWidget(conv_frame, 1)

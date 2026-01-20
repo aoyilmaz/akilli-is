@@ -32,22 +32,22 @@ class JournalModule(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Baslik
-        header = QHBoxLayout()
+        # Header - PageHeader kullanarak
+        from ui.components.page_header import PageHeader
 
-        title = QLabel("Yevmiye Fisleri")
-        header.addWidget(title)
+        self.header = PageHeader(
+            title="Yevmiye Fişleri",
+            icon="📝",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Yevmiye",
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.load_data)
+        self.header.add_clicked.connect(self._new_journal)
 
-        header.addStretch()
-
-        # Yeni fis
-        new_btn = QPushButton(f"{ICONS['add']} Yeni Yevmiye")
-        new_btn.setStyleSheet(get_button_style("add"))
-        new_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        new_btn.clicked.connect(self._new_journal)
-        header.addWidget(new_btn)
-
-        layout.addLayout(header)
+        layout.addWidget(self.header)
 
         # Liste
         self.list_widget = JournalListWidget()

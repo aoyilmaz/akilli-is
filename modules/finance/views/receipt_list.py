@@ -23,10 +23,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY,
     BG_SECONDARY,
     BG_TERTIARY,
-    BG_HOVER,
     BORDER,
     TEXT_PRIMARY,
     TEXT_MUTED,
@@ -34,9 +32,6 @@ from config.styles import (
     SUCCESS,
     WARNING,
     ERROR,
-    get_table_style,
-    get_button_style,
-    get_input_style,
 )
 
 
@@ -59,35 +54,34 @@ class ReceiptListPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        title = QLabel("Tahsilatlar")
-        header_layout.addWidget(title)
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        header_layout.addStretch()
+        self.header = PageHeader(
+            title="Tahsilatlar",
+            icon="💰",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Tahsilat",
+            search_placeholder="Ara... (no, musteri)",
+            parent=self,
+        )
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Ara... (no, musteri)")
-        self.search_input.setFixedWidth(250)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        # Sinyalleri bağla
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
 
-        # Yenile butonu
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setFixedHeight(42)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
+        # Arama kutusunu referans al
+        self.search_input = self.header.search_input
 
-        # Yeni ekle butonu
-        add_btn = QPushButton("➕ Yeni Tahsilat")
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # Filtre alani
         filter_layout = QHBoxLayout()
@@ -220,6 +214,15 @@ class ReceiptListPage(QWidget):
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         card = QFrame()
         card.setFixedSize(160, 80)
+        card.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: {BG_SECONDARY};
+                border: 1px solid {BORDER};
+                border-radius: 8px;
+            }}
+        """
+        )
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(4)

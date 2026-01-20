@@ -82,15 +82,7 @@ class MovementFormPage(QWidget):
 
         # === Fiş Bilgileri ===
         info_frame = QFrame()
-        info_frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """
-        )
+        info_frame.setProperty("class", "card")
         info_layout = QHBoxLayout(info_frame)
         info_layout.setContentsMargins(16, 16, 16, 16)
         info_layout.setSpacing(24)
@@ -142,15 +134,7 @@ class MovementFormPage(QWidget):
 
         # === Satır Ekleme ===
         add_frame = QFrame()
-        add_frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """
-        )
+        add_frame.setProperty("class", "card-secondary")
         add_layout = QHBoxLayout(add_frame)
         add_layout.setContentsMargins(16, 12, 16, 12)
         add_layout.setSpacing(12)
@@ -161,15 +145,7 @@ class MovementFormPage(QWidget):
         self.barcode_input.setPlaceholderText("Barkod okutun...")
         self.barcode_input.setMaximumWidth(150)
         self.barcode_input.returnPressed.connect(self._on_barcode_scan)
-        self.barcode_input.setStyleSheet(
-            """
-            QLineEdit {
-                border: 2px solid #3b82f6;
-                border-radius: 4px;
-                padding: 4px 8px;
-            }
-        """
-        )
+        self.barcode_input.setProperty("class", "barcode-input")
         add_layout.addWidget(self.barcode_input)
 
         # Stok seçimi
@@ -202,6 +178,20 @@ class MovementFormPage(QWidget):
         self.lot_input.setMaximumWidth(100)
         add_layout.addWidget(self.lot_input)
 
+        # === Dual-Unit (İkincil Birim) ===
+        add_layout.addWidget(QLabel("İkincil Mkt:"))
+        self.secondary_qty_input = QDoubleSpinBox()
+        self.secondary_qty_input.setRange(0, 999999999)
+        self.secondary_qty_input.setDecimals(4)
+        self.secondary_qty_input.setSpecialValueText("-")
+        self.secondary_qty_input.setToolTip("Örn: 10 koli = 150 kg")
+        add_layout.addWidget(self.secondary_qty_input)
+
+        add_layout.addWidget(QLabel("İkincil Birim:"))
+        self.secondary_unit_combo = QComboBox()
+        self.secondary_unit_combo.setMinimumWidth(80)
+        add_layout.addWidget(self.secondary_unit_combo)
+
         # Ekle butonu
         add_btn = QPushButton("➕ Ekle")
         add_btn.clicked.connect(self._add_line)
@@ -216,15 +206,7 @@ class MovementFormPage(QWidget):
 
         # === Alt Bilgi ===
         footer_frame = QFrame()
-        footer_frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """
-        )
+        footer_frame.setProperty("class", "card")
         footer_layout = QHBoxLayout(footer_frame)
         footer_layout.setContentsMargins(16, 12, 16, 12)
 
@@ -256,12 +238,14 @@ class MovementFormPage(QWidget):
     def _setup_table(self):
         columns = [
             ("Stok Kodu", 100),
-            ("Stok Adı", 250),
-            ("Miktar", 100),
-            ("Birim", 60),
-            ("Birim Fiyat", 110),
-            ("Toplam", 120),
-            ("Lot No", 100),
+            ("Stok Adı", 200),
+            ("Miktar", 90),
+            ("Birim", 55),
+            ("İkincil Mkt", 90),
+            ("İkn. Birim", 70),
+            ("Birim Fiyat", 100),
+            ("Toplam", 110),
+            ("Lot No", 90),
             ("", 50),  # Sil butonu
         ]
 
@@ -279,26 +263,7 @@ class MovementFormPage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
 
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: rgba(30, 41, 59, 0.3);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #334155;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #94a3b8;
-                font-weight: 600;
-                padding: 10px 8px;
-                border: none;
-            }
-        """
-        )
+        self.table.setProperty("class", "enhanced-table")
 
     def _on_barcode_scan(self):
         """Barkod okutulduğunda ürünü bul ve seç"""
@@ -345,6 +310,13 @@ class MovementFormPage(QWidget):
             }
             self.item_combo.addItem(f"{item.code} - {item.name}", item.id)
 
+    def load_units(self, units: list):
+        """Birimleri ikincil birim combo'suna yükle (Dual-Unit)"""
+        self.secondary_unit_combo.clear()
+        self.secondary_unit_combo.addItem("-", None)
+        for unit in units:
+            self.secondary_unit_combo.addItem(unit.code, unit.id)
+
     def load_warehouses(self, warehouses: list):
         """Depoları yükle"""
         self.warehouses_data = {wh.id: wh for wh in warehouses}
@@ -378,6 +350,14 @@ class MovementFormPage(QWidget):
         price = Decimal(str(self.price_input.value()))
         lot = self.lot_input.text().strip()
 
+        # İkincil birim (Dual-Unit)
+        sec_qty_val = self.secondary_qty_input.value()
+        secondary_qty = Decimal(str(sec_qty_val)) if sec_qty_val > 0 else None
+        secondary_unit_id = self.secondary_unit_combo.currentData()
+        secondary_unit_code = (
+            self.secondary_unit_combo.currentText() if secondary_unit_id else ""
+        )
+
         line = {
             "item_id": item_id,
             "item_code": item["code"],
@@ -387,6 +367,10 @@ class MovementFormPage(QWidget):
             "unit_price": price,
             "total": qty * price,
             "lot_number": lot or None,
+            # Dual-Unit
+            "secondary_quantity": secondary_qty,
+            "secondary_unit_id": secondary_unit_id,
+            "secondary_unit_code": secondary_unit_code,
         }
 
         self.lines.append(line)
@@ -396,6 +380,8 @@ class MovementFormPage(QWidget):
         self.qty_input.setValue(1)
         self.price_input.setValue(0)
         self.lot_input.clear()
+        self.secondary_qty_input.setValue(0)
+        self.secondary_unit_combo.setCurrentIndex(0)
         self.item_combo.setFocus()
 
     def _refresh_table(self):
@@ -421,27 +407,40 @@ class MovementFormPage(QWidget):
             # Birim
             self.table.setItem(row, 3, QTableWidgetItem(line["unit_code"]))
 
+            # İkincil Miktar (Dual-Unit)
+            sec_qty = line.get("secondary_quantity")
+            sec_text = f"{sec_qty:,.4f}" if sec_qty else "-"
+            sec_item = QTableWidgetItem(sec_text)
+            sec_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            self.table.setItem(row, 4, sec_item)
+
+            # İkincil Birim (Dual-Unit)
+            sec_unit = line.get("secondary_unit_code", "")
+            self.table.setItem(row, 5, QTableWidgetItem(sec_unit))
+
             # Birim Fiyat
             price_item = QTableWidgetItem(f"₺{line['unit_price']:,.4f}")
             price_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
-            self.table.setItem(row, 4, price_item)
+            self.table.setItem(row, 6, price_item)
 
             # Toplam
             total_item = QTableWidgetItem(f"₺{line['total']:,.2f}")
             total_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
-            self.table.setItem(row, 5, total_item)
+            self.table.setItem(row, 7, total_item)
 
             # Lot No
-            self.table.setItem(row, 6, QTableWidgetItem(line["lot_number"] or ""))
+            self.table.setItem(row, 8, QTableWidgetItem(line["lot_number"] or ""))
 
             # Sil butonu
             del_btn = QPushButton("🗑")
             del_btn.clicked.connect(lambda checked, r=row: self._delete_line(r))
-            self.table.setCellWidget(row, 7, del_btn)
+            self.table.setCellWidget(row, 9, del_btn)
 
             total += line["total"]
 

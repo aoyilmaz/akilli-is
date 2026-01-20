@@ -1,31 +1,32 @@
 """
 Akıllı İş - Satın Alma Talepleri Liste Sayfası
+Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QLabel,
+    QVBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QFrame,
-    QLineEdit,
-    QHeaderView,
-    QAbstractItemView,
-    QMessageBox,
     QComboBox,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from ui.components.stat_cards import MiniStatCard
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+)
 
 
 class PurchaseRequestListPage(QWidget):
-    """Satın alma talepleri listesi"""
+    """Satın alma talepleri listesi."""
 
+    # Sinyaller
     add_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
@@ -35,25 +36,46 @@ class PurchaseRequestListPage(QWidget):
     create_order_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
+    STATUS_LABELS = {
+        "draft": ("🔵 Taslak", "#64748b"),
+        "pending": ("🟡 Onay Bekliyor", "#f59e0b"),
+        "approved": ("🟢 Onaylandı", "#10b981"),
+        "rejected": ("🔴 Reddedildi", "#ef4444"),
+        "ordered": ("📦 Sipariş Verildi", "#8b5cf6"),
+        "cancelled": ("⚫ İptal", "#475569"),
+    }
+
+    PRIORITY_LABELS = {
+        1: ("⬇️ Düşük", "#64748b"),
+        2: ("➡️ Normal", "#3b82f6"),
+        3: ("⬆️ Yüksek", "#f59e0b"),
+        4: ("🔥 Acil", "#ef4444"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.requests = []
-        self.setup_ui()
+        self._setup_ui()
+        self._connect_signals()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
         # Header
-        header_layout = QHBoxLayout()
+        self.header = PageHeader(
+            title="Satın Alma Talepleri",
+            icon="📋",
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Talep",
+            search_placeholder="Ara... (talep no, departman)",
+            parent=self,
+        )
 
-        title = QLabel("📋 Satın Alma Talepleri")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        # Durum filtresi
+        # Filtre ekle
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
         self.status_filter.addItem("🔵 Taslak", "draft")
@@ -61,356 +83,233 @@ class PurchaseRequestListPage(QWidget):
         self.status_filter.addItem("🟢 Onaylandı", "approved")
         self.status_filter.addItem("🔴 Reddedildi", "rejected")
         self.status_filter.addItem("📦 Sipariş Verildi", "ordered")
-        self.status_filter.setStyleSheet(self._combo_style())
         self.status_filter.setMinimumWidth(160)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        header_layout.addWidget(self.status_filter)
 
-        # Arama
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Ara... (talep no, departman)")
-        self.search_input.setFixedWidth(250)
-        self.search_input.textChanged.connect(self._on_search)
-        header_layout.addWidget(self.search_input)
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
 
-        # Yenile butonu
-        refresh_btn = QPushButton(f"{ICONS['refresh']} Yenile")
-        refresh_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        refresh_btn.setStyleSheet(get_button_style("refresh"))
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        header_layout.addWidget(refresh_btn)
-
-        # Yeni ekle butonu
-        add_btn = QPushButton(f"{ICONS['add']} Yeni Talep")
-        add_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
-        add_btn.setStyleSheet(get_button_style("add"))
-        add_btn.clicked.connect(self.add_clicked.emit)
-        header_layout.addWidget(add_btn)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
         # İstatistik kartları
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(12)
 
-        self.total_card = self._create_stat_card("📊", "Toplam", "0", "#6366f1")
-        stats_layout.addWidget(self.total_card)
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
+        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
+        self.stat_cards["pending"] = MiniStatCard("🟡 Bekleyen", "0", "#f59e0b")
+        self.stat_cards["approved"] = MiniStatCard("🟢 Onaylı", "0", "#10b981")
+        self.stat_cards["rejected"] = MiniStatCard("🔴 Ret", "0", "#ef4444")
 
-        self.draft_card = self._create_stat_card("🔵", "Taslak", "0", "#64748b")
-        stats_layout.addWidget(self.draft_card)
-
-        self.pending_card = self._create_stat_card(
-            "🟡", "Onay Bekliyor", "0", "#f59e0b"
-        )
-        stats_layout.addWidget(self.pending_card)
-
-        self.approved_card = self._create_stat_card("🟢", "Onaylandı", "0", "#10b981")
-        stats_layout.addWidget(self.approved_card)
-
-        self.rejected_card = self._create_stat_card("🔴", "Reddedildi", "0", "#ef4444")
-        stats_layout.addWidget(self.rejected_card)
-
+        for card in self.stat_cards.values():
+            stats_layout.addWidget(card)
         stats_layout.addStretch()
         layout.addLayout(stats_layout)
 
         # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(9)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "Talep No",
-                "Tarih",
-                "Talep Eden",
-                "Departman",
-                "Kalem",
-                "Öncelik",
-                "Durum",
-                "Termin",
+        columns = [
+            ColumnConfig("request_no", "Talep No", width=120),
+            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("requested_by", "Talep Eden", width=120),
+            ColumnConfig("department", "Departman", width=150, stretch=True),
+            ColumnConfig("items", "Kalem", width=60),
+            ColumnConfig("priority", "Öncelik", width=80),
+            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig("required_date", "Termin", width=100),
+            ColumnConfig(
+                "actions",
                 "İşlemler",
-            ]
+                width=180,
+                resizable=False,
+                movable=False,
+                hideable=False,
+            ),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="purchase_requests",
+            columns=columns,
+            parent=self,
         )
-
-        # Tablo stili
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-
-        # Kolon genişlikleri
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
-
-        self.table.setColumnWidth(0, 120)  # Talep No
-        self.table.setColumnWidth(1, 100)  # Tarih
-        self.table.setColumnWidth(2, 120)  # Talep Eden
-        self.table.setColumnWidth(4, 60)  # Kalem
-        self.table.setColumnWidth(5, 80)  # Öncelik
-        self.table.setColumnWidth(6, 120)  # Durum
-        self.table.setColumnWidth(7, 100)  # Termin
-        self.table.setColumnWidth(8, 180)  # İşlemler
-
-        self.table.doubleClicked.connect(self._on_double_click)
-
         layout.addWidget(self.table)
 
-    def _create_stat_card(
-        self, icon: str, title: str, value: str, color: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(f"{icon} {title}", value, color)
-
-    def _update_card(self, card: MiniStatCard, value: str):
-        """Kart değerini güncelle"""
-        card.update_value(value)
-
-    def _combo_style(self):
-        return """
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: #f8fafc;
-                font-size: 14px;
-            }
-            QComboBox:hover { border-color: #475569; }
-            QComboBox::drop-down { border: none; width: 30px; }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid #94a3b8;
-                margin-right: 10px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-                selection-background-color: #334155;
-            }
-        """
+    def _connect_signals(self):
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._on_search)
+        self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, requests: list):
-        """Verileri yükle"""
         self.requests = requests
         self._apply_filter()
 
     def _apply_filter(self):
-        """Filtreyi uygula"""
         status_filter = self.status_filter.currentData()
-
         filtered = self.requests
         if status_filter:
             filtered = [r for r in self.requests if r.get("status") == status_filter]
-
         self._display_data(filtered)
         self._update_stats()
 
     def _display_data(self, requests: list):
-        """Tabloya verileri yükle"""
-        self.table.setRowCount(0)
-
-        priority_labels = {
-            1: ("⬇️ Düşük", "#64748b"),
-            2: ("➡️ Normal", "#3b82f6"),
-            3: ("⬆️ Yüksek", "#f59e0b"),
-            4: ("🔥 Acil", "#ef4444"),
-        }
-
-        status_labels = {
-            "draft": ("🔵 Taslak", "#64748b"),
-            "pending": ("🟡 Onay Bekliyor", "#f59e0b"),
-            "approved": ("🟢 Onaylandı", "#10b981"),
-            "rejected": ("🔴 Reddedildi", "#ef4444"),
-            "ordered": ("📦 Sipariş Verildi", "#8b5cf6"),
-            "cancelled": ("⚫ İptal", "#475569"),
-        }
+        self.table.setRowCount(len(requests))
+        visible_cols = self.table.get_visible_columns()
 
         for row, req in enumerate(requests):
-            self.table.insertRow(row)
+            self._populate_row(row, req, visible_cols)
 
-            # Talep No
-            no_item = QTableWidgetItem(req.get("request_no", ""))
-            no_item.setData(Qt.ItemDataRole.UserRole, req.get("id"))
-            self.table.setItem(row, 0, no_item)
+    def _populate_row(self, row: int, req: dict, visible_cols: list):
+        req_id = req.get("id")
 
-            # Tarih
-            req_date = req.get("request_date")
-            if req_date:
-                if isinstance(req_date, date):
-                    date_str = req_date.strftime("%d.%m.%Y")
-                else:
-                    date_str = str(req_date)
-            else:
-                date_str = "-"
-            self.table.setItem(row, 1, QTableWidgetItem(date_str))
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "request_no":
+                item = QTableWidgetItem(req.get("request_no", ""))
+                item.setData(Qt.ItemDataRole.UserRole, req_id)
+                self.table.setItem(row, col_idx, item)
 
-            # Talep Eden
-            self.table.setItem(
-                row, 2, QTableWidgetItem(req.get("requested_by", "") or "-")
+            elif col_key == "date":
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(self._format_date(req.get("request_date"))),
+                )
+
+            elif col_key == "requested_by":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(req.get("requested_by", "") or "-")
+                )
+
+            elif col_key == "department":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(req.get("department", "") or "-")
+                )
+
+            elif col_key == "items":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(str(req.get("total_items", 0)))
+                )
+
+            elif col_key == "priority":
+                priority = req.get("priority", 2)
+                label, _ = self.PRIORITY_LABELS.get(priority, ("Normal", "#3b82f6"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(label))
+
+            elif col_key == "status":
+                status = req.get("status", "draft")
+                label, _ = self.STATUS_LABELS.get(status, ("Taslak", "#64748b"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(label))
+
+            elif col_key == "required_date":
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(self._format_date(req.get("required_date"))),
+                )
+
+            elif col_key == "actions":
+                self._add_action_buttons(row, col_idx, req)
+
+        self.table.setRowHeight(row, 52)
+
+    def _format_date(self, dt) -> str:
+        if dt:
+            if isinstance(dt, date):
+                return dt.strftime("%d.%m.%Y")
+            return str(dt)
+        return "-"
+
+    def _add_action_buttons(self, row: int, col: int, req: dict):
+        btn_widget = QWidget()
+        btn_widget.setProperty("class", "action-button-group")
+        btn_layout = QHBoxLayout(btn_widget)
+        btn_layout.setContentsMargins(2, 2, 2, 2)
+        btn_layout.setSpacing(2)
+
+        req_id = req.get("id")
+        status = req.get("status", "draft")
+
+        # Görüntüle
+        view_btn = QPushButton("👁")
+        view_btn.setFixedSize(28, 26)
+        view_btn.clicked.connect(
+            lambda checked, rid=req_id: self.view_clicked.emit(rid)
+        )
+        btn_layout.addWidget(view_btn)
+
+        if status == "draft":
+            edit_btn = QPushButton("✏")
+            edit_btn.setFixedSize(28, 26)
+            edit_btn.clicked.connect(
+                lambda checked, rid=req_id: self.edit_clicked.emit(rid)
             )
+            btn_layout.addWidget(edit_btn)
 
-            # Departman
-            self.table.setItem(
-                row, 3, QTableWidgetItem(req.get("department", "") or "-")
+        if status == "pending":
+            approve_btn = QPushButton("✓")
+            approve_btn.setFixedSize(28, 26)
+            approve_btn.setToolTip("Onayla")
+            approve_btn.clicked.connect(
+                lambda checked, rid=req_id: self.approve_clicked.emit(rid)
             )
+            btn_layout.addWidget(approve_btn)
 
-            # Kalem Sayısı
-            item_count = req.get("total_items", 0)
-            self.table.setItem(row, 4, QTableWidgetItem(str(item_count)))
-
-            # Öncelik
-            priority = req.get("priority", 2)
-            priority_text, priority_color = priority_labels.get(
-                priority, ("Normal", "#3b82f6")
+            reject_btn = QPushButton("✗")
+            reject_btn.setFixedSize(28, 26)
+            reject_btn.setToolTip("Reddet")
+            reject_btn.clicked.connect(
+                lambda checked, rid=req_id: self.reject_clicked.emit(rid)
             )
-            priority_item = QTableWidgetItem(priority_text)
-            priority_item.setForeground(Qt.GlobalColor.white)
-            self.table.setItem(row, 5, priority_item)
+            btn_layout.addWidget(reject_btn)
 
-            # Durum
-            status = req.get("status", "draft")
-            status_text, status_color = status_labels.get(status, ("Taslak", "#64748b"))
-            status_item = QTableWidgetItem(status_text)
-            self.table.setItem(row, 6, status_item)
-
-            # Termin
-            req_required = req.get("required_date")
-            if req_required:
-                if isinstance(req_required, date):
-                    required_str = req_required.strftime("%d.%m.%Y")
-                else:
-                    required_str = str(req_required)
-            else:
-                required_str = "-"
-            self.table.setItem(row, 7, QTableWidgetItem(required_str))
-
-            # İşlem butonları
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 4, 4, 4)
-            btn_layout.setSpacing(4)
-
-            req_id = req.get("id")
-            req_status = req.get("status", "draft")
-
-            # Görüntüle
-            view_btn = QPushButton("Gör")
-            view_btn.setFixedSize(40, 28)
-            view_btn.setToolTip("Görüntüle")
-            view_btn.clicked.connect(
-                lambda checked, id=req_id: self.view_clicked.emit(id)
+        if status == "approved":
+            order_btn = QPushButton("📦")
+            order_btn.setFixedSize(28, 26)
+            order_btn.setToolTip("Sipariş Oluştur")
+            order_btn.clicked.connect(
+                lambda checked, rid=req_id: self.create_order_clicked.emit(rid)
             )
-            btn_layout.addWidget(view_btn)
+            btn_layout.addWidget(order_btn)
 
-            # Düzenle (sadece taslak)
-            if req_status == "draft":
-                edit_btn = QPushButton("Düz")
-                edit_btn.setFixedSize(40, 28)
-                edit_btn.setToolTip("Düzenle")
-                edit_btn.clicked.connect(
-                    lambda checked, id=req_id: self.edit_clicked.emit(id)
-                )
-                btn_layout.addWidget(edit_btn)
+        if status == "draft":
+            del_btn = QPushButton("🗑")
+            del_btn.setFixedSize(28, 26)
+            del_btn.clicked.connect(
+                lambda checked, rid=req_id: self._confirm_delete(rid)
+            )
+            btn_layout.addWidget(del_btn)
 
-            # Onayla / Reddet (sadece pending)
-            if req_status == "pending":
-                approve_btn = QPushButton("On")
-                approve_btn.setFixedSize(40, 28)
-                approve_btn.setToolTip("Onayla")
-                approve_btn.clicked.connect(
-                    lambda checked, id=req_id: self.approve_clicked.emit(id)
-                )
-                btn_layout.addWidget(approve_btn)
-
-                reject_btn = QPushButton("İpt")
-                reject_btn.setFixedSize(40, 28)
-                reject_btn.setToolTip("Reddet")
-                reject_btn.clicked.connect(
-                    lambda checked, id=req_id: self.reject_clicked.emit(id)
-                )
-                btn_layout.addWidget(reject_btn)
-
-            # Sipariş Oluştur (sadece approved)
-            if req_status == "approved":
-                order_btn = QPushButton("📦")
-                order_btn.setFixedSize(40, 28)
-                order_btn.setToolTip("Sipariş Oluştur")
-                order_btn.clicked.connect(
-                    lambda checked, id=req_id: self.create_order_clicked.emit(id)
-                )
-                btn_layout.addWidget(order_btn)
-
-            # Sil (sadece taslak)
-            if req_status == "draft":
-                del_btn = QPushButton("Sil")
-                del_btn.setFixedSize(40, 28)
-                del_btn.setToolTip("Sil")
-                del_btn.clicked.connect(
-                    lambda checked, id=req_id: self._confirm_delete(id)
-                )
-                btn_layout.addWidget(del_btn)
-
-            self.table.setCellWidget(row, 8, btn_widget)
-            self.table.setRowHeight(row, 56)
+        self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):
-        """İstatistikleri güncelle"""
         total = len(self.requests)
         draft = sum(1 for r in self.requests if r.get("status") == "draft")
         pending = sum(1 for r in self.requests if r.get("status") == "pending")
         approved = sum(1 for r in self.requests if r.get("status") == "approved")
         rejected = sum(1 for r in self.requests if r.get("status") == "rejected")
 
-        self._update_card(self.total_card, str(total))
-        self._update_card(self.draft_card, str(draft))
-        self._update_card(self.pending_card, str(pending))
-        self._update_card(self.approved_card, str(approved))
-        self._update_card(self.rejected_card, str(rejected))
-
-    def _action_btn_style(self, color: str) -> str:
-        return f"""
-            QPushButton {{
-                background-color: {color}20;
-                border: 1px solid {color}50;
-                border-radius: 6px;
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: {color}40;
-            }}
-        """
+        self.stat_cards["total"].update_value(str(total))
+        self.stat_cards["draft"].update_value(str(draft))
+        self.stat_cards["pending"].update_value(str(pending))
+        self.stat_cards["approved"].update_value(str(approved))
+        self.stat_cards["rejected"].update_value(str(rejected))
 
     def _on_search(self, text: str):
-        """Arama"""
         text = text.lower()
         for row in range(self.table.rowCount()):
-            match = False
-            for col in range(7):
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
+            match = any(
+                self.table.item(row, col)
+                and text in self.table.item(row, col).text().lower()
+                for col in range(self.table.columnCount() - 1)
+            )
             self.table.setRowHidden(row, not match)
 
     def _on_filter_changed(self):
-        """Filtre değişti"""
         self._apply_filter()
 
-    def _on_double_click(self, index):
-        """Çift tıklama"""
-        row = index.row()
-        item = self.table.item(row, 0)
-        if item:
-            request_id = item.data(Qt.ItemDataRole.UserRole)
-            if request_id:
-                self.view_clicked.emit(request_id)
-
-    def _confirm_delete(self, request_id: int):
-        """Silme onayı"""
+    def _confirm_delete(self, req_id: int):
         reply = QMessageBox.question(
             self,
             "Silme Onayı",
@@ -418,4 +317,4 @@ class PurchaseRequestListPage(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.delete_clicked.emit(request_id)
+            self.delete_clicked.emit(req_id)

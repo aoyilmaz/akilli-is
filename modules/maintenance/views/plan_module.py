@@ -43,45 +43,65 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # Üst Butonlar
-        btn_layout = QHBoxLayout()
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
 
-        self.btn_new = QPushButton("Yeni Plan Oluştur")
-        self.btn_new.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 8px 16px; border-radius: 4px;"
+        self.header = PageHeader(
+            title="Periyodik Bakım Planları",
+            icon="📅",
+            show_search=False,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Plan Oluştur",
+            parent=self,
         )
-        self.btn_new.clicked.connect(self.create_plan)
-        btn_layout.addWidget(self.btn_new)
+        self.header.add_clicked.connect(self.create_plan)
+        self.header.refresh_clicked.connect(self.refresh_data)
 
-        self.btn_edit = QPushButton("Düzenle")
-        self.btn_edit.clicked.connect(self.edit_plan)
-        btn_layout.addWidget(self.btn_edit)
+        # Header Layout - Butonlar ve Filtreler
+        h_layout = self.header.header_layout()
 
-        self.btn_generate = QPushButton("Seçili Plandan İş Emri Oluştur")
-        self.btn_generate.setStyleSheet(
-            "background-color: #22c55e; color: white; padding: 8px 16px; border-radius: 4px;"
-        )
-        self.btn_generate.clicked.connect(self.generate_work_order)
-        btn_layout.addWidget(self.btn_generate)
-
-        btn_layout.addStretch()
-
-        # Filtre
         self.chk_active = QCheckBox("Sadece Aktifler")
         self.chk_active.setChecked(True)
         self.chk_active.stateChanged.connect(self.refresh_data)
-        btn_layout.addWidget(self.chk_active)
+        self.chk_active.setFixedHeight(36)
+        h_layout.addWidget(self.chk_active)
 
-        self.layout.addLayout(btn_layout)
+        h_layout.addStretch()
+
+        self.btn_edit = QPushButton("Düzenle")
+        self.btn_edit.clicked.connect(self.edit_plan)
+        self.btn_edit.setFixedHeight(36)
+        h_layout.addWidget(self.btn_edit)
+
+        self.btn_generate = QPushButton("Seçili Plandan İş Emri Oluştur")
+        self.btn_generate.setStyleSheet(
+            "background-color: #22c55e; color: white; padding: 0 16px; border-radius: 4px;"
+        )
+        self.btn_generate.setFixedHeight(36)
+        self.btn_generate.clicked.connect(self.generate_work_order)
+        h_layout.addWidget(self.btn_generate)
+
+        self.layout.addWidget(self.header)
 
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "Ekipman", "Plan Adı", "Sıklık", "Son Bakım", "Sonraki Bakım",
-            "Otomatik İş Emri", "Durum", "Kalan Gün"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Ekipman",
+                "Plan Adı",
+                "Sıklık",
+                "Son Bakım",
+                "Sonraki Bakım",
+                "Otomatik İş Emri",
+                "Durum",
+                "Kalan Gün",
+            ]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.layout.addWidget(self.table)
@@ -96,21 +116,29 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
         today = datetime.now().date()
 
         for i, plan in enumerate(plans):
-            self.table.setItem(i, 0, QTableWidgetItem(
-                plan.equipment.name if plan.equipment else "-"
-            ))
+            self.table.setItem(
+                i, 0, QTableWidgetItem(plan.equipment.name if plan.equipment else "-")
+            )
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, plan.id)
 
             self.table.setItem(i, 1, QTableWidgetItem(plan.name))
 
             # Sıklık
-            freq_text = self._format_frequency(plan.frequency_type, plan.frequency_value)
+            freq_text = self._format_frequency(
+                plan.frequency_type, plan.frequency_value
+            )
             self.table.setItem(i, 2, QTableWidgetItem(freq_text))
 
             # Son bakım
-            self.table.setItem(i, 3, QTableWidgetItem(
-                plan.last_maintenance_date.strftime("%d.%m.%Y") if plan.last_maintenance_date else "-"
-            ))
+            self.table.setItem(
+                i,
+                3,
+                QTableWidgetItem(
+                    plan.last_maintenance_date.strftime("%d.%m.%Y")
+                    if plan.last_maintenance_date
+                    else "-"
+                ),
+            )
 
             # Sonraki bakım
             next_date = plan.next_maintenance_date
@@ -124,9 +152,11 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
             self.table.setItem(i, 4, next_item)
 
             # Otomatik
-            self.table.setItem(i, 5, QTableWidgetItem(
-                "Evet" if plan.auto_generate_work_order else "Hayır"
-            ))
+            self.table.setItem(
+                i,
+                5,
+                QTableWidgetItem("Evet" if plan.auto_generate_work_order else "Hayır"),
+            )
 
             # Durum
             status_item = QTableWidgetItem("Aktif" if plan.is_active else "Pasif")
@@ -189,8 +219,7 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
         try:
             wo = self.service.generate_work_order_from_plan(plan_id)
             QMessageBox.information(
-                self, "Başarılı",
-                f"İş emri oluşturuldu: {wo.order_no}"
+                self, "Başarılı", f"İş emri oluşturuldu: {wo.order_no}"
             )
             self.refresh_data()
         except Exception as e:
@@ -268,7 +297,9 @@ class PlanDialog(QDialog):
         freq_layout.addRow("Sayaç Aralığı:", counter_row)
 
         self.chk_counter.stateChanged.connect(
-            lambda state: self.spin_counter.setEnabled(state == Qt.CheckState.Checked.value)
+            lambda state: self.spin_counter.setEnabled(
+                state == Qt.CheckState.Checked.value
+            )
         )
 
         main_layout.addWidget(freq_group)
@@ -302,7 +333,8 @@ class PlanDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
@@ -352,7 +384,9 @@ class PlanDialog(QDialog):
                 "frequency_type": self.cmb_freq_type.currentData(),
                 "frequency_value": self.spin_freq.value(),
                 "is_counter_based": self.chk_counter.isChecked(),
-                "counter_interval": self.spin_counter.value() if self.chk_counter.isChecked() else None,
+                "counter_interval": (
+                    self.spin_counter.value() if self.chk_counter.isChecked() else None
+                ),
                 "auto_generate_work_order": self.chk_auto.isChecked(),
                 "lead_days": self.spin_lead_days.value(),
                 "checklist_id": self.cmb_checklist.currentData(),
@@ -376,6 +410,20 @@ class MaintenanceCalendarWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
+        # === Header - PageHeader kullanarak ===
+        from ui.components.page_header import PageHeader
+
+        self.header = PageHeader(
+            title="Bakım Takvimi",
+            icon="📅",
+            show_search=False,
+            show_refresh=True,
+            show_add=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.mark_calendar)
+        self.layout.addWidget(self.header)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.layout.addWidget(splitter)
 
@@ -428,7 +476,7 @@ class MaintenanceCalendarWidget(MaintenanceBaseWidget):
                 next_date = QDate(
                     plan.next_maintenance_date.year,
                     plan.next_maintenance_date.month,
-                    plan.next_maintenance_date.day
+                    plan.next_maintenance_date.day,
                 )
 
                 if next_date < today:
@@ -454,7 +502,5 @@ class MaintenanceCalendarWidget(MaintenanceBaseWidget):
             return
 
         for plan in plans:
-            item = QListWidgetItem(
-                f"[{plan.equipment.code}] {plan.name}"
-            )
+            item = QListWidgetItem(f"[{plan.equipment.code}] {plan.name}")
             self.day_list.addItem(item)

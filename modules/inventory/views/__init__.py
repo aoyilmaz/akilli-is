@@ -22,6 +22,9 @@ from .unit_management import UnitManagementPage
 from .unit_module import UnitModule
 from .location_management import LocationManagementPage
 from .warehouse_operator import WarehouseOperatorPage
+from .sscc_list import SSCCListPage
+from .sscc_form import SSCCFormPage
+from .sscc_module import SSCCModule
 
 __all__ = [
     "StockListPage",
@@ -44,4 +47,7 @@ __all__ = [
     "UnitModule",
     "LocationManagementPage",
     "WarehouseOperatorPage",
+    "SSCCListPage",
+    "SSCCFormPage",
+    "SSCCModule",
 ]

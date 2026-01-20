@@ -13,14 +13,7 @@ class MaintenanceBaseWidget(QWidget):
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
-
-        # Başlık
-        title_label = QLabel(title)
-        title_label.setStyleSheet(
-            "font-size: 24px; font-weight: bold; margin-bottom: 20px;"
-        )
-        self.layout.addWidget(title_label)
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         # Database session ve service
         self.db_session = get_session()
@@ -28,7 +21,7 @@ class MaintenanceBaseWidget(QWidget):
 
     def closeEvent(self, event):
         """Widget kapanırken session'ı kapat"""
-        if hasattr(self, 'db_session') and self.db_session:
+        if hasattr(self, "db_session") and self.db_session:
             self.db_session.close()
         super().closeEvent(event)
 
