@@ -1,119 +1,208 @@
 # Akıllı İş - Stok Modülü Kullanıcı El Kitabı
 
-## 1. Giriş ve Çalışma Mantığı
+---
 
-Akıllı İş Stok Modülü, işletmenizin tüm malzeme akışını (Hammadde > Üretim > Mamul > Satış) kayıt altına alan ve yöneten merkezi birimdir.
+## 1. Giriş
+
+Stok Modülü, işletmenizin tüm malzeme ve ürün akışını yöneten merkezi sistemdir. Her türlü ürün (hammadde, yarı mamul, mamul, ticari mal) bu modül üzerinden takip edilir.
 
 ### Temel Prensipler
-1.  **Her Şey Bir Karttır:** Sistemde takip edilecek her varlık (vida, bilgisayar, hizmet, koli) bir "Stok Kartı" olarak tanımlanmalıdır.
-2.  **Hareket Esastır:** Stok miktarları elle değiştirilemez. Stok artışı için "Giriş Hareketi", azalışı için "Çıkış Hareketi" yapılmalıdır. Sistem bakiyeyi bu hareketlerden hesaplar.
-3.  **Depo ve Lokasyon:** Ürünler havada durmaz; mutlaka bir "Depo" ve o deponun bir "Lokasyonu" (Raf/Göz) üzerinde dururlar.
+*   **Her Şey Bir "Stok Kartı"dır:** Sistemде takip edilecek her varlık bir stok kartı olarak tanımlanmalıdır.
+*   **Hareket Esastır:** Stok miktarları elle değiştirilemez. Her artış veya azalış bir "Hareket Fişi" ile kayıt altına alınır.
+*   **Depo ve Lokasyon:** Ürünler bir deponun belirlenen raflarında durur. Sistem bu lokasyonları takip eder.
+*   **Maliyet Takibi:** Sistem ağırlıklı ortalama maliyet yöntemini otomatik kullanır.
 
 ---
 
-## 2. İş Akışları
+## 2. Sayfa Açıklamaları
 
-Aşağıda sistemdeki temel operasyonların nasıl yürüdüğü özetlenmiştir.
-
-### 2.1. Mal Kabul (Satın Alma) Akışı
-1.  Tedarikçiden malzemeler gelir.
-2.  İrsaliye kontrol edilir.
-3.  Sisteme **Satın Alma Giriş Fişi** işlenir.
-4.  Malzemeler ilgili depoya ve raflara yerleştirilir.
-5.  Stok miktarı artar ve maliyet ortalaması güncellenir.
-
-### 2.2. Satış ve Sevk Akışı
-1.  Müşteri siparişi gelir.
-2.  Depodan mallar toplanır (Picking).
-3.  Sisteme **Satış Çıkış Fişi** veya **İrsaliye** işlenir.
-4.  Stok miktarı düşer.
-
-### 2.3. Depo Transfer Akışı
-1.  Merkez depodan Şube depoya mal gönderilecekse **Transfer Fişi** oluşturulur.
-2.  Kaynak depodan stok düşer, hedef depoda henüz "Yolda" statüsüne geçer (veya anında artar, konfigürasyona bağlı).
-3.  Mal fiziksel olarak ulaştığında işlem tamamlanır.
-
----
-
-## 3. Ekran Kullanım Kılavuzu
-
-### 3.1. Stok Kartları Listesi
-Sisteme girdiğinizde karşınıza çıkan ana ekrandır. Tüm ürün envanterinizi buradan yönetirsiniz.
+### 2.1. Stok Kartları Listesi
+**Amaç:** Sistemdeki tüm ürünlerin listelendiği ana ekrandır.
 
 **Özellikler:**
-*   **Filtreleme:** Üst kısımdaki "Tür" (Hammadde, Mamul vb.) ve "Durum" (Kritik, Normal) kutucukları ile listeyi daraltabilirsiniz.
+*   **Filtreleme:** Üst kısımdan "Tür" (Hammadde, Mamul vb.) ve "Durum" (Normal, Kritik, Stok Yok) seçenekleriyle listeyi daraltabilirsiniz.
 *   **Arama:** Barkod, stok kodu veya ürün adı ile hızlı arama yapabilirsiniz.
-*   **Renkli Gösterim:**
-    *   🔴 Kırmızı satırlar: Kritik seviyenin altındaki veya tükenmiş ürünleri gösterir.
-    *   🟣 Mor kodlar: Tıklanabilir stok detayını belirtir.
-*   **İşlem Menüsü:** Herhangi bir satıra sağ tıklayarak "Düzenle", "Sil" veya "Hareket Geçmişi" seçeneklerine ulaşabilirsiniz.
-*   **Dışa Aktar:** Listeyi Excel veya PDF olarak alabilir, ürün etiketleri (barkod) yazdırabilirsiniz.
+*   **Renkli Gösterim:** 🔴 Kırmızı = Kritik, 🟡 Sarı = Düşük, ✅ Yeşil = Normal.
+*   **İşlem Menüsü:** Satıra sağ tıklayarak Düzenle, Sil, Hareket Geçmişi'ne ulaşabilirsiniz.
+*   **Dışa Aktarım:** Excel/PDF veya ürün etiketi (barkod) alabilirsiniz.
 
-### 3.2. Stok Kartı Formu (Yeni/Düzenle)
-Yeni bir ürün tanımlarken veya mevcut ürünü düzenlerken kullanılan detaylı formdur. 4 ana sekmeden oluşur:
+**İstatistik Kartları:** Ekranın üst kısmında Toplam Ürün, Normal, Düşük Stok ve Kritik Stok sayıları anlık gösterilir.
 
-#### A. Genel Bilgiler
-Bu sekme ürünün kimlik kartıdır.
-*   **Stok Kodu:** Zorunludur. `STK001` gibi benzersiz bir kod. Yanındaki "🔄" butonuna basarsanız sistem otomatik verir.
-*   **Barkod:** Ürün üzerindeki barkodu okutun. EAN-13 veya Code-128 destekler.
-*   **Tür:** Raporlama için kritiktir. (Örn: Üretimde kullanılacaksa 'Hammadde', satılacaksa 'Mamul' seçin).
-*   **Birim:** Ana takip birimi (Adet, Kg, Lt). Değiştirmek zordur, baştan doğru seçilmelidir.
+---
 
-#### B. Stok Ayarları (Limitler)
-Otomatik uyarı mekanizmalarını buradan kurarsınız.
-*   **Min. Stok:** "Elimde en az 10 tane kalsın" dediğiniz sınır. Altına düşerse liste kırmızı olur.
-*   **Maks. Stok:** Depo kapasitesi veya bozulma riski nedeniyle aşılmaması gereken sınır.
-*   **Raf Ömrü:** Gıda/İlaç gibi ürünler için gün sayısı (Örn: 90 gün).
+### 2.2. Stok Kartı Formu (Yeni/Düzenle)
+**Amaç:** Yeni ürün tanımlamak veya mevcut ürünü düzenlemek.
 
-#### C. Fiyatlandırma
-*   **Alış/Satış Fiyatı:** Varsayılan fiyatlardır. Fatura keserken bu fiyatlar otomatik gelir ama değiştirilebilir.
-*   **KDV Oranı:** %1, %10, %20 gibi vergi dilimi.
+**4 Sekme:**
 
-#### D. Takip & Durum
-*   **Lot Takibi:** "Bu ürün partiler halinde gelir ve hangi partiden satış yaptığım önemlidir" diyorsanız işaretleyin.
-*   **Seri No Takibi:** "Her ürünün kendine ait bir kimliği (S/N) var" diyorsanız işaretleyin (Telefon, Laptop vb.).
+| Sekme | Alanlar |
+| :--- | :--- |
+| **Genel Bilgiler** | Stok Kodu*, Stok Adı*, Barkod, Tür*, Birim*, Kategori, Marka, Model |
+| **Stok Ayarları** | Min. Stok, Maks. Stok, Yeniden Sipariş Noktası, Temin Süresi, Fiziksel Özellikler (Ağırlık, Hacim) |
+| **Fiyatlandırma** | Alış Fiyatı, Satış Fiyatı, Liste Fiyatı, KDV Oranı, Tevkifat Oranı |
+| **Takip** | Lot Takibi, Seri No Takibi, Son Kullanma Tarihi Takibi, Raf Ömrü |
 
-### 3.3. Stok Hareketleri Listesi
-Depoya giren ve çıkan her şeyin kaydıdır. Burası değiştirilemez bir defter gibidir.
-*   **Giriş Fişi (📥):** Dışarıdan veya üretimden gelen mallar için.
-*   **Çıkış Fişi (📤):** Satılan, üretime giden veya bozulan (fire) mallar için.
-*   **Transfer (🔄):** Depolar arası yer değişimi.
+`*` işaretli alanlar zorunludur.
 
-**Nasıl Hareket Eklerim?**
-1.  Üstteki butonlardan işlem türünü seçin (Giriş / Çıkış).
-2.  Açılan formda **Depo** seçin.
-3.  Ürünleri ekleyin ve miktarları girin.
-4. Kaydettiğiniz an stok bakiyesi güncellenir.
+---
 
-### 3.4. Stok Sayım Modülü
-Gerçek stok ile sistem stoğunu eşitlemek için kullanılır.
+### 2.3. Kategoriler
+**Amaç:** Ürünleri gruplamak için hiyerarşik bir ağaç yapısı oluşturmak.
 
-**Sayım Süreci (Workflow):**
-1.  **Taslak (🟡):** Yeni bir sayım fişi oluşturulur. Henüz sisteme etkisi yoktur.
-2.  **Sayım Girişi:** Depodaki ürünler tek tek sayılır ve sisteme "Sayılan Miktar" olarak girilir.
-3.  **Fark Analizi:** Sistem, "Sistemdeki Stok" ile "Sayılan" arasındaki farkı hesaplar ve parasal değerini gösterir.
-4.  **Uygula (📥):** Sayım tamamlandığında sağ tıklayıp "Stoklara Uygula" denir. Sistem otomatik olarak aradaki fark kadar "Sayım Fazlası" veya "Sayım Eksiği" fişi keserek stoğu günceller.
+**Özellikler:**
+*   **Ağaç Görünümü:** Kategoriler alt-üst ilişkili olarak (Elektronik > Bilgisayar > Laptop) görüntülenir.
+*   **Alt Kategori Ekleme:** Bir kategoriye sağ tıklayın > "Alt Kategori Ekle".
+*   **Ürün Sayısı:** Her kategorinin kaç ürün içerdiği görüntülenir.
+*   **Tümünü Aç/Kapat:** Üst menüdeki butonlarla ağacı açıp kapatabilirsiniz.
 
-### 3.5. Depo Yönetimi Ekranı
-Firmanızın fiziksel depo yapılanmasını kurduğunuz yerdir.
-*   **Depo Türleri:** Genel, Soğuk Hava Deposu, Antrepo vb. tipler seçilebilir.
-*   **Lokasyonlar:** Her depo satırına sağ tıklayıp "Lokasyonlar" diyerek o deponun raf/göz planını yönetebilirsiniz.
-*   **Varsayılan Depo:** En çok kullanılan deponuzu "Varsayılan" yaparak fişlerde otomatik gelmesini sağlayabilirsiniz.
+---
+
+### 2.4. Birimler
+**Amaç:** Ürün takip birimlerini (Adet, Kg, Lt, Kutu vb.) tanımlamak ve birimler arası dönüşüm oranlarını belirlemek.
+
+**İki Bölüm:**
+1.  **Birimler Listesi:** Kod, Ad, Kısa Ad, Durum. Örn: `KG`, `Kilogram`, `kg`.
+2.  **Birim Dönüşümleri:** Örn: 1 KUTU = 12 ADET. Bu tanım yapılınca sisteme "5 KUTU" girerseniz "60 ADET" olarak da gösterir.
+
+---
+
+### 2.5. Depolar
+**Amaç:** Şirketin fiziksel depo tanımlarını yönetmek.
+
+**Özellikler:**
+*   **Depo Türleri:** Genel, Hammadde, Mamul, Soğuk, Antrepo.
+*   **Varsayılan Depo:** Fişler açılırken öntanımlı gelecek depoyu işaretleyebilirsiniz.
+*   **Lokasyonlar:** Her satıra sağ tıklayarak o deponun raf/göz planını yönetebilirsiniz.
+
+---
+
+### 2.6. Lokasyonlar
+**Amaç:** Depo içi raf/koridor/göz adres sistemini kurmak.
+
+**Format:** `Koridor-Raf-Kat` (Örn: `A-01-03`)
+
+**Toplu Oluşturma:** "Toplu Ekle" seçeneğiyle A'dan Z'ye koridorlar, 1-10 arası raflar için yüzlerce lokasyonu tek seferde oluşturabilirsiniz. Sistem her lokasyona otomatik `LOC-XXXXXXXX` barkodu atar.
+
+---
+
+### 2.7. Stok Hareketleri
+**Amaç:** Depoya giren/çıkan veya depolar arası transfer edilen her malzemenin kaydı.
+
+**Hareket Türleri:**
+*   📥 **Giriş Fişi:** Satın alma, üretimden giriş, sayım fazlası.
+*   📤 **Çıkış Fişi:** Satış, üretime sevk, fire, sayım eksiği.
+*   🔄 **Transfer:** Depo A'dan Depo B'ye.
+
+**Filtreleme:** Tür, tarih aralığı ve arama kutusuyla hareketleri süzebilirsiniz.
+
+**İstatistikler:** Toplam Hareket, Giriş Tutarı (₺), Çıkış Tutarı (₺) anlık gösterilir.
+
+---
+
+### 2.8. Stok Sayımı
+**Amaç:** Fiili stok ile sistemdeki stoğu karşılaştırmak ve farkları düzeltmek.
+
+**Sayım Durumları:**
+| Durum | Açıklama |
+| :--- | :--- |
+| 🟡 Taslak | Sayım oluşturuldu, henüz sayılmadı. |
+| 🔵 Devam Ediyor | Sayım başladı, ürünler giriliyor. |
+| ✅ Tamamlandı | Sayım bitti, onay bekliyor. |
+| 📥 Uygulandı | Farklar stoklara yansıtıldı. |
+
+**Uygula İşlemi:** Sayım tamamlandıktan sonra sağ tık > "Stoklara Uygula" dediğinizde sistem otomatik olarak "Sayım Fazlası" veya "Sayım Eksiği" fişleri oluşturur.
+
+---
+
+### 2.9. Taşıma Birimleri (SSCC / Palet)
+**Amaç:** Ürünleri palet veya koli bazında bir taşıma birimi (SSCC kodu) altında gruplamak.
+
+**Durum Akışı:**
+| Durum | Açıklama |
+| :--- | :--- |
+| 🔓 Açık | Palete ürün eklenebilir. |
+| 🔒 Kapalı | Palet kapatıldı, ürün eklenemez. |
+| 🚚 Sevk Edildi | Müşteriye gönderildi. |
+| ❌ İptal | Kullanılmıyor. |
+
+**Kullanım:** Üretimden çıkan mamulleri bir palet kodu altında toplar, depo lokasyonuna yerleştirir ve sevkiyat sırasında palet bazlı çıkış yaparsınız.
+
+---
+
+### 2.10. Stok Raporları
+**Amaç:** Stok durumunu analiz etmek.
+
+**4 Rapor Sekmesi:**
+| Rapor | İçerik |
+| :--- | :--- |
+| **Stok Durumu** | Tüm ürünlerin anlık miktar, maliyet, toplam değer bilgisi. |
+| **Kritik Stoklar** | Minimum seviyenin altındaki veya tükenmiş ürünler. |
+| **Hareket Özeti** | Ürün bazlı Toplam Giriş, Çıkış, Net Değişim. |
+| **Depo Raporu** | Depo bazlı stok dağılımı ve lokasyon detayı. |
+
+---
+
+### 2.11. Depocu Paneli
+**Amaç:** Tablet/mobil uyumlu, büyük butonlu operasyon ekranı.
+
+**Menü Seçenekleri:**
+| Buton | Açıklama |
+| :--- | :--- |
+| 📥 Mal Kabul | Gelen malı okutup raflara yerleştirme (Put-away). |
+| 📦 Toplama | Sipariş toplama listeleri (Picking). |
+| 🔄 Transfer | Depolar arası ürün taşıma. |
+| 📋 Sayım | Lokasyon bazlı hızlı sayım. |
+| 🔍 Stok Sorgula | Barkod okutarak anlık stok bilgisi. |
+| 📍 Adres Okut | Raf barkodunu okutarak içeriğini görme. |
+
+**Kullanıcı Deneyimi:** El terminali veya tabletler için optimize edilmiş; barkod okutma odaklı.
+
+---
+
+## 3. İş Akışları
+
+### 3.1. Mal Kabul (Satın Alma Girişi)
+1.  Tedarikçiden mallar gelir, irsaliye kontrol edilir.
+2.  **Stok Hareketleri > Giriş Fişi (📥)** açılır.
+3.  Depo ve ürün seçilir, miktar girilir.
+4.  (Opsiyonel) Lot numarası veya SKT girilir.
+5.  Kaydet. → Stok artar, maliyet ortalaması güncellenir.
+
+### 3.2. Satış Çıkışı
+1.  Müşteri siparişi alınır.
+2.  Mallar toplanır (Picking).
+3.  **Stok Hareketleri > Çıkış Fişi (📤)** işlenir.
+4.  Stok düşer.
+
+### 3.3. Depolar Arası Transfer
+1.  Merkez Depo > Şube Depo transfer edilecek.
+2.  **Stok Hareketleri > Transfer (🔄)** açılır.
+3.  Kaynak ve Hedef Depo seçilir, ürün/miktar girilir.
+4.  Kaydet. → Kaynak depoda stok düşer, hedefte artar.
+
+### 3.4. Stok Sayımı
+1.  **Stok Sayımı > Yeni Sayım** açılır, depo seçilir.
+2.  Ürünler fiziksel olarak sayılır, "Sayılan Miktar" girilir.
+3.  Sayım tamamlandığında sağ tık > **Stoklara Uygula**.
+4.  Sistem fark fişleri (Sayım Fazlası / Eksiği) otomatik oluşturur.
 
 ---
 
 ## 4. Sık Karşılaşılan Hatalar ve Çözümleri
 
-| Hata Mesajı | Olası Sebep | Çözüm |
+| Hata | Sebep | Çözüm |
 | :--- | :--- | :--- |
-| **Negatif Stok Hatası** | Depoda görünenden daha fazla çıkış yapmaya çalışıyorsunuz. | 1. Fiziksel stoğu sayın.<br>2. Eksik giriş varsa "Giriş Fişi" ile ekleyin.<br>3. Depo ayarlarından "Eksiye Düşmeye İzin Ver"i açabilirsiniz (Önerilmez). |
-| **Mükerrer Kayıt (Duplicate Code)** | Bu stok kodu veya barkod başka ürün tarafından kullanılıyor. | Arama kutusuna bu kodu yazıp mevcut ürünü bulun. Aynı ürünü iki kere kaydetmeyin. |
-| **Silme Başarısız** | "Hareket görmüş stok kartı silinemez" uyarısı. | Ürün geçmişte bir kez bile işlem gördüyse silinemez (muhasebe tutarlılığı için). Bunun yerine kartı düzenleyip **"Aktif"** kutucuğunu kaldırın (Pasife alın). |
-| **Birim Değiştirilemiyor** | Kartta hareket var. | Hareket görmüş kartın birimi değişirse geçmiş hesaplar bozulur. Yeni bir stok kartı açın. |
+| **Negatif Stok Hatası** | Eldekinden fazla çıkış. | Önce fiziksel stoğu sayın; eksik ise giriş fişi kesin. |
+| **Mükerrer Kod/Barkod** | Bu kod başka üründe var. | Mevcut ürünü arayın; yeni kart açmayın. |
+| **Silme Başarısız** | Hareket görmüş kart silinemez. | Kartı **pasife** alın (Aktif kutusunu kaldırın). |
+| **Birim Değiştirilemez** | Hareket görmüş kart. | Yeni stok kartı açın, eskisini pasife alın. |
 
 ---
 
 ## 5. İpuçları
-*   📦 **Düzenli Sayım:** Ayda bir kez "Sayım Modülü"nü kullanarak sistem üzerindeki stokla gerçek stoğu karşılaştırın.
-*   🏷️ **Etiketleme:** Ürünleri rafa koymadan önce üzerine sistemden aldığınız barkod etiketini yapıştırmak işleri %50 hızlandırır.
-*   📊 **Raporlar:** "Hangi ürün ne kadar süredir hareketsiz?" sorusu için "Stok Yaşlandırma Raporu"nu kullanın.
+
+*   📦 **Düzenli Sayım:** Ayda bir "Sayım Modülü"nü kullanarak tutarsızlıkları erken yakalayın.
+*   🏷️ **Etiketleme:** Ürünleri rafa koymadan önce barkod etiketi yapıştırın.
+*   📊 **Raporlar:** "Kritik Stoklar" raporunu haftada bir kontrol edin.
+*   📍 **Lokasyon Kullanın:** Raf adresleri tanımlarsanız mal toplama süresi %50 düşer.
+*   🔄 **Birim Dönüşümü:** Tedarikçi irsaliyesi "Koli" ama siz "Adet" takip ediyorsanız, dönüşüm oranını girin.
