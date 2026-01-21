@@ -25,6 +25,8 @@ from PyQt6.QtCore import Qt
 
 from .purchase_invoice_list import PurchaseInvoiceListPage
 from .purchase_invoice_form import PurchaseInvoiceFormPage
+from ui.components import EnhancedTableWidget, ColumnConfig
+
 
 class ReceiptSelectorDialog(QDialog):
     """Mal kabul seçim dialogu"""
@@ -34,79 +36,114 @@ class ReceiptSelectorDialog(QDialog):
         self.receipts = receipts
         self.selected_receipt_id = None
         self.setWindowTitle("Mal Kabul Seç")
-        self.setMinimumSize(800, 500)
-        self.setup_ui()
+        self.setMinimumSize(900, 600)
+        self._setup_ui()
 
-    def setup_ui(self):
+    def _setup_ui(self):
         layout = QVBox(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(20)
 
-        title = QLabel("📦 Mal Kabul Seçin")
-        layout.addWidget(title)
+        # Başlık ve Bilgi
+        header_layout = QHBoxLayout()
+        icon_label = QLabel("📦")
+        icon_label.setProperty("class", "h1")
+        header_layout.addWidget(icon_label)
 
-        info_label = QLabel("Fatura oluşturmak için tamamlanmış bir mal kabul seçin:")
-        layout.addWidget(info_label)
+        text_layout = QVBox()
+        title = QLabel("Mal Kabul Seçin")
+        title.setProperty("class", "h2")
+        text_layout.addWidget(title)
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Seç", "Fiş No", "Tarih", "Tedarikçi", "Kalem"]
+        info = QLabel("Fatura oluşturmak için tamamlanmış bir mal kabul seçin:")
+        info.setProperty("class", "text-muted")
+        text_layout.addWidget(info)
+
+        header_layout.addLayout(text_layout)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+
+        # Tablo
+        columns = [
+            ColumnConfig("receipt_no", "Fiş No", width=120),
+            ColumnConfig("date", "Tarih", width=120),
+            ColumnConfig("supplier", "Tedarikçi", width=250),
+            ColumnConfig("items", "Kalem", width=80),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="receipt_selector", columns=columns, parent=self
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setStyleSheet(self._table_style())
+        # Çift tıklama ile seçim
+        self.table.row_double_clicked.connect(self._on_table_double_clicked)
+
         layout.addWidget(self.table)
 
         self._load_receipts()
 
+        # Butonlar
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
-        cancel_btn.setStyleSheet(self._button_style("#334155", "#475569"))
+        cancel_btn.setProperty("class", "btn-secondary")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        select_btn = QPushButton("Seçili Mal Kabulden Fatura Oluştur")
-        select_btn.setStyleSheet(self._button_style("#8b5cf6", "#7c3aed"))
-        select_btn.clicked.connect(self._on_select)
-        btn_layout.addWidget(select_btn)
+        self.select_btn = QPushButton("Seçili Mal Kabulden Fatura Oluştur")
+        self.select_btn.setProperty("class", "btn-primary")
+        self.select_btn.clicked.connect(self._on_select)
+        btn_layout.addWidget(self.select_btn)
 
         layout.addLayout(btn_layout)
 
     def _load_receipts(self):
         self.table.setRowCount(len(self.receipts))
+        visible_cols = self.table.get_visible_columns()
 
         for row, rec in enumerate(self.receipts):
-            check_item = QTableWidgetItem()
-            check_item.setFlags(
-                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
-            )
-            check_item.setCheckState(Qt.CheckState.Unchecked)
-            check_item.setData(Qt.ItemDataRole.UserRole, rec["id"])
-            self.table.setItem(row, 0, check_item)
+            for col_idx, col_key in enumerate(visible_cols):
+                if col_key == "receipt_no":
+                    item = QTableWidgetItem(rec.get("receipt_no", ""))
+                    item.setData(Qt.ItemDataRole.UserRole, rec["id"])
+                    self.table.setItem(row, col_idx, item)
 
-            self.table.setItem(row, 1, QTableWidgetItem(rec.get("receipt_no", "")))
-            self.table.setItem(
-                row,
-                2,
-                QTableWidgetItem(
-                    rec.get("receipt_date").strftime("%d.%m.%Y")
-                    if rec.get("receipt_date")
-                    else "-"
-                ),
-            )
-            self.table.setItem(row, 3, QTableWidgetItem(rec.get("supplier_name", "")))
-            self.table.setItem(row, 4, QTableWidgetItem(str(rec.get("total_items", 0))))
+                elif col_key == "date":
+                    date_str = (
+                        rec.get("receipt_date").strftime("%d.%m.%Y")
+                        if rec.get("receipt_date")
+                        else "-"
+                    )
+                    self.table.setItem(row, col_idx, QTableWidgetItem(date_str))
+
+                elif col_key == "supplier":
+                    self.table.setItem(
+                        row, col_idx, QTableWidgetItem(rec.get("supplier_name", ""))
+                    )
+
+                elif col_key == "items":
+                    count = str(rec.get("total_items", 0))
+                    item = QTableWidgetItem(count)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.table.setItem(row, col_idx, item)
+
+    def _on_table_double_clicked(self, row):
+        """Tabloya çift tıklayınca seç"""
+        receipt_no_item = self.table.item(row, 0)
+        if receipt_no_item:
+            self.selected_receipt_id = receipt_no_item.data(Qt.ItemDataRole.UserRole)
+            self.accept()
 
     def _on_select(self):
-        for row in range(self.table.rowCount()):
-            check_item = self.table.item(row, 0)
-            if check_item and check_item.checkState() == Qt.CheckState.Checked:
-                self.selected_receipt_id = check_item.data(Qt.ItemDataRole.UserRole)
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            receipt_no_item = self.table.item(current_row, 0)
+            if receipt_no_item:
+                self.selected_receipt_id = receipt_no_item.data(
+                    Qt.ItemDataRole.UserRole
+                )
                 self.accept()
                 return
 
@@ -115,36 +152,6 @@ class ReceiptSelectorDialog(QDialog):
     def get_selected_receipt_id(self) -> int:
         return self.selected_receipt_id
 
-    def _table_style(self):
-        return """
-            QTableWidget {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #f8fafc;
-            }
-            QHeaderView::section {
-                background-color: #1e293b;
-                color: #f8fafc;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-            QTableWidget::item { padding: 8px; }
-        """
-
-    def _button_style(self, bg_color, hover_color):
-        return f"""
-            QPushButton {{
-                background-color: {bg_color};
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {hover_color}; }}
-        """
 
 class PaymentDialog(QDialog):
     """Ödeme kaydetme dialogu"""
@@ -213,10 +220,12 @@ class PaymentDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
+        cancel_btn.setProperty("class", "btn-secondary")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Ödemeyi Kaydet")
+        save_btn.setProperty("class", "btn-primary")
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -235,10 +244,13 @@ class PaymentDialog(QDialog):
             "notes": self.payment_notes,
         }
 
+
 class PurchaseInvoiceModule(QWidget):
     """Satınalma faturası modülü"""
 
     page_title = "Satınalma Faturaları"
+
+    CURRENCY_SYMBOLS = {"TRY": "₺", "USD": "$", "EUR": "€", "GBP": "£"}
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -315,6 +327,12 @@ class PurchaseInvoiceModule(QWidget):
                         "total": inv.total,
                         "paid_amount": inv.paid_amount,
                         "balance": inv.balance,
+                        "currency": inv.currency.value if inv.currency else "TRY",
+                        "currency_symbol": (
+                            self.CURRENCY_SYMBOLS.get(inv.currency.value, "₺")
+                            if inv.currency
+                            else "₺"
+                        ),
                     }
                 )
             self.list_page.load_data(data)
@@ -449,6 +467,7 @@ class PurchaseInvoiceModule(QWidget):
                     "supplier_invoice_date": invoice.supplier_invoice_date,
                     "notes": invoice.notes,
                     "status": (invoice.status.value if invoice.status else "draft"),
+                    "currency": (invoice.currency.value if invoice.currency else "TRY"),
                     "items": items_data,
                 }
 

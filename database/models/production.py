@@ -159,6 +159,7 @@ class BOMLine(BaseModel):
     item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
 
     quantity = Column(Numeric(18, 6), nullable=False)
+    is_percentage = Column(Boolean, default=False)  # Miktar yüzdelik mi?
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
     scrap_rate = Column(Numeric(5, 2), default=0)
 

@@ -667,12 +667,16 @@ class WorkOrderModule(QWidget):
                 except:
                     stock = 0
 
+                # Birim miktar hesapla (1 mamul için gerekli hammadde)
+                base_quantity = Decimal(str(bom.base_quantity or 1))
+                unit_qty = line.effective_quantity / base_quantity
+
                 materials.append(
                     {
                         "item_id": line.item_id,
                         "item_code": line.item.code if line.item else "",
                         "item_name": line.item.name if line.item else "",
-                        "quantity": line.effective_quantity,
+                        "quantity": unit_qty,
                         "unit_code": line.unit.code if line.unit else "ADET",
                         "unit_cost": (
                             float(line.item.purchase_price or 0) if line.item else 0

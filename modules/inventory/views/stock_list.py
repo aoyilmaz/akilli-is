@@ -35,6 +35,7 @@ class StockListPage(QWidget):
     # Sinyaller
     item_selected = pyqtSignal(int)
     add_clicked = pyqtSignal()
+    duplicate_clicked = pyqtSignal(int)
     edit_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
@@ -323,6 +324,10 @@ class StockListPage(QWidget):
         edit_action = QAction("✏️ Düzenle", self)
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(item_id))
         menu.addAction(edit_action)
+
+        duplicate_action = QAction("📑 Kopyala ve Oluştur", self)
+        duplicate_action.triggered.connect(lambda: self.duplicate_clicked.emit(item_id))
+        menu.addAction(duplicate_action)
 
         menu.addSeparator()
 

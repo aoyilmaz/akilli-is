@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QMessageBox,
     QGridLayout,
-    QScrollArea,
     QDateEdit,
     QTableWidget,
     QTableWidgetItem,
@@ -27,8 +26,12 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from ui.components.page_header import PageHeader
+
 
 class ItemSelectorDialog(QDialog):
     """Stok kartı seçim dialogu"""
@@ -110,6 +113,7 @@ class ItemSelectorDialog(QDialog):
                 self.selected_item = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
 
+
 class PurchaseRequestFormPage(QWidget):
     """Satın alma talep formu"""
 
@@ -141,132 +145,123 @@ class PurchaseRequestFormPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
-        header_layout = QHBoxLayout()
-
-        back_btn = QPushButton("← Geri")
-        back_btn.clicked.connect(self.cancelled.emit)
-        header_layout.addWidget(back_btn)
-
+        # === Header ===
         title_text = "Talep Düzenle" if self.is_edit_mode else "Yeni Satın Alma Talebi"
-        title = QLabel(f"📋 {title_text}")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
+        self.header = PageHeader(
+            title=title_text,
+            show_back=True,
+            show_search=False,
+            show_refresh=False,
+            show_add=False,
+            parent=self,
+        )
+        self.header.back_clicked.connect(self.cancelled.emit)
 
-        # Onaya Gönder butonu (sadece düzenlemede ve taslak ise)
+        # Header butonları
+        h_layout = self.header.header_layout()
+
+        # Onaya Gönder (Edit modunda ve taslak ise)
         if self.is_edit_mode and self.request_data.get("status") == "draft":
             submit_btn = QPushButton("📤 Onaya Gönder")
             submit_btn.clicked.connect(self._on_submit_for_approval)
-            header_layout.addWidget(submit_btn)
+            h_layout.addWidget(submit_btn)
 
+        # Kaydet
         save_btn = QPushButton("💾 Kaydet")
-        save_btn.setStyleSheet(
-            """
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #a855f7);
-                border: none;
-                color: white;
-                font-weight: 600;
-                padding: 12px 24px;
-                border-radius: 12px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #9333ea);
-            }
-        """
-        )
+        save_btn.setProperty("class", "btn-primary")
+        save_btn.setFixedHeight(36)
         save_btn.clicked.connect(self._on_save)
-        header_layout.addWidget(save_btn)
+        h_layout.addWidget(save_btn)
 
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
-        # Scroll Area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(16)
+        # === Main Content (Split View) ===
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(24)
 
-        # === GENEL BİLGİLER ===
-        general_frame = self._create_section("📝 Genel Bilgiler")
-        general_layout = QGridLayout()
-        general_layout.setColumnMinimumWidth(0, 140)
-        general_layout.setSpacing(12)
+        # --- LEFT: Genel Bilgiler ---
+        left_frame = QFrame()
+        left_frame.setProperty("class", "card")
+        left_frame.setFixedWidth(350)  # Sabit genişlik
+        left_layout = QVBoxLayout(left_frame)
+        left_layout.setContentsMargins(16, 16, 16, 16)
 
-        row = 0
+        left_title = QLabel("📝 Genel Bilgiler")
+        left_layout.addWidget(left_title)
+
+        form_layout = QFormLayout()
+        form_layout.setSpacing(12)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Talep No
-        general_layout.addWidget(self._create_label("Talep No"), row, 0)
         self.request_no_input = QLineEdit()
-        self.request_no_input.setPlaceholderText("Otomatik oluşturulacak")
+        self.request_no_input.setPlaceholderText("Otomatik")
         self.request_no_input.setReadOnly(True)
-        general_layout.addWidget(self.request_no_input, row, 1)
-        row += 1
+        form_layout.addRow("Talep No", self.request_no_input)
 
         # Talep Tarihi
-        general_layout.addWidget(self._create_label("Talep Tarihi *"), row, 0)
         self.request_date_input = QDateEdit()
         self.request_date_input.setDate(QDate.currentDate())
         self.request_date_input.setCalendarPopup(True)
-        general_layout.addWidget(self.request_date_input, row, 1)
-        row += 1
+        form_layout.addRow("Tarih *", self.request_date_input)
 
         # Talep Eden
-        general_layout.addWidget(self._create_label("Talep Eden"), row, 0)
         self.requested_by_input = QLineEdit()
         self.requested_by_input.setPlaceholderText("Ad Soyad")
-        general_layout.addWidget(self.requested_by_input, row, 1)
-        row += 1
+        form_layout.addRow("Talep Eden", self.requested_by_input)
 
         # Departman
-        general_layout.addWidget(self._create_label("Departman"), row, 0)
         self.department_input = QComboBox()
         self.department_input.setEditable(True)
         self.department_input.addItems(
             ["", "Üretim", "Satış", "Satın Alma", "Depo", "Kalite", "Bakım", "İdari"]
         )
-        general_layout.addWidget(self.department_input, row, 1)
-        row += 1
+        form_layout.addRow("Departman", self.department_input)
 
         # Öncelik
-        general_layout.addWidget(self._create_label("Öncelik"), row, 0)
         self.priority_input = QComboBox()
         self.priority_input.addItem("⬇️ Düşük", 1)
         self.priority_input.addItem("➡️ Normal", 2)
         self.priority_input.addItem("⬆️ Yüksek", 3)
         self.priority_input.addItem("🔥 Acil", 4)
-        self.priority_input.setCurrentIndex(1)  # Normal
-        general_layout.addWidget(self.priority_input, row, 1)
-        row += 1
+        self.priority_input.setCurrentIndex(1)
+        form_layout.addRow("Öncelik", self.priority_input)
 
         # Termin Tarihi
-        general_layout.addWidget(self._create_label("Termin Tarihi"), row, 0)
         self.required_date_input = QDateEdit()
         self.required_date_input.setDate(QDate.currentDate().addDays(7))
         self.required_date_input.setCalendarPopup(True)
-        general_layout.addWidget(self.required_date_input, row, 1)
-        row += 1
+        form_layout.addRow("Termin", self.required_date_input)
 
         # Notlar
-        general_layout.addWidget(self._create_label("Notlar"), row, 0)
         self.notes_input = QTextEdit()
         self.notes_input.setMaximumHeight(80)
-        self.notes_input.setPlaceholderText("Ek açıklamalar...")
-        general_layout.addWidget(self.notes_input, row, 1)
+        self.notes_input.setPlaceholderText("Açıklama...")
+        form_layout.addRow("Notlar", self.notes_input)
 
-        general_frame.layout().addLayout(general_layout)
-        scroll_layout.addWidget(general_frame)
+        left_layout.addLayout(form_layout)
+        left_layout.addStretch()
+        content_layout.addWidget(left_frame)
 
-        # === TALEP KALEMLERİ ===
-        items_frame = self._create_section("📦 Talep Kalemleri")
-        items_layout = QVBoxLayout()
+        # --- RIGHT: Kalemler ---
+        right_frame = QFrame()
+        right_frame.setProperty("class", "card")
+        right_layout = QVBoxLayout(right_frame)
+        right_layout.setContentsMargins(16, 16, 16, 16)
+        right_layout.setSpacing(12)
 
-        # Kalem ekleme butonu
+        # Kalem Başlığı ve Buton
+        items_header = QHBoxLayout()
+        items_header.addWidget(QLabel("📦 Talep Kalemleri"))
+        items_header.addStretch()
+
         add_item_btn = QPushButton("➕ Kalem Ekle")
         add_item_btn.clicked.connect(self._add_item_row)
-        items_layout.addWidget(add_item_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        items_header.addWidget(add_item_btn)
 
-        # Kalemler tablosu
+        right_layout.addLayout(items_header)
+
+        # Tablo
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(7)
         self.items_table.setHorizontalHeaderLabels(
@@ -276,63 +271,35 @@ class PurchaseRequestFormPage(QWidget):
                 "Miktar",
                 "Birim",
                 "Tahmini Fiyat",
-                "Önerilen Tedarikçi",
-                "İşlem",
+                "Tedarikçi",
+                "",  # İşlem
             ]
         )
-        self.items_table.setMinimumHeight(200)
         self.items_table.verticalHeader().setVisible(False)
+        self.items_table.setProperty("class", "enhanced-table")
 
         header = self.items_table.horizontalHeader()
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.items_table.setColumnWidth(0, 120)
-        self.items_table.setColumnWidth(2, 100)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Adı genişlet
+        self.items_table.setColumnWidth(0, 100)
+        self.items_table.setColumnWidth(2, 90)
         self.items_table.setColumnWidth(3, 80)
-        self.items_table.setColumnWidth(4, 120)
-        self.items_table.setColumnWidth(5, 150)
-        self.items_table.setColumnWidth(6, 60)
+        self.items_table.setColumnWidth(4, 110)
+        self.items_table.setColumnWidth(5, 140)
+        self.items_table.setColumnWidth(6, 50)
 
-        items_layout.addWidget(self.items_table)
+        right_layout.addWidget(self.items_table)
+        content_layout.addWidget(right_frame)
 
-        items_frame.layout().addLayout(items_layout)
-        scroll_layout.addWidget(items_frame)
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll)
-
-    def _create_section(self, title: str) -> QFrame:
-        frame = QFrame()
-        frame.setStyleSheet(
-            """
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.5);
-                border: 1px solid #334155;
-                border-radius: 12px;
-            }
-        """
-        )
-
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
-
-        title_label = QLabel(title)
-        layout.addWidget(title_label)
-
-        return frame
-
-    def _create_label(self, text: str) -> QLabel:
-        label = QLabel(text)
-        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        return label
+        layout.addLayout(content_layout)
 
     def _add_item_row(self):
         """Yeni kalem satırı ekle"""
         # Stok kartı seçimi
         if not self.items:
-            QMessageBox.warning(self, "Uyarı", "Önce stok kartları yüklenmelidir!")
-            return
+            # Geliştirme kolaylığı için boş ise yine de açılabilir veya uyarı verebiliriz
+            # Şimdilik uyarı verelim
+            QMessageBox.warning(self, "Uyarı", "Stok kartı listesi boş!")
+            pass  # items listesi boş olsa bile dialog açılsın diye pass
 
         dialog = ItemSelectorDialog(self.items, self)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_item:
@@ -364,9 +331,8 @@ class PurchaseRequestFormPage(QWidget):
         # Miktar
         qty_spin = QDoubleSpinBox()
         qty_spin.setRange(0.0001, 999999999)
-        qty_spin.setDecimals(4)
+        qty_spin.setDecimals(2)
         qty_spin.setValue(quantity)
-        qty_spin.setStyleSheet(self._spin_style())
         self.items_table.setCellWidget(row, 2, qty_spin)
 
         # Birim
@@ -379,16 +345,14 @@ class PurchaseRequestFormPage(QWidget):
             if unit_combo.itemData(i) == unit_id:
                 unit_combo.setCurrentIndex(i)
                 break
-        unit_combo.setStyleSheet(self._combo_style_small())
         self.items_table.setCellWidget(row, 3, unit_combo)
 
         # Tahmini Fiyat
         price_spin = QDoubleSpinBox()
         price_spin.setRange(0, 999999999)
-        price_spin.setDecimals(4)
+        price_spin.setDecimals(2)
         price_spin.setPrefix("₺ ")
         price_spin.setValue(estimated_price)
-        price_spin.setStyleSheet(self._spin_style())
         self.items_table.setCellWidget(row, 4, price_spin)
 
         # Önerilen Tedarikçi
@@ -401,16 +365,17 @@ class PurchaseRequestFormPage(QWidget):
                 if supplier_combo.itemData(i) == supplier_id:
                     supplier_combo.setCurrentIndex(i)
                     break
-        supplier_combo.setStyleSheet(self._combo_style_small())
         self.items_table.setCellWidget(row, 5, supplier_combo)
 
         # Sil butonu
         del_btn = QPushButton("🗑")
-        del_btn.setFixedSize(32, 32)
+        del_btn.setFixedSize(30, 30)
+        del_btn.setProperty("class", "btn-danger")
         del_btn.clicked.connect(lambda: self._remove_item_row(row))
         self.items_table.setCellWidget(row, 6, del_btn)
 
-        self.items_table.setRowHeight(row, 50)
+        # Satır yüksekliği
+        self.items_table.setRowHeight(row, 44)
 
     def _remove_item_row(self, row: int):
         """Kalem satırını sil"""
@@ -539,33 +504,3 @@ class PurchaseRequestFormPage(QWidget):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.submit_for_approval.emit(self.request_data.get("id"))
-
-    def _spin_style(self):
-        return """
-            QDoubleSpinBox, QSpinBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px 8px;
-                color: #f8fafc;
-                font-size: 12px;
-            }
-        """
-
-    def _combo_style_small(self):
-        return """
-            QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px 8px;
-                color: #f8fafc;
-                font-size: 12px;
-            }
-            QComboBox::drop-down { border: none; width: 20px; }
-            QComboBox QAbstractItemView {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                color: #f8fafc;
-            }
-        """

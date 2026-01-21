@@ -11,8 +11,9 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QLineEdit,
     QFrame,
+    QSizePolicy,
 )
-from PyQt6.QtCore import pyqtSignal, QTimer
+from PyQt6.QtCore import pyqtSignal, QTimer, Qt
 
 
 class PageHeader(QWidget):
@@ -47,10 +48,13 @@ class PageHeader(QWidget):
         show_export: bool = False,
         show_filter: bool = False,
         search_placeholder: str = "Ara...",
+        subtitle: str = "",
         parent=None,
     ):
         super().__init__(parent)
         self.setProperty("class", "page-header")
+        self.setFixedHeight(42)  # Ana widget yüksekliğini sabitle
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._setup_ui(
             title,
             icon,
@@ -62,6 +66,7 @@ class PageHeader(QWidget):
             show_export,
             show_filter,
             search_placeholder,
+            subtitle,
         )
 
         # Arama için debounce timer
@@ -82,16 +87,17 @@ class PageHeader(QWidget):
         show_export,
         show_filter,
         search_placeholder,
+        subtitle,
     ):
         # Ana layout - margin olmadan
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 12)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
         # Header çubuğu (frame)
         self.header_frame = QFrame()
         self.header_frame.setProperty("class", "header-bar")
-        self.header_frame.setFixedHeight(50)
+        self.header_frame.setFixedHeight(42)
 
         # Header içi layout
         header_layout = QHBoxLayout(self.header_frame)
@@ -109,16 +115,36 @@ class PageHeader(QWidget):
         else:
             self.back_btn = None
 
-        # Sayfa başlığı
+        # Başlık ve Alt Başlık
+        # Başlık ve Alt Başlık
         title_text = f"{icon} {title}" if icon else title
         self.title_label = QLabel(title_text)
         self.title_label.setProperty("class", "page-title")
-        header_layout.addWidget(self.title_label)
+
+        if subtitle:
+            title_container = QWidget()
+            title_layout = QVBoxLayout(title_container)
+            title_layout.setContentsMargins(0, 0, 0, 0)
+            title_layout.setSpacing(0)
+            title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+            title_layout.addWidget(self.title_label)
+
+            self.subtitle_label = QLabel(subtitle)
+            self.subtitle_label.setProperty("class", "page-subtitle")
+            self.subtitle_label.setStyleSheet(
+                "color: #94a3b8; font-size: 12px; margin-top: 2px;"
+            )
+            title_layout.addWidget(self.subtitle_label)
+
+            header_layout.addWidget(title_container)
+        else:
+            header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
 
         # Standart yükseklik
-        BTN_HEIGHT = 36
+        BTN_HEIGHT = 30
 
         # Arama kutusu
         if show_search:
@@ -209,3 +235,11 @@ class PageHeader(QWidget):
     def header_layout(self):
         """Header frame içindeki layout'u döndür (widget ekleme için)"""
         return self.header_frame.layout()
+
+    def add_action_button(self, widget: QWidget):
+        """Header'a özel aksiyon butonu ekle"""
+        # Layout'un sonundaki butonların önüne ekle
+        # Stretch'ten sonra eklemek için layout count'u alabiliriz veya direkt addWidget
+        # Standart butonlar layout'un sonunda.
+        # Bizim eklediğimiz butonlar da onların yanında olmalı.
+        self.header_frame.layout().addWidget(widget)

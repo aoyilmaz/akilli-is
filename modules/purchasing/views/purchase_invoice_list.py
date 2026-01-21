@@ -194,19 +194,22 @@ class PurchaseInvoiceListPage(QWidget):
 
             elif col_key == "total":
                 total = inv.get("total", 0) or 0
+                symbol = inv.get("currency_symbol", "₺")
                 self.table.setItem(
-                    row, col_idx, QTableWidgetItem(f"₺{float(total):,.2f}")
+                    row, col_idx, QTableWidgetItem(f"{symbol}{float(total):,.2f}")
                 )
 
             elif col_key == "paid":
                 paid = inv.get("paid_amount", 0) or 0
+                symbol = inv.get("currency_symbol", "₺")
                 self.table.setItem(
-                    row, col_idx, QTableWidgetItem(f"₺{float(paid):,.2f}")
+                    row, col_idx, QTableWidgetItem(f"{symbol}{float(paid):,.2f}")
                 )
 
             elif col_key == "balance":
                 balance = inv.get("balance", 0) or 0
-                item = QTableWidgetItem(f"₺{float(balance):,.2f}")
+                symbol = inv.get("currency_symbol", "₺")
+                item = QTableWidgetItem(f"{symbol}{float(balance):,.2f}")
                 if float(balance) > 0:
                     item.setForeground(Qt.GlobalColor.red)
                 self.table.setItem(row, col_idx, item)

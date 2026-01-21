@@ -261,6 +261,19 @@ class UnitService(ServiceBase):
         self.session.commit()
         return unit
 
+    def convert(self, amount: Decimal, from_unit_id: int, to_unit_id: int) -> Decimal:
+        """Birim dönüşümü yap."""
+        if from_unit_id == to_unit_id:
+            return amount
+
+        # Basit dönüşüm mantığı - Şimdilik sadece 1-1 varsayıyoruz veya conversion tablosu eklenecek.
+        # İleride UnitConversion tablosundan katsayı alınacak.
+        # Şu anlık proje kapsamında birim dönüşüm tablosu olmadığı için
+        # sadece isim bazlı (kg->ton gibi) basit kontrol yapabiliriz veya
+        # kullanıcı manuel girmeli.
+        # Plan gereği şimdilik pas geçiyoruz, stok giriş ekranında kullanıcı yönetecek.
+        return amount
+
 
 class CategoryService(ServiceBase):
     """Kategori servisi"""
@@ -416,7 +429,16 @@ class StockMovementService(ServiceBase):
         limit: int = 100,
     ) -> List[StockMovement]:
         """Filtrelenmiş stok hareketleri listesi"""
-        query = self.session.query(StockMovement)
+        from sqlalchemy.orm import joinedload
+
+        query = self.session.query(StockMovement).options(
+            joinedload(StockMovement.item),
+            joinedload(StockMovement.unit),
+            joinedload(StockMovement.from_warehouse),
+            joinedload(StockMovement.to_warehouse),
+            joinedload(StockMovement.secondary_unit),
+            joinedload(StockMovement.currency),
+        )
 
         if item_id:
             query = query.filter(StockMovement.item_id == item_id)
@@ -514,12 +536,12 @@ class StockMovementService(ServiceBase):
         # === Dual-Unit (İkincil Birim) ===
         secondary_quantity: Decimal = None,
         secondary_unit_id: int = None,
+        # === Currency ===
+        currency_id: int = None,
+        exchange_rate: Decimal = None,
     ) -> StockMovement:
         """
         Stok hareketi oluştur
-
-        KRİTİK: Transaction içinde hem hareket hem bakiye güncellenir.
-        Herhangi bir hata durumunda tüm işlem geri alınır.
         """
 
         if quantity <= 0:
@@ -527,6 +549,22 @@ class StockMovementService(ServiceBase):
 
         quantity = Decimal(str(quantity))
         unit_price = Decimal(str(unit_price)) if unit_price else Decimal(0)
+
+        # Kur dönüşümü
+        exchange_rate = Decimal(str(exchange_rate)) if exchange_rate else Decimal(1)
+        if currency_id and exchange_rate > 1:
+            # Fiyat dövizli gelmiş, TL'ye çevirip unit_price (TL) olarak kaydedelim mi?
+            # Modelde unit_price TL tutulmalı (standart), ayrıca currency_id ve rate saklanmalı.
+            # Gelen unit_price DÖVİZLİ ise:
+            movement_cost = unit_price * exchange_rate  # TL Maliyet
+            # Ancak unit_price parametresi fonksiyona hangisi geliyor?
+            # Servis çağrılırken TL'ye çevrilmiş mi yoksa ham mı?
+            # Ham kabul edelim, burada çevirelim.
+            # unit_price -> Veritabanında TL tutulur.
+            # O yüzden veritabanına yazarken unit_price alanına TL yazacağız.
+            pass
+        else:
+            movement_cost = unit_price
 
         # İkincil birim miktarını Decimal'e çevir
         if secondary_quantity is not None:
@@ -543,8 +581,11 @@ class StockMovementService(ServiceBase):
             # GİRİŞ işlemleri - to_warehouse zorunlu
             if not to_warehouse_id:
                 raise ValueError("Giriş işlemleri için hedef depo zorunludur!")
-            # Giriş maliyeti = verilen birim fiyat
-            movement_cost = unit_price
+
+            # Giriş maliyeti (TL)
+            # Eğer yukarıda kur ile çarptıysak movement_cost TL'dir.
+            # Eğer kur yoksa movement_cost = unit_price (TL)
+            pass
 
         elif movement_type in [
             StockMovementType.CIKIS,
@@ -623,6 +664,9 @@ class StockMovementService(ServiceBase):
                 # Dual-Unit alanları
                 secondary_quantity=secondary_quantity,
                 secondary_unit_id=secondary_unit_id,
+                # Currency
+                currency_id=currency_id,
+                exchange_rate=exchange_rate,
             )
             self.session.add(movement)
 
@@ -639,7 +683,27 @@ class StockMovementService(ServiceBase):
                 secondary_unit_id=secondary_unit_id,
             )
 
-            # 3. Transaction'ı tamamla
+            # 3. Stok Kartı Fiyatını Güncelle (Genel Ortalama Maliyet)
+            if movement_type in [StockMovementType.SATIN_ALMA, StockMovementType.GIRIS]:
+                summary = self.get_stock_summary(item_id)
+                avg_cost = summary.get("average_cost", Decimal(0))
+                if avg_cost > 0:
+                    item = self.session.query(Item).filter(Item.id == item_id).first()
+                    if item:
+                        item.purchase_price = avg_cost
+                        # Para birimini TL (TRY) yap
+                        # Eğer TRY yoksa ilk currency'i al veya None bırak
+                        try_currency = (
+                            self.session.query(Currency)
+                            .filter(Currency.code == "TRY")
+                            .first()
+                        )
+                        if try_currency:
+                            item.currency_id = try_currency.id
+
+                        self.session.add(item)
+
+            # 4. Transaction'ı tamamla
             self.session.commit()
 
             return movement

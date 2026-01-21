@@ -44,6 +44,7 @@ class WorkOrderListPage(QWidget):
         "released": ("🚀 Serbest", "#8b5cf6"),
         "in_progress": ("🔄 Üretimde", "#f59e0b"),
         "completed": ("✅ Tamamlandı", "#10b981"),
+        "quality_check": ("🔍 Kalite Kontrol", "#06b6d4"),
         "closed": ("🔒 Kapatıldı", "#64748b"),
         "cancelled": ("❌ İptal", "#ef4444"),
     }
@@ -94,6 +95,7 @@ class WorkOrderListPage(QWidget):
         self.status_combo.addItem("📅 Planlandı", "planned")
         self.status_combo.addItem("🚀 Serbest", "released")
         self.status_combo.addItem("🔄 Üretimde", "in_progress")
+        self.status_combo.addItem("🔍 Kalite Kontrol", "quality_check")
         self.status_combo.addItem("✅ Tamamlandı", "completed")
         self.status_combo.addItem("🔒 Kapatıldı", "closed")
         self.status_combo.setMinimumWidth(140)
@@ -168,7 +170,7 @@ class WorkOrderListPage(QWidget):
             status = wo.get("status", "draft")
             if status == "in_progress":
                 in_progress_count += 1
-            elif status in ["completed", "closed"]:
+            elif status in ["quality_check", "completed", "closed"]:
                 completed_count += 1
 
             end = wo.get("planned_end")
@@ -312,7 +314,7 @@ class WorkOrderListPage(QWidget):
             )
             menu.addAction(complete_action)
 
-        if "Tamamlandı" in status_text:
+        if "Tamamlandı" in status_text or "Kalite Kontrol" in status_text:
             close_action = QAction("🔒 Kapat", self)
             close_action.triggered.connect(
                 lambda: self.status_change_requested.emit(wo_id, "closed")

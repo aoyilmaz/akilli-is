@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QCheckBox,
     QFormLayout,
+    QGridLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.toast import show_toast
@@ -30,7 +31,9 @@ class StockFormPage(QWidget):
     """Stok kartı ekleme/düzenleme formu"""
 
     saved = pyqtSignal(dict)
+    saved = pyqtSignal(dict)
     cancelled = pyqtSignal()
+    generate_code_requested = pyqtSignal()
 
     def __init__(self, item: Optional[Item] = None, parent=None):
         super().__init__(parent)
@@ -86,31 +89,60 @@ class StockFormPage(QWidget):
     def _create_general_tab(self) -> QWidget:
         """Genel bilgiler sekmesi"""
         tab = QWidget()
-        layout = QHBoxLayout(tab)
-        layout.setSpacing(24)
+        main_layout = QVBoxLayout(tab)
+        main_layout.setSpacing(24)
+
+        # === Üst Bölüm: Kod ve İsim (Tam Genişlik) ===
+        top_widget = QWidget()
+        top_layout = QGridLayout(top_widget)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(12)
+
+        # 1. Satır: Kod ve İsim yan yana ama İsim daha geniş
+        # Stok Kodu
+        top_layout.addWidget(QLabel("Stok Kodu *"), 0, 0)
+
+        code_container = QWidget()
+        code_layout = QHBoxLayout(code_container)
+        code_layout.setContentsMargins(0, 0, 0, 0)
+        code_layout.setSpacing(4)
+
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("STK000001")
+        self.code_input.setFixedWidth(150)  # Sabit genişlik
+
+        auto_btn = QPushButton("🔄")
+        auto_btn.setFixedWidth(30)
+        auto_btn.setToolTip("Otomatik Kod Üret")
+        auto_btn.clicked.connect(self._generate_code)
+
+        code_layout.addWidget(self.code_input)
+        code_layout.addWidget(auto_btn)
+
+        top_layout.addWidget(code_container, 0, 1)
+
+        # Stok Adı
+        top_layout.addWidget(QLabel("Stok Adı *"), 0, 2)
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Ürün adını girin")
+        top_layout.addWidget(self.name_input, 0, 3)
+
+        # Kolon oranları: Label, Input(Code), Label, Input(Name)
+        top_layout.setColumnStretch(1, 0)  # Kod sabit gibi
+        top_layout.setColumnStretch(3, 1)  # İsim uzasın
+
+        main_layout.addWidget(top_widget)
+
+        # === Alt Bölüm: 2 Kolonlu Detaylar ===
+        columns_layout = QHBoxLayout()
+        columns_layout.setSpacing(24)
 
         # Sol kolon
         left_widget = QWidget()
         left_layout = QFormLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(16)
         left_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-
-        # Stok Kodu
-        code_layout = QHBoxLayout()
-        self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("STK000001")
-        auto_btn = QPushButton("🔄")
-        auto_btn.setFixedWidth(40)
-        auto_btn.setToolTip("Otomatik Kod Üret")
-        auto_btn.clicked.connect(self._generate_code)
-        code_layout.addWidget(self.code_input)
-        code_layout.addWidget(auto_btn)
-        left_layout.addRow("Stok Kodu *", code_layout)
-
-        # Stok Adı
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Ürün adını girin")
-        left_layout.addRow("Stok Adı *", self.name_input)
 
         # Kısa Ad
         self.short_name_input = QLineEdit()
@@ -138,7 +170,7 @@ class StockFormPage(QWidget):
         self.unit_combo = QComboBox()
         left_layout.addRow("Birim *", self.unit_combo)
 
-        layout.addWidget(left_widget)
+        columns_layout.addWidget(left_widget)
 
         # Sağ kolon
         right_widget = QWidget()
@@ -174,7 +206,8 @@ class StockFormPage(QWidget):
         self.description_input.setMaximumHeight(100)
         right_layout.addRow("Açıklama", self.description_input)
 
-        layout.addWidget(right_widget)
+        columns_layout.addWidget(right_widget)
+        main_layout.addLayout(columns_layout)
 
         return tab
 
@@ -242,7 +275,19 @@ class StockFormPage(QWidget):
         self.weight_input.setRange(0, 999999)
         self.weight_input.setDecimals(4)
         self.weight_input.setSuffix(" kg")
-        form2.addRow("Ağırlık", self.weight_input)
+        form2.addRow("Ağırlık (Genel)", self.weight_input)
+
+        self.net_weight_input = QDoubleSpinBox()
+        self.net_weight_input.setRange(0, 999999)
+        self.net_weight_input.setDecimals(4)
+        self.net_weight_input.setSuffix(" kg")
+        form2.addRow("Net Ağırlık", self.net_weight_input)
+
+        self.gross_weight_input = QDoubleSpinBox()
+        self.gross_weight_input.setRange(0, 999999)
+        self.gross_weight_input.setDecimals(4)
+        self.gross_weight_input.setSuffix(" kg")
+        form2.addRow("Brüt Ağırlık", self.gross_weight_input)
 
         self.volume_input = QDoubleSpinBox()
         self.volume_input.setRange(0, 999999)
@@ -294,6 +339,13 @@ class StockFormPage(QWidget):
         self.purchase_price_input.setRange(0, 999999999)
         self.purchase_price_input.setDecimals(4)
         self.purchase_price_input.setPrefix("₺ ")
+        self.purchase_price_input.setReadOnly(True)
+        self.purchase_price_input.setButtonSymbols(
+            QDoubleSpinBox.ButtonSymbols.NoButtons
+        )
+        self.purchase_price_input.setToolTip(
+            "Ortalama maliyet sistem tarafından hesaplanır."
+        )
         form.addRow("Alış Fiyatı", self.purchase_price_input)
 
         self.sale_price_input = QDoubleSpinBox()
@@ -467,6 +519,8 @@ class StockFormPage(QWidget):
 
         # Fiziksel
         self.weight_input.setValue(float(self.item.weight or 0))
+        self.net_weight_input.setValue(float(self.item.net_weight or 0))
+        self.gross_weight_input.setValue(float(self.item.gross_weight or 0))
         self.volume_input.setValue(float(self.item.volume or 0))
         self.width_input.setValue(float(self.item.width or 0))
         self.height_input.setValue(float(self.item.height or 0))
@@ -494,10 +548,19 @@ class StockFormPage(QWidget):
         self.is_producible_check.setChecked(self.item.is_producible)
         self.is_active_check.setChecked(self.item.is_active)
 
+    def set_duplicate_mode(self):
+        """Formu kopyalama moduna ayarla"""
+        self.item = None
+        self.is_edit_mode = False
+        self.header.title_label.setText("Stok Kartı Kopyala")
+
+        # ID ve kod alanlarını temizle
+        self.code_input.clear()
+        self.barcode_input.clear()
+
     def _generate_code(self):
         """Otomatik kod üret - sinyal gönder"""
-        # Bu parent'tan alınacak
-        pass
+        self.generate_code_requested.emit()
 
     def set_generated_code(self, code: str):
         """Üretilen kodu ayarla"""
@@ -555,6 +618,8 @@ class StockFormPage(QWidget):
             "safety_stock": Decimal(str(self.safety_stock_input.value())),
             "lead_time_days": self.lead_time_input.value(),
             "weight": Decimal(str(self.weight_input.value())) or None,
+            "net_weight": Decimal(str(self.net_weight_input.value())) or None,
+            "gross_weight": Decimal(str(self.gross_weight_input.value())) or None,
             "volume": Decimal(str(self.volume_input.value())) or None,
             "width": Decimal(str(self.width_input.value())) or None,
             "height": Decimal(str(self.height_input.value())) or None,

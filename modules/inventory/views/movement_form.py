@@ -3,8 +3,10 @@ Akıllı İş - Stok Hareket Formu (Giriş/Çıkış/Transfer)
 """
 
 from typing import Optional, List
+from typing import Optional, List
 from decimal import Decimal
 from datetime import datetime
+from modules.finance.services.currency_service import CurrencyService
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -135,67 +137,84 @@ class MovementFormPage(QWidget):
         # === Satır Ekleme ===
         add_frame = QFrame()
         add_frame.setProperty("class", "card-secondary")
-        add_layout = QHBoxLayout(add_frame)
+        # Layout Grid olarak değiştirildi
+        from PyQt6.QtWidgets import QGridLayout
+
+        add_layout = QGridLayout(add_frame)
         add_layout.setContentsMargins(16, 12, 16, 12)
         add_layout.setSpacing(12)
 
-        # Barkod girişi
-        add_layout.addWidget(QLabel("Barkod:"))
+        # Row 0: Barkod, Stok, Lot
+        add_layout.addWidget(QLabel("Barkod:"), 0, 0)
         self.barcode_input = QLineEdit()
         self.barcode_input.setPlaceholderText("Barkod okutun...")
         self.barcode_input.setMaximumWidth(150)
         self.barcode_input.returnPressed.connect(self._on_barcode_scan)
         self.barcode_input.setProperty("class", "barcode-input")
-        add_layout.addWidget(self.barcode_input)
+        add_layout.addWidget(self.barcode_input, 0, 1)
 
-        # Stok seçimi
-        add_layout.addWidget(QLabel("Stok:"))
+        add_layout.addWidget(QLabel("Stok:"), 0, 2)
         self.item_combo = QComboBox()
         self.item_combo.setEditable(True)
-        self.item_combo.setMinimumWidth(300)
-        add_layout.addWidget(self.item_combo)
+        self.item_combo.setMinimumWidth(250)
+        add_layout.addWidget(self.item_combo, 0, 3, 1, 3)  # Span 3 col
 
+        add_layout.addWidget(QLabel("Lot:"), 0, 6)
+        self.lot_input = QLineEdit()
+        self.lot_input.setPlaceholderText("Lot no")
+        self.lot_input.setMaximumWidth(100)
+        add_layout.addWidget(self.lot_input, 0, 7)
+
+        # Row 1: Miktar, Fiyat, Döviz, Kur, İkincil...
         # Miktar
-        add_layout.addWidget(QLabel("Miktar:"))
+        add_layout.addWidget(QLabel("Miktar:"), 1, 0)
         self.qty_input = QDoubleSpinBox()
         self.qty_input.setRange(0.0001, 999999999)
         self.qty_input.setDecimals(4)
         self.qty_input.setValue(1)
-        add_layout.addWidget(self.qty_input)
+        add_layout.addWidget(self.qty_input, 1, 1)
 
-        # Birim Fiyat
-        add_layout.addWidget(QLabel("Birim Fiyat:"))
+        # Fiyat
+        add_layout.addWidget(QLabel("Birim Fiyat:"), 1, 2)
         self.price_input = QDoubleSpinBox()
         self.price_input.setRange(0, 999999999)
         self.price_input.setDecimals(4)
-        self.price_input.setPrefix("₺ ")
-        add_layout.addWidget(self.price_input)
+        add_layout.addWidget(self.price_input, 1, 3)
 
-        # Lot No
-        add_layout.addWidget(QLabel("Lot:"))
-        self.lot_input = QLineEdit()
-        self.lot_input.setPlaceholderText("Lot no")
-        self.lot_input.setMaximumWidth(100)
-        add_layout.addWidget(self.lot_input)
+        # Döviz
+        self.currency_combo = QComboBox()
+        # Dinamik yüklenecek
+        self.currency_combo.setFixedWidth(70)
+        self.currency_combo.currentTextChanged.connect(self._on_currency_changed)
+        add_layout.addWidget(self.currency_combo, 1, 4)
 
-        # === Dual-Unit (İkincil Birim) ===
-        add_layout.addWidget(QLabel("İkincil Mkt:"))
+        # Kur
+        self.rate_input = QDoubleSpinBox()
+        self.rate_input.setRange(0.0001, 9999)
+        self.rate_input.setDecimals(4)
+        self.rate_input.setValue(1.0)
+        self.rate_input.setToolTip("Döviz Kuru")
+        add_layout.addWidget(self.rate_input, 1, 5)
+
+        # İkincil Mkt
+        add_layout.addWidget(QLabel("İkn. Mkt:"), 1, 6)
         self.secondary_qty_input = QDoubleSpinBox()
         self.secondary_qty_input.setRange(0, 999999999)
         self.secondary_qty_input.setDecimals(4)
         self.secondary_qty_input.setSpecialValueText("-")
-        self.secondary_qty_input.setToolTip("Örn: 10 koli = 150 kg")
-        add_layout.addWidget(self.secondary_qty_input)
+        add_layout.addWidget(self.secondary_qty_input, 1, 7)
 
-        add_layout.addWidget(QLabel("İkincil Birim:"))
+        # İkincil Birim
         self.secondary_unit_combo = QComboBox()
-        self.secondary_unit_combo.setMinimumWidth(80)
-        add_layout.addWidget(self.secondary_unit_combo)
+        self.secondary_unit_combo.setMinimumWidth(70)
+        add_layout.addWidget(self.secondary_unit_combo, 1, 8)
 
         # Ekle butonu
         add_btn = QPushButton("➕ Ekle")
         add_btn.clicked.connect(self._add_line)
-        add_layout.addWidget(add_btn)
+        add_layout.addWidget(add_btn, 1, 9)
+
+        layout.addWidget(add_frame)
 
         layout.addWidget(add_frame)
 
@@ -243,10 +262,12 @@ class MovementFormPage(QWidget):
             ("Birim", 55),
             ("İkincil Mkt", 90),
             ("İkn. Birim", 70),
-            ("Birim Fiyat", 100),
-            ("Toplam", 110),
+            ("Fiyat", 90),
+            ("Döviz", 60),
+            ("Kur", 60),
+            ("Toplam (TL)", 110),
             ("Lot No", 90),
-            ("", 50),  # Sil butonu
+            ("", 50),
         ]
 
         self.table.setColumnCount(len(columns))
@@ -317,6 +338,23 @@ class MovementFormPage(QWidget):
         for unit in units:
             self.secondary_unit_combo.addItem(unit.code, unit.id)
 
+    def load_currencies(self, currencies: list):
+        """Para birimlerini yükle"""
+        self.currency_combo.clear()
+        # Default TRY olsun
+        try_currency = next((c for c in currencies if c.code == "TRY"), None)
+
+        # Önce TRY ekle
+        if try_currency:
+            self.currency_combo.addItem(try_currency.code, try_currency.id)
+
+        for currency in currencies:
+            if currency.code != "TRY":
+                self.currency_combo.addItem(currency.code, currency.id)
+
+        if self.currency_combo.count() > 0:
+            self.currency_combo.setCurrentIndex(0)
+
     def load_warehouses(self, warehouses: list):
         """Depoları yükle"""
         self.warehouses_data = {wh.id: wh for wh in warehouses}
@@ -358,6 +396,14 @@ class MovementFormPage(QWidget):
             self.secondary_unit_combo.currentText() if secondary_unit_id else ""
         )
 
+        # Kur ve Döviz
+        currency = self.currency_combo.currentText()
+        currency_id = self.currency_combo.currentData()
+        rate = Decimal(str(self.rate_input.value()))
+
+        # Toplam Tutar (TL olarak hesapla)
+        total_tl = qty * price * rate
+
         line = {
             "item_id": item_id,
             "item_code": item["code"],
@@ -365,7 +411,10 @@ class MovementFormPage(QWidget):
             "unit_code": item["unit_code"],
             "quantity": qty,
             "unit_price": price,
-            "total": qty * price,
+            "currency": currency,
+            "currency_id": currency_id,
+            "exchange_rate": rate,
+            "total_tl": total_tl,
             "lot_number": lot or None,
             # Dual-Unit
             "secondary_quantity": secondary_qty,
@@ -382,7 +431,26 @@ class MovementFormPage(QWidget):
         self.lot_input.clear()
         self.secondary_qty_input.setValue(0)
         self.secondary_unit_combo.setCurrentIndex(0)
+        self.secondary_qty_input.setValue(0)
+        self.secondary_unit_combo.setCurrentIndex(0)
+        self.currency_combo.setCurrentText("TRY")
+        self.rate_input.setValue(1.0)
         self.item_combo.setFocus()
+
+    def _on_currency_changed(self, currency):
+        """Para birimi değişince kur getir"""
+        if currency == "TRY":
+            self.rate_input.setValue(1.0)
+            self.rate_input.setEnabled(False)
+        else:
+            self.rate_input.setEnabled(True)
+            # TCMB Servisinden çek
+            try:
+                rates = CurrencyService.fetch_tcmb_rates()
+                if rates and currency in rates:
+                    self.rate_input.setValue(float(rates[currency]))
+            except Exception as e:
+                print(f"Kur getirme hatası: {e}")
 
     def _refresh_table(self):
         """Tabloyu yenile"""
@@ -421,28 +489,38 @@ class MovementFormPage(QWidget):
             self.table.setItem(row, 5, QTableWidgetItem(sec_unit))
 
             # Birim Fiyat
-            price_item = QTableWidgetItem(f"₺{line['unit_price']:,.4f}")
+            price_item = QTableWidgetItem(f"{line['unit_price']:,.2f}")
             price_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
             self.table.setItem(row, 6, price_item)
 
-            # Toplam
-            total_item = QTableWidgetItem(f"₺{line['total']:,.2f}")
+            # Döviz
+            self.table.setItem(row, 7, QTableWidgetItem(line["currency"]))
+
+            # Kur
+            rate_item = QTableWidgetItem(f"{line['exchange_rate']:,.4f}")
+            rate_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            self.table.setItem(row, 8, rate_item)
+
+            # Toplam (TL)
+            total_item = QTableWidgetItem(f"₺{line['total_tl']:,.2f}")
             total_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
-            self.table.setItem(row, 7, total_item)
+            self.table.setItem(row, 9, total_item)
 
-            # Lot No
-            self.table.setItem(row, 8, QTableWidgetItem(line["lot_number"] or ""))
+            # Lot No (Index kaydı)
+            self.table.setItem(row, 10, QTableWidgetItem(line["lot_number"] or ""))
 
-            # Sil butonu
+            # Sil butonu (Index kaydı)
             del_btn = QPushButton("🗑")
             del_btn.clicked.connect(lambda checked, r=row: self._delete_line(r))
-            self.table.setCellWidget(row, 9, del_btn)
+            self.table.setCellWidget(row, 11, del_btn)
 
-            total += line["total"]
+            total += line["total_tl"]
 
         self.line_count_label.setText(f"Satır: {len(self.lines)}")
         self.total_label.setText(f"Toplam: ₺{total:,.2f}")

@@ -198,8 +198,11 @@ class MovementListPage(QWidget):
         for row, mov in enumerate(movements):
             self._populate_row(row, mov, visible_cols)
 
-            # Toplamları hesapla
+            # Toplamları hesapla (TL Dönüşümü ile)
             total = mov.total_price or Decimal(0)
+            exchange_rate = mov.exchange_rate or Decimal(1)
+            total_tl = total * exchange_rate
+
             if mov.movement_type in [
                 StockMovementType.GIRIS,
                 StockMovementType.SATIN_ALMA,
@@ -207,9 +210,9 @@ class MovementListPage(QWidget):
                 StockMovementType.SAYIM_FAZLA,
                 StockMovementType.IADE_SATIS,
             ]:
-                total_in += total
+                total_in += total_tl
             else:
-                total_out += total
+                total_out += total_tl
 
         # Kartları güncelle
         self.stat_cards["total"].update_value(str(len(movements)))
@@ -245,12 +248,15 @@ class MovementListPage(QWidget):
                 self.table.setItem(row, col_idx, cell)
 
             elif col_key == "item_code":
-                cell = QTableWidgetItem(mov.item_code or "-")
+                # Modelden relationship ile gelen veriyi tercih et
+                code = mov.item.code if mov.item else (mov.item_code or "-")
+                cell = QTableWidgetItem(code)
                 cell.setForeground(QColor("#818cf8"))
                 self.table.setItem(row, col_idx, cell)
 
             elif col_key == "item_name":
-                self.table.setItem(row, col_idx, QTableWidgetItem(mov.item_name or "-"))
+                name = mov.item.name if mov.item else (mov.item_name or "-")
+                self.table.setItem(row, col_idx, QTableWidgetItem(name))
 
             elif col_key == "quantity":
                 qty = mov.quantity or Decimal(0)
@@ -261,12 +267,14 @@ class MovementListPage(QWidget):
                 self.table.setItem(row, col_idx, cell)
 
             elif col_key == "unit":
+                # Birim
                 unit_text = mov.unit.code if mov.unit else "-"
                 self.table.setItem(row, col_idx, QTableWidgetItem(unit_text))
 
             elif col_key == "unit_price":
                 price = mov.unit_price or Decimal(0)
-                cell = QTableWidgetItem(f"₺{price:,.2f}")
+                symbol = mov.currency.symbol if mov.currency else "₺"
+                cell = QTableWidgetItem(f"{symbol}{price:,.2f}")
                 cell.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
@@ -274,19 +282,22 @@ class MovementListPage(QWidget):
 
             elif col_key == "total":
                 total = mov.total_price or Decimal(0)
-                cell = QTableWidgetItem(f"₺{total:,.2f}")
+                symbol = mov.currency.symbol if mov.currency else "₺"
+                cell = QTableWidgetItem(f"{symbol}{total:,.2f}")
                 cell.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
                 self.table.setItem(row, col_idx, cell)
 
             elif col_key == "from_wh":
-                from_wh = mov.from_warehouse.code if mov.from_warehouse else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(from_wh))
+                # Kaynak Depo
+                wh_code = mov.from_warehouse.code if mov.from_warehouse else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(wh_code))
 
             elif col_key == "to_wh":
-                to_wh = mov.to_warehouse.code if mov.to_warehouse else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(to_wh))
+                # Hedef Depo
+                wh_code = mov.to_warehouse.code if mov.to_warehouse else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(wh_code))
 
         self.table.setRowHeight(row, 48)
 

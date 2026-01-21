@@ -607,6 +607,9 @@ class WorkOrderService:
         bom = (
             self.session.query(BillOfMaterials)
             .options(
+                joinedload(
+                    BillOfMaterials.item
+                ),  # Mamul detaylarını yükle (net_weight için)
                 joinedload(BillOfMaterials.lines).joinedload(BOMLine.item),
                 joinedload(BillOfMaterials.operations),
             )
@@ -619,13 +622,30 @@ class WorkOrderService:
 
         multiplier = planned_quantity / (bom.base_quantity or Decimal(1))
 
+        # Mamul net ağırlığı (Yüzdelik hesaplama için)
+        product_net_weight = bom.item.net_weight or Decimal(0)
+        total_net_weight_for_order = planned_quantity * product_net_weight
+
         # Malzeme satırlarını oluştur
         for line in bom.lines:
+            # Miktar hesaplama
+            if getattr(line, "is_percentage", False):
+                # Yüzdelik hesaplama: (Toplam Net Ağırlık * % / 100)
+                # effective_quantity zaten scrap dahil değerdir: qty * (1+scrap)
+                # Örn: %50 reçete, %2 fire -> 50 * 1.02 = 51.
+                # 100kg üretim için -> 100 * 51 / 100 = 51kg.
+                required_quantity = total_net_weight_for_order * (
+                    line.effective_quantity / Decimal(100)
+                )
+            else:
+                # Standart hesaplama
+                required_quantity = line.effective_quantity * multiplier
+
             wo_line = WorkOrderLine(
                 work_order_id=order.id,
                 bom_line_id=line.id,
                 item_id=line.item_id,
-                required_quantity=line.effective_quantity * multiplier,
+                required_quantity=required_quantity,
                 issued_quantity=Decimal(0),  # Henüz çıkış yapılmadı
                 unit_id=line.unit_id,
                 unit_cost=line.item.purchase_price if line.item else Decimal(0),

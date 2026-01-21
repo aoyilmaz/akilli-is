@@ -4,6 +4,7 @@ Akıllı İş - Ürün Reçetesi (BOM) Form Sayfası
 
 from typing import Optional
 from decimal import Decimal
+from modules.finance.services.currency_service import CurrencyService
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -23,8 +24,25 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QDialog,
     QGridLayout,
+    QCheckBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+
+
+class AutoSelectSpinBox(QDoubleSpinBox):
+    """Odaklandığında içeriği seçen SpinBox"""
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        # Gecikmeli seçim (Qt davranışı bazen seçimi hemen kaldırabilir)
+        QTimer.singleShot(0, self.selectAll)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        # Tıklamada da seç
+        QTimer.singleShot(0, self.selectAll)
+
+
 from ui.components.toast import show_toast
 from PyQt6.QtGui import QColor
 
@@ -133,6 +151,23 @@ class BOMFormPage(QWidget):
         self.by_products = []
         self.available_items = []
         self.available_products = []
+        self.parent_net_weight = Decimal(0)  # Ana ürün ağırlığı
+        # Varsayılan kurlar (Servisten güncellenecek)
+        self.exchange_rates = {
+            "TRY": Decimal("1.0"),
+            "USD": Decimal("38.50"),
+            "EUR": Decimal("40.20"),
+            "GBP": Decimal("48.50"),
+        }
+
+        # Canlı kurları çekmeyi dene
+        try:
+            live_rates = CurrencyService.fetch_tcmb_rates()
+            if live_rates:
+                self.exchange_rates.update(live_rates)
+        except Exception as e:
+            print(f"BOM Form Kur Hatası: {e}")
+
         self.setup_ui()
         if self.is_edit_mode:
             self.load_data()
@@ -204,6 +239,7 @@ class BOMFormPage(QWidget):
         # Mamul
         form_layout.addWidget(QLabel("Mamul *"), 2, 0)
         self.product_combo = QComboBox()
+        self.product_combo.currentIndexChanged.connect(self._on_product_changed)
         form_layout.addWidget(self.product_combo, 2, 1)
 
         # Temel Üretim Miktarı
@@ -213,6 +249,7 @@ class BOMFormPage(QWidget):
         self.base_qty_input.setRange(0.0001, 999999999)
         self.base_qty_input.setDecimals(4)
         self.base_qty_input.setValue(1)
+        self.base_qty_input.valueChanged.connect(self._refresh_materials_table)
         qty_layout.addWidget(self.base_qty_input)
 
         self.unit_combo = QComboBox()
@@ -287,6 +324,7 @@ class BOMFormPage(QWidget):
             ("Malzeme Adı", 200),
             ("Miktar", 100),
             ("Birim", 80),
+            ("Yüzde Mi?", 70),
             ("Fire %", 80),
             ("Net Miktar", 100),
             ("Birim Maliyet", 110),
@@ -511,6 +549,7 @@ class BOMFormPage(QWidget):
                     "unit_id": item.unit_id,
                     "purchase_price": float(item.purchase_price or 0),
                     "total_stock": float(item.total_stock or 0),
+                    "currency_code": item.currency.code if item.currency else "TRY",
                 }
             )
 
@@ -539,6 +578,7 @@ class BOMFormPage(QWidget):
                         "quantity": Decimal("1"),
                         "unit_code": item["unit_code"],
                         "unit_id": item.get("unit_id"),
+                        "is_percentage": False,
                         "scrap_rate": Decimal("0"),
                         "unit_cost": Decimal(str(item["purchase_price"])),
                     }
@@ -556,6 +596,7 @@ class BOMFormPage(QWidget):
         total_cost = Decimal(0)
 
         for row, line in enumerate(self.lines):
+            self.materials_table.setRowHeight(row, 50)  # Satır yüksekliği artırıldı
             self.materials_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
 
             code_item = QTableWidgetItem(line["item_code"])
@@ -563,55 +604,173 @@ class BOMFormPage(QWidget):
             self.materials_table.setItem(row, 1, code_item)
             self.materials_table.setItem(row, 2, QTableWidgetItem(line["item_name"]))
 
-            qty_spin = QDoubleSpinBox()
+            qty_spin = AutoSelectSpinBox()
             qty_spin.setRange(0.0001, 999999999)
             qty_spin.setDecimals(4)
+            qty_spin.setMinimumWidth(100)
+            qty_spin.setMinimumHeight(50)  # Satır yüksekliği ile aynı
+            qty_spin.setFrame(False)  # Çerçeveyi kaldır
             qty_spin.setValue(float(line["quantity"]))
             qty_spin.valueChanged.connect(
                 lambda val, r=row: self._on_qty_changed(r, val)
             )
             self.materials_table.setCellWidget(row, 3, qty_spin)
 
+            # Stil: Şeffaf ve tam oturan
+            # Stil: Şeffaf ve tam oturan, butonları gizle
+            qty_spin.setStyleSheet(
+                """
+                QDoubleSpinBox { background: transparent; border: none; font-size: 14px; selection-background-color: #4f46e5; }
+                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0px; border: none; background: transparent; }
+            """
+            )
+
             self.materials_table.setItem(row, 4, QTableWidgetItem(line["unit_code"]))
 
-            scrap_spin = QDoubleSpinBox()
+            # Yüzde Mi Checkbox
+            chk_widget = QWidget()
+            chk_layout = QHBoxLayout(chk_widget)
+            chk_layout.setContentsMargins(0, 0, 0, 0)
+            chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            chk_percentage = QCheckBox()
+            chk_percentage.setChecked(line.get("is_percentage", False))
+            chk_percentage.stateChanged.connect(
+                lambda state, r=row: self._on_type_changed(r, state)
+            )
+            chk_layout.addWidget(chk_percentage)
+            self.materials_table.setCellWidget(row, 5, chk_widget)
+
+            scrap_spin = AutoSelectSpinBox()
             scrap_spin.setRange(0, 100)
             scrap_spin.setDecimals(2)
             scrap_spin.setSuffix("%")
+            scrap_spin.setMinimumWidth(80)
+            scrap_spin.setMinimumHeight(50)  # Satır yüksekliği ile aynı
+            scrap_spin.setFrame(False)  # Çerçeveyi kaldır
             scrap_spin.setValue(float(line.get("scrap_rate", 0)))
+            scrap_spin.setStyleSheet(
+                """
+                QDoubleSpinBox { background: transparent; border: none; font-size: 14px; selection-background-color: #4f46e5; }
+                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0px; border: none; background: transparent; }
+            """
+            )
             scrap_spin.valueChanged.connect(
                 lambda val, r=row: self._on_scrap_changed(r, val)
             )
-            self.materials_table.setCellWidget(row, 5, scrap_spin)
+            self.materials_table.setCellWidget(row, 6, scrap_spin)
 
             qty = line["quantity"]
             scrap = line.get("scrap_rate", Decimal(0))
-            net_qty = qty * (1 + scrap / 100)
-            self.materials_table.setItem(row, 6, QTableWidgetItem(f"{net_qty:,.4f}"))
+            is_percentage = line.get("is_percentage", False)
+            base_qty = Decimal(str(self.base_qty_input.value()))
+
+            if is_percentage:
+                # Yüzde hesaplama: (Ana Ürün Ağırlığı * Yüzde / 100) * Temel Miktar
+                percentage = qty
+                if self.parent_net_weight > 0:
+                    calculated_qty = (
+                        self.parent_net_weight * percentage / Decimal("100")
+                    ) * base_qty
+                    # Fire eklenmiş hali (Üretim için gerekli miktar)
+                    gross_qty = calculated_qty * (Decimal("1") + scrap / Decimal("100"))
+
+                    net_qty = gross_qty
+                    net_qty_item = QTableWidgetItem(f"{gross_qty:,.4f} KG")
+                    net_qty_item.setToolTip(
+                        f"%{percentage:,.2f} (Baz: {self.parent_net_weight} KG)"
+                    )
+                else:
+                    net_qty = Decimal(0)
+                    net_qty_item = QTableWidgetItem("Ağırlık Yok!")
+                    net_qty_item.setToolTip("Mamul kartında net ağırlık girilmemiş.")
+
+                net_qty_item.setText(f"%{percentage:,.2f} -> {net_qty:,.3f}")
+                net_qty_item.setForeground(QColor("#a855f7"))
+            else:
+                # Standart miktar
+                net_qty = qty * (Decimal("1") + scrap / Decimal("100")) * base_qty
+                net_qty_item = QTableWidgetItem(f"{net_qty:,.4f}")
+                net_qty_item.setForeground(QColor("#a855f7"))  # Mor renk
+
+            self.materials_table.setItem(row, 7, net_qty_item)
 
             unit_cost = line.get("unit_cost", Decimal(0))
-            self.materials_table.setItem(row, 7, QTableWidgetItem(f"₺{unit_cost:,.2f}"))
+            self.materials_table.setItem(row, 8, QTableWidgetItem(f"₺{unit_cost:,.2f}"))
 
             line_cost = net_qty * unit_cost
+
             line["line_cost"] = line_cost
             total_cost += line_cost
             line_cost_item = QTableWidgetItem(f"₺{line_cost:,.2f}")
             line_cost_item.setForeground(QColor("#10b981"))
-            self.materials_table.setItem(row, 8, line_cost_item)
+            self.materials_table.setItem(row, 9, line_cost_item)
 
         self.total_label.setText(f"Toplam: {len(self.lines)} malzeme")
         self.material_cost_label.setText(f"₺{total_cost:,.2f}")
         self._update_total_cost()
 
+    def _on_type_changed(self, row: int, state: int):
+        if 0 <= row < len(self.lines):
+            self.lines[row]["is_percentage"] = state == 2  # 2 = Checked
+            self._update_row_calculations(row)
+
     def _on_qty_changed(self, row: int, value: float):
         if 0 <= row < len(self.lines):
             self.lines[row]["quantity"] = Decimal(str(value))
-            self._refresh_materials_table()
+            self._update_row_calculations(row)
 
     def _on_scrap_changed(self, row: int, value: float):
         if 0 <= row < len(self.lines):
             self.lines[row]["scrap_rate"] = Decimal(str(value))
-            self._refresh_materials_table()
+            self._update_row_calculations(row)
+
+    def _update_row_calculations(self, row: int):
+        if not (0 <= row < len(self.lines)):
+            return
+
+        line = self.lines[row]
+        qty = line["quantity"]
+        scrap = line.get("scrap_rate", Decimal(0))
+        is_percentage = line.get("is_percentage", False)
+        base_qty = Decimal(str(self.base_qty_input.value()))
+        unit_cost = line.get("unit_cost", Decimal(0))
+
+        if is_percentage:
+            percentage = qty
+            if self.parent_net_weight > 0:
+                calculated_qty = (
+                    self.parent_net_weight * percentage / Decimal("100")
+                ) * base_qty
+                gross_qty = calculated_qty * (Decimal("1") + scrap / Decimal("100"))
+                net_qty = gross_qty
+                net_qty_text = f"%{percentage:,.2f} -> {gross_qty:,.3f}"
+                tooltip = f"%{percentage:,.2f} (Baz: {self.parent_net_weight} KG)"
+            else:
+                net_qty = Decimal(0)
+                net_qty_text = "Ağırlık Yok!"
+                tooltip = "Mamul kartında net ağırlık girilmemiş."
+
+            item = self.materials_table.item(row, 7)
+            if item:
+                item.setText(net_qty_text)
+                item.setToolTip(tooltip)
+                item.setForeground(QColor("#a855f7"))
+        else:
+            net_qty = qty * (Decimal("1") + scrap / Decimal("100")) * base_qty
+            item = self.materials_table.item(row, 7)
+            if item:
+                item.setText(f"{net_qty:,.4f}")
+                item.setToolTip("")
+                item.setForeground(QColor("#a855f7"))
+
+        line_cost = net_qty * unit_cost
+        line["line_cost"] = line_cost
+
+        cost_item = self.materials_table.item(row, 9)
+        if cost_item:
+            cost_item.setText(f"₺{line_cost:,.2f}")
+
+        self._update_total_cost()
 
     def _update_total_cost(self):
         material_cost = sum(line.get("line_cost", Decimal(0)) for line in self.lines)
@@ -623,6 +782,20 @@ class BOMFormPage(QWidget):
         base_qty = Decimal(str(self.base_qty_input.value()))
         if base_qty > 0:
             self.unit_cost_label.setText(f"₺{total / base_qty:,.2f}")
+
+    def _on_product_changed(self, index: int):
+        product_id = self.product_combo.currentData()
+        self.parent_net_weight = Decimal(0)
+
+        if product_id and self.available_products:
+            for p in self.available_products:
+                if p.id == product_id:
+                    # Decimal conversion handling
+                    weight = getattr(p, "net_weight", 0)
+                    self.parent_net_weight = Decimal(str(weight if weight else 0))
+                    break
+
+        self._refresh_materials_table()
 
     def load_data(self):
         if not self.bom_data:
@@ -677,6 +850,7 @@ class BOMFormPage(QWidget):
                     "item_id": line_item["item_id"],
                     "quantity": line_item["quantity"],
                     "unit_id": line_item.get("unit_id"),
+                    "is_percentage": line_item.get("is_percentage", False),
                     "scrap_rate": line_item.get("scrap_rate", Decimal(0)),
                     "unit_cost": line_item.get("unit_cost", Decimal(0)),
                     "line_cost": line_item.get("line_cost", Decimal(0)),

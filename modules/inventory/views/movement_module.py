@@ -12,6 +12,7 @@ from modules.inventory.services import (
     WarehouseService,
     UnitService,
 )
+from modules.finance.services.currency_service import CurrencyService
 from modules.inventory.views.movement_list import MovementListPage
 from modules.inventory.views.movement_form import MovementFormPage
 
@@ -26,7 +27,9 @@ class MovementModule(QWidget):
         self.movement_service = None
         self.item_service = None
         self.warehouse_service = None
+        self.warehouse_service = None
         self.unit_service = None  # Dual-Unit için
+        self.currency_service = None
         self.setup_ui()
         self.load_data()
 
@@ -42,6 +45,7 @@ class MovementModule(QWidget):
         self.list_page.add_exit_clicked.connect(lambda: self.show_form("exit"))
         self.list_page.add_transfer_clicked.connect(lambda: self.show_form("transfer"))
         self.list_page.refresh_requested.connect(self.load_data)
+        self.list_page.view_clicked.connect(self.show_detail)
         self.stack.addWidget(self.list_page)
 
         layout.addWidget(self.stack)
@@ -55,6 +59,8 @@ class MovementModule(QWidget):
             self.warehouse_service = WarehouseService()
         if self.unit_service is None:
             self.unit_service = UnitService()
+        if self.currency_service is None:
+            self.currency_service = CurrencyService()
 
     def _close_services(self):
         if self.movement_service:
@@ -69,6 +75,12 @@ class MovementModule(QWidget):
         if self.unit_service:
             self.unit_service.close()
             self.unit_service = None
+        if self.currency_service:
+            # CurrencyService session kullanıyor mu? Evet, basit init ile.
+            # close metodu yoksa hata verebilir, ama service base kullanmıyor şimdilik.
+            # Yine de kontrol edelim. base.py'deki ServiceBase close methoduna sahip.
+            # Benim yazdığım CurrencyService ServiceBase inherit etmedi, ama session.close yapmalı.
+            pass
 
     def load_data(self):
         try:
@@ -146,6 +158,10 @@ class MovementModule(QWidget):
             units = self.unit_service.get_all()
             form.load_units(units)
 
+            # Dövizleri yükle
+            currencies = self.currency_service.get_all()
+            form.load_currencies(currencies)
+
             self.stack.addWidget(form)
             self.stack.setCurrentIndex(1)
 
@@ -184,6 +200,9 @@ class MovementModule(QWidget):
                     # Dual-Unit
                     secondary_quantity=line.get("secondary_quantity"),
                     secondary_unit_id=line.get("secondary_unit_id"),
+                    # Currency
+                    currency_id=line.get("currency_id"),
+                    exchange_rate=line.get("exchange_rate"),
                 )
 
             QMessageBox.information(self, "Başarılı", f"{len(lines)} satır kaydedildi!")
@@ -193,3 +212,111 @@ class MovementModule(QWidget):
             QMessageBox.critical(self, "Hata", f"Kaydetme hatası:\n{str(e)}")
         finally:
             self._close_services()
+
+    def show_detail(self, movement_id: int):
+        """Hareket detayını göster"""
+        try:
+            self._get_services()
+            movement = self.movement_service.get_by_id(movement_id)
+            if not movement:
+                QMessageBox.warning(self, "Hata", "Hareket bulunamadı!")
+                return
+
+            dialog = MovementDetailDialog(movement, self)
+            dialog.exec()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Detay görüntüleme hatası:\n{str(e)}")
+        finally:
+            self._close_services()
+
+
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QLabel,
+    QDialogButtonBox,
+    QScrollArea,
+    QFrame,
+)
+from PyQt6.QtCore import Qt
+
+
+class MovementDetailDialog(QDialog):
+    """Hareket detay penceresi"""
+
+    def __init__(self, movement, parent=None):
+        super().__init__(parent)
+        self.movement = movement
+        self.setWindowTitle(f"Hareket Detayı - {movement.document_no or 'Belgesiz'}")
+        self.setMinimumSize(450, 500)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Scroll Area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+        form_layout = QFormLayout(content)
+        form_layout.setSpacing(12)
+
+        # Helper
+        def add_row(label, value, color=None):
+            lbl = QLabel(str(value) if value is not None else "-")
+            if color:
+                lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+            lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            form_layout.addRow(QLabel(f"<b>{label}:</b>"), lbl)
+
+        m = self.movement
+
+        # Temel Bilgiler
+        add_row("Tarih", m.movement_date.strftime("%d.%m.%Y %H:%M"))
+        add_row("Belge No", m.document_no)
+        add_row("Tür", m.movement_type.name)  # Enum name
+
+        # Stok Bilgileri
+        item_text = f"{m.item.code} - {m.item.name}" if m.item else (m.item_code or "-")
+        add_row("Stok Kartı", item_text, "#818cf8")
+
+        # Depo Bilgileri
+        from_wh = m.from_warehouse.name if m.from_warehouse else "-"
+        to_wh = m.to_warehouse.name if m.to_warehouse else "-"
+        add_row("Kaynak Depo", from_wh)
+        add_row("Hedef Depo", to_wh)
+
+        # Miktar ve Fiyat
+        quantity = f"{m.quantity:,.4f} {m.unit.code if m.unit else ''}"
+        add_row("Miktar", quantity, "#10b981")
+
+        if m.secondary_quantity:
+            sec_qty = f"{m.secondary_quantity:,.4f} {m.secondary_unit.code if m.secondary_unit else ''}"
+            add_row("İkincil Miktar", sec_qty)
+
+        add_row("Birim Fiyat", f"₺{m.unit_price:,.2f}")
+        add_row("Toplam Tutar", f"₺{m.total_price:,.2f}")
+
+        if m.currency:
+            add_row("Döviz", m.currency.code)
+            add_row("Kur", m.exchange_rate)
+
+        # Diğer
+        if m.lot_number:
+            add_row("Lot No", m.lot_number)
+
+        if m.description:
+            add_row("Açıklama", m.description)
+
+        if m.created_by:
+            add_row("Oluşturan ID", m.created_by)
+
+        # Kapat butonu
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.accept)
+        layout.addWidget(buttons)

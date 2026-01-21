@@ -25,6 +25,7 @@ from database.models.purchasing import (
     PurchaseInvoiceStatus,
     Currency,
 )
+from database.models.common import Currency as FinanceCurrency
 from database.models.inventory import StockMovementType
 
 
@@ -568,13 +569,62 @@ class GoodsReceiptService:
 
             movement_service = StockMovementService()
 
+            # Siparişin döviz cinsini ID'ye çevirmek için cache
+            currency_map = {}
+            if receipt.purchase_order:
+                po_currency_code = (
+                    receipt.purchase_order.currency.value
+                    if receipt.purchase_order.currency
+                    else "TRY"
+                )
+                # FinanceCurrency tablosundan ID bul
+                fin_curr = (
+                    self.session.query(FinanceCurrency)
+                    .filter(FinanceCurrency.code == po_currency_code)
+                    .first()
+                )
+                if fin_curr:
+                    currency_map[po_currency_code] = fin_curr.id
+
             for item in receipt.items:
                 if item.accepted_quantity and item.accepted_quantity > 0:
+
+                    # Fiyat ve birim bilgilerini al
+                    unit_price = Decimal(0)
+                    currency_id = None
+                    exchange_rate = Decimal(1)
+
+                    if item.po_item:
+                        unit_price = item.po_item.unit_price
+
+                        # Sipariş üzerinden döviz bilgileri
+                        if receipt.purchase_order:
+                            po = receipt.purchase_order
+                            currency_code = po.currency.value if po.currency else "TRY"
+                            exchange_rate = po.exchange_rate or Decimal(1)
+
+                            # ID'yi mapten al veya sorgula
+                            if currency_code in currency_map:
+                                currency_id = currency_map[currency_code]
+                            else:
+                                fin_curr = (
+                                    self.session.query(FinanceCurrency)
+                                    .filter(FinanceCurrency.code == currency_code)
+                                    .first()
+                                )
+                                if fin_curr:
+                                    currency_id = fin_curr.id
+                                    currency_map[currency_code] = currency_id
+
                     movement_service.create_movement(
                         movement_type=StockMovementType.SATIN_ALMA,
                         item_id=item.item_id,
                         to_warehouse_id=receipt.warehouse_id,
                         quantity=float(item.accepted_quantity),
+                        unit_id=item.unit_id,  # Birim
+                        unit_price=unit_price,  # Fiyat
+                        currency_id=currency_id,  # Döviz
+                        exchange_rate=exchange_rate,  # Kur
                         document_type="goods_receipt",
                         document_no=receipt.receipt_no,
                         description=f"Mal Kabul: {receipt.receipt_no}",
@@ -737,6 +787,11 @@ class PurchaseInvoiceService:
 
         if "invoice_date" not in data or data["invoice_date"] is None:
             data["invoice_date"] = date.today()
+
+        # Siparişten döviz bilgilerini al
+        if receipt.purchase_order:
+            data["currency"] = receipt.purchase_order.currency
+            data["exchange_rate"] = receipt.purchase_order.exchange_rate
 
         # Kalemler
         items_data = []
