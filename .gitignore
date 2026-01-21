@@ -40,6 +40,8 @@ build/
 .coverage
 htmlcov/
 tests/
+scripts/
+thoughts/
 test_output.html
 test_output.pdf
 *.html_backup
