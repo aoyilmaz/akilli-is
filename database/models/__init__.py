@@ -148,6 +148,11 @@ from database.models.sales import (
     Invoice,
     InvoiceItem,
     InvoiceStatus,
+    # Sevkiyat hazırlık
+    PaymentType,
+    ShipmentReadiness,
+    AdvancePaymentMethod,
+    OrderAdvancePayment,
 )
 
 # Finans modülü
@@ -296,11 +301,34 @@ from database.models.transport_unit import (
     TransportUnitStatus,
 )
 
+# Sevkiyat Modülü
+from database.models.shipping import (
+    Vehicle,
+    VehicleStatus,
+    VehicleType,
+    Driver,
+    DriverStatus,
+    Shipment,
+    ShipmentStatus,
+    ShipmentItem,
+    ShipmentLoad,
+)
+
 __all__.extend(
     [
         "TransportUnit",
         "TransportUnitItem",
         "TransportUnitType",
         "TransportUnitStatus",
+        # Sevkiyat
+        "Vehicle",
+        "VehicleStatus",
+        "VehicleType",
+        "Driver",
+        "DriverStatus",
+        "Shipment",
+        "ShipmentStatus",
+        "ShipmentItem",
+        "ShipmentLoad",
     ]
 )

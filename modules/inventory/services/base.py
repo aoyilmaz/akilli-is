@@ -79,7 +79,9 @@ class ItemService(ServiceBase):
     """Stok kartı servisi"""
 
     def get_all(self, active_only: bool = True) -> List[Item]:
-        query = self.session.query(Item)
+        from sqlalchemy.orm import joinedload
+
+        query = self.session.query(Item).options(joinedload(Item.currency))
         if active_only:
             query = query.filter(Item.is_active == True)
         return query.order_by(Item.code).all()

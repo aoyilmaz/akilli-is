@@ -222,6 +222,11 @@ except ImportError:
         MaintenancePlanWidget
     ) = ReportingWidget = MissingModule
 
+try:
+    from modules.shipping import ShippingMainModule
+except ImportError:
+    ShippingMainModule = MissingModule
+
 
 # --- DASHBOARD BİLEŞENLERİ ---
 
@@ -600,6 +605,12 @@ MENU_DATA = {
             ("İrsaliyeler", "fa5s.truck", "delivery-notes"),
             ("Faturalar", "fa5s.file-invoice-dollar", "invoices"),
             ("Fiyat Listeleri", "fa5s.list-alt", "price-lists"),
+        ],
+    },
+    "shipping": {
+        "title": "SEVKİYAT",
+        "items": [
+            ("Sevkiyat Yönetimi", "fa5s.shipping-fast", "shipping"),
         ],
     },
     "accounting": {
@@ -1046,6 +1057,8 @@ class MainWindow(QMainWindow):
         self.pages["delivery-notes"] = DeliveryNoteModule()
         self.pages["invoices"] = InvoiceModule()
         self.pages["price-lists"] = PriceListModule()
+        # Sevkiyat modülü sayfaları
+        self.pages["shipping"] = ShippingMainModule()
         # Muhasebe modülü sayfaları
         self.pages["accounts"] = AccountModule()
         self.pages["journals"] = JournalModule()

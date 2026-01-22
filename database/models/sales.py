@@ -83,6 +83,34 @@ class PriceListType(str, Enum):
     PURCHASE = "purchase"  # Alış fiyat listesi
 
 
+class PaymentType(str, Enum):
+    """Sipariş ödeme türleri"""
+
+    PESIN = "pesin"  # Peşin - sevk için ödeme gerekli
+    VADELI = "vadeli"  # Vadeli - direkt sevk edilebilir
+    KAPIDA = "kapida"  # Kapıda ödeme
+
+
+class ShipmentReadiness(str, Enum):
+    """Sevkiyat hazırlık durumları"""
+
+    BEKLIYOR = "bekliyor"  # Hazırlık bekleniyor
+    ODEME_BEKLIYOR = "odeme"  # Ödeme bekleniyor
+    ONAY_BEKLIYOR = "onay"  # Müşteri onayı bekleniyor
+    STOK_BEKLIYOR = "stok"  # Stok hazırlığı bekleniyor
+    URETIM_BEKLIYOR = "uretim"  # Üretim bekleniyor
+    HAZIR = "hazir"  # Sevke hazır
+
+
+class AdvancePaymentMethod(str, Enum):
+    """Avans ödeme yöntemleri"""
+
+    NAKIT = "nakit"  # Nakit
+    HAVALE = "havale"  # Havale/EFT
+    KREDI_KARTI = "kredi_karti"  # Kredi Kartı
+    CEK = "cek"  # Çek
+
+
 # === FİYAT LİSTESİ ===
 
 
@@ -416,6 +444,17 @@ class SalesOrder(BaseModel):
     notes = Column(Text)
     internal_notes = Column(Text)
 
+    # Sevkiyat hazırlık bilgileri
+    payment_type = Column(
+        SQLEnum(PaymentType, values_callable=lambda x: [e.value for e in x]),
+        default=PaymentType.VADELI,
+    )
+    shipment_approved = Column(Boolean, default=False)
+    shipment_approval_date = Column(DateTime, nullable=True)
+    shipment_approval_by = Column(String(100), nullable=True)
+    shipment_notes = Column(Text, nullable=True)  # Sevkiyat notları (adres teyidi vb.)
+    requested_delivery_date = Column(Date, nullable=True)  # Müşterinin istediği tarih
+
     # İlişkiler
     customer = relationship("Customer", back_populates="sales_orders")
     quote = relationship("SalesQuote", foreign_keys=[quote_id])
@@ -425,6 +464,9 @@ class SalesOrder(BaseModel):
     )
     delivery_notes = relationship("DeliveryNote", back_populates="sales_order")
     invoices = relationship("Invoice", back_populates="sales_order")
+    advance_payments = relationship(
+        "OrderAdvancePayment", back_populates="order", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_so_customer", "customer_id"),
@@ -473,6 +515,79 @@ class SalesOrder(BaseModel):
             for item in self.items
         )
         self.total = taxable + self.tax_amount
+
+    @property
+    def total_advance_paid(self) -> Decimal:
+        """Toplam alınan avans"""
+        if not self.advance_payments:
+            return Decimal("0")
+        return sum(Decimal(str(p.amount or 0)) for p in self.advance_payments)
+
+    @property
+    def is_paid(self) -> bool:
+        """Peşin siparişte ödeme yeterli mi?"""
+        if self.payment_type != PaymentType.PESIN:
+            return True
+        return self.total_advance_paid >= (self.total or Decimal("0"))
+
+    @property
+    def remaining_payment(self) -> Decimal:
+        """Kalan ödeme tutarı"""
+        return max(Decimal("0"), (self.total or Decimal("0")) - self.total_advance_paid)
+
+    @property
+    def has_production(self) -> bool:
+        """Bu sipariş için üretim iş emri var mı?"""
+        # WorkOrder ilişkisi üzerinden kontrol edilecek
+        # Şimdilik False döndürüyoruz, servis katmanında kontrol edilecek
+        return False
+
+    @property
+    def is_production_complete(self) -> bool:
+        """Üretim tamamlandı mı?"""
+        # WorkOrder ilişkisi üzerinden kontrol edilecek
+        # Şimdilik True döndürüyoruz, servis katmanında kontrol edilecek
+        return True
+
+    @property
+    def is_stock_ready(self) -> bool:
+        """Stok hazır mı?"""
+        # Stok rezervasyon sistemi üzerinden kontrol edilecek
+        # Şimdilik True döndürüyoruz, servis katmanında kontrol edilecek
+        return True
+
+    @property
+    def shipment_readiness(self) -> "ShipmentReadiness":
+        """Sevkiyat hazırlık durumu hesapla"""
+        if self.status != SalesOrderStatus.CONFIRMED:
+            return ShipmentReadiness.BEKLIYOR
+        if self.payment_type == PaymentType.PESIN and not self.is_paid:
+            return ShipmentReadiness.ODEME_BEKLIYOR
+        if not self.shipment_approved:
+            return ShipmentReadiness.ONAY_BEKLIYOR
+        if not self.is_stock_ready:
+            return ShipmentReadiness.STOK_BEKLIYOR
+        if self.has_production and not self.is_production_complete:
+            return ShipmentReadiness.URETIM_BEKLIYOR
+        return ShipmentReadiness.HAZIR
+
+    @property
+    def is_ready_for_shipment(self) -> bool:
+        """Sevkiyata hazır mı?"""
+        return self.shipment_readiness == ShipmentReadiness.HAZIR
+
+    @property
+    def shipment_readiness_display(self) -> str:
+        """Sevkiyat hazırlık durumu gösterimi"""
+        readiness_names = {
+            "bekliyor": "Hazırlık Bekleniyor",
+            "odeme": "Ödeme Bekleniyor",
+            "onay": "Onay Bekleniyor",
+            "stok": "Stok Bekleniyor",
+            "uretim": "Üretim Bekleniyor",
+            "hazir": "Sevke Hazır",
+        }
+        return readiness_names.get(self.shipment_readiness.value, self.shipment_readiness.value)
 
     def __repr__(self):
         return f"<SalesOrder {self.order_no}>"
@@ -789,3 +904,55 @@ class InvoiceItem(BaseModel):
 
     def __repr__(self):
         return f"<InvoiceItem {self.invoice_id}-{self.item_id}>"
+
+
+# === SİPARİŞ AVANS ÖDEMELERİ ===
+
+
+class OrderAdvancePayment(BaseModel):
+    """Sipariş avans ödemeleri tablosu"""
+
+    __tablename__ = "order_advance_payments"
+
+    # Sipariş ilişkisi
+    order_id = Column(
+        Integer, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Ödeme bilgileri
+    payment_date = Column(Date, nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    payment_method = Column(
+        SQLEnum(AdvancePaymentMethod, values_callable=lambda x: [e.value for e in x]),
+        default=AdvancePaymentMethod.HAVALE,
+    )
+    reference_no = Column(String(50), nullable=True)  # Dekont/referans no
+
+    # Notlar
+    notes = Column(Text, nullable=True)
+
+    # Kaydeden kullanıcı
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # İlişkiler
+    order = relationship("SalesOrder", back_populates="advance_payments")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        Index("idx_oap_order", "order_id"),
+        Index("idx_oap_date", "payment_date"),
+    )
+
+    @property
+    def payment_method_display(self) -> str:
+        """Ödeme yöntemi gösterimi"""
+        method_names = {
+            "nakit": "Nakit",
+            "havale": "Havale/EFT",
+            "kredi_karti": "Kredi Kartı",
+            "cek": "Çek",
+        }
+        return method_names.get(self.payment_method.value, self.payment_method.value)
+
+    def __repr__(self):
+        return f"<OrderAdvancePayment {self.order_id} - {self.amount}>"
