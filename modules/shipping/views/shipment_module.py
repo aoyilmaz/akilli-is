@@ -194,6 +194,15 @@ class ShipmentModule(QWidget):
                 ),
                 "total_pallets": shipment.total_pallets,
                 "notes": shipment.notes,
+                "loads": [
+                    {
+                        "id": load.id,
+                        "transport_unit_id": load.transport_unit_id,
+                        "sscc": load.transport_unit.sscc if load.transport_unit else "",
+                        "loaded_at": load.loaded_at,
+                    }
+                    for load in shipment.loads
+                ],
             }
 
             vehicles = self._get_vehicles_for_combo()

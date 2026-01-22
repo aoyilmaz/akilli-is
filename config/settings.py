@@ -48,6 +48,9 @@ def get_database_url() -> str:
 # Uygulama ayarları
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+STRICT_SHIPMENT_ORDER_LINK = (
+    os.getenv("STRICT_SHIPMENT_ORDER_LINK", "False").lower() == "true"
+)
 
 # AI Asistan
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

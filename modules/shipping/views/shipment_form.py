@@ -22,8 +22,11 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QCheckBox,
+    QGroupBox,
 )
 from PyQt6.QtCore import pyqtSignal, QDate, Qt
+from PyQt6.QtGui import QColor
+from datetime import datetime
 
 
 class DeliveryNoteSelectionDialog(QDialog):
@@ -123,14 +126,12 @@ class ShipmentFormPage(QWidget):
         self.drivers = drivers or []
         self.selected_delivery_notes = []  # Seçilen irsaliyeler
         self.is_edit = shipment_data is not None
-        self.setup_ui()
-        if self.is_edit:
-            self.load_data()
-        super().__init__(parent)
-        self.shipment_data = shipment_data
-        self.vehicles = vehicles or []
-        self.drivers = drivers or []
-        self.is_edit = shipment_data is not None
+
+        # Yükleme verileri
+        self.shipment_loads = []
+        if self.shipment_data and "loads" in self.shipment_data:
+            self.shipment_loads = self.shipment_data["loads"]
+
         self.setup_ui()
         if self.is_edit:
             self.load_data()
@@ -172,6 +173,10 @@ class ShipmentFormPage(QWidget):
         # Tab 3: Notlar
         tab3 = self._create_notes_tab()
         self.tabs.addTab(tab3, "📝 Notlar")
+
+        # Tab 4: Barkodlu Yükleme (Operasyon)
+        tab4 = self._create_loading_tab()
+        self.tabs.addTab(tab4, "📲 Barkodlu Yükleme")
 
         layout.addWidget(self.tabs)
 
@@ -483,6 +488,9 @@ class ShipmentFormPage(QWidget):
 
         self.notes_input.setText(self.shipment_data.get("notes", ""))
 
+        # Yükleme tablosunu güncelle
+        self._update_loading_table()
+
     def _save(self):
         """Form verisini kaydet"""
         data = {
@@ -494,6 +502,7 @@ class ShipmentFormPage(QWidget):
             "total_volume_m3": self.volume_input.value() or 0,
             "total_pallets": self.pallet_input.value() or 0,
             "notes": self.notes_input.toPlainText().strip() or None,
+            "loads": self.shipment_loads,  # Yükleme verileri
         }
 
         if self.is_edit and self.shipment_data:
@@ -504,4 +513,141 @@ class ShipmentFormPage(QWidget):
         dn_ids = [dn.id for dn in self.selected_delivery_notes]
         data["delivery_note_ids"] = dn_ids
 
-        self.saved.emit(data)
+    def _create_loading_tab(self) -> QWidget:
+        """Barkodlu yükleme sekmesi"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
+
+        # 1. Barkod Girişi ve Kiosk Butonu
+        input_group = QGroupBox("Barkod Okutma")
+        input_layout = QHBoxLayout(input_group)
+
+        self.barcode_input = QLineEdit()
+        self.barcode_input.setPlaceholderText("SSCC Barkodunu okutunuz...")
+        self.barcode_input.returnPressed.connect(self._check_barcode)
+        input_layout.addWidget(self.barcode_input, stretch=3)
+
+        kiosk_btn = QPushButton("📱 Kiosk Modunu Aç")
+        kiosk_btn.setStyleSheet(
+            "background-color: #3b82f6; color: white; font-weight: bold; padding: 5px;"
+        )
+        kiosk_btn.clicked.connect(self._open_kiosk)
+        input_layout.addWidget(kiosk_btn, stretch=1)
+
+        layout.addWidget(input_group)
+
+        # 2. Yükleme Listesi
+        list_group = QGroupBox("Yükleme Durumu")
+        list_layout = QVBoxLayout(list_group)
+
+        self.loading_table = QTableWidget()
+        self.loading_table.setColumnCount(3)
+        self.loading_table.setHorizontalHeaderLabels(
+            ["SSCC / Palet", "Durum", "Yükleme Zamanı"]
+        )
+        self.loading_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        list_layout.addWidget(self.loading_table)
+
+        layout.addWidget(list_group)
+
+        # 3. İlerleme
+        self.progress_label = QLabel("Bekleniyor...")
+        self.progress_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        layout.addWidget(self.progress_label)
+
+        return tab
+
+    def _open_kiosk(self):
+        """Kiosk modunu aç"""
+        from modules.shipping.views.kiosk import ShipmentLoadingKiosk
+
+        shipment_no = self.shipment_no_input.text() or "Yeni Sevkiyat"
+        dialog = ShipmentLoadingKiosk(shipment_no, self.shipment_loads, self)
+        dialog.exec()
+
+        # Kiosk kapanınca tabloyu güncelle
+        self._update_loading_table()
+
+    def _check_barcode(self):
+        """Barkod kontrolü"""
+        barcode = self.barcode_input.text().strip()
+        if not barcode:
+            return
+
+        self.barcode_input.clear()
+
+        # Beklenen yükler içinde ara
+        found = False
+        for load in self.shipment_loads:
+            # SSCC eşleşmesi (veya transport_unit_id üzerinden)
+            # load verisi: {'id': ..., 'sscc': ..., 'loaded_at': ...}
+            if load.get("sscc") == barcode:
+                found = True
+                if load.get("loaded_at"):
+                    QMessageBox.warning(
+                        self, "Uyarı", f"Bu palet zaten yüklendi: {barcode}"
+                    )
+                else:
+                    # Yüklendi olarak işaretle
+                    load["loaded_at"] = datetime.now().isoformat()
+                    # UI Güncelle
+                    self._update_loading_table()
+                    # Başarılı ses/toast eklenebilir
+                break
+
+        if not found:
+            # Hatalı barkod
+            QMessageBox.critical(
+                self, "Hata", f"Bu sevkiyata ait olmayan barkod: {barcode}"
+            )
+
+        self.barcode_input.setFocus()
+
+    def _update_loading_table(self):
+        """Yükleme tablosunu güncelle"""
+        self.loading_table.setRowCount(len(self.shipment_loads))
+
+        loaded_count = 0
+        total_count = len(self.shipment_loads)
+
+        for i, load in enumerate(self.shipment_loads):
+            sscc = load.get("sscc", "-")
+            loaded_at = load.get("loaded_at")
+
+            self.loading_table.setItem(i, 0, QTableWidgetItem(sscc))
+
+            if loaded_at:
+                status_item = QTableWidgetItem("YÜKLENDİ")
+                status_item.setBackground(QColor("#dcfce7"))  # Yeşil
+                date_str = (
+                    datetime.fromisoformat(loaded_at).strftime("%H:%M:%S")
+                    if isinstance(loaded_at, str)
+                    else str(loaded_at)
+                )
+                loaded_count += 1
+            else:
+                status_item = QTableWidgetItem("BEKLİYOR")
+                status_item.setBackground(QColor("#fee2e2"))  # Kırmızı
+                date_str = "-"
+
+            self.loading_table.setItem(i, 1, status_item)
+            self.loading_table.setItem(i, 2, QTableWidgetItem(date_str))
+
+        # İlerleme güncelle
+        if total_count > 0:
+            percentage = int((loaded_count / total_count) * 100)
+            self.progress_label.setText(
+                f"Yüklenen: {loaded_count} / {total_count} (%{percentage})"
+            )
+            if loaded_count == total_count:
+                self.progress_label.setStyleSheet(
+                    "color: green; font-weight: bold; font-size: 16px;"
+                )
+            else:
+                self.progress_label.setStyleSheet(
+                    "color: orange; font-weight: bold; font-size: 14px;"
+                )

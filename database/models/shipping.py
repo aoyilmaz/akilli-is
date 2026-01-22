@@ -19,6 +19,7 @@ from sqlalchemy import (
     Numeric,
     Enum as SQLEnum,
     Index,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from database.base import BaseModel
@@ -205,6 +206,7 @@ class Driver(BaseModel):
         if not self.license_expiry:
             return False
         from datetime import date, timedelta
+
         return self.license_expiry <= date.today() + timedelta(days=30)
 
     @property
@@ -213,6 +215,7 @@ class Driver(BaseModel):
         if not self.src_expiry:
             return False
         from datetime import date, timedelta
+
         return self.src_expiry <= date.today() + timedelta(days=30)
 
     def __repr__(self):
@@ -256,9 +259,23 @@ class Shipment(BaseModel):
     # Notlar
     notes = Column(Text, nullable=True)
 
+    # Maliyet Bilgileri
+    freight_amount = Column(Numeric(12, 2), default=0)
+    currency = Column(String(3), default="TRY")  # ISO code
+    carrier_invoice_no = Column(String(50), nullable=True)
+    extra_costs = Column(JSON, nullable=True)  # { "reason": amount, ... }
+
+    # Lojistik - Yoldaki Stok Deposu
+    in_transit_warehouse_id = Column(
+        Integer, ForeignKey("warehouses.id"), nullable=True
+    )
+
     # İlişkiler
     vehicle = relationship("Vehicle", back_populates="shipments")
     driver = relationship("Driver", back_populates="shipments")
+    in_transit_warehouse = relationship(
+        "Warehouse", foreign_keys=[in_transit_warehouse_id]
+    )
     items = relationship(
         "ShipmentItem", back_populates="shipment", cascade="all, delete-orphan"
     )
@@ -326,9 +343,7 @@ class ShipmentItem(BaseModel):
     )
 
     # İrsaliye ilişkisi
-    delivery_note_id = Column(
-        Integer, ForeignKey("delivery_notes.id"), nullable=False
-    )
+    delivery_note_id = Column(Integer, ForeignKey("delivery_notes.id"), nullable=False)
 
     # Teslimat sırası
     sequence = Column(Integer, default=0)

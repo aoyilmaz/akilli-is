@@ -566,15 +566,20 @@ MENU_DATA = {
             ("Faturalar", "fa5s.file-alt", "purchase-invoices"),
         ],
     },
-    "production": {
-        "title": "ÜRETİM",
+    "planning": {
+        "title": "PLANLAMA",
         "items": [
-            ("İş Emirleri", "fa5s.clipboard-check", "work-orders"),
+            ("MRP", "fa5s.project-diagram", "mrp"),
+            ("Üretim Planlama", "fa5s.calendar-alt", "planning"),
             ("Ürün Reçeteleri", "fa5s.scroll", "bom"),
-            ("Planlama", "fa5s.calendar-alt", "planning"),
             ("İş İstasyonları", "fa5s.cogs", "work-stations"),
             ("Takvim", "fa5s.calendar-day", "calendar"),
-            ("MRP", "fa5s.project-diagram", "mrp"),
+        ],
+    },
+    "production": {
+        "title": "ÜRETİM (İMALAT)",
+        "items": [
+            ("İş Emirleri", "fa5s.clipboard-check", "work-orders"),
             ("Operatör Paneli", "fa5s.desktop", "operator-panel"),
         ],
     },
@@ -877,15 +882,17 @@ class ActivityBar(QFrame):
         for key, icon, tip in [
             ("dashboard", "fa5s.home", "Genel Bakış"),
             ("inventory", "fa5s.boxes", "Stok"),
+            ("planning", "fa5s.calendar-alt", "Planlama"),
             ("purchasing", "fa5s.shopping-cart", "Satınalma"),
             ("sales", "fa5s.cash-register", "Satış"),
-            ("production", "fa5s.industry", "Üretim"),
+            ("production", "fa5s.industry", "Üretim (İmalat)"),
+            ("shipping", "fa5s.shipping-fast", "Sevkiyat"),
             ("accounting", "fa5s.calculator", "Muhasebe"),
             ("finance", "fa5s.wallet", "Finans"),
             ("hr", "fa5s.users", "İnsan Kaynakları"),
+            ("maintenance", "fa5s.tools", "Bakım & Onarım"),
             ("reports", "fa5s.chart-pie", "Raporlar"),
             ("development", "fa5s.bug", "Geliştirme"),
-            ("maintenance", "fa5s.tools", "Bakım & Onarım"),
             ("settings", "fa5s.cog", "Ayarlar"),
         ]:
             btn = QPushButton()

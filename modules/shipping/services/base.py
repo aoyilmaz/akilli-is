@@ -9,6 +9,9 @@ from sqlalchemy import desc, and_, or_
 from sqlalchemy.orm import joinedload
 
 from database.base import get_session
+from config.settings import STRICT_SHIPMENT_ORDER_LINK
+
+
 from database.models.shipping import (
     Vehicle,
     VehicleStatus,
@@ -296,6 +299,20 @@ class ShipmentService:
         self.session = get_session()
         self.stock_service = StockMovementService()
 
+    def _validate_strict_order_link(self, shipment: Shipment):
+        """Sıkı kontrol: tüm irsaliyelerin siparişi olmalı"""
+        if not STRICT_SHIPMENT_ORDER_LINK:
+            return
+
+        for s_item in shipment.items:
+            dn = s_item.delivery_note
+            if not dn:
+                continue
+            if not dn.sales_order_id:
+                raise ValueError(
+                    f"Sıkı Kontrol Hatası: İrsaliye {dn.delivery_no} bir siparişe bağlı değil! (Siparişsiz Sevkiyat Engellendi)"
+                )
+
     def get_available_delivery_notes(self) -> List[DeliveryNote]:
         """Henüz bir sevkiyata atanmamış ve sevke hazır irsaliyeleri getir"""
         # Burada DeliveryNoteStatus.DRAFT dışındakileri veya özel bir durumu filtreleyebiliriz
@@ -521,44 +538,54 @@ class ShipmentService:
         self.session.commit()
         return shipment
 
-    def update_status(
-        self, shipment_id: int, status: ShipmentStatus
-    ) -> Optional[Shipment]:
-        """Sevkiyat durumunu güncelle"""
+    def start_transit(self, shipment_id: int):
+        """Sevkiyatı başlat (Yola Çıkar)"""
         shipment = self.get_by_id(shipment_id)
         if not shipment:
-            return None
+            raise ValueError("Sevkiyat bulunamadı.")
 
-        old_status = shipment.status
-        shipment.status = status
+        if shipment.status == ShipmentStatus.YOLDA:
+            return
 
-        # Çıkış zamanını kaydet ve Stoktan Düş
-        if status == ShipmentStatus.YOLDA and old_status != ShipmentStatus.YOLDA:
-            if not shipment.departure_time:
-                shipment.departure_time = datetime.now()
+        # Sıkı sipariş kontrolü
+        self._validate_strict_order_link(shipment)
 
-            # Sürücüyü görevde yap
-            if shipment.driver:
-                shipment.driver.status = DriverStatus.GOREVDE
+        # Kapasite ve barkod kontrolleri burada yapılabilir (UI'da yapılıyor ama backend de yapmalı)
+        # TODO: Barkod doğrulama kontrolü (Phase 2 Requirement 4)
 
-            # --- STOK HAREKETLERİ ---
-            # İlişkili irsaliyelerdeki ürünleri stoktan Transit veya Müşteri deposuna sevk et
-            # Buradaki logic: Warehouse (Kaynak) -> Customer (Hedef)
-            # Eğer bir 'Transit' depo mantığı varsa oraya da alınabilir.
-            # Şimdilik TransactionType.TRANSFER kullanarak stoktan düşelim.
+        if not shipment.departure_time:
+            shipment.departure_time = datetime.now()
 
-            for s_item in shipment.items:
-                dn = s_item.delivery_note
-                if not dn or not dn.items:
-                    continue
+        # Sürücüyü görevde yap
+        if shipment.driver:
+            shipment.driver.status = DriverStatus.GOREVDE
 
-                # İrsaliye durumunu güncelle
-                dn.status = DeliveryNoteStatus.SHIPPED
+        shipment.status = ShipmentStatus.YOLDA
 
-                for dn_item in dn.items:
-                    # Kaynak depo
-                    source_wh_id = dn.source_warehouse_id
+        # Stok Hareketleri
+        for s_item in shipment.items:
+            dn = s_item.delivery_note
+            if not dn or not dn.items:
+                continue
 
+            dn.status = DeliveryNoteStatus.SHIPPED
+            source_wh_id = dn.source_warehouse_id
+
+            for dn_item in dn.items:
+                # Eğer in_transit_warehouse varsa TRANSFER yap, yoksa SATIS (Direkt düşüş)
+                if shipment.in_transit_warehouse_id:
+                    self.stock_service.create_movement(
+                        item_id=dn_item.item_id,
+                        from_warehouse_id=source_wh_id,
+                        to_warehouse_id=shipment.in_transit_warehouse_id,
+                        movement_type=StockMovementType.TRANSFER,
+                        quantity=float(dn_item.quantity),
+                        document_type="shipment",
+                        document_no=shipment.shipment_no,
+                        description=f"Transit Transfer: {shipment.shipment_no}",
+                    )
+                else:
+                    # Klasik yöntem: Direkt satış gibi düş
                     self.stock_service.create_movement(
                         item_id=dn_item.item_id,
                         from_warehouse_id=source_wh_id,
@@ -566,32 +593,65 @@ class ShipmentService:
                         quantity=float(dn_item.quantity),
                         document_type="shipment",
                         document_no=shipment.shipment_no,
-                        description=f"Sevkiyat: {shipment.shipment_no}, İrsaliye: {dn.delivery_no}",
-                        # Hedef depo olarak müşterinin sanal deposu veya shipment alanı yoksa
-                        # sadece çıkış yapılıyor olabilir.
-                        # Eğer StockMovementType.SALES kullanırsak stoktan direkt düşer.
+                        description=f"Sevkiyat Çıkış: {shipment.shipment_no}",
                     )
 
-        # Dönüş zamanını kaydet
-        if (
-            status == ShipmentStatus.TESLIM_EDILDI
-            and shipment.status != ShipmentStatus.TESLIM_EDILDI
-        ):
-            if not shipment.return_time:
-                shipment.return_time = datetime.now()
+        self.session.commit()
 
-            # Sürücüyü müsait yap
-            if shipment.driver:
-                shipment.driver.status = DriverStatus.MUSAIT
+    def complete_delivery(self, shipment_id: int):
+        """Teslimatı tamamla"""
+        shipment = self.get_by_id(shipment_id)
+        if not shipment:
+            raise ValueError("Sevkiyat bulunamadı.")
 
-            # İrsaliyeleri Teslim Edildi yap
-            for s_item in shipment.items:
-                if s_item.delivery_note:
-                    s_item.delivery_note.status = DeliveryNoteStatus.DELIVERED
-                    s_item.delivery_note.actual_delivery_date = date.today()
+        if shipment.status == ShipmentStatus.TESLIM_EDILDI:
+            return
+
+        if not shipment.return_time:
+            shipment.return_time = datetime.now()
+
+        if shipment.driver:
+            shipment.driver.status = DriverStatus.MUSAIT
+
+        shipment.status = ShipmentStatus.TESLIM_EDILDI
+
+        # İrsaliyeleri güncelle ve Yoldaki Stoktan Düş
+        for s_item in shipment.items:
+            if s_item.delivery_note:
+                s_item.delivery_note.status = DeliveryNoteStatus.DELIVERED
+                s_item.delivery_note.actual_delivery_date = date.today()
+
+                # Eğer Transit Depo kullanıldıysa, oradan ÇIKIS/SATIS yap
+                if shipment.in_transit_warehouse_id:
+                    for dn_item in s_item.delivery_note.items:
+                        self.stock_service.create_movement(
+                            item_id=dn_item.item_id,
+                            from_warehouse_id=shipment.in_transit_warehouse_id,
+                            movement_type=StockMovementType.SATIS,  # veya CIKIS
+                            quantity=float(dn_item.quantity),
+                            document_type="shipment",
+                            document_no=shipment.shipment_no,
+                            description=f"Teslimat Çıkışı: {shipment.shipment_no}",
+                        )
 
         self.session.commit()
-        return shipment
+
+    def update_status(
+        self, shipment_id: int, status: ShipmentStatus
+    ) -> Optional[Shipment]:
+        """Sevkiyat durumunu güncelle (Delegate)"""
+        if status == ShipmentStatus.YOLDA:
+            self.start_transit(shipment_id)
+        elif status == ShipmentStatus.TESLIM_EDILDI:
+            self.complete_delivery(shipment_id)
+        else:
+            # Diğer durumlar için basit update
+            shipment = self.get_by_id(shipment_id)
+            if shipment:
+                shipment.status = status
+                self.session.commit()
+
+        return self.get_by_id(shipment_id)
 
     def delete(self, shipment_id: int) -> bool:
         """Sevkiyat sil"""
