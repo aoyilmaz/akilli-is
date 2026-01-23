@@ -1,0 +1,400 @@
+"""
+Akıllı İş - Kapasite Analizi Modülü
+İş istasyonlarının doluluk oranlarını ve kapasite kullanımını analiz eder.
+"""
+
+from datetime import datetime, date, timedelta
+from decimal import Decimal
+from typing import List, Dict, Optional
+
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QFrame,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QPushButton,
+    QProgressBar,
+)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QBrush, QPen
+
+from ui.components.stat_cards import MiniStatCard
+from ui.components.page_header import PageHeader
+
+
+class CapacityChart(QWidget):
+    """İş İstasyonu Kapasite Yük Grafiği (Bar Chart)"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = []  # [{"station": str, "capacity": float, "load": float}, ...]
+        self.setMinimumHeight(300)
+
+    def set_data(self, data: List[Dict]):
+        self.data = data
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if not self.data:
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Veri yok")
+            return
+
+        # Çizim alanı
+        margin_left = 100
+        margin_bottom = 40
+        margin_top = 20
+        margin_right = 20
+
+        width = self.width() - margin_left - margin_right
+        height = self.height() - margin_bottom - margin_top
+
+        # Max değer bul (Kapasite veya Yük'ten hangisi büyükse)
+        max_val = 0
+        for item in self.data:
+            max_val = max(max_val, item["capacity"], item["load"])
+
+        if max_val == 0:
+            max_val = 10  # Bölme hatasını önle
+
+        bar_width = width / len(self.data) / 2
+        spacing = bar_width / 2
+
+        # Eksenleri çiz
+        painter.setPen(QPen(QColor("#64748b"), 1))
+        painter.drawLine(
+            margin_left, margin_top, margin_left, margin_top + height
+        )  # Y ekseni
+        painter.drawLine(
+            margin_left, margin_top + height, margin_left + width, margin_top + height
+        )  # X ekseni
+
+        # Kılavuz çizgileri ve Değerler
+        steps = 5
+        for i in range(steps + 1):
+            val = max_val * i / steps
+            y = margin_top + height - (val / max_val * height)
+
+            painter.setPen(QPen(QColor("#334155"), 1, Qt.PenStyle.DotLine))
+            painter.drawLine(margin_left, int(y), margin_left + width, int(y))
+
+            painter.setPen(QPen(QColor("#94a3b8")))
+            painter.drawText(
+                0,
+                int(y) - 5,
+                margin_left - 10,
+                10,
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                f"{val:.1f} sa",
+            )
+
+        # Barları çiz
+        for i, item in enumerate(self.data):
+            x = margin_left + (i * (bar_width * 2 + spacing)) + spacing
+
+            # Kapasite Barı
+            cap_height = (item["capacity"] / max_val) * height
+            cap_rect = (
+                int(x),
+                int(margin_top + height - cap_height),
+                int(bar_width),
+                int(cap_height),
+            )
+
+            painter.setBrush(QBrush(QColor("#3b82f6")))  # Mavi
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(*cap_rect, 4, 4)
+
+            # Yük Barı
+            load_height = (item["load"] / max_val) * height
+            load_rect = (
+                int(x + bar_width),
+                int(margin_top + height - load_height),
+                int(bar_width),
+                int(load_height),
+            )
+
+            # Aşırı yük varsa kırmızı, yoksa yeşil/turuncu
+            utilization = item["load"] / item["capacity"] if item["capacity"] > 0 else 0
+            if utilization > 1.0:
+                load_color = QColor("#ef4444")  # Kırmızı (Aşırı Yük)
+            elif utilization > 0.8:
+                load_color = QColor("#f59e0b")  # Turuncu (Uyarı)
+            else:
+                load_color = QColor("#10b981")  # Yeşil (Normal)
+
+            painter.setBrush(QBrush(load_color))
+            painter.drawRoundedRect(*load_rect, 4, 4)
+
+            # İstasyon adı
+            painter.setPen(QPen(QColor("#cbd5e1")))
+            painter.drawText(
+                int(x),
+                int(margin_top + height + 5),
+                int(bar_width * 2),
+                30,
+                Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
+                item["station"],
+            )
+
+
+class CapacityAnalysisPage(QWidget):
+    """Kapasite Analizi Sayfası"""
+
+    refresh_requested = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.wo_service = None
+        self.ws_service = None
+
+        # Varsayılan değerler
+        self.period_days = 7
+        self.current_date = date.today()
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        # === Header ===
+        self.header = PageHeader(
+            title="Kapasite Analizi",
+            icon="📊",
+            show_search=False,
+            show_refresh=True,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+
+        h_layout = self.header.header_layout()
+
+        # Dönem Seçimi
+        h_layout.addWidget(QLabel("Dönem:"))
+        self.period_combo = QComboBox()
+        self.period_combo.addItem("Bu Hafta", 7)
+        self.period_combo.addItem("Bu Ay", 30)
+        self.period_combo.addItem("3 Ay", 90)
+        self.period_combo.currentIndexChanged.connect(self._on_period_changed)
+        self.period_combo.setMinimumWidth(120)
+        h_layout.addWidget(self.period_combo)
+
+        layout.addWidget(self.header)
+
+        # === İçerik ===
+        content_layout = QHBoxLayout()
+
+        # Sol Taraf - Grafik
+        chart_frame = QFrame()
+        chart_frame.setStyleSheet(
+            ".QFrame { background-color: #1e293b; border-radius: 8px; }"
+        )
+        chart_layout = QVBoxLayout(chart_frame)
+
+        chart_layout.addWidget(QLabel("<b>İş İstasyonu Yük Grafiği</b>"))
+        self.chart = CapacityChart()
+        chart_layout.addWidget(self.chart)
+
+        # Lejant
+        legend_layout = QHBoxLayout()
+        legend_layout.addWidget(self._create_legend_item("Kapasite", "#3b82f6"))
+        legend_layout.addWidget(self._create_legend_item("Normal Yük", "#10b981"))
+        legend_layout.addWidget(
+            self._create_legend_item("Riskli Yük (>%80)", "#f59e0b")
+        )
+        legend_layout.addWidget(
+            self._create_legend_item("Aşırı Yük (>%100)", "#ef4444")
+        )
+        chart_layout.addLayout(legend_layout)
+
+        content_layout.addWidget(chart_frame, stretch=1)
+
+        # Sağ Taraf - Özet Tablo
+        table_frame = QFrame()
+        table_frame.setStyleSheet(
+            ".QFrame { background-color: #1e293b; border-radius: 8px; }"
+        )
+        table_layout = QVBoxLayout(table_frame)
+
+        table_layout.addWidget(QLabel("<b>Doluluk Detayları</b>"))
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(
+            ["İstasyon", "Kapasite", "Yük", "Doluluk %"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        self.table.verticalHeader().setVisible(False)
+        self.table.setStyleSheet(
+            """
+            QTableWidget { background-color: transparent; border: none; }
+            QHeaderView::section { background-color: #0f172a; color: #94a3b8; padding: 8px; }
+            QTableWidget::item { padding: 8px; color: #e2e8f0; }
+        """
+        )
+        table_layout.addWidget(self.table)
+
+        content_layout.addWidget(table_frame, stretch=1)
+
+        layout.addLayout(content_layout, stretch=1)
+
+        # İstatistik Kartları
+        stats_layout = QHBoxLayout()
+        self.total_load_card = MiniStatCard("⚡ Toplam Yük", "0 Saat", "#3b82f6")
+        self.overload_card = MiniStatCard("⚠️ Aşırı Yüklenen", "0 İstasyon", "#ef4444")
+        self.avg_util_card = MiniStatCard("📊 Ort. Doluluk", "%0", "#8b5cf6")
+
+        stats_layout.addWidget(self.total_load_card)
+        stats_layout.addWidget(self.overload_card)
+        stats_layout.addWidget(self.avg_util_card)
+        stats_layout.addStretch()
+
+        layout.addLayout(stats_layout)
+
+    def _create_legend_item(self, text, color_code):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        box = QLabel()
+        box.setFixedSize(12, 12)
+        box.setStyleSheet(f"background-color: {color_code}; border-radius: 2px;")
+        layout.addWidget(box)
+
+        label = QLabel(text)
+        label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        layout.addWidget(label)
+
+        return widget
+
+    def _on_period_changed(self):
+        self.period_days = self.period_combo.currentData()
+        self.refresh_requested.emit()
+
+    def set_services(self, wo_service, ws_service):
+        self.wo_service = wo_service
+        self.ws_service = ws_service
+
+    def load_data(self):
+        """Verileri hesapla ve arayüzü güncelle"""
+        if not self.wo_service or not self.ws_service:
+            # Servisler yoksa boş data
+            self.chart.set_data([])
+            return
+
+        try:
+            # 1. İş İstasyonlarını Getir
+            stations = self.ws_service.get_all(active_only=True)
+
+            # 2. Tarih Aralığı
+            start_date = datetime.combine(self.current_date, datetime.min.time())
+            end_date = start_date + timedelta(days=self.period_days)
+
+            # 3. Analiz Verilerini Hazırla
+            analysis_data = []  # {station_obj, capacity, load}
+
+            total_load = 0
+            overloaded_count = 0
+            total_utilization = 0
+
+            active_orders = self.wo_service.get_all()  # Filtreleme eklenebilir
+
+            for station in stations:
+                # Kapasite: (Gün * Saat) * Verimlilik
+                # Basit varsayım: Haftada 6 gün, günde 8 saat çalışılıyor
+                # TODO: Takvim entegrasyonu ile gerçek iş günleri
+                work_days = self.period_days  # Basitleştirilmiş
+                daily_hours = 8
+                efficiency = 1.0  # Varsayılan %100
+
+                capacity_hours = work_days * daily_hours * efficiency
+
+                # Yük Hesapla
+                station_load = 0
+                for wo in active_orders:
+                    if wo.status.name in ["CANCELLED", "CLOSED", "COMPLETED"]:
+                        continue
+
+                    if not wo.operations:
+                        continue
+
+                    for op in wo.operations:
+                        if op.work_station_id == station.id:
+                            # Operasyon bu tarih aralığında mı?
+                            # Basitlik için: Planlanan tarih aralığın içindeyse yük say
+                            # Gelişmiş: Kesişim süresini hesapla
+                            op_start = op.planned_start or wo.planned_start
+                            if op_start and start_date <= op_start <= end_date:
+                                # Setup + Run Time
+                                setup = (
+                                    float(op.planned_setup_time or 0) / 60
+                                )  # dk -> saat
+                                run = float(op.planned_run_time or 0) / 60  # dk -> saat
+                                station_load += setup + run
+
+                util_rate = (
+                    (station_load / capacity_hours * 100) if capacity_hours > 0 else 0
+                )
+
+                if util_rate > 100:
+                    overloaded_count += 1
+
+                total_load += station_load
+                total_utilization += util_rate
+
+                analysis_data.append(
+                    {
+                        "station": station.name,
+                        "capacity": capacity_hours,
+                        "load": station_load,
+                    }
+                )
+
+            # Grafik Güncelle
+            self.chart.set_data(analysis_data)
+
+            # Tablo Güncelle
+            self.table.setRowCount(len(analysis_data))
+            for row, data in enumerate(analysis_data):
+                util = (
+                    data["load"] / data["capacity"] * 100 if data["capacity"] > 0 else 0
+                )
+
+                self.table.setItem(row, 0, QTableWidgetItem(data["station"]))
+                self.table.setItem(
+                    row, 1, QTableWidgetItem(f"{data['capacity']:.1f} sa")
+                )
+                self.table.setItem(row, 2, QTableWidgetItem(f"{data['load']:.1f} sa"))
+
+                util_item = QTableWidgetItem(f"%{util:.1f}")
+                if util > 100:
+                    util_item.setForeground(QColor("#ef4444"))
+                elif util > 80:
+                    util_item.setForeground(QColor("#f59e0b"))
+                else:
+                    util_item.setForeground(QColor("#10b981"))
+
+                self.table.setItem(row, 3, util_item)
+
+            # Kartları Güncelle
+            self.total_load_card.update_value(f"{total_load:.1f} Sa")
+            self.overload_card.update_value(f"{overloaded_count} İstasyon")
+            avg_util = total_utilization / len(stations) if stations else 0
+            self.avg_util_card.update_value(f"%{avg_util:.1f}")
+
+        except Exception as e:
+            print(f"Kapasite analizi hatası: {e}")
+            import traceback
+
+            traceback.print_exc()

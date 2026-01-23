@@ -1,6 +1,6 @@
 """
 Akıllı İş - Ürün Reçeteleri (BOM) Liste Sayfası
-Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
+EnhancedTableWidget kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
@@ -13,9 +13,11 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QAction
 
+from config import COLORS
+from database.models.production import BOMStatus
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -25,26 +27,25 @@ from ui.components import (
 
 
 class BOMListPage(QWidget):
-    """Ürün reçeteleri listesi."""
+    """Ürün reçeteleri liste sayfası."""
 
     # Sinyaller
-    new_clicked = pyqtSignal()
+    bom_selected = pyqtSignal(int)
+    add_clicked = pyqtSignal()
     edit_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
-    copy_clicked = pyqtSignal(int)
-    activate_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
 
-    STATUS_DISPLAY = {
-        "draft": ("🟡 Taslak", "#f59e0b"),
-        "active": ("✅ Aktif", "#10b981"),
-        "revision": ("🔄 Revizyon", "#3b82f6"),
-        "obsolete": ("❌ Geçersiz", "#ef4444"),
+    STATUS_NAMES = {
+        BOMStatus.DRAFT: ("Taslak", "#94a3b8"),
+        BOMStatus.ACTIVE: ("Aktif", "#10b981"),
+        BOMStatus.REVISION: ("Revizyon", "#f59e0b"),
+        BOMStatus.OBSOLETE: ("İptal", "#ef4444"),
     }
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.boms_data = []
         self._setup_ui()
         self._connect_signals()
 
@@ -55,27 +56,26 @@ class BOMListPage(QWidget):
 
         # Header
         self.header = PageHeader(
-            title="Ürün Reçeteleri (BOM)",
-            icon="📋",
+            title="Ürün Reçeteleri",
+            icon="🏭",
             show_search=True,
             show_refresh=True,
             show_add=True,
             add_text="Yeni Reçete",
-            search_placeholder="Reçete ara...",
+            search_placeholder="Reçete kodu, ürün adı ara...",
             parent=self,
         )
 
-        # Filtre ekle
+        # Filtreleri header'a ekle
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem("🟡 Taslak", "draft")
-        self.status_combo.addItem("✅ Aktif", "active")
-        self.status_combo.addItem("🔄 Revizyon", "revision")
-        self.status_combo.addItem("❌ Geçersiz", "obsolete")
+        self.status_combo.addItem("✅ Aktif", BOMStatus.ACTIVE)
+        self.status_combo.addItem("✏️ Taslak", BOMStatus.DRAFT)
+        self.status_combo.addItem("🔧 Revizyon", BOMStatus.REVISION)
+        self.status_combo.addItem("❌ İptal", BOMStatus.OBSOLETE)
         self.status_combo.setMinimumWidth(130)
-        self.status_combo.currentIndexChanged.connect(
-            lambda: self.refresh_requested.emit()
-        )
+        self.status_combo.setFixedHeight(36)
+        self.status_combo.currentIndexChanged.connect(self._do_search)
 
         if self.header.search_input:
             h_layout = self.header.header_layout()
@@ -90,10 +90,10 @@ class BOMListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📋 Toplam Reçete", "0", "#6366f1")
+        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
         self.stat_cards["active"] = MiniStatCard("✅ Aktif", "0", "#10b981")
-        self.stat_cards["draft"] = MiniStatCard("🟡 Taslak", "0", "#f59e0b")
-        self.stat_cards["products"] = MiniStatCard("📦 Ürün Sayısı", "0", "#3b82f6")
+        self.stat_cards["draft"] = MiniStatCard("✏️ Taslak", "0", "#94a3b8")
+        self.stat_cards["revision"] = MiniStatCard("🔧 Revizyon", "0", "#f59e0b")
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -103,12 +103,12 @@ class BOMListPage(QWidget):
         # Tablo
         columns = [
             ColumnConfig("code", "Reçete Kodu", width=120),
-            ColumnConfig("item_name", "Mamul", width=200),
-            ColumnConfig("name", "Reçete Adı", width=200, stretch=True),
+            ColumnConfig("item", "Ürün", width=250),
             ColumnConfig("version", "Versiyon", width=80),
-            ColumnConfig("line_count", "Malzeme Sayısı", width=110),
-            ColumnConfig("total_cost", "Tahmini Maliyet", width=130),
+            ColumnConfig("quantity", "Baz Miktar", width=100),
+            ColumnConfig("unit", "Birim", width=70),
             ColumnConfig("status", "Durum", width=100),
+            ColumnConfig("material_cost", "Malzeme Maliyeti", width=120),
         ]
 
         self.table = EnhancedTableWidget(
@@ -121,98 +121,110 @@ class BOMListPage(QWidget):
         layout.addWidget(self.table)
 
         # Alt bilgi
+        footer_layout = QHBoxLayout()
         self.count_label = QLabel("Toplam: 0 reçete")
-        layout.addWidget(self.count_label)
+        footer_layout.addWidget(self.count_label)
+        layout.addLayout(footer_layout)
+
+        # Arama debounce timer
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self._do_search)
 
     def _connect_signals(self):
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.new_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
+        self.header.add_clicked.connect(self.add_clicked.emit)
+        self.header.search_changed.connect(self._on_search_changed)
         self.table.row_double_clicked.connect(self.edit_clicked.emit)
 
     def load_data(self, boms: list):
+        """Tabloyu verilerle doldur"""
+        self.boms_data = boms
         self.table.setRowCount(len(boms))
         visible_cols = self.table.get_visible_columns()
 
-        active_count = draft_count = 0
-        unique_products = set()
+        active_count = draft_count = revision_count = 0
 
         for row, bom in enumerate(boms):
             self._populate_row(row, bom, visible_cols)
 
-            status = bom.get("status", "draft")
-            if status == "active":
+            # İstatistikler
+            if bom.status == BOMStatus.ACTIVE:
                 active_count += 1
-            elif status == "draft":
+            elif bom.status == BOMStatus.DRAFT:
                 draft_count += 1
-            unique_products.add(bom.get("item_id"))
+            elif bom.status == BOMStatus.REVISION:
+                revision_count += 1
 
-        # Kartları güncelle
+        # İstatistik kartlarını güncelle
         self.stat_cards["total"].update_value(str(len(boms)))
         self.stat_cards["active"].update_value(str(active_count))
         self.stat_cards["draft"].update_value(str(draft_count))
-        self.stat_cards["products"].update_value(str(len(unique_products)))
+        self.stat_cards["revision"].update_value(str(revision_count))
 
         self.count_label.setText(f"Toplam: {len(boms)} reçete")
 
-    def _populate_row(self, row: int, bom: dict, visible_cols: list):
-        bom_id = bom.get("id")
-
+    def _populate_row(self, row: int, bom, visible_cols: list):
         for col_idx, col_key in enumerate(visible_cols):
             if col_key == "code":
-                item = QTableWidgetItem(bom.get("code", ""))
-                item.setData(Qt.ItemDataRole.UserRole, bom_id)
-                item.setForeground(QColor("#818cf8"))
-                self.table.setItem(row, col_idx, item)
+                cell = QTableWidgetItem(bom.code)
+                cell.setData(Qt.ItemDataRole.UserRole, bom.id)
+                cell.setForeground(QColor("#818cf8"))
+                self.table.setItem(row, col_idx, cell)
 
-            elif col_key == "item_name":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(bom.get("item_name", "-"))
-                )
-
-            elif col_key == "name":
-                self.table.setItem(row, col_idx, QTableWidgetItem(bom.get("name", "")))
+            elif col_key == "item":
+                item_text = f"{bom.item.code} - {bom.item.name}" if bom.item else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(item_text))
 
             elif col_key == "version":
-                version = f"v{bom.get('version', 1)}.{bom.get('revision', 'A')}"
-                item = QTableWidgetItem(version)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, col_idx, item)
+                ver_text = f"v{bom.version} (Rev {bom.revision})"
+                self.table.setItem(row, col_idx, QTableWidgetItem(ver_text))
 
-            elif col_key == "line_count":
-                item = QTableWidgetItem(str(bom.get("line_count", 0)))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, col_idx, item)
-
-            elif col_key == "total_cost":
-                cost = bom.get("total_cost", 0)
-                item = QTableWidgetItem(f"₺{cost:,.2f}")
-                item.setTextAlignment(
+            elif col_key == "quantity":
+                cell = QTableWidgetItem(f"{bom.base_quantity:,.2f}")
+                cell.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
-                self.table.setItem(row, col_idx, item)
+                self.table.setItem(row, col_idx, cell)
+
+            elif col_key == "unit":
+                unit_text = bom.unit.code if bom.unit else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(unit_text))
+
+            elif col_key == "material_cost":
+                cost = bom.total_material_cost or 0
+                cell = QTableWidgetItem(f"₺{cost:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, cell)
 
             elif col_key == "status":
-                status = bom.get("status", "draft")
-                text, color = self.STATUS_DISPLAY.get(status, ("?", "#ffffff"))
-                item = QTableWidgetItem(text)
-                item.setForeground(QColor(color))
-                self.table.setItem(row, col_idx, item)
+                status_text, color = self.STATUS_NAMES.get(
+                    bom.status, ("Bilinmiyor", "#000000")
+                )
+                cell = QTableWidgetItem(status_text)
+                cell.setForeground(QColor(color))
+                self.table.setItem(row, col_idx, cell)
 
         self.table.setRowHeight(row, 48)
 
-    def get_status_filter(self) -> str:
-        return self.status_combo.currentData()
+    def _on_search_changed(self, text: str):
+        self.search_timer.stop()
+        self.search_timer.start(300)
 
-    def _on_search(self, text: str):
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(self.table.columnCount())
-            )
-            self.table.setRowHidden(row, not match)
+    def _do_search(self):
+        self.refresh_requested.emit()
+
+    def get_filters(self) -> dict:
+        return {
+            "keyword": (
+                self.header.search_input.text().strip()
+                if self.header.search_input
+                else ""
+            ),
+            "status": self.status_combo.currentData(),
+        }
 
     def _show_context_menu(self, position):
         row = self.table.rowAt(position.y())
@@ -220,38 +232,12 @@ class BOMListPage(QWidget):
             return
 
         bom_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        status_col = (
-            self.table.get_visible_columns().index("status")
-            if "status" in self.table.get_visible_columns()
-            else 6
-        )
-        status_text = (
-            self.table.item(row, status_col).text()
-            if self.table.item(row, status_col)
-            else ""
-        )
 
         menu = QMenu(self)
-        view_action = QAction("👁 Görüntüle", self)
-        view_action.triggered.connect(lambda: self.view_clicked.emit(bom_id))
-        menu.addAction(view_action)
 
         edit_action = QAction("✏️ Düzenle", self)
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(bom_id))
         menu.addAction(edit_action)
-
-        copy_action = QAction("📋 Kopyala", self)
-        copy_action.triggered.connect(lambda: self.copy_clicked.emit(bom_id))
-        menu.addAction(copy_action)
-
-        menu.addSeparator()
-
-        if "Aktif" not in status_text:
-            activate_action = QAction("✅ Aktifleştir", self)
-            activate_action.triggered.connect(
-                lambda: self.activate_clicked.emit(bom_id)
-            )
-            menu.addAction(activate_action)
 
         menu.addSeparator()
 
@@ -265,7 +251,7 @@ class BOMListPage(QWidget):
         reply = QMessageBox.question(
             self,
             "Silme Onayı",
-            "Bu reçeteyi silmek istediğinize emin misiniz?",
+            "Bu reçeteyi silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:

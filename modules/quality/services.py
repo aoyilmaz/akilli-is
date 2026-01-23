@@ -54,6 +54,17 @@ class QualityService:
             .first()
         )
 
+    def get_template_by_item(self, item_id: int) -> Optional[InspectionTemplate]:
+        """Malzemeye ait varsayılan şablonu getir"""
+        return (
+            self.session.query(InspectionTemplate)
+            .filter(
+                InspectionTemplate.item_id == item_id,
+                InspectionTemplate.is_active == True,
+            )
+            .first()
+        )
+
     def create_template(self, data: Dict) -> InspectionTemplate:
         """Yeni şablon oluştur"""
         template = InspectionTemplate(**data)
@@ -126,6 +137,12 @@ class QualityService:
         """Yeni kontrol oluştur"""
         if "inspection_no" not in data:
             data["inspection_no"] = self.generate_inspection_no()
+
+        # Item ID varsa ve Template ID yoksa, item'ın default şablonunu bul
+        if data.get("item_id") and not data.get("template_id"):
+            template = self.get_template_by_item(data["item_id"])
+            if template:
+                data["template_id"] = template.id
 
         inspection = Inspection(**data)
         self.session.add(inspection)

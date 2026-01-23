@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from ui.components.toast import show_toast
 
-from database.models import Item, ItemType
+from database.models import Item, ItemType, LotSizingProcedure
 
 
 class StockFormPage(QWidget):
@@ -82,6 +82,7 @@ class StockFormPage(QWidget):
         self.tabs.addTab(self._create_general_tab(), "📋 Genel Bilgiler")
         self.tabs.addTab(self._create_stock_tab(), "📦 Stok Ayarları")
         self.tabs.addTab(self._create_pricing_tab(), "💰 Fiyatlandırma")
+        self.tabs.addTab(self._create_mrp_tab(), "🏭 MRP")
         self.tabs.addTab(self._create_tracking_tab(), "🔍 Takip")
 
         layout.addWidget(self.tabs)
@@ -411,6 +412,70 @@ class StockFormPage(QWidget):
 
         return tab
 
+    def _create_mrp_tab(self) -> QWidget:
+        """MRP ayarları sekmesi"""
+        tab = QWidget()
+        layout = QHBoxLayout(tab)
+        layout.setSpacing(24)
+
+        # Sol: Planlama Parametreleri
+        left_frame = QFrame()
+        left_layout = QVBoxLayout(left_frame)
+
+        left_title = QLabel("⚙️ Planlama Parametreleri")
+        left_layout.addWidget(left_title)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        self.procurement_combo = QComboBox()
+        self.procurement_combo.addItem("Satınalma", "purchase")
+        self.procurement_combo.addItem("Üretim", "manufacture")
+        form.addRow("Tedarik Tipi", self.procurement_combo)
+
+        self.lot_sizing_combo = QComboBox()
+        self.lot_sizing_combo.addItem("Tam Miktar (L4L)", LotSizingProcedure.EXACT)
+        self.lot_sizing_combo.addItem("Sabit Miktar", LotSizingProcedure.FIXED)
+        self.lot_sizing_combo.addItem("Periyodik", LotSizingProcedure.PERIOD)
+        form.addRow("Lotlama Yöntemi", self.lot_sizing_combo)
+
+        self.planning_fence_input = QSpinBox()
+        self.planning_fence_input.setRange(0, 999)
+        self.planning_fence_input.setSuffix(" gün")
+        form.addRow("Planlama Zaman Sınırı", self.planning_fence_input)
+
+        left_layout.addLayout(form)
+        left_layout.addStretch()
+        layout.addWidget(left_frame)
+
+        # Sağ: Miktar Parametreleri
+        right_frame = QFrame()
+        right_layout = QVBoxLayout(right_frame)
+
+        right_title = QLabel("🔢 Miktar Parametreleri")
+        right_layout.addWidget(right_title)
+
+        form2 = QFormLayout()
+        form2.setSpacing(12)
+
+        self.min_order_qty_input = QDoubleSpinBox()
+        self.min_order_qty_input.setRange(0, 999999)
+        self.min_order_qty_input.setDecimals(2)
+        form2.addRow("Min. Sipariş Miktarı", self.min_order_qty_input)
+
+        self.order_multiple_input = QDoubleSpinBox()
+        self.order_multiple_input.setRange(0, 999999)
+        self.order_multiple_input.setDecimals(2)
+        form2.addRow("Sipariş Katı", self.order_multiple_input)
+
+        right_layout.addLayout(form2)
+        right_layout.addStretch()
+        layout.addWidget(right_frame)
+
+        layout.addStretch()
+
+        return tab
+
     def _create_tracking_tab(self) -> QWidget:
         """Takip sekmesi"""
         tab = QWidget()
@@ -542,6 +607,21 @@ class StockFormPage(QWidget):
         self.track_expiry_check.setChecked(self.item.track_expiry)
         self.shelf_life_input.setValue(self.item.shelf_life_days or 0)
 
+        # MRP
+        for i in range(self.procurement_combo.count()):
+            if self.procurement_combo.itemData(i) == self.item.procurement_type:
+                self.procurement_combo.setCurrentIndex(i)
+                break
+
+        for i in range(self.lot_sizing_combo.count()):
+            if self.lot_sizing_combo.itemData(i) == self.item.lot_sizing_procedure:
+                self.lot_sizing_combo.setCurrentIndex(i)
+                break
+
+        self.planning_fence_input.setValue(self.item.planning_time_fence or 0)
+        self.min_order_qty_input.setValue(float(self.item.min_order_qty or 0))
+        self.order_multiple_input.setValue(float(self.item.order_multiple or 0))
+
         # Durum
         self.is_purchasable_check.setChecked(self.item.is_purchasable)
         self.is_saleable_check.setChecked(self.item.is_saleable)
@@ -639,4 +719,9 @@ class StockFormPage(QWidget):
             "is_saleable": self.is_saleable_check.isChecked(),
             "is_producible": self.is_producible_check.isChecked(),
             "is_active": self.is_active_check.isChecked(),
+            "procurement_type": self.procurement_combo.currentData(),
+            "lot_sizing_procedure": self.lot_sizing_combo.currentData(),
+            "planning_time_fence": self.planning_fence_input.value(),
+            "min_order_qty": Decimal(str(self.min_order_qty_input.value())),
+            "order_multiple": Decimal(str(self.order_multiple_input.value())),
         }

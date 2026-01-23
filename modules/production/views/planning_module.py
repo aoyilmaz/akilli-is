@@ -6,10 +6,11 @@ Takvim entegrasyonu (tatil gösterimi)
 
 from datetime import date, timedelta
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox, QTabWidget
 from PyQt6.QtCore import pyqtSignal
 
 from .planning_page import ProductionPlanningPage
+from .capacity_analysis import CapacityAnalysisPage
 from database.models.production import WorkOrderStatus
 
 
@@ -29,16 +30,29 @@ class PlanningModule(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        self.tabs = QTabWidget()
+
+        # 1. Tab: Gantt Şeması
         self.planning_page = ProductionPlanningPage()
         self.planning_page.refresh_requested.connect(self._load_data)
         self.planning_page.work_order_clicked.connect(self._on_work_order_clicked)
+        self.planning_page.operation_moved.connect(self._on_operation_rescheduled)
+        self.tabs.addTab(self.planning_page, "📅 Gantt Şeması")
 
-        layout.addWidget(self.planning_page)
+        # 2. Tab: Kapasite Analizi
+        self.capacity_page = CapacityAnalysisPage()
+        self.capacity_page.refresh_requested.connect(self._load_capacity_data)
+        self.tabs.addTab(self.capacity_page, "📊 Kapasite Analizi")
+
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
+        layout.addWidget(self.tabs)
 
     def showEvent(self, event):
         super().showEvent(event)
         self._ensure_services()
         self._load_data()
+        self._load_capacity_data()
 
     def _ensure_services(self):
         """Servisleri yükle"""
@@ -51,6 +65,10 @@ class PlanningModule(QWidget):
 
                 self.wo_service = WorkOrderService()
                 self.ws_service = WorkStationService()
+
+                # Kapasite sayfasına servisleri ver
+                self.capacity_page.set_services(self.wo_service, self.ws_service)
+
             except Exception as e:
                 print(f"Servis yükleme hatası: {e}")
 
@@ -96,8 +114,20 @@ class PlanningModule(QWidget):
 
         return holidays
 
+    def _on_tab_changed(self, index):
+        """Sekme değiştiğinde veriyi yenile"""
+        if index == 0:
+            self._load_data()
+        elif index == 1:
+            self._load_capacity_data()
+
+    def _load_capacity_data(self):
+        """Kapasite verilerini yükle"""
+        if hasattr(self, "capacity_page"):
+            self.capacity_page.load_data()
+
     def _load_data(self):
-        """Verileri yükle"""
+        """Gantt verilerini yükle"""
         if not self.wo_service or not self.ws_service:
             return
 
@@ -127,7 +157,11 @@ class PlanningModule(QWidget):
 
             for wo in work_orders:
                 # Tamamlanan veya kapatılan iş emirlerini Gantt'ta gösterme
-                if wo.status in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED]:
+                if wo.status in [
+                    WorkOrderStatus.COMPLETED,
+                    WorkOrderStatus.CLOSED,
+                    WorkOrderStatus.CANCELLED,
+                ]:
                     continue
 
                 # Sadece planlanan başlangıç/bitiş tarihi olanlar
@@ -178,6 +212,7 @@ class PlanningModule(QWidget):
 
                         operations.append(
                             {
+                                "operation_id": op.id,
                                 "work_order_id": wo.id,
                                 "order_no": wo.order_no,
                                 "item_name": wo.item.name if wo.item else "-",
@@ -198,6 +233,7 @@ class PlanningModule(QWidget):
 
                     operations.append(
                         {
+                            "operation_id": None,
                             "work_order_id": wo.id,
                             "order_no": wo.order_no,
                             "item_name": wo.item.name if wo.item else "-",
@@ -227,12 +263,24 @@ class PlanningModule(QWidget):
         try:
             wo = self.wo_service.get_by_id(wo_id)
             if wo:
+                status_map = {
+                    "draft": "Taslak",
+                    "planned": "Planlandı",
+                    "released": "Serbest",
+                    "in_progress": "Üretimde",
+                    "quality_check": "Kalite Kontrol",
+                    "completed": "Tamamlandı",
+                    "closed": "Kapatıldı",
+                    "cancelled": "İptal Edildi",
+                }
+                status_text = status_map.get(wo.status.value, wo.status.value)
+
                 # Detay bilgisi göster
                 info = f"""
                 <b>İş Emri:</b> {wo.order_no}<br/>
                 <b>Ürün:</b> {wo.item.name if wo.item else '-'}<br/>
                 <b>Miktar:</b> {wo.planned_quantity}<br/>
-                <b>Durum:</b> {wo.status.value}<br/>
+                <b>Durum:</b> {status_text}<br/>
                 <b>Başlangıç:</b> {wo.planned_start.strftime('%d.%m.%Y %H:%M') if wo.planned_start else '-'}<br/>
                 <b>Bitiş:</b> {wo.planned_end.strftime('%d.%m.%Y %H:%M') if wo.planned_end else '-'}
                 """
@@ -245,3 +293,41 @@ class PlanningModule(QWidget):
 
         except Exception as e:
             print(f"İş emri detay hatası: {e}")
+
+    def _on_operation_rescheduled(
+        self,
+        wo_id: int,
+        new_start_time: object,
+        operation_id: int = None,
+        new_machine_id: int = None,
+    ):
+        """Operasyon taşındığında"""
+        if not self.wo_service:
+            return
+
+        try:
+            # QDateTime -> python datetime dönüşümü (gerekirse)
+            start_dt = new_start_time
+            if hasattr(new_start_time, "toPython"):
+                start_dt = new_start_time.toPython()
+
+            success = self.wo_service.reschedule_operation(
+                order_id=wo_id,
+                new_start_time=start_dt,
+                operation_id=operation_id,
+                new_work_station_id=new_machine_id,
+            )
+
+            if success:
+                # Verileri yenile
+                self._load_data()
+                self._load_capacity_data()
+            else:
+                QMessageBox.warning(
+                    self, "Hata", "Planlama güncellenemedi veya taşınamaz durumda."
+                )
+                self._load_data()  # Geri al
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Planlama hatası: {str(e)}")
+            self._load_data()  # Geri al

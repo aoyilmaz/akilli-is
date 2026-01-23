@@ -26,8 +26,10 @@ from database.base import BaseModel
 
 # ============== ENUM Tanımları ==============
 
+
 class MaintenancePriority(enum.Enum):
     """Bakım/Arıza öncelikleri"""
+
     LOW = "dusuk"
     NORMAL = "normal"
     HIGH = "yuksek"
@@ -36,6 +38,7 @@ class MaintenancePriority(enum.Enum):
 
 class MaintenanceStatus(enum.Enum):
     """Bakım talep durumları"""
+
     OPEN = "acik"
     IN_PROGRESS = "devam_ediyor"
     WAITING_PARTS = "parca_bekleniyor"
@@ -43,8 +46,9 @@ class MaintenanceStatus(enum.Enum):
     CANCELLED = "iptal"
 
 
-class WorkOrderStatus(enum.Enum):
+class MaintenanceWorkOrderStatus(enum.Enum):
     """İş emri durumları"""
+
     DRAFT = "taslak"
     ASSIGNED = "atandi"
     IN_PROGRESS = "devam_ediyor"
@@ -55,14 +59,16 @@ class WorkOrderStatus(enum.Enum):
 
 class MaintenanceType(enum.Enum):
     """Bakım türleri"""
-    BREAKDOWN = "ariza"          # Arıza Onarım
-    PREVENTIVE = "periyodik"     # Periyodik Bakım
-    PREDICTIVE = "kestirimci"    # Kestirimci Bakım
+
+    BREAKDOWN = "ariza"  # Arıza Onarım
+    PREVENTIVE = "periyodik"  # Periyodik Bakım
+    PREDICTIVE = "kestirimci"  # Kestirimci Bakım
     CALIBRATION = "kalibrasyon"  # Kalibrasyon
 
 
 class CriticalityLevel(enum.Enum):
     """Ekipman kritiklik seviyeleri"""
+
     LOW = "dusuk"
     MEDIUM = "orta"
     HIGH = "yuksek"
@@ -71,6 +77,7 @@ class CriticalityLevel(enum.Enum):
 
 class EquipmentStatus(enum.Enum):
     """Ekipman çalışma durumları"""
+
     RUNNING = "calisiyor"
     STOPPED = "durdu"
     MAINTENANCE = "bakimda"
@@ -79,6 +86,7 @@ class EquipmentStatus(enum.Enum):
 
 class DowntimeReason(enum.Enum):
     """Duruş sebepleri"""
+
     BREAKDOWN = "breakdown"
     MAINTENANCE = "maintenance"
     SETUP = "setup"
@@ -90,8 +98,10 @@ class DowntimeReason(enum.Enum):
 
 # ============== MODEL Tanımları ==============
 
+
 class MaintenanceCategory(BaseModel):
     """Bakım kategorileri (Mekanik, Elektrik, Pnömatik vb.)"""
+
     __tablename__ = "maintenance_categories"
 
     code = Column(String(50), unique=True, nullable=False, index=True)
@@ -108,6 +118,7 @@ class MaintenanceCategory(BaseModel):
 
 class Equipment(BaseModel):
     """Ekipman/Makine tanımları - Geliştirilmiş versiyon"""
+
     __tablename__ = "equipments"
 
     code = Column(String(50), unique=True, nullable=False, index=True)
@@ -119,7 +130,7 @@ class Equipment(BaseModel):
     children = relationship(
         "Equipment",
         backref=backref("parent", remote_side="Equipment.id"),
-        lazy="dynamic"
+        lazy="dynamic",
     )
 
     # Marka/Model
@@ -157,7 +168,9 @@ class Equipment(BaseModel):
     # İlişkiler
     supplier = relationship("Supplier")
     work_station = relationship("WorkStation")
-    maintenance_requests = relationship("MaintenanceRequest", back_populates="equipment")
+    maintenance_requests = relationship(
+        "MaintenanceRequest", back_populates="equipment"
+    )
     work_orders = relationship("MaintenanceWorkOrder", back_populates="equipment")
     maintenance_plans = relationship("MaintenancePlan", back_populates="equipment")
     spare_parts = relationship("EquipmentSparePart", back_populates="equipment")
@@ -175,9 +188,12 @@ class Equipment(BaseModel):
 
 class EquipmentSparePart(BaseModel):
     """Ekipman başına önerilen yedek parçalar"""
+
     __tablename__ = "equipment_spare_parts"
 
-    equipment_id = Column(Integer, ForeignKey("equipments.id", ondelete="CASCADE"), nullable=False)
+    equipment_id = Column(
+        Integer, ForeignKey("equipments.id", ondelete="CASCADE"), nullable=False
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
 
     min_quantity = Column(Numeric(18, 4), default=1)
@@ -194,9 +210,12 @@ class EquipmentSparePart(BaseModel):
 
 class EquipmentDowntime(BaseModel):
     """Ekipman duruş kayıtları"""
+
     __tablename__ = "equipment_downtimes"
 
-    equipment_id = Column(Integer, ForeignKey("equipments.id", ondelete="CASCADE"), nullable=False)
+    equipment_id = Column(
+        Integer, ForeignKey("equipments.id", ondelete="CASCADE"), nullable=False
+    )
 
     start_time = Column(DateTime, nullable=False, default=datetime.utcnow)
     end_time = Column(DateTime, nullable=True)
@@ -205,7 +224,9 @@ class EquipmentDowntime(BaseModel):
     notes = Column(Text, nullable=True)
 
     # Bağlı iş emri (varsa)
-    work_order_id = Column(Integer, ForeignKey("maintenance_work_orders.id"), nullable=True)
+    work_order_id = Column(
+        Integer, ForeignKey("maintenance_work_orders.id"), nullable=True
+    )
 
     # Kayıt bilgileri
     recorded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -238,12 +259,15 @@ class EquipmentDowntime(BaseModel):
 
 class MaintenanceRequest(BaseModel):
     """Arıza/Bakım Talepleri"""
+
     __tablename__ = "maintenance_requests"
 
     request_no = Column(String(50), unique=True, nullable=False, index=True)
 
     equipment_id = Column(Integer, ForeignKey("equipments.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("maintenance_categories.id"), nullable=True)
+    category_id = Column(
+        Integer, ForeignKey("maintenance_categories.id"), nullable=True
+    )
 
     request_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     description = Column(Text, nullable=False)
@@ -264,7 +288,11 @@ class MaintenanceRequest(BaseModel):
     category = relationship("MaintenanceCategory", back_populates="requests")
     reported_by = relationship("User", foreign_keys=[reported_by_id])
     work_orders = relationship("MaintenanceWorkOrder", back_populates="request")
-    attachments = relationship("MaintenanceRequestAttachment", back_populates="request", cascade="all, delete-orphan")
+    attachments = relationship(
+        "MaintenanceRequestAttachment",
+        back_populates="request",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("idx_maint_req_status", "status"),
@@ -278,9 +306,14 @@ class MaintenanceRequest(BaseModel):
 
 class MaintenanceRequestAttachment(BaseModel):
     """Bakım talebi ekleri (fotoğraf vb.)"""
+
     __tablename__ = "maintenance_request_attachments"
 
-    request_id = Column(Integer, ForeignKey("maintenance_requests.id", ondelete="CASCADE"), nullable=False)
+    request_id = Column(
+        Integer,
+        ForeignKey("maintenance_requests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
@@ -300,6 +333,7 @@ class MaintenanceRequestAttachment(BaseModel):
 
 class MaintenanceChecklist(BaseModel):
     """Bakım kontrol listesi şablonları"""
+
     __tablename__ = "maintenance_checklists"
 
     name = Column(String(200), nullable=False)
@@ -313,8 +347,12 @@ class MaintenanceChecklist(BaseModel):
 
     # İlişkiler
     equipment = relationship("Equipment", back_populates="checklists")
-    items = relationship("MaintenanceChecklistItem", back_populates="checklist", cascade="all, delete-orphan",
-                         order_by="MaintenanceChecklistItem.order_no")
+    items = relationship(
+        "MaintenanceChecklistItem",
+        back_populates="checklist",
+        cascade="all, delete-orphan",
+        order_by="MaintenanceChecklistItem.order_no",
+    )
 
     def __repr__(self):
         return f"<MaintenanceChecklist {self.name}>"
@@ -322,9 +360,14 @@ class MaintenanceChecklist(BaseModel):
 
 class MaintenanceChecklistItem(BaseModel):
     """Kontrol listesi maddeleri"""
+
     __tablename__ = "maintenance_checklist_items"
 
-    checklist_id = Column(Integer, ForeignKey("maintenance_checklists.id", ondelete="CASCADE"), nullable=False)
+    checklist_id = Column(
+        Integer,
+        ForeignKey("maintenance_checklists.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     order_no = Column(Integer, default=1)
     description = Column(Text, nullable=False)
@@ -340,6 +383,7 @@ class MaintenanceChecklistItem(BaseModel):
 
 class MaintenanceWorkOrder(BaseModel):
     """Bakım İş Emirleri - Geliştirilmiş versiyon"""
+
     __tablename__ = "maintenance_work_orders"
 
     order_no = Column(String(50), unique=True, nullable=False, index=True)
@@ -353,7 +397,9 @@ class MaintenanceWorkOrder(BaseModel):
     completed_date = Column(DateTime, nullable=True)
     due_date = Column(DateTime, nullable=True)
 
-    status = Column(Enum(WorkOrderStatus), default=WorkOrderStatus.DRAFT)
+    status = Column(
+        Enum(MaintenanceWorkOrderStatus), default=MaintenanceWorkOrderStatus.DRAFT
+    )
     priority = Column(Enum(MaintenancePriority), default=MaintenancePriority.NORMAL)
 
     # Atanan Teknisyen
@@ -377,22 +423,34 @@ class MaintenanceWorkOrder(BaseModel):
     total_cost = Column(Numeric(18, 4), default=0)
 
     # Kontrol Listesi
-    checklist_id = Column(Integer, ForeignKey("maintenance_checklists.id"), nullable=True)
+    checklist_id = Column(
+        Integer, ForeignKey("maintenance_checklists.id"), nullable=True
+    )
 
     # İlişkiler
     request = relationship("MaintenanceRequest", back_populates="work_orders")
     equipment = relationship("Equipment", back_populates="work_orders")
     assigned_to = relationship("User", foreign_keys=[assigned_to_id])
     checklist = relationship("MaintenanceChecklist")
-    parts = relationship("MaintenanceWorkOrderPart", back_populates="work_order", cascade="all, delete-orphan")
-    attachments = relationship("WorkOrderAttachment", back_populates="work_order", cascade="all, delete-orphan")
-    checklist_results = relationship("WorkOrderChecklistResult", back_populates="work_order", cascade="all, delete-orphan")
+    parts = relationship(
+        "MaintenanceWorkOrderPart",
+        back_populates="work_order",
+        cascade="all, delete-orphan",
+    )
+    attachments = relationship(
+        "WorkOrderAttachment", back_populates="work_order", cascade="all, delete-orphan"
+    )
+    checklist_results = relationship(
+        "WorkOrderChecklistResult",
+        back_populates="work_order",
+        cascade="all, delete-orphan",
+    )
     downtimes = relationship("EquipmentDowntime", back_populates="work_order")
 
     __table_args__ = (
-        Index("idx_wo_status", "status"),
-        Index("idx_wo_equipment", "equipment_id"),
-        Index("idx_wo_assigned", "assigned_to_id"),
+        Index("idx_mwo_status", "status"),
+        Index("idx_mwo_equipment", "equipment_id"),
+        Index("idx_mwo_assigned", "assigned_to_id"),
     )
 
     def __repr__(self):
@@ -401,9 +459,14 @@ class MaintenanceWorkOrder(BaseModel):
 
 class MaintenanceWorkOrderPart(BaseModel):
     """İş Emrinde Kullanılan Parçalar"""
+
     __tablename__ = "maintenance_work_order_parts"
 
-    work_order_id = Column(Integer, ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"), nullable=False)
+    work_order_id = Column(
+        Integer,
+        ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
 
     quantity = Column(Numeric(18, 4), nullable=False)
@@ -426,9 +489,14 @@ class MaintenanceWorkOrderPart(BaseModel):
 
 class WorkOrderAttachment(BaseModel):
     """İş emri dosya ekleri"""
+
     __tablename__ = "work_order_attachments"
 
-    work_order_id = Column(Integer, ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"), nullable=False)
+    work_order_id = Column(
+        Integer,
+        ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
@@ -448,10 +516,17 @@ class WorkOrderAttachment(BaseModel):
 
 class WorkOrderChecklistResult(BaseModel):
     """İş emri kontrol listesi sonuçları"""
+
     __tablename__ = "work_order_checklist_results"
 
-    work_order_id = Column(Integer, ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"), nullable=False)
-    checklist_item_id = Column(Integer, ForeignKey("maintenance_checklist_items.id"), nullable=False)
+    work_order_id = Column(
+        Integer,
+        ForeignKey("maintenance_work_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    checklist_item_id = Column(
+        Integer, ForeignKey("maintenance_checklist_items.id"), nullable=False
+    )
 
     is_checked = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
@@ -460,16 +535,21 @@ class WorkOrderChecklistResult(BaseModel):
     checked_at = Column(DateTime, nullable=True)
 
     # İlişkiler
-    work_order = relationship("MaintenanceWorkOrder", back_populates="checklist_results")
+    work_order = relationship(
+        "MaintenanceWorkOrder", back_populates="checklist_results"
+    )
     checklist_item = relationship("MaintenanceChecklistItem", back_populates="results")
     checked_by = relationship("User")
 
     def __repr__(self):
-        return f"<WorkOrderChecklistResult {self.work_order_id}-{self.checklist_item_id}>"
+        return (
+            f"<WorkOrderChecklistResult {self.work_order_id}-{self.checklist_item_id}>"
+        )
 
 
 class MaintenancePlan(BaseModel):
     """Periyodik Bakım Planları - Geliştirilmiş versiyon"""
+
     __tablename__ = "maintenance_plans"
 
     equipment_id = Column(Integer, ForeignKey("equipments.id"), nullable=False)
@@ -478,7 +558,9 @@ class MaintenancePlan(BaseModel):
     description = Column(Text, nullable=True)
 
     # Zaman Bazlı Sıklık
-    frequency_type = Column(String(20), nullable=False)  # 'daily', 'weekly', 'monthly', 'yearly'
+    frequency_type = Column(
+        String(20), nullable=False
+    )  # 'daily', 'weekly', 'monthly', 'yearly'
     frequency_value = Column(Integer, default=1)
 
     # Sayaç/Çalışma Saati Bazlı
@@ -496,7 +578,9 @@ class MaintenancePlan(BaseModel):
     lead_days = Column(Integer, default=7)  # Kaç gün önce iş emri oluşsun
 
     # Kontrol Listesi Şablonu
-    checklist_id = Column(Integer, ForeignKey("maintenance_checklists.id"), nullable=True)
+    checklist_id = Column(
+        Integer, ForeignKey("maintenance_checklists.id"), nullable=True
+    )
 
     is_active = Column(Boolean, default=True)
 

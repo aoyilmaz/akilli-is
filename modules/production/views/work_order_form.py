@@ -340,21 +340,30 @@ class WorkOrderFormPage(QWidget):
         self.priority_combo.setCurrentIndex(1)
         form_layout.addWidget(self.priority_combo, 4, 1)
 
+        # Parti No (Batch)
+        form_layout.addWidget(QLabel("Parti No"), 5, 0)
+        self.batch_input = QLineEdit()
+        self.batch_input.setPlaceholderText("Otomatik üretilir veya manuel girin")
+        self.batch_input.setToolTip(
+            "Boş bırakılırsa ve ürün lot takipli ise otomatik üretilir"
+        )
+        form_layout.addWidget(self.batch_input, 5, 1)
+
         # Kaynak Depo
-        form_layout.addWidget(QLabel("Hammadde Deposu"), 5, 0)
+        form_layout.addWidget(QLabel("Hammadde Deposu"), 6, 0)
         self.source_warehouse_combo = QComboBox()
-        form_layout.addWidget(self.source_warehouse_combo, 5, 1)
+        form_layout.addWidget(self.source_warehouse_combo, 6, 1)
 
         # Hedef Depo
-        form_layout.addWidget(QLabel("Mamul Deposu"), 6, 0)
+        form_layout.addWidget(QLabel("Mamul Deposu"), 7, 0)
         self.target_warehouse_combo = QComboBox()
-        form_layout.addWidget(self.target_warehouse_combo, 6, 1)
+        form_layout.addWidget(self.target_warehouse_combo, 7, 1)
 
         # Açıklama
-        form_layout.addWidget(QLabel("Açıklama"), 7, 0)
+        form_layout.addWidget(QLabel("Açıklama"), 8, 0)
         self.description_input = QTextEdit()
         self.description_input.setMaximumHeight(80)
-        form_layout.addWidget(self.description_input, 7, 1)
+        form_layout.addWidget(self.description_input, 8, 1)
 
         layout.addWidget(form_frame)
 
@@ -932,6 +941,7 @@ class WorkOrderFormPage(QWidget):
             return
 
         self.order_no_input.setText(self.wo_data.get("order_no", ""))
+        self.batch_input.setText(self.wo_data.get("batch_number", "") or "")
         self.description_input.setPlainText(self.wo_data.get("description", "") or "")
 
         # Özel Notlar
@@ -992,6 +1002,7 @@ class WorkOrderFormPage(QWidget):
             "shipping_notes": self.shipping_notes_input.toPlainText().strip(),
             "item_id": product_id,
             "bom_id": bom_id,
+            "batch_number": self.batch_input.text().strip() or None,
             "planned_quantity": Decimal(str(self.quantity_input.value())),
             "priority": self.priority_combo.currentData(),
             "source_warehouse_id": self.source_warehouse_combo.currentData(),

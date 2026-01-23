@@ -61,6 +61,14 @@ class LocationType(enum.Enum):
     TRANSIT = "transit"
 
 
+class LotSizingProcedure(enum.Enum):
+    """Lotlama yöntemleri"""
+
+    EXACT = "exact"  # Tam miktar (L4L - Lot for Lot)
+    FIXED = "fixed"  # Sabit miktar
+    PERIOD = "period"  # Periyodik (Haftalık, Aylık vb.)
+
+
 class Unit(BaseModel):
     """Birim tanımları"""
 
@@ -200,6 +208,10 @@ class Item(BaseModel):
     min_order_qty = Column(Numeric(18, 4), default=1)  # Minimum sipariş miktarı
     order_multiple = Column(Numeric(18, 4), default=1)  # Sipariş katı
     procurement_type = Column(String(20), default="purchase")  # purchase/manufacture
+    lot_sizing_procedure = Column(
+        Enum(LotSizingProcedure), default=LotSizingProcedure.EXACT, nullable=False
+    )
+    planning_time_fence = Column(Integer, default=0)  # Planlama zaman sınırı (gün)
 
     # === Takip Özellikleri ===
     track_lot = Column(Boolean, default=False)

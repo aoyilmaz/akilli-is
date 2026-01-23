@@ -10,7 +10,7 @@ DÜZELTMELER (V2 -> V3):
 
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session, joinedload
 
 from database.base import get_session
@@ -161,6 +161,7 @@ class BOMService:
 
         # Operasyonları ekle
         for op_data in operations_data:
+            op_data["bom_id"] = bom.id
             op = BOMOperation(**op_data)
             self.session.add(op)
 
@@ -597,6 +598,30 @@ class WorkOrderService:
         if bom_id:
             self._create_lines_from_bom(order, bom_id, planned_quantity)
 
+        # Batch Number Generation
+        if not order.batch_number and order.item_id:
+            item = self.session.query(Item).get(order.item_id)
+            if item and item.track_lot:
+                # Format: LOT-YYYYMMDD-SEQ
+                prefix = f"LOT-{datetime.now().strftime('%Y%m%d')}"
+
+                # Günlük sırayı bul
+                last_batch = (
+                    self.session.query(WorkOrder)
+                    .filter(WorkOrder.batch_number.like(f"{prefix}-%"))
+                    .order_by(WorkOrder.batch_number.desc())
+                    .first()
+                )
+
+                seq = 1
+                if last_batch and last_batch.batch_number:
+                    try:
+                        seq = int(last_batch.batch_number.split("-")[-1]) + 1
+                    except ValueError:
+                        pass
+
+                order.batch_number = f"{prefix}-{seq:02d}"
+
         self.session.commit()
         return order
 
@@ -721,6 +746,90 @@ class WorkOrderService:
             order.status = WorkOrderStatus.CANCELLED
         else:
             self.session.delete(order)
+
+        self.session.commit()
+        return True
+
+    def reschedule_operation(
+        self,
+        order_id: int,
+        new_start_time: datetime,
+        operation_id: int = None,
+        new_work_station_id: int = None,
+    ) -> bool:
+        """
+        Operasyonu veya iş emrini yeniden planla
+
+        Args:
+            order_id: İş emri ID
+            new_start_time: Yeni başlangıç zamanı
+            operation_id: (Opsiyonel) Operasyon ID. Belirtilmezse tüm iş emri kaydırılır.
+            new_work_station_id: (Opsiyonel) Yeni iş istasyonu ID
+        """
+        order = self.get_by_id(order_id)
+        if not order:
+            return False
+
+        # Sadece belirli durumlarda planlama yapılabilir
+        if order.status in [
+            WorkOrderStatus.COMPLETED,
+            WorkOrderStatus.CLOSED,
+            WorkOrderStatus.CANCELLED,
+        ]:
+            raise ProductionError(
+                f"Bu durumda ({order.status.value}) planlama değiştirilemez!"
+            )
+
+        if operation_id:
+            # Tek bir operasyonu taşı
+            op = next((o for o in order.operations if o.id == operation_id), None)
+            if not op:
+                return False
+
+            # Mevcut süreyi koru
+            current_start = op.planned_start or order.planned_start
+            current_end = op.planned_end or order.planned_end
+
+            duration = timedelta(hours=0)
+            if current_start and current_end:
+                duration = current_end - current_start
+            elif op.planned_run_time:
+                duration = timedelta(minutes=op.planned_run_time)
+
+            op.planned_start = new_start_time
+            op.planned_end = new_start_time + duration
+
+            if new_work_station_id:
+                op.work_station_id = new_work_station_id
+
+            # İş emri tarihlerini de güncelle (Gerekirse genişlet)
+            if not order.planned_start or new_start_time < order.planned_start:
+                order.planned_start = new_start_time
+            if not order.planned_end or op.planned_end > order.planned_end:
+                order.planned_end = op.planned_end
+
+        else:
+            # Tüm iş emrini taşı (Sadece başlangıç değişir, süre korunur)
+            current_start = order.planned_start
+            current_end = order.planned_end
+            duration = (
+                current_end - current_start
+                if current_start and current_end
+                else timedelta(hours=0)
+            )
+
+            # Farkı hesapla
+            diff = new_start_time - current_start if current_start else timedelta(0)
+
+            order.planned_start = new_start_time
+            order.planned_end = new_start_time + duration
+
+            # Alt operasyonları da aynı miktarda kaydır
+            for op in order.operations:
+                if op.planned_start:
+                    op.planned_start += diff
+                if op.planned_end:
+                    op.planned_end += diff
 
         self.session.commit()
         return True
@@ -1325,6 +1434,61 @@ class WorkOrderService:
         self.session.commit()
         return movement
 
+    def issue_material(
+        self,
+        operation_id: int,
+        item_id: int,
+        quantity: Decimal,
+        notes: str = None,
+    ) -> StockMovement:
+        """Operasyon için malzeme çıkışı yap (Manuel)"""
+        op = self.session.query(WorkOrderOperation).get(operation_id)
+        if not op:
+            raise ProductionError("Operasyon bulunamadı!")
+        order = op.work_order
+        if not order:
+            raise ProductionError("İş emri bulunamadı!")
+
+        # Miktarı Decimal'e çevir
+        quantity = Decimal(str(quantity))
+
+        # Stok hareketi (Üretim Çıkış)
+        movement = StockMovement(
+            item_id=item_id,
+            movement_type=StockMovementType.URETIM_CIKIS,
+            quantity=quantity,
+            unit_price=Decimal(0),  # Maliyet hesaplama eklenebilir
+            total_price=Decimal(0),
+            from_warehouse_id=order.source_warehouse_id,  # Kaynak depodan düş
+            document_no=order.order_no,
+            document_type="material_issue",
+            reference_no=f"OP-{op.operation_no}",
+            description=f"Malzeme Çıkışı: {op.name}" + (f" - {notes}" if notes else ""),
+            movement_date=datetime.now(),
+        )
+        self.session.add(movement)
+
+        # İş emri satırını güncelle (Ne kadar kullanıldı?)
+        # Not: İş emri satırlarında bu malzemenin olduğu satırı bulup güncellemeliyiz
+        # Eğer BOM'da yoksa bile manuel çıkış yapılmasına izin veriyoruz ama varsa eşleştiriyoruz.
+        line = (
+            self.session.query(WorkOrderLine)
+            .filter(
+                WorkOrderLine.order_id == order.id, WorkOrderLine.item_id == item_id
+            )
+            .first()
+        )
+        if line:
+            line.used_quantity = (line.used_quantity or 0) + quantity
+
+        # Kaynak depo bakiyesini güncelle
+        if order.source_warehouse_id:
+            balance = self._get_or_create_balance(item_id, order.source_warehouse_id)
+            balance.quantity -= quantity
+
+        self.session.commit()
+        return movement
+
     # ----------------------------------------------------------
     # OPERASYON TAKİBİ
     # ----------------------------------------------------------
@@ -1627,8 +1791,58 @@ class WorkOrderService:
             delta = op.actual_end - op.actual_start
             op.actual_run_time = int(delta.total_seconds() / 60)
 
+        # Aktif personelleri de bitir
+        active_personnel = self.get_active_personnel(op.id)
+        for p in active_personnel:
+            self.remove_personnel(op.id, p.user_id)
+
         self.session.commit()
         return op
+
+    def calculate_actual_costs(self, order_id: int) -> dict:
+        """
+        Gerçekleşen operasyon maliyetlerini hesapla (İşçilik + Genel Gider)
+
+        Hesaplama Mantığı:
+        1. İşçilik: Operasyon Süresi * (İstasyon Saat Ücreti)
+           - İleride personel saat ücreti de eklenebilir.
+        2. Genel Gider: Operasyon Süresi * (İstasyon Genel Gider Oranı)
+        """
+        order = self.get_by_id(order_id)
+        if not order:
+            return {}
+
+        total_labor = Decimal(0)
+        total_overhead = Decimal(0)
+
+        for op in order.operations:
+            # Süre (Saat cinsinden)
+            duration_hours = Decimal(0)
+            if op.actual_run_time:
+                duration_hours = Decimal(op.actual_run_time) / Decimal(60)
+
+            # İstasyon maliyet oranları
+            station = op.work_station
+            if station:
+                # İşçilik
+                labor_rate = station.hourly_rate or Decimal(0)
+                labor_cost = duration_hours * labor_rate
+                op.actual_labor_cost = labor_cost
+                total_labor += labor_cost
+
+                # Genel Gider
+                overhead_rate = station.overhead_rate or Decimal(0)
+                overhead_cost = duration_hours * overhead_rate
+                op.actual_overhead_cost = overhead_cost
+                total_overhead += overhead_cost
+
+        # İş emrini güncelle
+        order.actual_labor_cost = total_labor
+        order.actual_overhead_cost = total_overhead
+
+        self.session.commit()
+
+        return {"labor_cost": total_labor, "overhead_cost": total_overhead}
 
     # ----------------------------------------------------------
     # YARDIMCI METODLAR

@@ -18,9 +18,10 @@ from PyQt6.QtWidgets import (
     QToolTip,
     QGridLayout,
     QSpacerItem,
+    QApplication,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate, QRect, QSize
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QLinearGradient
+from PyQt6.QtCore import Qt, pyqtSignal, QDate, QRect, QSize, QMimeData
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QLinearGradient, QDrag
 from ui.components.stat_cards import MiniStatCard
 
 
@@ -39,10 +40,12 @@ class GanttBar(QWidget):
         status: str,
         color: str,
         duration_hours: float = 0,
+        operation_id: int = None,
         parent=None,
     ):
         super().__init__(parent)
         self.wo_id = wo_id
+        self.operation_id = operation_id
         self.order_no = order_no
         self.item_name = item_name
         self.operation_name = operation_name
@@ -116,7 +119,38 @@ class GanttBar(QWidget):
             )
 
     def mousePressEvent(self, event):
-        self.clicked.emit(self.wo_id)
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_start_position = event.pos()
+            self._drag_active = False  # Drag başladı mı kontrolü
+
+    def mouseReleaseEvent(self, event):
+        # Eğer sürükleme olmadıysa tıklama kabul et
+        if not self._drag_active and event.button() == Qt.MouseButton.LeftButton:
+            # Tıklama mesafesi kontrolü (hafif oynamalar için)
+            if (event.pos() - self.drag_start_position).manhattanLength() < 5:
+                self.clicked.emit(self.wo_id)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
+        if (
+            event.pos() - self.drag_start_position
+        ).manhattanLength() < QApplication.startDragDistance():
+            return
+
+        drag = QDrag(self)
+        mime_data = QMimeData()
+
+        # Verileri taşı: wo_id, duration_hours, start_offset_x, operation_id
+        mime_data.setText(
+            f"{self.wo_id}|{self.duration_hours}|{self.drag_start_position.x()}|{self.operation_id}"
+        )
+
+        drag.setMimeData(mime_data)
+        drag.setPixmap(self.grab())
+        drag.setHotSpot(event.pos())
+
+        drag.exec(Qt.DropAction.MoveAction)
 
     def sizeHint(self):
         return QSize(100, 36)
@@ -333,6 +367,9 @@ class MachineRow(QFrame):
     """Makine satırı - Sol etiket + Gantt alanı"""
 
     work_order_clicked = pyqtSignal(int)
+    operation_moved = pyqtSignal(
+        int, object, int, int
+    )  # wo_id, new_start_time, operation_id, new_machine_id
 
     def __init__(
         self,
@@ -352,7 +389,10 @@ class MachineRow(QFrame):
         self.operations = []
         self.holidays = []
 
+        self.holidays = []
+
         self.setFixedHeight(52)
+        self.setAcceptDrops(True)
 
     def set_operations(
         self,
@@ -470,6 +510,7 @@ class MachineRow(QFrame):
                 status=status_name,
                 color=color,
                 duration_hours=total_hours,
+                operation_id=op.get("operation_id"),
                 parent=bar_area,
             )
             bar.clicked.connect(self.work_order_clicked.emit)
@@ -477,6 +518,59 @@ class MachineRow(QFrame):
             bar.show()
 
         layout.addWidget(bar_area)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        try:
+            data = event.mimeData().text().split("|")
+            wo_id = int(data[0])
+            duration_hours = float(data[1])
+            click_offset = int(data[2])
+            operation_id = int(data[3]) if data[3] != "None" else None
+
+            # Yeni pozisyonu hesapla
+            # drop_x - click_offset = barın sol üst köşesinin yeni x pozisyonu (Gantt alanına göre)
+            # Ancak event.pos() MachineRow'a göre. Gantt alanı (bar_area) sağda, 180px sonra.
+
+            drop_x = event.position().x()
+            usage_area_start = 180
+
+            if drop_x < usage_area_start:
+                return  # Etiket alanına bırakıldı
+
+            relative_x = drop_x - usage_area_start - click_offset
+
+            # Zamanı hesapla
+            if not hasattr(self, "_period_info"):
+                return
+
+            period_start, period_days, pixels_per_day = self._period_info
+
+            days_offset = relative_x / pixels_per_day
+            days_offset = max(0, days_offset)  # Negatif olmamalı
+
+            new_start_time = period_start + timedelta(days=days_offset)
+
+            # Sinyal gönder
+            self.operation_moved.emit(
+                wo_id, new_start_time, operation_id, self.station_id
+            )
+            event.accept()
+
+        except Exception as e:
+            print(f"Drop hatası: {e}")
+            event.ignore()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -512,7 +606,10 @@ class ProductionPlanningPage(QWidget):
 
     page_title = "Üretim Planlama"
 
+    page_title = "Üretim Planlama"
+
     work_order_clicked = pyqtSignal(int)
+    operation_moved = pyqtSignal(int, object, int, int)
     refresh_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -916,6 +1013,7 @@ class ProductionPlanningPage(QWidget):
                 capacity=float(ws.get("capacity_per_hour", 0) or 0),
             )
             row.work_order_clicked.connect(self.work_order_clicked.emit)
+            row.operation_moved.connect(self.operation_moved.emit)
 
             station_ops = ops_by_station.get(ws_id, [])
             row.set_operations(

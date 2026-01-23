@@ -148,6 +148,9 @@ class InspectionTemplate(BaseModel):
     description = Column(Text, nullable=True)
     inspection_type = Column(Enum(InspectionType), nullable=False)
 
+    # Varsayılan olarak atandığı ürün (Opsiyonel)
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+
     # İlişkiler
     criteria = relationship(
         "InspectionCriteria", back_populates="template", cascade="all, delete-orphan"

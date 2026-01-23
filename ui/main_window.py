@@ -972,7 +972,7 @@ class SideBar(QFrame):
                 c.setFont(0, fi)
                 if "qta" in globals():
                     c.setIcon(0, qta.icon(icon, color="#cccccc"))
-            p.setExpanded(True)
+            p.setExpanded(False)
 
     def on_item_clicked(self, item, col):
         pid = item.data(0, Qt.ItemDataRole.UserRole)

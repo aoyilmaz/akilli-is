@@ -24,6 +24,13 @@ import enum
 from database.base import BaseModel
 
 
+class BOMType(enum.Enum):
+    """Reçete tipleri"""
+
+    STANDARD = "standard"  # Standart üretim
+    FORMULA = "formula"  # Formül/Proses üretimi
+
+
 class BOMStatus(enum.Enum):
     """Reçete durumları"""
 
@@ -99,6 +106,7 @@ class BillOfMaterials(BaseModel):
     version = Column(Integer, default=1)
     revision = Column(String(20), default="A")
     status = Column(Enum(BOMStatus), default=BOMStatus.DRAFT)
+    bom_type = Column(Enum(BOMType), default=BOMType.STANDARD, nullable=False)  # Yeni
 
     base_quantity = Column(Numeric(18, 4), default=1)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
@@ -208,6 +216,7 @@ class WorkStation(BaseModel):
     efficiency_rate = Column(Numeric(5, 2), default=100)
 
     hourly_rate = Column(Numeric(18, 4), default=0)
+    overhead_rate = Column(Numeric(18, 4), default=0)  # Genel Gider Oranı (Saatlik)
     setup_cost = Column(Numeric(18, 4), default=0)
 
     working_hours_per_day = Column(Numeric(4, 2), default=8)
@@ -391,6 +400,9 @@ class WorkOrder(BaseModel):
     shipping_notes = Column(Text, nullable=True)  # Sevkiyat açıklamaları
 
     notes = Column(Text, nullable=True)
+
+    # Parti/Lot Takibi (Yeni)
+    batch_number = Column(String(100), nullable=True, index=True)
 
     # İlişkiler
     item = relationship("Item", foreign_keys=[item_id])

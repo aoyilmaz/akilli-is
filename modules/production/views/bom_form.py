@@ -2,9 +2,7 @@
 Akıllı İş - Ürün Reçetesi (BOM) Form Sayfası
 """
 
-from typing import Optional
 from decimal import Decimal
-from modules.finance.services.currency_service import CurrencyService
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,858 +14,560 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QSpinBox,
-    QFrame,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QAbstractItemView,
+    QFrame,
     QTabWidget,
-    QDialog,
-    QGridLayout,
-    QCheckBox,
+    QFormLayout,
+    QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-
-
-class AutoSelectSpinBox(QDoubleSpinBox):
-    """Odaklandığında içeriği seçen SpinBox"""
-
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        # Gecikmeli seçim (Qt davranışı bazen seçimi hemen kaldırabilir)
-        QTimer.singleShot(0, self.selectAll)
-
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        # Tıklamada da seç
-        QTimer.singleShot(0, self.selectAll)
-
-
-from ui.components.toast import show_toast
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
-
-class MaterialSelectDialog(QDialog):
-    """Malzeme seçim dialogu"""
-
-    def __init__(self, items: list, parent=None):
-        super().__init__(parent)
-        self.items = items
-        self.selected_item = None
-        self.setup_ui()
-
-    def setup_ui(self):
-        self.setWindowTitle("Malzeme Seç")
-        self.setMinimumSize(600, 400)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-
-        # Arama
-        search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel("🔍"))
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Malzeme ara...")
-        self.search_input.textChanged.connect(self._filter_items)
-        search_layout.addWidget(self.search_input)
-        layout.addLayout(search_layout)
-
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Kod", "Malzeme Adı", "Birim", "Stok"])
-        self.table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.doubleClicked.connect(self._on_select)
-        self._load_items()
-        layout.addWidget(self.table)
-
-        # Butonlar
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-
-        cancel_btn = QPushButton("İptal")
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-
-        select_btn = QPushButton("Seç")
-        select_btn.clicked.connect(self._on_select)
-        btn_layout.addWidget(select_btn)
-
-        layout.addLayout(btn_layout)
-
-    def _load_items(self):
-        self.table.setRowCount(len(self.items))
-        for row, item in enumerate(self.items):
-            code_item = QTableWidgetItem(item.get("code", ""))
-            code_item.setData(Qt.ItemDataRole.UserRole, item)
-            code_item.setForeground(QColor("#818cf8"))
-            self.table.setItem(row, 0, code_item)
-            self.table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(item.get("unit_code", "ADET")))
-            stock = item.get("total_stock", 0)
-            stock_item = QTableWidgetItem(f"{stock:,.2f}")
-            stock_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 3, stock_item)
-
-    def _filter_items(self, text: str):
-        for row in range(self.table.rowCount()):
-            match = any(
-                text.lower()
-                in (
-                    self.table.item(row, col).text().lower()
-                    if self.table.item(row, col)
-                    else ""
-                )
-                for col in range(2)
-            )
-            self.table.setRowHidden(row, not match)
-
-    def _on_select(self):
-        row = self.table.currentRow()
-        if row >= 0:
-            self.selected_item = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-            self.accept()
-
-    def get_selected(self) -> Optional[dict]:
-        return self.selected_item
+from ui.components.toast import show_toast
+from ui.components.page_header import PageHeader
+from database.models.production import BOMStatus, BOMType
 
 
 class BOMFormPage(QWidget):
-    """Ürün reçetesi formu"""
+    """Ürün reçetesi ekleme/düzenleme formu"""
 
     saved = pyqtSignal(dict)
     cancelled = pyqtSignal()
-    code_requested = pyqtSignal()
 
-    def __init__(self, bom_data: Optional[dict] = None, parent=None):
+    STATUS_OPTS = [
+        ("Taslak", BOMStatus.DRAFT),
+        ("Aktif", BOMStatus.ACTIVE),
+        ("Revizyon", BOMStatus.REVISION),
+        ("İptal", BOMStatus.OBSOLETE),
+    ]
+
+    TYPE_OPTS = [
+        ("Standart Üretim", BOMType.STANDARD),
+        ("Formül/Proses", BOMType.FORMULA),
+    ]
+
+    def __init__(self, bom=None, parent=None):
         super().__init__(parent)
-        self.bom_data = bom_data
-        self.is_edit_mode = bom_data is not None
-        self.lines = []
-        self.by_products = []
-        self.available_items = []
-        self.available_products = []
-        self.parent_net_weight = Decimal(0)  # Ana ürün ağırlığı
-        # Varsayılan kurlar (Servisten güncellenecek)
-        self.exchange_rates = {
-            "TRY": Decimal("1.0"),
-            "USD": Decimal("38.50"),
-            "EUR": Decimal("40.20"),
-            "GBP": Decimal("48.50"),
-        }
+        self.bom = bom
+        self.is_edit = bom is not None
 
-        # Canlı kurları çekmeyi dene
-        try:
-            live_rates = CurrencyService.fetch_tcmb_rates()
-            if live_rates:
-                self.exchange_rates.update(live_rates)
-        except Exception as e:
-            print(f"BOM Form Kur Hatası: {e}")
+        self.items_map = {}  # id -> item obj
+        self.units_map = {}  # id -> code
+        self.stations_map = {}  # id -> station obj
 
-        self.setup_ui()
-        if self.is_edit_mode:
-            self.load_data()
+        self._setup_ui()
 
-    def setup_ui(self):
+        if self.is_edit:
+            self.load_bom_data()
+        else:
+            self._init_defaults()
+
+    def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Başlık
-        header_layout = QHBoxLayout()
+        # Header
+        title = "Reçete Düzenle" if self.is_edit else "Yeni Reçete"
+        self.header = PageHeader(
+            title=title, show_back=True, show_add=False, parent=self
+        )
+        self.header.back_clicked.connect(self.cancelled.emit)
 
-        back_btn = QPushButton("← Geri")
-        back_btn.clicked.connect(self.cancelled.emit)
-        header_layout.addWidget(back_btn)
-
-        title_text = "Reçete Düzenle" if self.is_edit_mode else "Yeni Ürün Reçetesi"
-        title = QLabel(f"📋 {title_text}")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-
+        # Kaydet Butonu
         save_btn = QPushButton("💾 Kaydet")
+        save_btn.setProperty("class", "btn-primary")
         save_btn.clicked.connect(self._on_save)
-        header_layout.addWidget(save_btn)
+        self.header.header_layout().addWidget(save_btn)
 
-        layout.addLayout(header_layout)
+        layout.addWidget(self.header)
 
-        # Tab Widget
-        tabs = QTabWidget()
-        tabs.addTab(self._create_general_tab(), "📝 Genel Bilgiler")
-        tabs.addTab(self._create_materials_tab(), "📦 Malzemeler")
-        tabs.addTab(self._create_by_products_tab(), "♻️ Yan Ürünler")
-        tabs.addTab(self._create_cost_tab(), "💰 Maliyet")
+        # Ana Tab Widget
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._create_general_tab(), "📋 Genel Bilgiler")
+        self.tabs.addTab(self._create_materials_tab(), "📦 Malzemeler")
+        self.tabs.addTab(self._create_operations_tab(), "⚙️ Operasyonlar")
+        self.tabs.addTab(self._create_cost_tab(), "💰 Maliyet Analizi")
 
-        layout.addWidget(tabs)
+        layout.addWidget(self.tabs)
 
     def _create_general_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
+        """Genel bilgiler ve başlık bilgileri"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
 
+        # Üst Bilgiler Formu
         form_frame = QFrame()
-        form_frame.setStyleSheet(
-            "QFrame { background-color: rgba(30, 41, 59, 0.3); border: 1px solid #334155; border-radius: 12px; }"
-        )
-        form_layout = QGridLayout(form_frame)
-        form_layout.setContentsMargins(20, 20, 20, 20)
-        form_layout.setSpacing(16)
+        form_layout = QHBoxLayout(form_frame)
 
-        # Reçete Kodu
-        form_layout.addWidget(QLabel("Reçete Kodu *"), 0, 0)
-        code_layout = QHBoxLayout()
+        # Sol Kolon
+        left_form = QFormLayout()
+
         self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("BOM000001")
-        code_layout.addWidget(self.code_input)
+        self.code_input.setPlaceholderText("BOM-0001")
+        left_form.addRow("Reçete Kodu *", self.code_input)
 
-        auto_btn = QPushButton("🔄")
-        auto_btn.setFixedSize(40, 40)
-        auto_btn.clicked.connect(self.code_requested.emit)
-        code_layout.addWidget(auto_btn)
-        form_layout.addLayout(code_layout, 0, 1)
-
-        # Reçete Adı
-        form_layout.addWidget(QLabel("Reçete Adı *"), 1, 0)
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Örn: PVC Film 500mm Standart")
-        form_layout.addWidget(self.name_input, 1, 1)
+        left_form.addRow("Reçete Adı *", self.name_input)
 
-        # Mamul
-        form_layout.addWidget(QLabel("Mamul *"), 2, 0)
-        self.product_combo = QComboBox()
-        self.product_combo.currentIndexChanged.connect(self._on_product_changed)
-        form_layout.addWidget(self.product_combo, 2, 1)
+        self.item_combo = QComboBox()  # Üretilen Ürün
+        left_form.addRow("Ürün *", self.item_combo)
 
-        # Temel Üretim Miktarı
-        form_layout.addWidget(QLabel("Temel Üretim Miktarı"), 3, 0)
-        qty_layout = QHBoxLayout()
+        self.status_combo = QComboBox()
+        for label, val in self.STATUS_OPTS:
+            self.status_combo.addItem(label, val)
+        left_form.addRow("Durum", self.status_combo)
+
+        self.type_combo = QComboBox()
+        for label, val in self.TYPE_OPTS:
+            self.type_combo.addItem(label, val)
+        left_form.addRow("Reçete Tipi", self.type_combo)
+
+        form_layout.addLayout(left_form)
+
+        # Sağ Kolon
+        right_form = QFormLayout()
+
         self.base_qty_input = QDoubleSpinBox()
-        self.base_qty_input.setRange(0.0001, 999999999)
-        self.base_qty_input.setDecimals(4)
-        self.base_qty_input.setValue(1)
-        self.base_qty_input.valueChanged.connect(self._refresh_materials_table)
-        qty_layout.addWidget(self.base_qty_input)
+        self.base_qty_input.setRange(0.0001, 999999)
+        self.base_qty_input.setValue(1.0)
+        right_form.addRow("Baz Miktar", self.base_qty_input)
 
         self.unit_combo = QComboBox()
-        self.unit_combo.setFixedWidth(100)
-        qty_layout.addWidget(self.unit_combo)
-        form_layout.addLayout(qty_layout, 3, 1)
+        right_form.addRow("Birim", self.unit_combo)
 
-        # Versiyon
-        form_layout.addWidget(QLabel("Versiyon"), 4, 0)
-        version_layout = QHBoxLayout()
-        self.version_input = QSpinBox()
-        self.version_input.setRange(1, 999)
-        self.version_input.setValue(1)
-        version_layout.addWidget(self.version_input)
-        version_layout.addWidget(QLabel("Rev:"))
+        self.version_input = QLineEdit("1")
+        self.version_input.setReadOnly(True)
+        right_form.addRow("Versiyon", self.version_input)
+
         self.revision_input = QLineEdit("A")
-        self.revision_input.setMaximumWidth(60)
-        version_layout.addWidget(self.revision_input)
-        version_layout.addStretch()
-        form_layout.addLayout(version_layout, 4, 1)
+        right_form.addRow("Revizyon", self.revision_input)
 
-        # Durum
-        form_layout.addWidget(QLabel("Durum"), 5, 0)
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("🟡 Taslak", "draft")
-        self.status_combo.addItem("✅ Aktif", "active")
-        form_layout.addWidget(self.status_combo, 5, 1)
+        form_layout.addLayout(right_form)
+        layout.addWidget(form_frame)
 
         # Açıklama
-        form_layout.addWidget(QLabel("Açıklama"), 6, 0)
-        self.description_input = QTextEdit()
-        self.description_input.setMaximumHeight(80)
-        form_layout.addWidget(self.description_input, 6, 1)
+        layout.addWidget(QLabel("Açıklama"))
+        self.desc_input = QTextEdit()
+        self.desc_input.setMaximumHeight(100)
+        layout.addWidget(self.desc_input)
 
-        layout.addWidget(form_frame)
         layout.addStretch()
-        return tab
+        return widget
 
     def _create_materials_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+        """Malzeme listesi (BOM Lines)"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
 
-        # Toolbar
+        # Araç çubuğu
         toolbar = QHBoxLayout()
+        add_line_btn = QPushButton("➕ Satır Ekle")
+        add_line_btn.clicked.connect(self._add_material_line)
 
-        add_btn = QPushButton("➕ Malzeme Ekle")
-        add_btn.clicked.connect(self._add_material)
-        toolbar.addWidget(add_btn)
+        remove_line_btn = QPushButton("🗑️ Satır Sil")
+        remove_line_btn.clicked.connect(self._remove_selected_material)
 
-        remove_btn = QPushButton("🗑 Seçileni Kaldır")
-        remove_btn.clicked.connect(self._remove_material)
-        toolbar.addWidget(remove_btn)
-        toolbar.addStretch()
-
-        self.total_label = QLabel("Toplam: 0 malzeme")
-        toolbar.addWidget(self.total_label)
-        layout.addLayout(toolbar)
-
-        # Tablo
-        self.materials_table = QTableWidget()
-        self._setup_materials_table()
-        layout.addWidget(self.materials_table)
-
-        return tab
-
-    def _setup_materials_table(self):
-        columns = [
-            ("Sıra", 50),
-            ("Malzeme Kodu", 120),
-            ("Malzeme Adı", 200),
-            ("Miktar", 100),
-            ("Birim", 80),
-            ("Yüzde Mi?", 70),
-            ("Fire %", 80),
-            ("Net Miktar", 100),
-            ("Birim Maliyet", 110),
-            ("Satır Maliyeti", 110),
-        ]
-
-        self.materials_table.setColumnCount(len(columns))
-        self.materials_table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.materials_table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 2:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.materials_table.setColumnWidth(i, width)
-
-        self.materials_table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.materials_table.verticalHeader().setVisible(False)
-
-    def _create_by_products_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        # Toolbar
-        toolbar = QHBoxLayout()
-
-        add_btn = QPushButton("➕ Yan Ürün Ekle")
-        add_btn.clicked.connect(self._add_by_product)
-        toolbar.addWidget(add_btn)
-
-        remove_btn = QPushButton("🗑 Seçileni Kaldır")
-        remove_btn.clicked.connect(self._remove_by_product)
-        toolbar.addWidget(remove_btn)
+        toolbar.addWidget(add_line_btn)
+        toolbar.addWidget(remove_line_btn)
         toolbar.addStretch()
 
         layout.addLayout(toolbar)
 
         # Tablo
-        self.by_products_table = QTableWidget()
-        self._setup_by_products_table()
-        layout.addWidget(self.by_products_table)
-
-        return tab
-
-    def _setup_by_products_table(self):
-        columns = [
-            ("Sıra", 50),
-            ("Malzeme Kodu", 120),
-            ("Malzeme Adı", 200),
-            ("Miktar", 100),
-            ("Birim", 80),
-            ("Maliyet Payı %", 100),
-            ("Notlar", 150),
-        ]
-
-        self.by_products_table.setColumnCount(len(columns))
-        self.by_products_table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.by_products_table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 2:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.by_products_table.setColumnWidth(i, width)
-
-        self.by_products_table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
+        self.lines_table = QTableWidget()
+        self.lines_table.setColumnCount(6)
+        self.lines_table.setHorizontalHeaderLabels(
+            [
+                "Malzeme (Item)",
+                "Miktar",
+                "Birim",
+                "Fire %",
+                "Birim Maliyet",
+                "Toplam Maliyet",
+            ]
         )
-        self.by_products_table.verticalHeader().setVisible(False)
 
-    def _add_by_product(self):
-        if not self.available_items:
-            show_toast("Malzeme listesi yüklenmedi!", "WARNING")
-            return
+        header = self.lines_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
 
-        dialog = MaterialSelectDialog(self.available_items, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            item = dialog.get_selected()
-            if item:
-                self.by_products.append(
-                    {
-                        "item_id": item["id"],
-                        "item_code": item["code"],
-                        "item_name": item["name"],
-                        "quantity": Decimal("1"),
-                        "unit_code": item["unit_code"],
-                        "unit_id": item.get("unit_id"),
-                        "cost_share_rate": Decimal("0"),
-                        "notes": "",
-                    }
-                )
-                self._refresh_by_products_table()
+        layout.addWidget(self.lines_table)
 
-    def _remove_by_product(self):
-        row = self.by_products_table.currentRow()
-        if 0 <= row < len(self.by_products):
-            self.by_products.pop(row)
-            self._refresh_by_products_table()
+        return widget
 
-    def _refresh_by_products_table(self):
-        self.by_products_table.setRowCount(len(self.by_products))
+    def _create_operations_tab(self) -> QWidget:
+        """Operasyon listesi (Routing)"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
 
-        for row, line in enumerate(self.by_products):
-            self.by_products_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+        # Araç çubuğu
+        toolbar = QHBoxLayout()
+        add_op_btn = QPushButton("➕ Operasyon Ekle")
+        add_op_btn.clicked.connect(self._add_operation_line)
 
-            code_item = QTableWidgetItem(line["item_code"])
-            code_item.setForeground(QColor("#818cf8"))
-            self.by_products_table.setItem(row, 1, code_item)
-            self.by_products_table.setItem(row, 2, QTableWidgetItem(line["item_name"]))
+        remove_op_btn = QPushButton("🗑️ Operasyon Sil")
+        remove_op_btn.clicked.connect(self._remove_selected_operation)
 
-            # Miktar
-            qty_spin = QDoubleSpinBox()
-            qty_spin.setRange(0.0001, 999999999)
-            qty_spin.setDecimals(4)
-            qty_spin.setValue(float(line["quantity"]))
-            qty_spin.valueChanged.connect(
-                lambda val, r=row: self._on_bp_qty_changed(r, val)
-            )
-            self.by_products_table.setCellWidget(row, 3, qty_spin)
+        toolbar.addWidget(add_op_btn)
+        toolbar.addWidget(remove_op_btn)
+        toolbar.addStretch()
 
-            self.by_products_table.setItem(row, 4, QTableWidgetItem(line["unit_code"]))
+        layout.addLayout(toolbar)
 
-            # Maliyet Payı
-            share_spin = QDoubleSpinBox()
-            share_spin.setRange(0, 100)
-            share_spin.setDecimals(2)
-            share_spin.setSuffix("%")
-            share_spin.setValue(float(line.get("cost_share_rate", 0)))
-            share_spin.valueChanged.connect(
-                lambda val, r=row: self._on_bp_share_changed(r, val)
-            )
-            self.by_products_table.setCellWidget(row, 5, share_spin)
+        # Tablo
+        self.ops_table = QTableWidget()
+        self.ops_table.setColumnCount(6)
+        self.ops_table.setHorizontalHeaderLabels(
+            [
+                "Operasyon Adı",
+                "İş İstasyonu",
+                "Kurulum (dk)",
+                "Birim Süre (dk)",
+                "Maliyet",
+                "Açıklama",
+            ]
+        )
 
-            # Notlar
-            note_edit = QLineEdit(line.get("notes", ""))
-            note_edit.textChanged.connect(
-                lambda val, r=row: self._on_bp_note_changed(r, val)
-            )
-            self.by_products_table.setCellWidget(row, 6, note_edit)
+        header = self.ops_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Ad
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # İstasyon
 
-    def _on_bp_qty_changed(self, row: int, value: float):
-        if 0 <= row < len(self.by_products):
-            self.by_products[row]["quantity"] = Decimal(str(value))
+        layout.addWidget(self.ops_table)
 
-    def _on_bp_share_changed(self, row: int, value: float):
-        if 0 <= row < len(self.by_products):
-            self.by_products[row]["cost_share_rate"] = Decimal(str(value))
+        # Bilgi notu
+        info_lbl = QLabel(
+            "ℹ️ Maliyet = (Kurulum/60 * Saatlik Ücret) + (Birim Süre/60 * Miktar * Saatlik Ücret) + Sabit Kurulum Maliyeti"
+        )
+        info_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
+        layout.addWidget(info_lbl)
 
-    def _on_bp_note_changed(self, row: int, value: str):
-        if 0 <= row < len(self.by_products):
-            self.by_products[row]["notes"] = value
+        return widget
 
     def _create_cost_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
+        """Maliyet özeti"""
+        widget = QWidget()
+        layout = QFormLayout(widget)
 
-        cost_frame = QFrame()
-        cost_frame.setStyleSheet(
-            "QFrame { background-color: rgba(30, 41, 59, 0.3); border: 1px solid #334155; border-radius: 12px; }"
+        self.total_material_cost_lbl = QLabel("₺0.00")
+        self.total_material_cost_lbl.setStyleSheet(
+            "font-weight: bold; font-size: 14px;"
         )
-        cost_layout = QGridLayout(cost_frame)
-        cost_layout.setContentsMargins(20, 20, 20, 20)
-        cost_layout.setSpacing(16)
+        layout.addRow("Toplam Malzeme Maliyeti:", self.total_material_cost_lbl)
 
-        cost_layout.addWidget(QLabel("Malzeme Maliyeti"), 0, 0)
-        self.material_cost_label = QLabel("₺0,00")
-        cost_layout.addWidget(self.material_cost_label, 0, 1)
-
-        cost_layout.addWidget(QLabel("İşçilik Maliyeti"), 1, 0)
         self.labor_cost_input = QDoubleSpinBox()
-        self.labor_cost_input.setRange(0, 999999999)
-        self.labor_cost_input.setDecimals(2)
+        self.labor_cost_input.setRange(0, 9999999)
         self.labor_cost_input.setPrefix("₺")
-        self.labor_cost_input.valueChanged.connect(self._update_total_cost)
-        cost_layout.addWidget(self.labor_cost_input, 1, 1)
+        layout.addRow("İşçilik/Operasyon Maliyeti:", self.labor_cost_input)
 
-        cost_layout.addWidget(QLabel("Genel Giderler"), 2, 0)
         self.overhead_cost_input = QDoubleSpinBox()
-        self.overhead_cost_input.setRange(0, 999999999)
-        self.overhead_cost_input.setDecimals(2)
+        self.overhead_cost_input.setRange(0, 9999999)
         self.overhead_cost_input.setPrefix("₺")
-        self.overhead_cost_input.valueChanged.connect(self._update_total_cost)
-        cost_layout.addWidget(self.overhead_cost_input, 2, 1)
+        layout.addRow("Genel Giderler:", self.overhead_cost_input)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        cost_layout.addWidget(separator, 3, 0, 1, 2)
+        self.total_cost_lbl = QLabel("₺0.00")
+        self.total_cost_lbl.setStyleSheet(
+            "font-weight: bold; font-size: 16px; color: #10b981;"
+        )
+        layout.addRow("TOPLAM MALİYET:", self.total_cost_lbl)
 
-        cost_layout.addWidget(QLabel("TOPLAM MALİYET"), 4, 0)
-        self.total_cost_label = QLabel("₺0,00")
-        cost_layout.addWidget(self.total_cost_label, 4, 1)
+        # Hesapla butonu
+        calc_btn = QPushButton("🔄 Maliyet Hesapla")
+        calc_btn.clicked.connect(self._calculate_totals)
+        layout.addRow("", calc_btn)
 
-        cost_layout.addWidget(QLabel("Birim Başı Maliyet"), 5, 0)
-        self.unit_cost_label = QLabel("₺0,00")
-        cost_layout.addWidget(self.unit_cost_label, 5, 1)
+        return widget
 
-        layout.addWidget(cost_frame)
-        layout.addStretch()
-        return tab
+    def _init_defaults(self):
+        """Varsayılan değerler"""
+        self.code_input.setText("")
 
-    def set_products(self, products: list):
-        self.available_products = products
-        self.product_combo.clear()
-        self.product_combo.addItem("Seçiniz...", None)
-        for p in products:
-            self.product_combo.addItem(f"{p.code} - {p.name}", p.id)
+    def load_data_sources(self, items: list, units: list, stations: list):
+        """Form için gerekli combo verilerini yükle"""
+        self.items_map = {i.id: i for i in items}
+        self.units_map = {u.id: u.code for u in units}
+        self.stations_map = {s.id: s for s in stations}
 
-    def set_items(self, items: list):
-        self.available_items = []
+        # Ürün Combo
+        self.item_combo.clear()
         for item in items:
-            self.available_items.append(
-                {
-                    "id": item.id,
-                    "code": item.code,
-                    "name": item.name,
-                    "unit_code": item.unit.code if item.unit else "ADET",
-                    "unit_id": item.unit_id,
-                    "purchase_price": float(item.purchase_price or 0),
-                    "total_stock": float(item.total_stock or 0),
-                    "currency_code": item.currency.code if item.currency else "TRY",
-                }
-            )
+            self.item_combo.addItem(f"{item.code} - {item.name}", item.id)
 
-    def set_units(self, units: list):
+        # Birim Combo
         self.unit_combo.clear()
-        for u in units:
-            self.unit_combo.addItem(u.code, u.id)
+        for unit in units:
+            self.unit_combo.addItem(f"{unit.code}", unit.id)
 
-    def set_generated_code(self, code: str):
-        self.code_input.setText(code)
-
-    def _add_material(self):
-        if not self.available_items:
-            show_toast("Malzeme listesi yüklenmedi!", "WARNING")
+    def load_bom_data(self):
+        """Mevcut BOM verisini forma yükle"""
+        if not self.bom:
             return
 
-        dialog = MaterialSelectDialog(self.available_items, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            item = dialog.get_selected()
-            if item:
-                self.lines.append(
-                    {
-                        "item_id": item["id"],
-                        "item_code": item["code"],
-                        "item_name": item["name"],
-                        "quantity": Decimal("1"),
-                        "unit_code": item["unit_code"],
-                        "unit_id": item.get("unit_id"),
-                        "is_percentage": False,
-                        "scrap_rate": Decimal("0"),
-                        "unit_cost": Decimal(str(item["purchase_price"])),
-                    }
-                )
-                self._refresh_materials_table()
+        self.code_input.setText(self.bom.code)
+        self.name_input.setText(self.bom.name)
+        self.desc_input.setText(self.bom.description)
+        self.base_qty_input.setValue(float(self.bom.base_quantity))
+        self.version_input.setText(str(self.bom.version))
+        self.revision_input.setText(self.bom.revision)
 
-    def _remove_material(self):
-        row = self.materials_table.currentRow()
-        if 0 <= row < len(self.lines):
-            self.lines.pop(row)
-            self._refresh_materials_table()
+        # Comboları set et
+        idx = self.item_combo.findData(self.bom.item_id)
+        if idx >= 0:
+            self.item_combo.setCurrentIndex(idx)
 
-    def _refresh_materials_table(self):
-        self.materials_table.setRowCount(len(self.lines))
-        total_cost = Decimal(0)
+        idx = self.unit_combo.findData(self.bom.unit_id)
+        if idx >= 0:
+            self.unit_combo.setCurrentIndex(idx)
 
-        for row, line in enumerate(self.lines):
-            self.materials_table.setRowHeight(row, 50)  # Satır yüksekliği artırıldı
-            self.materials_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+        # Status
+        for i in range(self.status_combo.count()):
+            if self.status_combo.itemData(i) == self.bom.status:
+                self.status_combo.setCurrentIndex(i)
+                break
 
-            code_item = QTableWidgetItem(line["item_code"])
-            code_item.setForeground(QColor("#818cf8"))
-            self.materials_table.setItem(row, 1, code_item)
-            self.materials_table.setItem(row, 2, QTableWidgetItem(line["item_name"]))
-
-            qty_spin = AutoSelectSpinBox()
-            qty_spin.setRange(0.0001, 999999999)
-            qty_spin.setDecimals(4)
-            qty_spin.setMinimumWidth(100)
-            qty_spin.setMinimumHeight(50)  # Satır yüksekliği ile aynı
-            qty_spin.setFrame(False)  # Çerçeveyi kaldır
-            qty_spin.setValue(float(line["quantity"]))
-            qty_spin.valueChanged.connect(
-                lambda val, r=row: self._on_qty_changed(r, val)
-            )
-            self.materials_table.setCellWidget(row, 3, qty_spin)
-
-            # Stil: Şeffaf ve tam oturan
-            # Stil: Şeffaf ve tam oturan, butonları gizle
-            qty_spin.setStyleSheet(
-                """
-                QDoubleSpinBox { background: transparent; border: none; font-size: 14px; selection-background-color: #4f46e5; }
-                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0px; border: none; background: transparent; }
-            """
-            )
-
-            self.materials_table.setItem(row, 4, QTableWidgetItem(line["unit_code"]))
-
-            # Yüzde Mi Checkbox
-            chk_widget = QWidget()
-            chk_layout = QHBoxLayout(chk_widget)
-            chk_layout.setContentsMargins(0, 0, 0, 0)
-            chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            chk_percentage = QCheckBox()
-            chk_percentage.setChecked(line.get("is_percentage", False))
-            chk_percentage.stateChanged.connect(
-                lambda state, r=row: self._on_type_changed(r, state)
-            )
-            chk_layout.addWidget(chk_percentage)
-            self.materials_table.setCellWidget(row, 5, chk_widget)
-
-            scrap_spin = AutoSelectSpinBox()
-            scrap_spin.setRange(0, 100)
-            scrap_spin.setDecimals(2)
-            scrap_spin.setSuffix("%")
-            scrap_spin.setMinimumWidth(80)
-            scrap_spin.setMinimumHeight(50)  # Satır yüksekliği ile aynı
-            scrap_spin.setFrame(False)  # Çerçeveyi kaldır
-            scrap_spin.setValue(float(line.get("scrap_rate", 0)))
-            scrap_spin.setStyleSheet(
-                """
-                QDoubleSpinBox { background: transparent; border: none; font-size: 14px; selection-background-color: #4f46e5; }
-                QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0px; border: none; background: transparent; }
-            """
-            )
-            scrap_spin.valueChanged.connect(
-                lambda val, r=row: self._on_scrap_changed(r, val)
-            )
-            self.materials_table.setCellWidget(row, 6, scrap_spin)
-
-            qty = line["quantity"]
-            scrap = line.get("scrap_rate", Decimal(0))
-            is_percentage = line.get("is_percentage", False)
-            base_qty = Decimal(str(self.base_qty_input.value()))
-
-            if is_percentage:
-                # Yüzde hesaplama: (Ana Ürün Ağırlığı * Yüzde / 100) * Temel Miktar
-                percentage = qty
-                if self.parent_net_weight > 0:
-                    calculated_qty = (
-                        self.parent_net_weight * percentage / Decimal("100")
-                    ) * base_qty
-                    # Fire eklenmiş hali (Üretim için gerekli miktar)
-                    gross_qty = calculated_qty * (Decimal("1") + scrap / Decimal("100"))
-
-                    net_qty = gross_qty
-                    net_qty_item = QTableWidgetItem(f"{gross_qty:,.4f} KG")
-                    net_qty_item.setToolTip(
-                        f"%{percentage:,.2f} (Baz: {self.parent_net_weight} KG)"
-                    )
-                else:
-                    net_qty = Decimal(0)
-                    net_qty_item = QTableWidgetItem("Ağırlık Yok!")
-                    net_qty_item.setToolTip("Mamul kartında net ağırlık girilmemiş.")
-
-                net_qty_item.setText(f"%{percentage:,.2f} -> {net_qty:,.3f}")
-                net_qty_item.setForeground(QColor("#a855f7"))
-            else:
-                # Standart miktar
-                net_qty = qty * (Decimal("1") + scrap / Decimal("100")) * base_qty
-                net_qty_item = QTableWidgetItem(f"{net_qty:,.4f}")
-                net_qty_item.setForeground(QColor("#a855f7"))  # Mor renk
-
-            self.materials_table.setItem(row, 7, net_qty_item)
-
-            unit_cost = line.get("unit_cost", Decimal(0))
-            self.materials_table.setItem(row, 8, QTableWidgetItem(f"₺{unit_cost:,.2f}"))
-
-            line_cost = net_qty * unit_cost
-
-            line["line_cost"] = line_cost
-            total_cost += line_cost
-            line_cost_item = QTableWidgetItem(f"₺{line_cost:,.2f}")
-            line_cost_item.setForeground(QColor("#10b981"))
-            self.materials_table.setItem(row, 9, line_cost_item)
-
-        self.total_label.setText(f"Toplam: {len(self.lines)} malzeme")
-        self.material_cost_label.setText(f"₺{total_cost:,.2f}")
-        self._update_total_cost()
-
-    def _on_type_changed(self, row: int, state: int):
-        if 0 <= row < len(self.lines):
-            self.lines[row]["is_percentage"] = state == 2  # 2 = Checked
-            self._update_row_calculations(row)
-
-    def _on_qty_changed(self, row: int, value: float):
-        if 0 <= row < len(self.lines):
-            self.lines[row]["quantity"] = Decimal(str(value))
-            self._update_row_calculations(row)
-
-    def _on_scrap_changed(self, row: int, value: float):
-        if 0 <= row < len(self.lines):
-            self.lines[row]["scrap_rate"] = Decimal(str(value))
-            self._update_row_calculations(row)
-
-    def _update_row_calculations(self, row: int):
-        if not (0 <= row < len(self.lines)):
-            return
-
-        line = self.lines[row]
-        qty = line["quantity"]
-        scrap = line.get("scrap_rate", Decimal(0))
-        is_percentage = line.get("is_percentage", False)
-        base_qty = Decimal(str(self.base_qty_input.value()))
-        unit_cost = line.get("unit_cost", Decimal(0))
-
-        if is_percentage:
-            percentage = qty
-            if self.parent_net_weight > 0:
-                calculated_qty = (
-                    self.parent_net_weight * percentage / Decimal("100")
-                ) * base_qty
-                gross_qty = calculated_qty * (Decimal("1") + scrap / Decimal("100"))
-                net_qty = gross_qty
-                net_qty_text = f"%{percentage:,.2f} -> {gross_qty:,.3f}"
-                tooltip = f"%{percentage:,.2f} (Baz: {self.parent_net_weight} KG)"
-            else:
-                net_qty = Decimal(0)
-                net_qty_text = "Ağırlık Yok!"
-                tooltip = "Mamul kartında net ağırlık girilmemiş."
-
-            item = self.materials_table.item(row, 7)
-            if item:
-                item.setText(net_qty_text)
-                item.setToolTip(tooltip)
-                item.setForeground(QColor("#a855f7"))
-        else:
-            net_qty = qty * (Decimal("1") + scrap / Decimal("100")) * base_qty
-            item = self.materials_table.item(row, 7)
-            if item:
-                item.setText(f"{net_qty:,.4f}")
-                item.setToolTip("")
-                item.setForeground(QColor("#a855f7"))
-
-        line_cost = net_qty * unit_cost
-        line["line_cost"] = line_cost
-
-        cost_item = self.materials_table.item(row, 9)
-        if cost_item:
-            cost_item.setText(f"₺{line_cost:,.2f}")
-
-        self._update_total_cost()
-
-    def _update_total_cost(self):
-        material_cost = sum(line.get("line_cost", Decimal(0)) for line in self.lines)
-        labor_cost = Decimal(str(self.labor_cost_input.value()))
-        overhead_cost = Decimal(str(self.overhead_cost_input.value()))
-        total = material_cost + labor_cost + overhead_cost
-        self.total_cost_label.setText(f"₺{total:,.2f}")
-
-        base_qty = Decimal(str(self.base_qty_input.value()))
-        if base_qty > 0:
-            self.unit_cost_label.setText(f"₺{total / base_qty:,.2f}")
-
-    def _on_product_changed(self, index: int):
-        product_id = self.product_combo.currentData()
-        self.parent_net_weight = Decimal(0)
-
-        if product_id and self.available_products:
-            for p in self.available_products:
-                if p.id == product_id:
-                    # Decimal conversion handling
-                    weight = getattr(p, "net_weight", 0)
-                    self.parent_net_weight = Decimal(str(weight if weight else 0))
+        # Type
+        if hasattr(self.bom, "bom_type"):
+            for i in range(self.type_combo.count()):
+                if self.type_combo.itemData(i) == self.bom.bom_type:
+                    self.type_combo.setCurrentIndex(i)
                     break
 
-        self._refresh_materials_table()
+        # Maliyetler
+        self.labor_cost_input.setValue(float(self.bom.labor_cost or 0))
+        self.overhead_cost_input.setValue(float(self.bom.overhead_cost or 0))
 
-    def load_data(self):
-        if not self.bom_data:
-            return
-        self.code_input.setText(self.bom_data.get("code", ""))
-        self.name_input.setText(self.bom_data.get("name", ""))
-        self.description_input.setPlainText(self.bom_data.get("description", ""))
-        self.base_qty_input.setValue(float(self.bom_data.get("base_quantity", 1)))
-        self.version_input.setValue(self.bom_data.get("version", 1))
-        self.revision_input.setText(self.bom_data.get("revision", "A"))
-        self.lines = self.bom_data.get("lines", [])
-        self._refresh_materials_table()
+        # Satırları yükle
+        self.lines_table.setRowCount(0)
+        for line in self.bom.lines:
+            self._add_material_line(line)
 
-        self.by_products = self.bom_data.get("by_products", [])
-        self._refresh_by_products_table()
+        # Operasyonları yükle
+        self.ops_table.setRowCount(0)
+        if self.bom.operations:
+            # operation_no sırasına göre
+            sorted_ops = sorted(self.bom.operations, key=lambda x: x.operation_no)
+            for op in sorted_ops:
+                self._add_operation_line(op)
 
-        self.labor_cost_input.setValue(float(self.bom_data.get("labor_cost", 0)))
-        self.overhead_cost_input.setValue(float(self.bom_data.get("overhead_cost", 0)))
+        self._calculate_totals()
+
+    def _add_material_line(self, line_data=None):
+        """Tabloya yeni malzeme satırı ekle"""
+        row = self.lines_table.rowCount()
+        self.lines_table.insertRow(row)
+
+        # Malzeme Seçimi (Combo)
+        combo = QComboBox()
+        for item_id, item in self.items_map.items():
+            combo.addItem(f"{item.code} - {item.name}", item_id)
+
+        if line_data:
+            idx = combo.findData(line_data.item_id)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+
+        self.lines_table.setCellWidget(row, 0, combo)
+
+        # Miktar
+        qty_spin = QDoubleSpinBox()
+        qty_spin.setRange(0, 999999)
+        qty_spin.setValue(float(line_data.quantity) if line_data else 1.0)
+        self.lines_table.setCellWidget(row, 1, qty_spin)
+
+        # Birim (Combo)
+        unit_combo = QComboBox()
+        for u_id, u_code in self.units_map.items():
+            unit_combo.addItem(u_code, u_id)
+
+        if line_data:
+            idx = unit_combo.findData(line_data.unit_id)
+            if idx >= 0:
+                unit_combo.setCurrentIndex(idx)
+
+        self.lines_table.setCellWidget(row, 2, unit_combo)
+
+        # Fire
+        scrap_spin = QDoubleSpinBox()
+        scrap_spin.setRange(0, 100)
+        scrap_spin.setValue(float(line_data.scrap_rate) if line_data else 0.0)
+        self.lines_table.setCellWidget(row, 3, scrap_spin)
+
+        # Birim Maliyet (Readonly - Item'dan gelecek)
+        cost_item = QTableWidgetItem()
+        cost_val = float(line_data.unit_cost) if line_data else 0.0
+        cost_item.setText(f"{cost_val:.2f}")
+        cost_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Readonly
+        self.lines_table.setItem(row, 4, cost_item)
+
+        # Toplam Maliyet (Hesaplanan)
+        total_item = QTableWidgetItem("0.00")
+        total_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        self.lines_table.setItem(row, 5, total_item)
+
+    def _add_operation_line(self, op_data=None):
+        """Tabloya yeni operasyon satırı ekle"""
+        row = self.ops_table.rowCount()
+        self.ops_table.insertRow(row)
+
+        # Operasyon Adı
+        name_input = QLineEdit()
+        name_input.setText(op_data.name if op_data else "")
+        name_input.setPlaceholderText("Örn: Kesim, Montaj")
+        self.ops_table.setCellWidget(row, 0, name_input)
+
+        # İstasyon Seçimi
+        combo = QComboBox()
+        combo.addItem("Seçiniz...", None)
+        for s_id, station in self.stations_map.items():
+            combo.addItem(f"{station.code} - {station.name}", s_id)
+
+        if op_data and op_data.work_station_id:
+            idx = combo.findData(op_data.work_station_id)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+
+        self.ops_table.setCellWidget(row, 1, combo)
+
+        # Süreler
+        setup_spin = QSpinBox()  # Dakika
+        setup_spin.setRange(0, 9999)
+        setup_spin.setValue(int(op_data.setup_time) if op_data else 0)
+        self.ops_table.setCellWidget(row, 2, setup_spin)
+
+        run_spin = QDoubleSpinBox()  # Dakika/Birim
+        run_spin.setRange(0, 9999)
+        run_spin.setValue(float(op_data.run_time) if op_data else 0)
+        self.ops_table.setCellWidget(row, 3, run_spin)
+
+        # Maliyet (Hesaplanan - Gösterimlik)
+        cost_item = QTableWidgetItem("0.00")
+        cost_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        self.ops_table.setItem(row, 4, cost_item)
+
+        # Açıklama
+        desc_input = QLineEdit()
+        desc_input.setText(op_data.description if op_data else "")
+        self.ops_table.setCellWidget(row, 5, desc_input)
+
+    def _remove_selected_material(self):
+        """Seçili malzeme satırını sil"""
+        current_row = self.lines_table.currentRow()
+        if current_row >= 0:
+            self.lines_table.removeRow(current_row)
+
+    def _remove_selected_operation(self):
+        """Seçili operasyon satırını sil"""
+        current_row = self.ops_table.currentRow()
+        if current_row >= 0:
+            self.ops_table.removeRow(current_row)
+
+    def _calculate_totals(self):
+        """Tüm maliyetleri hesapla"""
+        bom_qty = self.base_qty_input.value()
+
+        # --- Malzeme Maliyeti ---
+        total_mat_cost = 0.0
+        for row in range(self.lines_table.rowCount()):
+            item_combo = self.lines_table.cellWidget(row, 0)
+            item_id = item_combo.currentData()
+            item = self.items_map.get(item_id)
+
+            qty_spin = self.lines_table.cellWidget(row, 1)
+            qty = qty_spin.value()
+
+            scrap_spin = self.lines_table.cellWidget(row, 3)
+            scrap = scrap_spin.value()
+
+            unit_cost = float(item.purchase_price or 0) if item else 0.0
+            self.lines_table.item(row, 4).setText(f"{unit_cost:.2f}")
+
+            line_cost = qty * (1 + scrap / 100) * unit_cost
+            self.lines_table.item(row, 5).setText(f"{line_cost:.2f}")
+            total_mat_cost += line_cost
+
+        self.total_material_cost_lbl.setText(f"₺{total_mat_cost:,.2f}")
+
+        # --- Operasyon (İşçilik) Maliyeti ---
+        total_op_cost = 0.0
+        for row in range(self.ops_table.rowCount()):
+            # İstasyon verilerini al
+            station_combo = self.ops_table.cellWidget(row, 1)
+            station_id = station_combo.currentData()
+            station = self.stations_map.get(station_id)
+
+            setup_min = self.ops_table.cellWidget(row, 2).value()
+            run_min = self.ops_table.cellWidget(row, 3).value()
+
+            op_cost = 0.0
+            if station:
+                hourly_rate = float(station.hourly_rate or 0)
+                setup_cost_fixed = float(station.setup_cost or 0)
+
+                # Maliyet = (Kurulum Süresi / 60 * Saatlik Ücret) + Sabit Kurulum + (Birim Süre * BOM Miktarı / 60 * Saatlik Ücret)
+                # Not: Genelde BOM Miktarı için hesaplanır. BOM 1 adet ise 1 birim için.
+
+                setup_part = (setup_min / 60.0) * hourly_rate
+                run_part = (run_min / 60.0) * bom_qty * hourly_rate
+
+                op_cost = setup_part + setup_cost_fixed + run_part
+
+            self.ops_table.item(row, 4).setText(f"{op_cost:.2f}")
+            total_op_cost += op_cost
+
+        # İşçilik maliyetini güncelle
+        self.labor_cost_input.setValue(total_op_cost)
+
+        # --- Toplam ---
+        overhead = self.overhead_cost_input.value()
+        grand_total = total_mat_cost + total_op_cost + overhead
+        self.total_cost_lbl.setText(f"₺{grand_total:,.2f}")
 
     def _on_save(self):
-        code = self.code_input.text().strip()
-        name = self.name_input.text().strip()
-
-        if not code:
+        """Kaydet"""
+        if not self.code_input.text():
             show_toast("Reçete kodu zorunludur!", "WARNING")
             return
-        if not name:
-            show_toast("Reçete adı zorunludur!", "WARNING")
-            return
-        product_id = self.product_combo.currentData()
-        if not product_id:
-            show_toast("Mamul seçimi zorunludur!", "WARNING")
-            return
-        if not self.lines:
-            show_toast("En az bir malzeme eklemelisiniz!", "WARNING")
-            return
 
+        # Genel veriler
         data = {
-            "code": code,
-            "name": name,
-            "description": self.description_input.toPlainText().strip(),
-            "item_id": product_id,
+            "code": self.code_input.text(),
+            "name": self.name_input.text(),
+            "description": self.desc_input.toPlainText(),
+            "item_id": self.item_combo.currentData(),
+            "status": self.status_combo.currentData(),
+            "bom_type": self.type_combo.currentData(),
             "base_quantity": Decimal(str(self.base_qty_input.value())),
             "unit_id": self.unit_combo.currentData(),
-            "version": self.version_input.value(),
-            "revision": self.revision_input.text().strip() or "A",
-            "status": self.status_combo.currentData(),
+            "revision": self.revision_input.text(),
             "labor_cost": Decimal(str(self.labor_cost_input.value())),
             "overhead_cost": Decimal(str(self.overhead_cost_input.value())),
-            "lines": [
-                {
-                    "item_id": line_item["item_id"],
-                    "quantity": line_item["quantity"],
-                    "unit_id": line_item.get("unit_id"),
-                    "is_percentage": line_item.get("is_percentage", False),
-                    "scrap_rate": line_item.get("scrap_rate", Decimal(0)),
-                    "unit_cost": line_item.get("unit_cost", Decimal(0)),
-                    "line_cost": line_item.get("line_cost", Decimal(0)),
-                }
-                for line_item in self.lines
-            ],
-            "by_products": [
-                {
-                    "item_id": b["item_id"],
-                    "quantity": b["quantity"],
-                    "unit_id": b.get("unit_id"),
-                    "cost_share_rate": b.get("cost_share_rate", Decimal(0)),
-                    "notes": b.get("notes", ""),
-                }
-                for b in self.by_products
-            ],
+            "lines": [],
+            "operations": [],
         }
-        if self.is_edit_mode and self.bom_data:
-            data["id"] = self.bom_data.get("id")
+
+        # Satırlar
+        for row in range(self.lines_table.rowCount()):
+            line = {
+                "item_id": self.lines_table.cellWidget(row, 0).currentData(),
+                "quantity": Decimal(str(self.lines_table.cellWidget(row, 1).value())),
+                "unit_id": self.lines_table.cellWidget(row, 2).currentData(),
+                "scrap_rate": Decimal(str(self.lines_table.cellWidget(row, 3).value())),
+                "unit_cost": Decimal(self.lines_table.item(row, 4).text()),
+                "line_cost": Decimal(self.lines_table.item(row, 5).text()),
+            }
+            data["lines"].append(line)
+
+        # Operasyonlar
+        for row in range(self.ops_table.rowCount()):
+            op = {
+                "operation_no": (row + 1) * 10,
+                "name": self.ops_table.cellWidget(row, 0).text(),
+                "work_station_id": self.ops_table.cellWidget(row, 1).currentData(),
+                "setup_time": int(self.ops_table.cellWidget(row, 2).value()),
+                "run_time": int(self.ops_table.cellWidget(row, 3).value()),
+                "description": self.ops_table.cellWidget(row, 5).text(),
+            }
+            data["operations"].append(op)
+
         self.saved.emit(data)

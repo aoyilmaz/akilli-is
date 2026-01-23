@@ -1,0 +1,1950 @@
+
+AKILLI İŞ ERP
+Üretim ve Planlama Modülleri
+Kapsamlı Geliştirme Yol Haritası
+
+Mevcut Durum Analizi • Ekran Karşılaştırması • PyQt6 UI Yapısı • Uygulama Planı
+
+Versiyon 2.0 - Güncellenmiş Rapor
+Ocak 2026
+
+İÇİNDEKİLER
+
+BÖLÜM 1: Mevcut Durum Analizi
+    1.1 GitHub Repository Yapısı
+    1.2 Mevcut Modüller ve Teknoloji Stack
+
+BÖLÜM 2: Ekran Karşılaştırma Analizi
+    2.1 Master Data Yönetim Ekranları
+    2.2 Planlama Ekranları
+    2.3 Üretim Yürütme Ekranları
+    2.4 İzleme ve Raporlama Ekranları
+    2.5 Proses Üretimi Ekranları
+
+BÖLÜM 3: PyQt6 UI Yapıları
+    3.1 Temel Pencere Mimarisi
+    3.2 BOM Yönetim Ekranı
+    3.3 MRP Çalıştırma Ekranı
+    3.4 Üretim Emri Detay Ekranı
+    3.5 Shop Floor Terminal Ekranı
+    3.6 Gantt Chart Ekranı
+
+BÖLÜM 4: Veritabanı Şeması
+
+BÖLÜM 5: Geliştirme Yol Haritası
+    5.1 Faz 1: Temel Altyapı (3-4 Ay)
+    5.2 Faz 2: Profesyonel Özellikler (3-4 Ay)
+    5.3 Faz 3: İleri Düzey Özellikler (3-4 Ay)
+
+BÖLÜM 1: MEVCUT DURUM ANALİZİ
+1.1 GitHub Repository Yapısı
+Akıllı İş ERP projesinin GitHub repository'si (github.com/aoyilmaz/akilli-is) incelendiğinde aşağıdaki klasör yapısı tespit edilmiştir:
+Klasör/Dosya
+Açıklama
+Durum
+config/
+Uygulama konfigürasyon dosyaları
+Mevcut
+database/
+Veritabanı şema ve script'leri
+Mevcut
+modules/inventory/
+Stok/Envanter modülü
+Mevcut
+modules/production/
+Üretim modülü
+Eklenmeli
+modules/planning/
+Planlama modülü
+Eklenmeli
+scripts/
+Yardımcı script'ler
+Mevcut
+ui/
+Kullanıcı arayüzü dosyaları
+Mevcut
+main.py
+Ana uygulama giriş noktası
+Mevcut
+requirements.txt
+Python bağımlılıkları
+Mevcut
+1.2 Mevcut Teknoloji Stack
+Projenin %96.3 Python, %3.7 Shell script'lerinden oluştuğu tespit edilmiştir. Tahmin edilen teknoloji stack'i:
+Katman
+Teknoloji
+Versiyon
+GUI Framework
+PyQt6
+6.x
+Veritabanı
+SQLite
+3.x
+Programlama Dili
+Python
+3.10+
+İşletim Sistemi
+macOS / Linux / Windows
+Cross-platform
+⚠ ÖNEMLİ: Repository'de production/ ve planning/ modülleri henüz bulunmamaktadır. Bu modüllerin sıfırdan oluşturulması gerekmektedir.
+
+BÖLÜM 2: EKRAN KARŞILAŞTIRMA ANALİZİ
+Aşağıdaki tablolarda profesyonel ERP sistemlerinde (SAP, Oracle, Dynamics 365, Canias) bulunan ekranlar ile Akıllı İş ERP'nin mevcut durumu karşılaştırılmaktadır. Durum sütununda VAR (yeşil), KISMİ (turuncu) ve YOK (kırmızı) renkleri kullanılmıştır.
+2.1 Master Data Yönetim Ekranları
+Ekran Adı
+Durum
+Öncelik
+Açıklama
+Malzeme Master (Temel)
+KISMİ
+Yüksek
+Mevcut, MRP parametreleri sekmesi eklenmeli
+Malzeme Master - MRP Sekmesi
+YOK
+Yüksek
+Lot sizing, emniyet stoğu, lead time
+BOM (Ürün Ağacı) Yönetimi
+YOK
+Kritik
+Çok seviyeli BOM, phantom BOM desteği
+İş Merkezi Tanımları
+YOK
+Kritik
+Kapasite, maliyet oranları, takvim
+Rota (Routing) Yönetimi
+YOK
+Kritik
+Operasyonlar, süre hesaplamaları
+Formül/Reçete (Proses)
+YOK
+Orta
+Batch üretimi için girdi/çıktı tanımları
+Üretim Takvimi
+YOK
+Yüksek
+Çalışma günleri, vardiyalar, tatiller
+
+2.2 Planlama Ekranları
+Ekran Adı
+Durum
+Öncelik
+Açıklama
+MRP Çalıştırma Ekranı
+YOK
+Kritik
+MRP parametreleri, çalıştırma, sonuç özeti
+Planlı Sipariş Listesi
+YOK
+Kritik
+MRP çıktıları, dönüştürme işlemleri
+MRP Exception Ekranı
+YOK
+Yüksek
+Planlama sorunları, uyarılar
+Kapasite Yük Grafiği
+YOK
+Yüksek
+İş merkezi bazlı kapasite görselleştirme
+Gantt Chart Çizelgeleme
+YOK
+Yüksek
+İnteraktif üretim çizelgesi
+Talep Tahmini Ekranı
+YOK
+Düşük
+Forecast yönetimi
+
+2.3 Üretim Yürütme Ekranları
+Ekran Adı
+Durum
+Öncelik
+Açıklama
+Üretim Emri Listesi
+YOK
+Kritik
+Tüm emirlerin listesi, filtreleme, toplu işlem
+Üretim Emri Detay
+YOK
+Kritik
+Header, bileşenler, operasyonlar, maliyet
+Shop Floor Terminal
+YOK
+Kritik
+Operatör arayüzü, touch-friendly
+Üretim Onay Ekranı
+YOK
+Kritik
+Miktar, süre, fire girişi
+Malzeme Çıkış Ekranı
+YOK
+Yüksek
+Üretim emrine malzeme çıkışı
+İade/Hurda Ekranı
+YOK
+Orta
+Kullanılmayan malzeme iadesi
+
+2.4 İzleme ve Raporlama Ekranları
+Ekran Adı
+Durum
+Öncelik
+Açıklama
+Üretim Dashboard
+YOK
+Yüksek
+Günlük özet, KPI widget'ları
+WIP Raporu
+YOK
+Yüksek
+Devam eden işler, yarı mamuller
+Maliyet Analizi Ekranı
+YOK
+Orta
+Standart vs fiili, variance analizi
+OEE Monitör
+YOK
+Orta
+Makine verimliliği izleme
+Üretim Performans Raporları
+YOK
+Orta
+Verimlilik, fire, zamanında teslim
+
+2.5 Proses Üretimi ve Kalite Ekranları
+Ekran Adı
+Durum
+Öncelik
+Açıklama
+Batch (Parti) Kayıt Ekranı
+YOK
+Orta
+Parti numarası, son kullanma tarihi
+Batch Genealogy
+YOK
+Orta
+İleri/geri izlenebilirlik
+Kalite Kontrol Noktası
+YOK
+Düşük
+Kontrol karakteristikleri tanımı
+Muayene Emri Ekranı
+YOK
+Düşük
+Ölçüm sonuçları, pass/fail
+
+2.6 Genel Özet
+Kategori
+Toplam Ekran
+Mevcut
+Kısmi
+Eksik
+Master Data
+7
+0
+1
+6
+Planlama
+6
+0
+0
+6
+Üretim Yürütme
+6
+0
+0
+6
+İzleme/Raporlama
+5
+0
+0
+5
+Proses/Kalite
+4
+0
+0
+4
+TOPLAM
+28
+0
+1
+27
+📊 Sonuç: Profesyonel üretim planlama için 28 ekrandan 27'si sıfırdan geliştirilmeli, 1 tanesi genişletilmelidir.
+
+BÖLÜM 3: PYQT6 UI YAPILARI
+Bu bölümde kritik ekranlar için PyQt6 temel kod yapıları sunulmaktadır. Her ekran için sınıf yapısı, ana bileşenler ve temel fonksiyonlar verilmiştir.
+3.1 Temel Pencere Mimarisi (Base Classes)
+# base_window.py - Tüm ekranların miras alacağı temel sınıf
+ 
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                              QToolBar, QStatusBar, QMessageBox, QTableWidget,
+                              QTableWidgetItem, QHeaderView, QPushButton, QLabel,
+                              QLineEdit, QComboBox, QDateEdit, QSpinBox, QDoubleSpinBox,
+                              QGroupBox, QFormLayout, QSplitter, QTreeWidget, QTreeWidgetItem,
+                              QTabWidget, QProgressBar, QDialog)
+from PyQt6.QtCore import Qt, QDate, pyqtSignal, QThread
+from PyQt6.QtGui import QAction, QIcon, QFont
+import sqlite3
+from datetime import datetime
+ 
+ 
+class BaseWindow(QMainWindow):
+    """Tüm modül pencerelerinin temel sınıfı"""
+    
+    def __init__(self, db_path: str, title: str = "Akıllı İş ERP"):
+        super().__init__()
+        self.db_path = db_path
+        self.setWindowTitle(title)
+        self.setMinimumSize(1200, 800)
+        
+        # Ana widget ve layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        
+        # Toolbar ve Statusbar
+        self.setup_toolbar()
+        self.setup_statusbar()
+        
+    def setup_toolbar(self):
+        """Standart toolbar oluştur"""
+        self.toolbar = QToolBar("Ana Araç Çubuğu")
+        self.addToolBar(self.toolbar)
+        
+        # Standart aksiyonlar
+        self.action_new = QAction("Yeni", self)
+        self.action_save = QAction("Kaydet", self)
+        self.action_delete = QAction("Sil", self)
+        self.action_refresh = QAction("Yenile", self)
+        self.action_export = QAction("Dışa Aktar", self)
+        
+        self.toolbar.addAction(self.action_new)
+        self.toolbar.addAction(self.action_save)
+        self.toolbar.addAction(self.action_delete)
+        self.toolbar.addSeparator()
+        self.toolbar.addAction(self.action_refresh)
+        self.toolbar.addAction(self.action_export)
+        
+    def setup_statusbar(self):
+        """Status bar oluştur"""
+        self.statusbar = QStatusBar()
+        self.setStatusBar(self.statusbar)
+        self.statusbar.showMessage("Hazır")
+        
+    def get_db_connection(self):
+        """Veritabanı bağlantısı al"""
+        return sqlite3.connect(self.db_path)
+    
+    def show_error(self, message: str):
+        """Hata mesajı göster"""
+        QMessageBox.critical(self, "Hata", message)
+        
+    def show_info(self, message: str):
+        """Bilgi mesajı göster"""
+        QMessageBox.information(self, "Bilgi", message)
+        
+    def confirm_action(self, message: str) -> bool:
+        """Onay iste"""
+        reply = QMessageBox.question(self, "Onay", message,
+                                     QMessageBox.StandardButton.Yes | 
+                                     QMessageBox.StandardButton.No)
+        return reply == QMessageBox.StandardButton.Yes
+ 
+ 
+class BaseListWindow(BaseWindow):
+    """Liste görünümlü pencereler için temel sınıf"""
+    
+    def __init__(self, db_path: str, title: str):
+        super().__init__(db_path, title)
+        
+        # Filtre alanı
+        self.filter_layout = QHBoxLayout()
+        self.main_layout.addLayout(self.filter_layout)
+        
+        # Ana tablo
+        self.table = QTableWidget()
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.main_layout.addWidget(self.table)
+        
+    def setup_table_columns(self, columns: list):
+        """Tablo sütunlarını ayarla"""
+        self.table.setColumnCount(len(columns))
+        self.table.setHorizontalHeaderLabels(columns)
+        
+    def add_filter_field(self, label: str, widget: QWidget):
+        """Filtre alanına widget ekle"""
+        self.filter_layout.addWidget(QLabel(label))
+        self.filter_layout.addWidget(widget)
+ 
+ 
+class BaseDetailWindow(BaseWindow):
+    """Detay görünümlü pencereler için temel sınıf"""
+    
+    def __init__(self, db_path: str, title: str):
+        super().__init__(db_path, title)
+        
+        # Splitter - sol tarafta liste, sağ tarafta detay
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_layout.addWidget(self.splitter)
+        
+        # Sol panel (liste)
+        self.left_panel = QWidget()
+        self.left_layout = QVBoxLayout(self.left_panel)
+        self.splitter.addWidget(self.left_panel)
+        
+        # Sağ panel (detay)
+        self.right_panel = QWidget()
+        self.right_layout = QVBoxLayout(self.right_panel)
+        self.splitter.addWidget(self.right_panel)
+        
+        # Varsayılan oranlar
+        self.splitter.setSizes([300, 900])
+
+3.2 BOM (Ürün Ağacı) Yönetim Ekranı
+BOM ekranı, ürün ağacı yapısını ağaç görünümünde gösterir ve çok seviyeli BOM yönetimi sağlar.
+# screens/bom_management.py
+ 
+class BOMManagementWindow(BaseDetailWindow):
+    """Ürün Ağacı (BOM) Yönetim Ekranı"""
+    
+    def __init__(self, db_path: str):
+        super().__init__(db_path, "BOM - Ürün Ağacı Yönetimi")
+        self.current_bom_id = None
+        self.setup_ui()
+        self.load_bom_list()
+        
+    def setup_ui(self):
+        # === SOL PANEL: BOM Listesi ===
+        self.left_layout.addWidget(QLabel("Ürün Ağaçları"))
+        
+        # Arama
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Ürün kodu veya adı ara...")
+        self.search_edit.textChanged.connect(self.filter_bom_list)
+        self.left_layout.addWidget(self.search_edit)
+        
+        # BOM Listesi
+        self.bom_list = QTableWidget()
+        self.bom_list.setColumnCount(3)
+        self.bom_list.setHorizontalHeaderLabels(["Ürün Kodu", "Ürün Adı", "Versiyon"])
+        self.bom_list.itemSelectionChanged.connect(self.on_bom_selected)
+        self.left_layout.addWidget(self.bom_list)
+        
+        # === SAĞ PANEL: BOM Detay ===
+        # Header bilgileri
+        header_group = QGroupBox("BOM Bilgileri")
+        header_layout = QFormLayout()
+        
+        self.txt_material_code = QLineEdit()
+        self.txt_material_code.setReadOnly(True)
+        self.txt_material_name = QLineEdit()
+        self.txt_material_name.setReadOnly(True)
+        self.cmb_bom_type = QComboBox()
+        self.cmb_bom_type.addItems(["Üretim", "Planlama", "Satış", "Maliyetlendirme"])
+        self.spin_base_qty = QDoubleSpinBox()
+        self.spin_base_qty.setRange(0.0001, 999999)
+        self.spin_base_qty.setValue(1)
+        self.date_valid_from = QDateEdit()
+        self.date_valid_from.setDate(QDate.currentDate())
+        self.chk_phantom = QCheckBox("Phantom BOM")
+        
+        header_layout.addRow("Ürün Kodu:", self.txt_material_code)
+        header_layout.addRow("Ürün Adı:", self.txt_material_name)
+        header_layout.addRow("BOM Tipi:", self.cmb_bom_type)
+        header_layout.addRow("Temel Miktar:", self.spin_base_qty)
+        header_layout.addRow("Geçerlilik Başlangıç:", self.date_valid_from)
+        header_layout.addRow("", self.chk_phantom)
+        header_group.setLayout(header_layout)
+        self.right_layout.addWidget(header_group)
+        
+        # BOM Ağaç Görünümü
+        tree_group = QGroupBox("Bileşen Yapısı")
+        tree_layout = QVBoxLayout()
+        
+        # Toolbar
+        tree_toolbar = QHBoxLayout()
+        self.btn_add_component = QPushButton("+ Bileşen Ekle")
+        self.btn_remove_component = QPushButton("- Bileşen Sil")
+        self.btn_expand_all = QPushButton("Tümünü Aç")
+        self.btn_collapse_all = QPushButton("Tümünü Kapat")
+        self.btn_where_used = QPushButton("Nerede Kullanılıyor?")
+        
+        tree_toolbar.addWidget(self.btn_add_component)
+        tree_toolbar.addWidget(self.btn_remove_component)
+        tree_toolbar.addStretch()
+        tree_toolbar.addWidget(self.btn_expand_all)
+        tree_toolbar.addWidget(self.btn_collapse_all)
+        tree_toolbar.addWidget(self.btn_where_used)
+        tree_layout.addLayout(tree_toolbar)
+        
+        # Ağaç Görünümü
+        self.bom_tree = QTreeWidget()
+        self.bom_tree.setHeaderLabels([
+            "Bileşen Kodu", "Bileşen Adı", "Miktar", "Birim", 
+            "Fire %", "Operasyon No", "Kategori"
+        ])
+        self.bom_tree.setColumnWidth(0, 120)
+        self.bom_tree.setColumnWidth(1, 200)
+        self.bom_tree.itemDoubleClicked.connect(self.edit_component)
+        tree_layout.addWidget(self.bom_tree)
+        
+        tree_group.setLayout(tree_layout)
+        self.right_layout.addWidget(tree_group)
+        
+        # Bağlantılar
+        self.btn_add_component.clicked.connect(self.add_component)
+        self.btn_remove_component.clicked.connect(self.remove_component)
+        self.btn_expand_all.clicked.connect(self.bom_tree.expandAll)
+        self.btn_collapse_all.clicked.connect(self.bom_tree.collapseAll)
+        self.btn_where_used.clicked.connect(self.show_where_used)
+        
+    def load_bom_list(self):
+        """BOM listesini veritabanından yükle"""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT bh.bom_id, m.material_code, m.description, bh.alternative_bom
+            FROM bom_headers bh
+            JOIN materials m ON bh.material_id = m.material_id
+            WHERE bh.status = 'ACTIVE'
+            ORDER BY m.material_code
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        self.bom_list.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            self.bom_list.setItem(i, 0, QTableWidgetItem(row[1]))
+            self.bom_list.setItem(i, 1, QTableWidgetItem(row[2]))
+            self.bom_list.setItem(i, 2, QTableWidgetItem(str(row[3])))
+            self.bom_list.item(i, 0).setData(Qt.ItemDataRole.UserRole, row[0])
+            
+    def load_bom_tree(self, bom_id: int, parent_item=None):
+        """BOM ağacını recursive olarak yükle"""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        if parent_item is None:
+            # Root level
+            self.bom_tree.clear()
+            cursor.execute("""
+                SELECT bi.bom_item_id, m.material_code, m.description, bi.quantity,
+                       u.uom_code, bi.scrap_pct, bi.operation_no, bi.item_category,
+                       m.material_id
+                FROM bom_items bi
+                JOIN materials m ON bi.component_id = m.material_id
+                LEFT JOIN uom u ON bi.uom_id = u.uom_id
+                WHERE bi.bom_id = ?
+                ORDER BY bi.item_no
+            """, (bom_id,))
+        else:
+            # Child level - component'ın kendi BOM'u var mı?
+            material_id = parent_item.data(0, Qt.ItemDataRole.UserRole + 1)
+            cursor.execute("""
+                SELECT bh.bom_id FROM bom_headers bh
+                WHERE bh.material_id = ? AND bh.status = 'ACTIVE'
+            """, (material_id,))
+            child_bom = cursor.fetchone()
+            
+            if child_bom:
+                cursor.execute("""
+                    SELECT bi.bom_item_id, m.material_code, m.description, bi.quantity,
+                           u.uom_code, bi.scrap_pct, bi.operation_no, bi.item_category,
+                           m.material_id
+                    FROM bom_items bi
+                    JOIN materials m ON bi.component_id = m.material_id
+                    LEFT JOIN uom u ON bi.uom_id = u.uom_id
+                    WHERE bi.bom_id = ?
+                    ORDER BY bi.item_no
+                """, (child_bom[0],))
+            else:
+                conn.close()
+                return
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        for row in rows:
+            item = QTreeWidgetItem([
+                row[1],  # Bileşen Kodu
+                row[2],  # Bileşen Adı
+                f"{row[3]:.4f}",  # Miktar
+                row[4] or "",  # Birim
+                f"{row[5]:.2f}%" if row[5] else "",  # Fire
+                str(row[6]) if row[6] else "",  # Operasyon No
+                row[7] or ""  # Kategori
+            ])
+            item.setData(0, Qt.ItemDataRole.UserRole, row[0])  # bom_item_id
+            item.setData(0, Qt.ItemDataRole.UserRole + 1, row[8])  # material_id
+            
+            if parent_item is None:
+                self.bom_tree.addTopLevelItem(item)
+            else:
+                parent_item.addChild(item)
+            
+            # Recursive: alt seviyeleri yükle
+            self.load_bom_tree(bom_id, item)
+            
+    def add_component(self):
+        """Yeni bileşen ekle dialog"""
+        dialog = ComponentDialog(self.db_path, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            component_data = dialog.get_data()
+            self.save_component(component_data)
+            self.load_bom_tree(self.current_bom_id)
+            
+    def show_where_used(self):
+        """Seçili bileşenin nerede kullanıldığını göster"""
+        current = self.bom_tree.currentItem()
+        if not current:
+            self.show_error("Lütfen bir bileşen seçin")
+            return
+        material_id = current.data(0, Qt.ItemDataRole.UserRole + 1)
+        dialog = WhereUsedDialog(self.db_path, material_id, self)
+        dialog.exec()
+
+3.3 MRP Çalıştırma Ekranı
+MRP motoru parametrelerini ayarlama, çalıştırma ve sonuçları izleme ekranı.
+# screens/mrp_run.py
+ 
+class MRPWorker(QThread):
+    """MRP hesaplamasını arka planda çalıştıran thread"""
+    progress = pyqtSignal(int, str)  # yüzde, mesaj
+    finished = pyqtSignal(dict)  # sonuç
+    error = pyqtSignal(str)
+    
+    def __init__(self, db_path: str, params: dict):
+        super().__init__()
+        self.db_path = db_path
+        self.params = params
+        
+    def run(self):
+        try:
+            from core.mrp_engine import MRPEngine
+            engine = MRPEngine(self.db_path, self.params)
+            engine.progress_callback = lambda p, m: self.progress.emit(p, m)
+            result = engine.run_mrp()
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+ 
+ 
+class MRPRunWindow(BaseWindow):
+    """MRP Çalıştırma Ekranı"""
+    
+    def __init__(self, db_path: str):
+        super().__init__(db_path, "MRP - Malzeme İhtiyaç Planlaması")
+        self.mrp_worker = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        # === PARAMETRELER ===
+        params_group = QGroupBox("MRP Parametreleri")
+        params_layout = QFormLayout()
+        
+        # Çalıştırma tipi
+        self.cmb_run_type = QComboBox()
+        self.cmb_run_type.addItems([
+            "Net Değişiklik (Net Change)",
+            "Planlama Ufkunda Net Değişiklik",
+            "Yeniden Oluşturma (Regenerative)"
+        ])
+        
+        # Planlama ufku
+        self.spin_horizon = QSpinBox()
+        self.spin_horizon.setRange(7, 365)
+        self.spin_horizon.setValue(90)
+        self.spin_horizon.setSuffix(" gün")
+        
+        # Fabrika seçimi
+        self.cmb_plant = QComboBox()
+        self.load_plants()
+        
+        # Malzeme filtresi
+        self.cmb_material_filter = QComboBox()
+        self.cmb_material_filter.addItems([
+            "Tüm Malzemeler",
+            "Sadece Üretilenler",
+            "Sadece Satın Alınanlar",
+            "Seçili Malzeme Grubu"
+        ])
+        
+        # Malzeme grubu (opsiyonel)
+        self.cmb_material_group = QComboBox()
+        self.cmb_material_group.setEnabled(False)
+        self.load_material_groups()
+        
+        # Simülasyon modu
+        self.chk_simulation = QCheckBox("Simülasyon Modu (Değişiklik Yapmadan Çalıştır)")
+        
+        params_layout.addRow("Çalıştırma Tipi:", self.cmb_run_type)
+        params_layout.addRow("Planlama Ufku:", self.spin_horizon)
+        params_layout.addRow("Fabrika:", self.cmb_plant)
+        params_layout.addRow("Malzeme Filtresi:", self.cmb_material_filter)
+        params_layout.addRow("Malzeme Grubu:", self.cmb_material_group)
+        params_layout.addRow("", self.chk_simulation)
+        
+        params_group.setLayout(params_layout)
+        self.main_layout.addWidget(params_group)
+        
+        # === ÇALIŞTIRMA KONTROL ===
+        control_layout = QHBoxLayout()
+        
+        self.btn_run = QPushButton("▶ MRP Çalıştır")
+        self.btn_run.setMinimumHeight(50)
+        self.btn_run.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #388E3C; }
+            QPushButton:disabled { background-color: #BDBDBD; }
+        """)
+        
+        self.btn_cancel = QPushButton("⏹ İptal")
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setMinimumHeight(50)
+        
+        control_layout.addWidget(self.btn_run)
+        control_layout.addWidget(self.btn_cancel)
+        self.main_layout.addLayout(control_layout)
+        
+        # === İLERLEME ===
+        progress_group = QGroupBox("Çalışma Durumu")
+        progress_layout = QVBoxLayout()
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        
+        self.lbl_status = QLabel("Hazır")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.lbl_status)
+        progress_group.setLayout(progress_layout)
+        self.main_layout.addWidget(progress_group)
+        
+        # === SONUÇLAR ===
+        results_group = QGroupBox("MRP Sonuçları")
+        results_layout = QVBoxLayout()
+        
+        # Özet kartları
+        summary_layout = QHBoxLayout()
+        
+        self.card_planned = self.create_summary_card("Planlı Sipariş", "0", "#1976D2")
+        self.card_purchase = self.create_summary_card("Satınalma Talebi", "0", "#388E3C")
+        self.card_exception = self.create_summary_card("Exception", "0", "#D32F2F")
+        self.card_materials = self.create_summary_card("İşlenen Malzeme", "0", "#7B1FA2")
+        
+        summary_layout.addWidget(self.card_planned)
+        summary_layout.addWidget(self.card_purchase)
+        summary_layout.addWidget(self.card_exception)
+        summary_layout.addWidget(self.card_materials)
+        results_layout.addLayout(summary_layout)
+        
+        # Sonuç tablosu
+        self.tab_results = QTabWidget()
+        
+        self.table_planned = QTableWidget()
+        self.table_planned.setColumnCount(6)
+        self.table_planned.setHorizontalHeaderLabels([
+            "Malzeme Kodu", "Malzeme Adı", "Miktar", "Başlangıç", "Bitiş", "Tip"
+        ])
+        
+        self.table_exceptions = QTableWidget()
+        self.table_exceptions.setColumnCount(4)
+        self.table_exceptions.setHorizontalHeaderLabels([
+            "Malzeme Kodu", "Exception Tipi", "Mesaj", "Öneri"
+        ])
+        
+        self.tab_results.addTab(self.table_planned, "Planlı Siparişler")
+        self.tab_results.addTab(self.table_exceptions, "Exception'lar")
+        results_layout.addWidget(self.tab_results)
+        
+        # İşlem butonları
+        action_layout = QHBoxLayout()
+        self.btn_convert_all = QPushButton("Tümünü Üretim Emrine Dönüştür")
+        self.btn_convert_selected = QPushButton("Seçilileri Dönüştür")
+        self.btn_export = QPushButton("Excel'e Aktar")
+        
+        action_layout.addWidget(self.btn_convert_all)
+        action_layout.addWidget(self.btn_convert_selected)
+        action_layout.addStretch()
+        action_layout.addWidget(self.btn_export)
+        results_layout.addLayout(action_layout)
+        
+        results_group.setLayout(results_layout)
+        self.main_layout.addWidget(results_group)
+        
+        # Bağlantılar
+        self.btn_run.clicked.connect(self.run_mrp)
+        self.btn_cancel.clicked.connect(self.cancel_mrp)
+        self.cmb_material_filter.currentIndexChanged.connect(self.on_filter_changed)
+        
+    def create_summary_card(self, title: str, value: str, color: str) -> QGroupBox:
+        """Özet kartı oluştur"""
+        card = QGroupBox()
+        card.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {color};
+                border-radius: 8px;
+                padding: 10px;
+            }}
+        """)
+        layout = QVBoxLayout()
+        
+        lbl_value = QLabel(value)
+        lbl_value.setStyleSheet("color: white; font-size: 32px; font-weight: bold;")
+        lbl_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_value.setObjectName("value")
+        
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet("color: white; font-size: 12px;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        layout.addWidget(lbl_value)
+        layout.addWidget(lbl_title)
+        card.setLayout(layout)
+        return card
+        
+    def run_mrp(self):
+        """MRP çalıştır"""
+        if self.mrp_worker and self.mrp_worker.isRunning():
+            return
+            
+        params = {
+            'run_type': self.cmb_run_type.currentIndex(),
+            'horizon_days': self.spin_horizon.value(),
+            'plant_id': self.cmb_plant.currentData(),
+            'material_filter': self.cmb_material_filter.currentIndex(),
+            'simulation': self.chk_simulation.isChecked()
+        }
+        
+        self.btn_run.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self.progress_bar.setValue(0)
+        
+        self.mrp_worker = MRPWorker(self.db_path, params)
+        self.mrp_worker.progress.connect(self.on_mrp_progress)
+        self.mrp_worker.finished.connect(self.on_mrp_finished)
+        self.mrp_worker.error.connect(self.on_mrp_error)
+        self.mrp_worker.start()
+        
+    def on_mrp_progress(self, percent: int, message: str):
+        """MRP ilerleme güncellemesi"""
+        self.progress_bar.setValue(percent)
+        self.lbl_status.setText(message)
+        
+    def on_mrp_finished(self, result: dict):
+        """MRP tamamlandı"""
+        self.btn_run.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.progress_bar.setValue(100)
+        self.lbl_status.setText("Tamamlandı")
+        
+        # Sonuçları göster
+        self.update_summary_cards(result)
+        self.load_planned_orders(result.get('planned_orders', []))
+        self.load_exceptions(result.get('exceptions', []))
+
+3.4 Üretim Emri Detay Ekranı
+Tek bir üretim emrinin tüm bilgilerini, bileşenlerini, operasyonlarını ve maliyetlerini yöneten ekran.
+# screens/production_order_detail.py
+ 
+class ProductionOrderDetailWindow(BaseWindow):
+    """Üretim Emri Detay Ekranı"""
+    
+    # Durum geçiş sırası
+    STATUS_FLOW = ['CREATED', 'RELEASED', 'STARTED', 'CONFIRMED', 'TECO', 'CLOSED']
+    STATUS_LABELS = {
+        'CREATED': 'Oluşturuldu',
+        'RELEASED': 'Serbest Bırakıldı',
+        'STARTED': 'Başladı',
+        'CONFIRMED': 'Onaylandı',
+        'TECO': 'Teknik Tamamlandı',
+        'CLOSED': 'Kapatıldı'
+    }
+    
+    def __init__(self, db_path: str, order_id: int = None):
+        super().__init__(db_path, "Üretim Emri Detay")
+        self.order_id = order_id
+        self.setup_ui()
+        if order_id:
+            self.load_order(order_id)
+        
+    def setup_ui(self):
+        # === HEADER BÖLÜMÜ ===
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        
+        # Sol: Temel bilgiler
+        info_group = QGroupBox("Üretim Emri Bilgileri")
+        info_layout = QFormLayout()
+        
+        self.txt_order_number = QLineEdit()
+        self.txt_order_number.setReadOnly(True)
+        self.txt_order_number.setStyleSheet("font-size: 18px; font-weight: bold;")
+        
+        self.txt_material = QLineEdit()
+        self.txt_material.setReadOnly(True)
+        
+        self.spin_planned_qty = QDoubleSpinBox()
+        self.spin_planned_qty.setRange(0.0001, 9999999)
+        
+        self.spin_confirmed_qty = QDoubleSpinBox()
+        self.spin_confirmed_qty.setReadOnly(True)
+        self.spin_confirmed_qty.setStyleSheet("background-color: #E8F5E9;")
+        
+        self.spin_scrap_qty = QDoubleSpinBox()
+        self.spin_scrap_qty.setReadOnly(True)
+        self.spin_scrap_qty.setStyleSheet("background-color: #FFEBEE;")
+        
+        self.date_planned_start = QDateTimeEdit()
+        self.date_planned_end = QDateTimeEdit()
+        
+        info_layout.addRow("Emir No:", self.txt_order_number)
+        info_layout.addRow("Ürün:", self.txt_material)
+        info_layout.addRow("Planlanan Miktar:", self.spin_planned_qty)
+        info_layout.addRow("Onaylanan Miktar:", self.spin_confirmed_qty)
+        info_layout.addRow("Fire Miktar:", self.spin_scrap_qty)
+        info_layout.addRow("Plan. Başlangıç:", self.date_planned_start)
+        info_layout.addRow("Plan. Bitiş:", self.date_planned_end)
+        info_group.setLayout(info_layout)
+        header_layout.addWidget(info_group)
+        
+        # Sağ: Durum ve aksiyon
+        status_group = QGroupBox("Durum Yönetimi")
+        status_layout = QVBoxLayout()
+        
+        # Durum göstergesi
+        self.lbl_status = QLabel("CREATED")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_status.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #E0E0E0;
+        """)
+        status_layout.addWidget(self.lbl_status)
+        
+        # İlerleme çubuğu
+        self.progress_order = QProgressBar()
+        self.progress_order.setTextVisible(True)
+        self.progress_order.setFormat("%p% Tamamlandı")
+        status_layout.addWidget(self.progress_order)
+        
+        # Durum geçiş butonları
+        self.btn_release = QPushButton("🔓 Serbest Bırak")
+        self.btn_start = QPushButton("▶ Başlat")
+        self.btn_confirm = QPushButton("✓ Onayla")
+        self.btn_teco = QPushButton("⏹ Teknik Tamamla")
+        self.btn_close = QPushButton("🔒 Kapat")
+        
+        self.btn_release.clicked.connect(lambda: self.change_status('RELEASED'))
+        self.btn_start.clicked.connect(lambda: self.change_status('STARTED'))
+        self.btn_confirm.clicked.connect(self.show_confirmation_dialog)
+        self.btn_teco.clicked.connect(lambda: self.change_status('TECO'))
+        self.btn_close.clicked.connect(lambda: self.change_status('CLOSED'))
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.btn_release)
+        btn_layout.addWidget(self.btn_start)
+        btn_layout.addWidget(self.btn_confirm)
+        btn_layout.addWidget(self.btn_teco)
+        btn_layout.addWidget(self.btn_close)
+        status_layout.addLayout(btn_layout)
+        
+        status_group.setLayout(status_layout)
+        header_layout.addWidget(status_group)
+        
+        self.main_layout.addWidget(header_widget)
+        
+        # === TABS BÖLÜMÜ ===
+        self.tabs = QTabWidget()
+        
+        # Tab 1: Bileşenler
+        self.tab_components = QWidget()
+        comp_layout = QVBoxLayout(self.tab_components)
+        
+        comp_toolbar = QHBoxLayout()
+        self.btn_issue_material = QPushButton("📤 Malzeme Çıkış")
+        self.btn_return_material = QPushButton("📥 Malzeme İade")
+        self.btn_backflush = QPushButton("⚡ Backflush")
+        comp_toolbar.addWidget(self.btn_issue_material)
+        comp_toolbar.addWidget(self.btn_return_material)
+        comp_toolbar.addWidget(self.btn_backflush)
+        comp_toolbar.addStretch()
+        comp_layout.addLayout(comp_toolbar)
+        
+        self.table_components = QTableWidget()
+        self.table_components.setColumnCount(8)
+        self.table_components.setHorizontalHeaderLabels([
+            "Malzeme Kodu", "Malzeme Adı", "Gerekli", "Çıkış", 
+            "İade", "Kalan", "Birim", "Durum"
+        ])
+        comp_layout.addWidget(self.table_components)
+        self.tabs.addTab(self.tab_components, "Bileşenler")
+        
+        # Tab 2: Operasyonlar
+        self.tab_operations = QWidget()
+        op_layout = QVBoxLayout(self.tab_operations)
+        
+        self.table_operations = QTableWidget()
+        self.table_operations.setColumnCount(10)
+        self.table_operations.setHorizontalHeaderLabels([
+            "Op. No", "İşlem", "İş Merkezi", "Plan. Hazırlık", "Plan. İşlem",
+            "Fiili Hazırlık", "Fiili İşlem", "Onay Mik.", "Fire", "Durum"
+        ])
+        op_layout.addWidget(self.table_operations)
+        self.tabs.addTab(self.tab_operations, "Operasyonlar")
+        
+        # Tab 3: Onay Geçmişi
+        self.tab_confirmations = QWidget()
+        conf_layout = QVBoxLayout(self.tab_confirmations)
+        
+        self.table_confirmations = QTableWidget()
+        self.table_confirmations.setColumnCount(7)
+        self.table_confirmations.setHorizontalHeaderLabels([
+            "Tarih", "Operasyon", "Üretilen", "Fire", "Süre", "Kullanıcı", "Not"
+        ])
+        conf_layout.addWidget(self.table_confirmations)
+        self.tabs.addTab(self.tab_confirmations, "Onay Geçmişi")
+        
+        # Tab 4: Maliyet
+        self.tab_cost = QWidget()
+        cost_layout = QVBoxLayout(self.tab_cost)
+        
+        cost_summary = QHBoxLayout()
+        self.card_material_cost = self.create_cost_card("Malzeme Maliyeti", "0.00 ₺")
+        self.card_labor_cost = self.create_cost_card("İşçilik Maliyeti", "0.00 ₺")
+        self.card_overhead_cost = self.create_cost_card("Genel Gider", "0.00 ₺")
+        self.card_total_cost = self.create_cost_card("Toplam Maliyet", "0.00 ₺", highlight=True)
+        
+        cost_summary.addWidget(self.card_material_cost)
+        cost_summary.addWidget(self.card_labor_cost)
+        cost_summary.addWidget(self.card_overhead_cost)
+        cost_summary.addWidget(self.card_total_cost)
+        cost_layout.addLayout(cost_summary)
+        
+        # Variance analizi
+        self.table_variance = QTableWidget()
+        self.table_variance.setColumnCount(4)
+        self.table_variance.setHorizontalHeaderLabels([
+            "Maliyet Kalemi", "Standart", "Fiili", "Sapma"
+        ])
+        cost_layout.addWidget(self.table_variance)
+        self.tabs.addTab(self.tab_cost, "Maliyet")
+        
+        self.main_layout.addWidget(self.tabs)
+        
+    def change_status(self, new_status: str):
+        """Durum değişikliği"""
+        current_idx = self.STATUS_FLOW.index(self.current_status)
+        new_idx = self.STATUS_FLOW.index(new_status)
+        
+        if new_idx != current_idx + 1:
+            self.show_error("Geçersiz durum geçişi")
+            return
+            
+        if not self.confirm_action(f"Durum '{self.STATUS_LABELS[new_status]}' olarak değiştirilsin mi?"):
+            return
+            
+        # Veritabanı güncelle
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE production_orders 
+            SET status = ?, updated_at = ?
+            WHERE production_order_id = ?
+        """, (new_status, datetime.now(), self.order_id))
+        conn.commit()
+        conn.close()
+        
+        self.current_status = new_status
+        self.update_status_ui()
+        
+    def show_confirmation_dialog(self):
+        """Üretim onay dialogunu göster"""
+        dialog = ConfirmationDialog(self.db_path, self.order_id, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.load_order(self.order_id)  # Refresh
+
+3.5 Shop Floor Terminal Ekranı (Operatör Arayüzü)
+Üretim sahasında operatörlerin kullanacağı basit, büyük butonlu, touch-friendly ekran.
+# screens/shop_floor_terminal.py
+ 
+class ShopFloorTerminal(QMainWindow):
+    """
+    Üretim Sahası Operatör Terminali
+    - Büyük, touch-friendly butonlar
+    - Basit ve odaklı arayüz
+    - Barkod/kart okuyucu desteği
+    """
+    
+    def __init__(self, db_path: str):
+        super().__init__()
+        self.db_path = db_path
+        self.current_operator = None
+        self.current_order = None
+        self.current_operation = None
+        
+        self.setWindowTitle("Üretim Terminali")
+        self.setMinimumSize(1024, 768)
+        self.showFullScreen()  # Tam ekran modunda aç
+        
+        self.setup_ui()
+        self.show_login_screen()
+        
+    def setup_ui(self):
+        self.central = QWidget()
+        self.setCentralWidget(self.central)
+        self.main_layout = QVBoxLayout(self.central)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Üst bilgi çubuğu
+        self.header = QWidget()
+        self.header.setStyleSheet("background-color: #1E3A5F; border-radius: 10px;")
+        header_layout = QHBoxLayout(self.header)
+        
+        self.lbl_operator = QLabel("Operatör: -")
+        self.lbl_operator.setStyleSheet("color: white; font-size: 18px;")
+        self.lbl_datetime = QLabel()
+        self.lbl_datetime.setStyleSheet("color: white; font-size: 18px;")
+        self.btn_logout = QPushButton("Çıkış")
+        self.btn_logout.setStyleSheet("""
+            QPushButton {
+                background-color: #D32F2F;
+                color: white;
+                font-size: 16px;
+                padding: 10px 20px;
+                border-radius: 5px;
+            }
+        """)
+        
+        header_layout.addWidget(self.lbl_operator)
+        header_layout.addStretch()
+        header_layout.addWidget(self.lbl_datetime)
+        header_layout.addWidget(self.btn_logout)
+        self.main_layout.addWidget(self.header)
+        
+        # Ana içerik alanı (stack widget ile ekran geçişleri)
+        self.stack = QStackedWidget()
+        self.main_layout.addWidget(self.stack)
+        
+        # Ekranları oluştur
+        self.create_login_screen()
+        self.create_job_list_screen()
+        self.create_job_detail_screen()
+        self.create_confirmation_screen()
+        
+        # Timer - saat güncelleme
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_datetime)
+        self.timer.start(1000)
+        
+        self.btn_logout.clicked.connect(self.logout)
+        
+    def create_login_screen(self):
+        """Operatör giriş ekranı"""
+        screen = QWidget()
+        layout = QVBoxLayout(screen)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Logo/Başlık
+        lbl_title = QLabel("🏭 AKILLI İŞ ERP")
+        lbl_title.setStyleSheet("font-size: 48px; font-weight: bold; color: #1E3A5F;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_title)
+        
+        lbl_subtitle = QLabel("Üretim Terminali")
+        lbl_subtitle.setStyleSheet("font-size: 24px; color: #666;")
+        lbl_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_subtitle)
+        
+        layout.addSpacing(50)
+        
+        # Kart/Barkod okutma alanı
+        self.txt_badge = QLineEdit()
+        self.txt_badge.setPlaceholderText("Personel kartınızı okutun veya sicil no girin...")
+        self.txt_badge.setStyleSheet("""
+            font-size: 32px;
+            padding: 20px;
+            border: 3px solid #1E3A5F;
+            border-radius: 10px;
+        """)
+        self.txt_badge.setMaximumWidth(500)
+        self.txt_badge.returnPressed.connect(self.do_login)
+        layout.addWidget(self.txt_badge, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        # Giriş butonu
+        btn_login = QPushButton("GİRİŞ YAP")
+        btn_login.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 20px 60px;
+                border-radius: 10px;
+            }
+            QPushButton:hover { background-color: #388E3C; }
+        """)
+        btn_login.clicked.connect(self.do_login)
+        layout.addWidget(btn_login, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.stack.addWidget(screen)
+        
+    def create_job_list_screen(self):
+        """Atanan işler listesi ekranı"""
+        screen = QWidget()
+        layout = QVBoxLayout(screen)
+        
+        lbl_title = QLabel("📋 Atanan İşlerim")
+        lbl_title.setStyleSheet("font-size: 28px; font-weight: bold;")
+        layout.addWidget(lbl_title)
+        
+        # İş listesi (büyük kartlar halinde)
+        self.job_list_widget = QWidget()
+        self.job_list_layout = QVBoxLayout(self.job_list_widget)
+        
+        scroll = QScrollArea()
+        scroll.setWidget(self.job_list_widget)
+        scroll.setWidgetResizable(True)
+        layout.addWidget(scroll)
+        
+        self.stack.addWidget(screen)
+        
+    def create_job_card(self, order_data: dict) -> QWidget:
+        """İş kartı widget'ı oluştur"""
+        card = QWidget()
+        card.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                border: 2px solid #E0E0E0;
+                border-radius: 10px;
+            }
+        """)
+        card.setMinimumHeight(120)
+        
+        layout = QHBoxLayout(card)
+        
+        # Sol: Bilgiler
+        info_layout = QVBoxLayout()
+        
+        lbl_order = QLabel(f"📦 {order_data['order_number']}")
+        lbl_order.setStyleSheet("font-size: 22px; font-weight: bold;")
+        
+        lbl_product = QLabel(f"Ürün: {order_data['material_name']}")
+        lbl_product.setStyleSheet("font-size: 18px;")
+        
+        lbl_qty = QLabel(f"Miktar: {order_data['planned_qty']} {order_data['uom']}")
+        lbl_qty.setStyleSheet("font-size: 18px;")
+        
+        lbl_operation = QLabel(f"İşlem: {order_data['operation_desc']}")
+        lbl_operation.setStyleSheet("font-size: 16px; color: #666;")
+        
+        info_layout.addWidget(lbl_order)
+        info_layout.addWidget(lbl_product)
+        info_layout.addWidget(lbl_qty)
+        info_layout.addWidget(lbl_operation)
+        layout.addLayout(info_layout)
+        
+        layout.addStretch()
+        
+        # Sağ: Başlat butonu
+        btn_start = QPushButton("BAŞLAT ▶")
+        btn_start.setStyleSheet("""
+            QPushButton {
+                background-color: #1976D2;
+                color: white;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 30px 40px;
+                border-radius: 10px;
+            }
+            QPushButton:hover { background-color: #1E88E5; }
+        """)
+        btn_start.clicked.connect(lambda: self.start_job(order_data))
+        layout.addWidget(btn_start)
+        
+        return card
+        
+    def create_confirmation_screen(self):
+        """Üretim onay ekranı - büyük butonlu"""
+        screen = QWidget()
+        layout = QVBoxLayout(screen)
+        
+        # Mevcut iş bilgisi
+        self.lbl_current_job = QLabel()
+        self.lbl_current_job.setStyleSheet("""
+            font-size: 24px;
+            background-color: #E3F2FD;
+            padding: 20px;
+            border-radius: 10px;
+        """)
+        layout.addWidget(self.lbl_current_job)
+        
+        # Miktar girişi
+        qty_layout = QHBoxLayout()
+        
+        # Üretilen miktar
+        good_group = QGroupBox("✓ Üretilen Miktar")
+        good_group.setStyleSheet("font-size: 20px;")
+        good_layout = QVBoxLayout(good_group)
+        self.spin_good_qty = QSpinBox()
+        self.spin_good_qty.setRange(0, 99999)
+        self.spin_good_qty.setStyleSheet("font-size: 48px; padding: 20px;")
+        good_layout.addWidget(self.spin_good_qty)
+        qty_layout.addWidget(good_group)
+        
+        # Fire miktar
+        scrap_group = QGroupBox("✗ Fire Miktar")
+        scrap_group.setStyleSheet("font-size: 20px;")
+        scrap_layout = QVBoxLayout(scrap_group)
+        self.spin_scrap_qty = QSpinBox()
+        self.spin_scrap_qty.setRange(0, 99999)
+        self.spin_scrap_qty.setStyleSheet("font-size: 48px; padding: 20px;")
+        scrap_layout.addWidget(self.spin_scrap_qty)
+        qty_layout.addWidget(scrap_group)
+        
+        layout.addLayout(qty_layout)
+        
+        # Hızlı miktar butonları
+        quick_layout = QHBoxLayout()
+        for qty in [1, 5, 10, 50, 100]:
+            btn = QPushButton(f"+{qty}")
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 24px;
+                    padding: 15px 30px;
+                    background-color: #E0E0E0;
+                    border-radius: 8px;
+                }
+            """)
+            btn.clicked.connect(lambda checked, q=qty: 
+                self.spin_good_qty.setValue(self.spin_good_qty.value() + q))
+            quick_layout.addWidget(btn)
+        layout.addLayout(quick_layout)
+        
+        layout.addStretch()
+        
+        # Aksiyon butonları
+        action_layout = QHBoxLayout()
+        
+        btn_pause = QPushButton("⏸ DURAKLAT")
+        btn_pause.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 25px 50px;
+                border-radius: 10px;
+            }
+        """)
+        
+        btn_complete = QPushButton("✓ ONAYLA")
+        btn_complete.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 25px 50px;
+                border-radius: 10px;
+            }
+        """)
+        btn_complete.clicked.connect(self.submit_confirmation)
+        
+        btn_problem = QPushButton("⚠ SORUN BİLDİR")
+        btn_problem.setStyleSheet("""
+            QPushButton {
+                background-color: #D32F2F;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 25px 50px;
+                border-radius: 10px;
+            }
+        """)
+        
+        action_layout.addWidget(btn_pause)
+        action_layout.addWidget(btn_complete)
+        action_layout.addWidget(btn_problem)
+        layout.addLayout(action_layout)
+        
+        self.stack.addWidget(screen)
+
+3.6 Gantt Chart Çizelgeleme Ekranı
+Üretim emirlerinin ve operasyonların zaman çizelgesini gösteren interaktif Gantt grafiği.
+# screens/gantt_chart.py
+ 
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem
+from PyQt6.QtCore import QRectF, QDateTime
+from PyQt6.QtGui import QBrush, QColor, QPen, QFont
+from datetime import datetime, timedelta
+ 
+ 
+class GanttChartView(QGraphicsView):
+    """Özel Gantt Chart görünümü"""
+    
+    HOUR_WIDTH = 30  # Her saat için piksel genişliği
+    ROW_HEIGHT = 40
+    HEADER_HEIGHT = 60
+    
+    STATUS_COLORS = {
+        'CREATED': QColor("#E0E0E0"),
+        'RELEASED': QColor("#BBDEFB"),
+        'STARTED': QColor("#FFF59D"),
+        'CONFIRMED': QColor("#A5D6A7"),
+        'TECO': QColor("#81C784"),
+        'CLOSED': QColor("#4CAF50")
+    }
+    
+    def __init__(self):
+        super().__init__()
+        self.scene = QGraphicsScene()
+        self.setScene(self.scene)
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        
+        self.start_date = datetime.now().replace(hour=0, minute=0, second=0)
+        self.days_to_show = 14
+        self.resources = []  # İş merkezleri veya üretim emirleri
+        self.tasks = []  # Operasyonlar
+        
+    def set_data(self, resources: list, tasks: list):
+        """Gantt verilerini ayarla"""
+        self.resources = resources
+        self.tasks = tasks
+        self.draw_chart()
+        
+    def draw_chart(self):
+        """Gantt grafiğini çiz"""
+        self.scene.clear()
+        
+        total_hours = self.days_to_show * 24
+        chart_width = total_hours * self.HOUR_WIDTH
+        chart_height = self.HEADER_HEIGHT + len(self.resources) * self.ROW_HEIGHT
+        
+        # Arka plan
+        self.scene.setSceneRect(0, 0, chart_width, chart_height)
+        
+        # Zaman başlıkları çiz
+        self.draw_time_header(chart_width)
+        
+        # Grid çizgileri
+        self.draw_grid(chart_width, chart_height)
+        
+        # Resource satırları
+        self.draw_resource_rows()
+        
+        # Task çubukları
+        self.draw_tasks()
+        
+        # Bugün çizgisi
+        self.draw_today_line(chart_height)
+        
+    def draw_time_header(self, width):
+        """Zaman başlığı çiz"""
+        # Gün başlıkları
+        for day in range(self.days_to_show):
+            date = self.start_date + timedelta(days=day)
+            x = day * 24 * self.HOUR_WIDTH
+            
+            # Gün kutusu
+            rect = QGraphicsRectItem(x, 0, 24 * self.HOUR_WIDTH, 30)
+            rect.setBrush(QBrush(QColor("#1E3A5F")))
+            self.scene.addItem(rect)
+            
+            # Gün yazısı
+            text = QGraphicsTextItem(date.strftime("%d %b %Y - %A"))
+            text.setDefaultTextColor(QColor("white"))
+            text.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            text.setPos(x + 10, 5)
+            self.scene.addItem(text)
+            
+        # Saat başlıkları
+        for hour in range(self.days_to_show * 24):
+            x = hour * self.HOUR_WIDTH
+            h = hour % 24
+            
+            if h % 4 == 0:  # Her 4 saatte bir göster
+                text = QGraphicsTextItem(f"{h:02d}:00")
+                text.setFont(QFont("Arial", 8))
+                text.setPos(x + 2, 35)
+                self.scene.addItem(text)
+                
+    def draw_grid(self, width, height):
+        """Grid çizgileri çiz"""
+        pen = QPen(QColor("#E0E0E0"))
+        pen.setWidth(1)
+        
+        # Yatay çizgiler (resource satırları)
+        for i in range(len(self.resources) + 1):
+            y = self.HEADER_HEIGHT + i * self.ROW_HEIGHT
+            line = self.scene.addLine(0, y, width, y, pen)
+            
+        # Dikey çizgiler (günler)
+        for day in range(self.days_to_show + 1):
+            x = day * 24 * self.HOUR_WIDTH
+            line = self.scene.addLine(x, 0, x, height, pen)
+            
+    def draw_resource_rows(self):
+        """Resource (iş merkezi/üretim emri) satırlarını çiz"""
+        for i, resource in enumerate(self.resources):
+            y = self.HEADER_HEIGHT + i * self.ROW_HEIGHT
+            
+            # Arka plan (alternatif renkler)
+            bg_color = QColor("#FAFAFA") if i % 2 == 0 else QColor("#FFFFFF")
+            rect = QGraphicsRectItem(0, y, 150, self.ROW_HEIGHT)
+            rect.setBrush(QBrush(bg_color))
+            rect.setPen(QPen(Qt.PenStyle.NoPen))
+            self.scene.addItem(rect)
+            
+            # Resource adı
+            text = QGraphicsTextItem(resource['name'][:20])
+            text.setFont(QFont("Arial", 9))
+            text.setPos(5, y + 10)
+            self.scene.addItem(text)
+            
+    def draw_tasks(self):
+        """Task çubuklarını çiz"""
+        for task in self.tasks:
+            resource_idx = self.get_resource_index(task['resource_id'])
+            if resource_idx < 0:
+                continue
+                
+            # Zaman hesaplama
+            start_hours = self.datetime_to_hours(task['start_date'])
+            end_hours = self.datetime_to_hours(task['end_date'])
+            
+            if start_hours < 0 or end_hours > self.days_to_show * 24:
+                continue  # Görünür aralık dışında
+                
+            x = start_hours * self.HOUR_WIDTH
+            width = (end_hours - start_hours) * self.HOUR_WIDTH
+            y = self.HEADER_HEIGHT + resource_idx * self.ROW_HEIGHT + 5
+            height = self.ROW_HEIGHT - 10
+            
+            # Task çubuğu
+            color = self.STATUS_COLORS.get(task['status'], QColor("#E0E0E0"))
+            rect = GanttTaskItem(x, y, width, height, task, self)
+            rect.setBrush(QBrush(color))
+            rect.setPen(QPen(QColor("#666666")))
+            self.scene.addItem(rect)
+            
+            # Task etiketi
+            if width > 50:
+                text = QGraphicsTextItem(task['label'][:15])
+                text.setFont(QFont("Arial", 8))
+                text.setPos(x + 3, y + 3)
+                self.scene.addItem(text)
+                
+    def draw_today_line(self, height):
+        """Bugün çizgisi çiz"""
+        now = datetime.now()
+        hours = self.datetime_to_hours(now)
+        
+        if 0 <= hours <= self.days_to_show * 24:
+            x = hours * self.HOUR_WIDTH
+            pen = QPen(QColor("#D32F2F"))
+            pen.setWidth(2)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            self.scene.addLine(x, 0, x, height, pen)
+            
+    def datetime_to_hours(self, dt):
+        """Datetime'ı başlangıçtan itibaren saat cinsine çevir"""
+        delta = dt - self.start_date
+        return delta.total_seconds() / 3600
+ 
+ 
+class GanttTaskItem(QGraphicsRectItem):
+    """Drag edilebilir Gantt task çubuğu"""
+    
+    def __init__(self, x, y, width, height, task_data, view):
+        super().__init__(x, y, width, height)
+        self.task_data = task_data
+        self.view = view
+        self.setFlag(QGraphicsRectItem.GraphicsItemFlag.ItemIsMovable)
+        self.setFlag(QGraphicsRectItem.GraphicsItemFlag.ItemIsSelectable)
+        self.setAcceptHoverEvents(True)
+        
+    def mouseReleaseEvent(self, event):
+        """Sürükle bırak sonrası yeni pozisyonu kaydet"""
+        new_x = self.pos().x()
+        new_hours = new_x / self.view.HOUR_WIDTH
+        new_start = self.view.start_date + timedelta(hours=new_hours)
+        
+        # Callback: yeni tarihi kaydet
+        # self.view.on_task_moved(self.task_data, new_start)
+        super().mouseReleaseEvent(event)
+ 
+ 
+class GanttChartWindow(BaseWindow):
+    """Gantt Chart Ana Penceresi"""
+    
+    def __init__(self, db_path: str):
+        super().__init__(db_path, "Üretim Çizelgesi - Gantt Chart")
+        self.setup_ui()
+        self.load_data()
+        
+    def setup_ui(self):
+        # Toolbar
+        toolbar_layout = QHBoxLayout()
+        
+        self.cmb_view_type = QComboBox()
+        self.cmb_view_type.addItems(["İş Merkezi Bazlı", "Üretim Emri Bazlı"])
+        
+        self.date_start = QDateEdit()
+        self.date_start.setDate(QDate.currentDate())
+        
+        self.spin_days = QSpinBox()
+        self.spin_days.setRange(7, 60)
+        self.spin_days.setValue(14)
+        self.spin_days.setSuffix(" gün")
+        
+        self.btn_refresh = QPushButton("Yenile")
+        self.btn_zoom_in = QPushButton("🔍+")
+        self.btn_zoom_out = QPushButton("🔍-")
+        
+        toolbar_layout.addWidget(QLabel("Görünüm:"))
+        toolbar_layout.addWidget(self.cmb_view_type)
+        toolbar_layout.addWidget(QLabel("Başlangıç:"))
+        toolbar_layout.addWidget(self.date_start)
+        toolbar_layout.addWidget(QLabel("Süre:"))
+        toolbar_layout.addWidget(self.spin_days)
+        toolbar_layout.addStretch()
+        toolbar_layout.addWidget(self.btn_zoom_in)
+        toolbar_layout.addWidget(self.btn_zoom_out)
+        toolbar_layout.addWidget(self.btn_refresh)
+        
+        self.main_layout.addLayout(toolbar_layout)
+        
+        # Gantt Chart
+        self.gantt = GanttChartView()
+        self.main_layout.addWidget(self.gantt)
+        
+        # Bağlantılar
+        self.btn_refresh.clicked.connect(self.load_data)
+        self.btn_zoom_in.clicked.connect(lambda: self.zoom(1.2))
+        self.btn_zoom_out.clicked.connect(lambda: self.zoom(0.8))
+
+BÖLÜM 4: VERİTABANI ŞEMASI
+Üretim ve planlama modülleri için gerekli veritabanı tabloları aşağıda verilmiştir. Bu şema SAP, Oracle ve Canias ERP sistemlerinin best practice'lerinden yola çıkılarak tasarlanmıştır.
+4.1 Master Data Tabloları
+-- materials: Malzeme/Ürün Ana Verisi
+CREATE TABLE materials (
+    material_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_code VARCHAR(50) UNIQUE NOT NULL,
+    description VARCHAR(200),
+    material_type VARCHAR(20),  -- 'RAW', 'SEMI', 'FINISHED', 'PHANTOM'
+    uom_id INTEGER REFERENCES uom(uom_id),
+    procurement_type VARCHAR(10),  -- 'MAKE', 'BUY', 'BOTH'
+    planning_strategy VARCHAR(10),  -- 'MTS', 'MTO', 'ATO'
+    lot_size_type VARCHAR(15),  -- 'LOT_FOR_LOT', 'FIXED', 'EOQ'
+    lot_size_qty DECIMAL(15,4),
+    safety_stock DECIMAL(15,4) DEFAULT 0,
+    lead_time_days INTEGER DEFAULT 0,
+    standard_cost DECIMAL(15,4),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
+ 
+-- bom_headers: Ürün Ağacı Başlık
+CREATE TABLE bom_headers (
+    bom_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER NOT NULL REFERENCES materials(material_id),
+    bom_type VARCHAR(20) DEFAULT 'PRODUCTION',
+    alternative_bom INTEGER DEFAULT 1,
+    base_qty DECIMAL(15,4) DEFAULT 1,
+    valid_from DATE,
+    valid_to DATE,
+    status VARCHAR(10) DEFAULT 'ACTIVE',
+    is_phantom BOOLEAN DEFAULT FALSE
+);
+ 
+-- bom_items: Ürün Ağacı Bileşenleri
+CREATE TABLE bom_items (
+    bom_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bom_id INTEGER NOT NULL REFERENCES bom_headers(bom_id),
+    item_no INTEGER,
+    component_id INTEGER NOT NULL REFERENCES materials(material_id),
+    quantity DECIMAL(15,6),
+    uom_id INTEGER REFERENCES uom(uom_id),
+    item_category VARCHAR(10) DEFAULT 'STOCK',
+    scrap_pct DECIMAL(5,2) DEFAULT 0,
+    operation_no INTEGER,
+    backflush BOOLEAN DEFAULT FALSE
+);
+ 
+-- work_centers: İş Merkezleri
+CREATE TABLE work_centers (
+    work_center_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_center_code VARCHAR(20) UNIQUE,
+    description VARCHAR(100),
+    capacity_category VARCHAR(20),  -- 'MACHINE', 'LABOR', 'TOOL'
+    available_hours_day DECIMAL(5,2) DEFAULT 8,
+    utilization_pct DECIMAL(5,2) DEFAULT 100,
+    hourly_rate DECIMAL(15,4),
+    is_finite_capacity BOOLEAN DEFAULT FALSE,
+    calendar_id INTEGER
+);
+ 
+-- routes: Üretim Rotaları
+CREATE TABLE routes (
+    route_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER NOT NULL REFERENCES materials(material_id),
+    route_type VARCHAR(20) DEFAULT 'STANDARD',
+    alternative_route INTEGER DEFAULT 1,
+    valid_from DATE,
+    valid_to DATE,
+    status VARCHAR(10) DEFAULT 'ACTIVE'
+);
+ 
+-- route_operations: Rota Operasyonları
+CREATE TABLE route_operations (
+    operation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id INTEGER NOT NULL REFERENCES routes(route_id),
+    operation_no INTEGER,
+    operation_code VARCHAR(20),
+    description VARCHAR(200),
+    work_center_id INTEGER REFERENCES work_centers(work_center_id),
+    base_qty DECIMAL(15,4) DEFAULT 1,
+    setup_time DECIMAL(10,2),  -- Dakika
+    run_time DECIMAL(10,2),    -- Dakika/birim
+    labor_time DECIMAL(10,2),
+    wait_time DECIMAL(10,2),
+    move_time DECIMAL(10,2),
+    overlap_pct DECIMAL(5,2) DEFAULT 0,
+    scrap_pct DECIMAL(5,2) DEFAULT 0
+);
+
+4.2 Transaction Tabloları
+-- planned_orders: MRP Planlı Siparişleri
+CREATE TABLE planned_orders (
+    planned_order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER NOT NULL REFERENCES materials(material_id),
+    order_type VARCHAR(15),  -- 'PRODUCTION', 'PURCHASE', 'TRANSFER'
+    planned_qty DECIMAL(15,4),
+    planned_start_date DATE,
+    planned_end_date DATE,
+    requirement_date DATE,
+    source_type VARCHAR(20),  -- 'MRP', 'MANUAL', 'FORECAST'
+    mrp_run_id INTEGER,
+    is_firmed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ 
+-- production_orders: Üretim Emirleri
+CREATE TABLE production_orders (
+    production_order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_number VARCHAR(30) UNIQUE,
+    material_id INTEGER NOT NULL REFERENCES materials(material_id),
+    order_type VARCHAR(20) DEFAULT 'STANDARD',
+    planned_qty DECIMAL(15,4),
+    confirmed_qty DECIMAL(15,4) DEFAULT 0,
+    scrapped_qty DECIMAL(15,4) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'CREATED',
+    priority INTEGER DEFAULT 50,
+    planned_start_date DATETIME,
+    planned_end_date DATETIME,
+    actual_start_date DATETIME,
+    actual_end_date DATETIME,
+    bom_id INTEGER REFERENCES bom_headers(bom_id),
+    route_id INTEGER REFERENCES routes(route_id),
+    batch_number VARCHAR(30),
+    standard_cost DECIMAL(15,4),
+    actual_cost DECIMAL(15,4),
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
+ 
+-- production_order_components: Üretim Emri Bileşenleri
+CREATE TABLE production_order_components (
+    component_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    production_order_id INTEGER NOT NULL REFERENCES production_orders(production_order_id),
+    item_no INTEGER,
+    material_id INTEGER NOT NULL REFERENCES materials(material_id),
+    required_qty DECIMAL(15,4),
+    issued_qty DECIMAL(15,4) DEFAULT 0,
+    returned_qty DECIMAL(15,4) DEFAULT 0,
+    scrap_qty DECIMAL(15,4) DEFAULT 0,
+    uom_id INTEGER,
+    operation_no INTEGER,
+    backflush BOOLEAN DEFAULT FALSE,
+    warehouse_id INTEGER
+);
+ 
+-- production_order_operations: Üretim Emri Operasyonları
+CREATE TABLE production_order_operations (
+    operation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    production_order_id INTEGER NOT NULL REFERENCES production_orders(production_order_id),
+    operation_no INTEGER,
+    work_center_id INTEGER REFERENCES work_centers(work_center_id),
+    description VARCHAR(200),
+    planned_setup_time DECIMAL(10,2),
+    planned_run_time DECIMAL(10,2),
+    actual_setup_time DECIMAL(10,2) DEFAULT 0,
+    actual_run_time DECIMAL(10,2) DEFAULT 0,
+    confirmed_qty DECIMAL(15,4) DEFAULT 0,
+    scrapped_qty DECIMAL(15,4) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    planned_start_date DATETIME,
+    planned_end_date DATETIME,
+    actual_start_date DATETIME,
+    actual_end_date DATETIME
+);
+ 
+-- production_confirmations: Üretim Onayları
+CREATE TABLE production_confirmations (
+    confirmation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    production_order_id INTEGER NOT NULL REFERENCES production_orders(production_order_id),
+    operation_no INTEGER,
+    confirmation_type VARCHAR(20),  -- 'PARTIAL', 'FINAL'
+    yield_qty DECIMAL(15,4),
+    scrap_qty DECIMAL(15,4) DEFAULT 0,
+    setup_time DECIMAL(10,2),
+    run_time DECIMAL(10,2),
+    posting_date DATE,
+    confirmed_by INTEGER,
+    confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT
+);
+ 
+-- mrp_runs: MRP Çalıştırma Logları
+CREATE TABLE mrp_runs (
+    mrp_run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_type VARCHAR(20),
+    planning_horizon_days INTEGER,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    status VARCHAR(20),
+    materials_processed INTEGER,
+    orders_created INTEGER,
+    exceptions_count INTEGER
+);
+
+BÖLÜM 5: GELİŞTİRME YOL HARİTASI
+5.1 Faz 1: Temel Altyapı (3-4 Ay)
+Bu fazda çalışan bir MRP motoru ve temel üretim emri yönetimi hedeflenmektedir.
+Hafta
+Görev
+Çıktı
+Ekranlar
+1-2
+Veritabanı şeması implementasyonu
+Tüm tablolar oluşturulmuş
+-
+3-4
+Material master ve BOM modülü
+Malzeme ve ürün ağacı yönetimi
+Malzeme Master, BOM Yönetimi
+5-6
+Work center ve routing modülü
+İş merkezi ve rota tanımları
+İş Merkezi, Rota Yönetimi
+7-10
+MRP motoru geliştirme
+Temel MRP fonksiyonelliği
+MRP Çalıştırma, Planlı Sipariş Listesi
+11-12
+Üretim emri CRUD ve status
+İş emri lifecycle
+Üretim Emri Liste/Detay
+13-14
+Test ve stabilizasyon
+Stabil Faz 1 release
+-
+
+5.2 Faz 2: Profesyonel Özellikler (3-4 Ay)
+Kapasite planlama, maliyet hesaplama ve gelişmiş scheduling özellikleri eklenmektedir.
+Hafta
+Görev
+Çıktı
+Ekranlar
+1-3
+CRP (Capacity Requirements Planning)
+Kapasite yük analizi
+Kapasite Yük Grafiği
+4-6
+Finite/Infinite scheduling
+Çizelgeleme algoritmaları
+Gantt Chart
+7-8
+Standard costing implementasyonu
+Planlı maliyet hesaplama
+Maliyet sekmesi
+9-10
+Actual costing ve variance
+Fiili maliyet ve sapma
+Maliyet Analizi
+11-12
+Shop floor data collection
+Operatör arayüzü
+Shop Floor Terminal
+13-14
+Dashboard ve raporlar
+Yönetim raporları
+Üretim Dashboard, WIP Raporu
+
+5.3 Faz 3: İleri Düzey Özellikler (3-4 Ay)
+Proses üretimi, Lean/Kanban ve kalite entegrasyonu özellikleri eklenmektedir.
+Hafta
+Görev
+Çıktı
+Ekranlar
+1-4
+Process manufacturing (batch, formula)
+Proses üretim desteği
+Formül/Reçete, Batch Kayıt
+5-6
+Kanban kuralları ve board'ları
+Lean manufacturing
+Kanban Board
+7-8
+Quality inspection entegrasyonu
+Kalite kontrol
+Kalite Kontrol Noktası, Muayene
+9-10
+Fason üretim yönetimi
+Outsource operasyonlar
+Fason Sipariş
+11-12
+e-Dönüşüm entegrasyonu
+GİB uyumu
+e-İrsaliye entegrasyonu
+13-14
+Performans ve OEE
+Verimlilik izleme
+OEE Monitör
+
+5.4 Özet ve Tahmini Süre
+Faz
+Süre
+Toplam Ekran
+Kritik Çıktı
+Faz 1: Temel Altyapı
+3-4 Ay
+8 ekran
+Çalışan MRP ve üretim emri yönetimi
+Faz 2: Profesyonel
+3-4 Ay
+8 ekran
+Kapasite planlama ve shop floor
+Faz 3: İleri Düzey
+3-4 Ay
+8 ekran
+Proses üretimi ve kalite
+TOPLAM
+9-12 Ay
+24+ ekran
+Profesyonel ERP seviyesi
+✓ Bu yol haritası uygulandığında, Akıllı İş ERP orta-büyük ölçekli Türk üretim işletmeleri için SAP, Oracle ve Canias'a alternatif olabilecek profesyonel bir ERP çözümü haline gelecektir.
+
+— Rapor Sonu —

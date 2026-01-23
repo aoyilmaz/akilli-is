@@ -22,6 +22,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 from modules.production.services import WorkOrderService, WorkStationService
+from database.models.production import WorkOrderOperation, WorkOrderLine
 
 
 from config.styles import (
@@ -127,6 +128,104 @@ class StationSelectDialog(QDialog):
         if idx >= 0:
             self.selected_station = self.stations[idx]
             self.accept()
+
+
+class MaterialIssueDialog(QDialog):
+    """Malzeme Çıkış Dialogu"""
+
+    def __init__(self, operation_id, service, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Malzeme Çıkışı (Manual Issue)")
+        self.setMinimumSize(500, 400)
+        self.operation_id = operation_id
+        self.service = service
+        self.items = []
+        self._setup_ui()
+        self._load_data()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Stil
+        self.setStyleSheet(f"background-color: {BG_PRIMARY}; color: {TEXT_PRIMARY};")
+
+        title = QLabel("📦 Malzeme Çıkışı")
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Malzeme Listesi
+        self._list_widget = QListWidget()
+        self._list_widget.setStyleSheet(
+            f"""
+            QListWidget {{ background: {BG_SECONDARY}; border: 1px solid {BORDER}; }}
+            QListWidget::item {{ padding: 10px; border-bottom: 1px solid {BORDER}; }}
+        """
+        )
+        layout.addWidget(self._list_widget)
+
+        # Miktar Girişi
+        form_layout = QHBoxLayout()
+        self.qty_input = QLineEdit()
+        self.qty_input.setPlaceholderText("Miktar...")
+        self.qty_input.setFixedWidth(100)
+        form_layout.addWidget(QLabel("Çıkış Miktarı:"))
+        form_layout.addWidget(self.qty_input)
+        layout.addLayout(form_layout)
+
+        # Butonlar
+        btn_layout = QHBoxLayout()
+        self.btn_issue = QPushButton("📉 Stoktan Düş")
+        self.btn_issue.setStyleSheet(make_btn_style(WARNING, WARNING))
+        self.btn_issue.clicked.connect(self._on_issue)
+
+        btn_close = QPushButton("Kapat")
+        btn_close.clicked.connect(self.accept)
+
+        btn_layout.addWidget(self.btn_issue)
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)
+
+    def _load_data(self):
+        self._list_widget.clear()
+        op = self.service.session.query(WorkOrderOperation).get(self.operation_id)
+        if not op or not op.work_order:
+            return
+
+        # İş emrinin reçetesindeki malzemeleri bul
+        # WorkOrderLine tablosundan çekiyoruz
+        lines = op.work_order.lines
+        for line in lines:
+            item_text = f"{line.item.code} - {line.item.name}"
+            # Gerekli ve Kullanılan
+            info_text = f"Gerekli: {line.required_quantity} | Kullanılan: {line.used_quantity or 0}"
+
+            widget_item = QListWidgetItem(f"{item_text}\n   {info_text}")
+            widget_item.setData(Qt.ItemDataRole.UserRole, line.item_id)
+            self._list_widget.addItem(widget_item)
+
+    def _on_issue(self):
+        item = self._list_widget.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Uyarı", "Lütfen listeden bir malzeme seçin.")
+            return
+
+        item_id = item.data(Qt.ItemDataRole.UserRole)
+        try:
+            qty = float(self.qty_input.text().replace(",", "."))
+        except ValueError:
+            QMessageBox.warning(self, "Uyarı", "Geçersiz miktar!")
+            return
+
+        if qty <= 0:
+            return
+
+        try:
+            self.service.issue_material(self.operation_id, item_id, qty)
+            QMessageBox.information(self, "Başarılı", "Malzeme çıkışı yapıldı.")
+            self.qty_input.clear()
+            self._load_data()  # Listeyi yenile
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
 
 
 class OperatorPanel(QWidget):
@@ -299,28 +398,43 @@ class OperatorPanel(QWidget):
 
         self.btn_start = QPushButton("▶ BAŞLAT")
         self.btn_start.setProperty("class", "btn-large-green")
-        self.btn_start.setMinimumHeight(55)
+        self.btn_start.setMinimumHeight(60)
         self.btn_start.clicked.connect(self._start_operation)
         btn_grid.addWidget(self.btn_start, 0, 0)
 
         self.btn_pause = QPushButton("⏸ DURAKLAT")
         self.btn_pause.setProperty("class", "btn-large-yellow")
-        self.btn_pause.setMinimumHeight(55)
+        self.btn_pause.setMinimumHeight(60)
         self.btn_pause.clicked.connect(self._pause_operation)
         self.btn_pause.hide()
         btn_grid.addWidget(self.btn_pause, 0, 0)
 
+        # Üretim Gir Butonu (YENİ)
+        self.btn_produce = QPushButton("📦 ÜRETİM GİR")
+        self.btn_produce.setProperty("class", "btn-large-teal")
+        self.btn_produce.setMinimumHeight(60)
+        self.btn_produce.clicked.connect(self._report_production)
+        self.btn_produce.setEnabled(False)  # Sadece çalışırken aktif
+        btn_grid.addWidget(self.btn_produce, 0, 1)
+
+        self.btn_material = QPushButton("🧪 MALZEME")
+        self.btn_material.setProperty("class", "btn-large-yellow")
+        self.btn_material.setMinimumHeight(60)
+        self.btn_material.clicked.connect(self._issue_material)
+        self.btn_material.setEnabled(False)
+        btn_grid.addWidget(self.btn_material, 1, 0)
+
         self.btn_scrap = QPushButton("🗑 HURDA")
         self.btn_scrap.setProperty("class", "btn-large-red")
-        self.btn_scrap.setMinimumHeight(55)
+        self.btn_scrap.setMinimumHeight(60)
         self.btn_scrap.clicked.connect(self._report_scrap)
-        btn_grid.addWidget(self.btn_scrap, 0, 1)
+        btn_grid.addWidget(self.btn_scrap, 1, 1)
 
         self.btn_finish = QPushButton("✅ BİTİR")
-        self.btn_finish.setProperty("class", "btn-large-teal")
-        self.btn_finish.setMinimumHeight(55)
+        self.btn_finish.setProperty("class", "btn-large-blue")
+        self.btn_finish.setMinimumHeight(60)
         self.btn_finish.clicked.connect(self._finish_operation)
-        btn_grid.addWidget(self.btn_finish, 1, 0, 1, 2)
+        btn_grid.addWidget(self.btn_finish, 2, 0, 1, 2)
 
         center_layout.addLayout(btn_grid)
 
@@ -369,17 +483,23 @@ class OperatorPanel(QWidget):
             self.btn_start.setEnabled(False)
             self.btn_pause.hide()
             self.btn_start.show()
+            self.btn_produce.setEnabled(False)
+            self.btn_material.setEnabled(False)
             self.btn_scrap.setEnabled(False)
             self.btn_finish.setEnabled(False)
         elif state == "selected":
             self.btn_start.setEnabled(True)
             self.btn_pause.hide()
             self.btn_start.show()
+            self.btn_produce.setEnabled(False)
+            self.btn_material.setEnabled(True)  # Malzeme her zaman girilebilir
             self.btn_scrap.setEnabled(False)
             self.btn_finish.setEnabled(False)
         elif state == "running":
             self.btn_start.hide()
             self.btn_pause.show()
+            self.btn_produce.setEnabled(True)
+            self.btn_material.setEnabled(True)
             self.btn_scrap.setEnabled(True)
             self.btn_finish.setEnabled(True)
 
@@ -533,23 +653,91 @@ class OperatorPanel(QWidget):
                 except Exception as e:
                     QMessageBox.critical(self, "Hata", str(e))
 
-    def _finish_operation(self):
-        """Operasyonu bitir"""
+    def _report_production(self):
+        """Parçalı üretim girişi"""
         if not self.active_operation:
             return
 
-        reply = QMessageBox.question(
-            self,
-            "Onayla",
-            "Bu operasyonu tamamlamak istiyor musunuz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        qty, ok = QInputDialog.getDouble(
+            self, "Üretim Girişi", "Üretilen Miktar:", 0, 0, 100000, 2
         )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        if ok and qty > 0:
             try:
-                self.service.complete_operation(self.active_operation.id)
+                # Backend çağrısı (pack_type opsiyonel, şimdilik sabit)
+                result = self.service.create_partial_production(
+                    self.active_operation.id, qty
+                )
+
+                # Başarılı mesajı
+                msg = f"""
+                <b>Üretim Kaydedildi!</b><br/>
+                Koli No: {result.get('pack_id')}<br/>
+                Miktar: {result.get('quantity')}
+                """
+                QMessageBox.information(self, "Başarılı", msg)
+
+                # Detayı güncelle (tamamlanan miktarı artırmak için)
+                self._on_job_selected(self.job_list.currentItem())
+
+            except Exception as e:
+                QMessageBox.critical(self, "Hata", str(e))
+
+    def _issue_material(self):
+        """Malzeme çıkış ekranını aç"""
+        if not self.active_operation:
+            return
+
+        dialog = MaterialIssueDialog(self.active_operation.id, self.service, self)
+        dialog.exec()
+
+    def _finish_operation(self):
+        """Operasyonu bitir (Özet Ekranlı)"""
+        if not self.active_operation:
+            return
+
+        # Özet bilgilerini hazırla
+        op = self.active_operation
+        wo = op.work_order
+
+        # Süre hesapla
+        duration_str = self.timer_label.text()
+
+        # Tamamlanan miktar
+        total_completed = op.completed_quantity or 0
+
+        summary = f"""
+        <h3>Operasyon Tamamlama Özeti</h3>
+        <hr>
+        <b>İş Emri:</b> {wo.order_no}<br>
+        <b>Ürün:</b> {wo.item.name}<br>
+        <b>Operasyon:</b> {op.name}<br>
+        <br>
+        <b>Süre:</b> {duration_str}<br>
+        <b>Toplam Üretilen:</b> {total_completed} {wo.unit.code if wo.unit else ''}<br>
+        <hr>
+        <i>Onaylıyor musunuz?</i>
+        """
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Operasyon Tamamlama")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(summary)
+        msg.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        msg.setIcon(QMessageBox.Icon.Question)
+
+        if msg.exec() == QMessageBox.StandardButton.Yes:
+            try:
+                # Süreyi parse et (HH:MM:SS -> dakika)
+                h, m, s = map(int, duration_str.split(":"))
+                minutes = h * 60 + m + (1 if s > 30 else 0)
+
+                self.service.complete_operation(self.active_operation.id, minutes)
                 self.timer.stop()
                 self.active_operation = None
+
+                # UI Sıfırla
                 self.order_label.setText("📋 İş Emri: -")
                 self.op_title.setText("Operasyon seçin...")
                 self.op_title.setStyleSheet(f"color: {TEXT_SECONDARY};")
@@ -557,7 +745,8 @@ class OperatorPanel(QWidget):
                 self.timer_label.setText("00:00:00")
                 self._set_ui_state("idle")
                 self._load_jobs()
-                QMessageBox.information(self, "OK", "Operasyon tamamlandı.")
+
+                QMessageBox.information(self, "OK", "Operasyon başarıyla tamamlandı.")
             except Exception as e:
                 QMessageBox.critical(self, "Hata", str(e))
 

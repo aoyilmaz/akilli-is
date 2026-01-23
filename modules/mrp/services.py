@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import List, Dict, Optional, Tuple
 import json
+import collections
 
 from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import Session
@@ -61,10 +62,10 @@ class MRPService:
         MRP çalıştır
 
         1. MRP Run kaydı oluştur
-        2. Brüt ihtiyaçları topla
-        3. BOM patlatma yap
+        2. Ürünleri işlem sırasına (Low Level Code) göre sırala
+        3. Brüt ihtiyaçları topla (Bağımsız + Bağımlı İhtiyaçlar)
         4. Net ihtiyaç hesapla
-        5. Tedarik önerileri oluştur
+        5. Tedarik önerileri oluştur ve alt bileşenlere ihtiyaç aktar
         """
         # MRP Run oluştur
         run = MRPRun(
@@ -83,17 +84,31 @@ class MRPService:
         start_date = date.today()
         end_date = start_date + timedelta(days=horizon_days)
 
-        # Ürünleri belirle
+        # 1. Low Level Code Hesapla ve Sırala
+        # Bu işlem, üst ürünlerin (Level 0) önce planlanmasını sağlar
+        level_map = self._calculate_low_level_codes()
+
         items = self._get_items_to_plan(item_ids)
+        # Level'a göre küçükten büyüğe sırala (0, 1, 2...)
+        items.sort(key=lambda x: level_map.get(x.id, 0))
+
+        # 2. Bağımlı İhtiyaçlar Deposu
+        # {item_id: [requirement_dict, ...]}
+        derived_demands = collections.defaultdict(list)
 
         processed_items = 0
         items_with_shortage = 0
         total_suggestions = 0
 
         for item in items:
-            # Brüt ihtiyaçları topla
+            # Brüt ihtiyaçları topla (Satış + İş Emri + Taranan-Bağımlı)
             gross_reqs = self._get_gross_requirements(
-                item.id, start_date, end_date, include_work_orders, include_sales_orders
+                item.id,
+                start_date,
+                end_date,
+                include_work_orders,
+                include_sales_orders,
+                derived_demands=derived_demands,
             )
 
             # Mevcut stok
@@ -122,11 +137,15 @@ class MRPService:
                     demand_source_ref=req.get("source_ref"),
                 )
 
-                # Tedarik önerisi
+                # Tedarik önerisi ve BOM Patlatma
                 if req["net"] > 0:
-                    self._create_suggestion(line, item, req)
+                    created_line = self._create_suggestion(line, item, req)
                     items_with_shortage += 1
                     total_suggestions += 1
+
+                    # Eğer üretim önerisi ise, alt bileşenlere ihtiyaç aktar
+                    if created_line.suggestion_type == SuggestionType.MANUFACTURE:
+                        self._explode_demand(item, created_line, derived_demands)
 
                 self.session.add(line)
 
@@ -141,6 +160,82 @@ class MRPService:
 
         self.session.commit()
         return run
+
+    def _calculate_low_level_codes(self) -> Dict[int, int]:
+        """
+        Tüm aktif BOM'ları tarayarak ürünlerin Low Level Code'larını hesaplar.
+        0: Nihai ürün (En üst seviye)
+        N: Alt bileşen (N. seviye)
+        Bir bileşen birden fazla yerde kullanılıyorsa, en derin seviyesini alır.
+        """
+        levels = collections.defaultdict(int)
+
+        # Tüm aktif BOM satırlarını çek: Parent -> Child
+        # Her bağlantı için Child.level = max(Child.level, Parent.level + 1)
+
+        # Basit bir graf dolaşımı yerine, çoklu geçiş (relaxation) yöntemi ile çözelim (Bellman-Ford benzeri)
+        # BOM döngüsü varsa sonsuz döngüye girmemesi için limit koyuyoruz
+
+        boms = (
+            self.session.query(BillOfMaterials)
+            .join(BOMLine)
+            .filter(
+                BillOfMaterials.is_active == True,
+                BillOfMaterials.status == BOMStatus.ACTIVE,
+            )
+            .all()
+        )
+
+        # Dependency graph: parent_id -> [child_ids]
+        graph = collections.defaultdict(list)
+        all_items = set()
+
+        for bom in boms:
+            all_items.add(bom.item_id)
+            for line in bom.lines:
+                graph[bom.item_id].append(line.item_id)
+                all_items.add(line.item_id)
+
+        # Başlangıçta hepsi 0.
+        # Değişiklik olmayana kadar relax et
+        changed = True
+        iterations = 0
+        max_iterations = 20  # Max derinlik varsayımı
+
+        while changed and iterations < max_iterations:
+            changed = False
+            iterations += 1
+
+            for parent_id, children in graph.items():
+                parent_level = levels[parent_id]
+                for child_id in children:
+                    if levels[child_id] < parent_level + 1:
+                        levels[child_id] = parent_level + 1
+                        changed = True
+
+        return levels
+
+    def _explode_demand(self, parent_item: Item, line: MRPLine, derived_demands: Dict):
+        """
+        Üretim önerisini patlatıp alt bileşenlere talep olarak ekler.
+        """
+        # Sadece 1 seviye patlat (alt seviyeler kendi sıraları gelince işlenecek)
+        components = self.explode_bom(
+            parent_item.id, line.planned_order_release, max_level=1
+        )
+
+        # Önerilen başlama tarihi (lead time öncesi)
+        start_date = line.suggested_date
+
+        for comp in components:
+            req = {
+                "date": start_date,  # Alt bileşen, üst bileşenin üretim başlangıcında hazır olmalı
+                "gross": comp["quantity"],
+                "source": "mrp_dependent",  # Özel kaynak kodu
+                "source_id": line.mrp_run_id,  # Referans
+                "source_ref": f"P:{parent_item.code}",  # Parent ref
+            }
+            derived_demands[comp["item_id"]].append(req)
 
     def _generate_run_no(self) -> str:
         """MRP çalışma numarası oluştur"""
@@ -183,13 +278,15 @@ class MRPService:
         end_date: date,
         include_wo: bool = True,
         include_so: bool = True,
+        derived_demands: Dict = None,
     ) -> List[Dict]:
         """
         Brüt ihtiyaçları topla
 
         Kaynaklar:
-        - İş emirleri (WorkOrderLine)
-        - Satış siparişleri (SalesOrderItem)
+        - İş emirleri
+        - Satış siparişleri
+        - Bağımlı Talepler (derived_demands)
         """
         requirements = []
 
@@ -202,6 +299,13 @@ class MRPService:
         if include_so:
             so_reqs = self._get_sales_order_requirements(item_id, start_date, end_date)
             requirements.extend(so_reqs)
+
+        # Bağımlı Taleplerden (MRP patlatma sonucu gelenler)
+        if derived_demands and item_id in derived_demands:
+            derived = derived_demands[item_id]
+            # Tarih filtresi uygula
+            valid_derived = [d for d in derived if start_date <= d["date"] <= end_date]
+            requirements.extend(valid_derived)
 
         # Tarihe göre sırala
         requirements.sort(key=lambda x: x["date"])
@@ -233,7 +337,7 @@ class MRPService:
         return [
             {
                 "date": line.work_order.planned_start,
-                "gross": line.planned_quantity or Decimal(0),
+                "gross": line.required_quantity or Decimal(0),
                 "source": DemandSource.WORK_ORDER,
                 "source_id": line.work_order_id,
                 "source_ref": line.work_order.order_no,
@@ -261,12 +365,12 @@ class MRPService:
 
         return [
             {
-                "date": item.sales_order.delivery_date,
+                "date": item.order.delivery_date,
                 "gross": (item.quantity or Decimal(0))
                 - (item.delivered_quantity or Decimal(0)),
                 "source": DemandSource.SALES_ORDER,
-                "source_id": item.sales_order_id,
-                "source_ref": item.sales_order.order_no,
+                "source_id": item.order_id,
+                "source_ref": item.order.order_no,
             }
             for item in items
             if (item.quantity or 0) > (item.delivered_quantity or 0)
@@ -279,8 +383,6 @@ class MRPService:
     def _get_current_stock(self, item_id: int) -> Decimal:
         """
         Mevcut kullanılabilir stok (rezervasyonlar hariç)
-
-        Formül: quantity - reserved_quantity
         """
         result = (
             self.session.query(
@@ -370,11 +472,27 @@ class MRPService:
             if projected < safety:
                 net = safety - projected
 
-            # Sonraki dönem için eldeki
+            # Sonraki dönem için eldeki (Eğer tedarik yapılacaksa stok tamamlanmış olur varsayımı? Hayır, henüz tedarik yok.)
+            # Ancak MRP mantığında, ihtiyaç kadar tedarik ÖNERİLDİĞİ varsayılır ve bakiye sıfırlanır (veya safety stoğa döner).
+            # Infinite Capacity Planning mantığı: İhtiyaç karşılandı kabul et.
+
+            if net > 0:
+                # İhtiyaç kadar giriş olacağını varsay
+                projected = safety
+
             on_hand = projected
 
             # İlk ihtiyaç kaynağını al
             first_req = data["reqs"][0] if data["reqs"] else {}
+
+            # Kaynak tipi belirle (Sales Order, Work Order veya Dependent)
+            source_type = first_req.get("source")
+            if (
+                not isinstance(source_type, DemandSource)
+                and source_type == "mrp_dependent"
+            ):
+                # Enum dışı string geldiyse
+                source_type = None
 
             results.append(
                 {
@@ -383,7 +501,7 @@ class MRPService:
                     "scheduled": sched,
                     "on_hand": projected,
                     "net": net,
-                    "source": first_req.get("source"),
+                    "source": source_type,
                     "source_id": first_req.get("source_id"),
                     "source_ref": first_req.get("source_ref"),
                 }
@@ -395,7 +513,7 @@ class MRPService:
     # TEDARİK ÖNERİSİ
     # =====================
 
-    def _create_suggestion(self, line: MRPLine, item: Item, req: Dict):
+    def _create_suggestion(self, line: MRPLine, item: Item, req: Dict) -> MRPLine:
         """Tedarik önerisi oluştur"""
         net = req["net"]
         req_date = req["date"]
@@ -407,6 +525,8 @@ class MRPService:
         lead_days = item.lead_time_days or 0
         order_date = req_date - timedelta(days=lead_days)
         if order_date < date.today():
+            # Geç kalındı uyarısı aslında burada yapılabilir
+            # Şimdilik bugüne çekiyoruz
             order_date = date.today()
 
         # Tedarik türü belirle
@@ -419,15 +539,16 @@ class MRPService:
         line.suggestion_type = sug_type
         line.suggested_qty = qty
         line.suggested_date = order_date
-        line.planned_order_receipt = qty
-        line.planned_order_release = qty
+
+        # Planlanan giriş ve çıkışlar
+        line.planned_order_receipt = qty  # İhtiyaç tarihinde elimize geçecek miktar
+        line.planned_order_release = qty  # Sipariş tarihinde işleme girecek miktar
+
+        return line
 
     def _apply_lot_sizing(self, net: Decimal, item: Item) -> Decimal:
         """
         Lot boyutlandırma
-
-        - Minimum sipariş miktarı
-        - Sipariş katı
         """
         qty = net
         min_qty = Decimal(str(item.min_order_qty or 1))
@@ -542,13 +663,6 @@ class MRPService:
     def apply_suggestion(self, line_id: int, auto_create: bool = True) -> Dict:
         """
         Öneriyi uygula
-
-        Args:
-            line_id: MRP satır ID
-            auto_create: True ise otomatik sipariş/iş emri oluştur
-
-        Returns:
-            dict: İşlem sonucu
         """
         line = self.session.query(MRPLine).get(line_id)
         if not line:
@@ -663,9 +777,6 @@ class MRPService:
     def apply_all_suggestions(self, run_id: int, auto_create: bool = True) -> Dict:
         """
         Tüm önerileri uygula
-
-        Satınalma önerileri tek talep altında gruplandı
-        Üretim önerileri ayrı iş emirleri olarak oluşturulur
         """
         suggestions = self.get_suggestions(run_id)
 
@@ -676,7 +787,7 @@ class MRPService:
             "errors": [],
         }
 
-        # Satınalma önerilerini grupla (tek talep, çoklu kalem)
+        # Satınalma ve Üretim önerileri
         purchase_lines = [
             s for s in suggestions if s.suggestion_type == SuggestionType.PURCHASE
         ]
