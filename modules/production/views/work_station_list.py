@@ -11,15 +11,20 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QMenu,
     QMessageBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
     ColumnConfig,
     MiniStatCard,
+    ScrollableCardContainer,
 )
 
 
@@ -42,6 +47,7 @@ class WorkStationListPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._search_text = ""
         self._setup_ui()
         self._connect_signals()
 
@@ -53,7 +59,7 @@ class WorkStationListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="İş İstasyonları",
-            icon="🏭",
+            icon=ICONS.PRODUCTION,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -63,10 +69,29 @@ class WorkStationListPage(QWidget):
         )
         layout.addWidget(self.header)
 
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
+        # Filtre ve İstatistik Alanı
+        filter_stats_layout = QHBoxLayout()
+        filter_stats_layout.setSpacing(24)
 
+        # Durum Filtresi
+        filter_box = QHBoxLayout()
+        filter_box.setSpacing(8)
+
+        lbl_filter = QLabel("Durum:")
+        lbl_filter.setStyleSheet("font-weight: bold; color: #a1a1aa;")
+        filter_box.addWidget(lbl_filter)
+
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(["Tümü", "Aktif", "Pasif"])
+        self.status_filter.setCurrentText("Aktif")
+        self.status_filter.setFixedWidth(120)
+        filter_box.addWidget(self.status_filter)
+
+        filter_stats_layout.addLayout(filter_box)
+        filter_stats_layout.addStretch()
+
+        # İstatistik kartları
+        stats_container = ScrollableCardContainer()
         self.stat_cards = {}
         self.stat_cards["total"] = MiniStatCard("🏭 Toplam", "0", "#6366f1")
         self.stat_cards["machine"] = MiniStatCard("⚙️ Makine", "0", "#3b82f6")
@@ -74,9 +99,12 @@ class WorkStationListPage(QWidget):
         self.stat_cards["assembly"] = MiniStatCard("🔩 Montaj Hattı", "0", "#f59e0b")
 
         for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
+            stats_container.add_card(card)
+        stats_container.add_stretch()
+
+        filter_stats_layout.addWidget(stats_container)
+
+        layout.addLayout(filter_stats_layout)
 
         # Tablo
         columns = [
@@ -107,6 +135,7 @@ class WorkStationListPage(QWidget):
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
         self.header.add_clicked.connect(self.new_clicked.emit)
         self.header.search_changed.connect(self._on_search)
+        self.status_filter.currentIndexChanged.connect(self._apply_filters)
         self.table.row_double_clicked.connect(self.edit_clicked.emit)
 
     def load_data(self, stations: list):
@@ -133,6 +162,9 @@ class WorkStationListPage(QWidget):
         self.stat_cards["assembly"].update_value(str(assembly_count))
 
         self.count_label.setText(f"Toplam: {len(stations)} istasyon")
+
+        # apply existing filters
+        self._apply_filters()
 
     def _populate_row(self, row: int, station: dict, visible_cols: list):
         station_id = station.get("id")
@@ -188,23 +220,65 @@ class WorkStationListPage(QWidget):
 
             elif col_key == "is_active":
                 is_active = station.get("is_active", True)
-                text = "✅ Aktif" if is_active else "❌ Pasif"
-                color = "#10b981" if is_active else "#ef4444"
-                item = QTableWidgetItem(text)
-                item.setForeground(QColor(color))
+                t = get_theme()
+                item = QTableWidgetItem()
+                if is_active:
+                    item.setText("Aktif")
+                    item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                    )
+                    item.setForeground(QColor(t.success))
+                else:
+                    item.setText("Pasif")
+                    item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                    )
+                    item.setForeground(QColor(t.text_muted))
                 self.table.setItem(row, col_idx, item)
 
         self.table.setRowHeight(row, 48)
 
     def _on_search(self, text: str):
-        text = text.lower()
+        self._search_text = text.lower()
+        self._apply_filters()
+
+    def _apply_filters(self):
+        status_filter = self.status_filter.currentText()
+
+        # Durum kolonunun indexini bul
+        status_col_idx = -1
+        for col in range(self.table.columnCount()):
+            header_item = self.table.horizontalHeaderItem(col)
+            if header_item and header_item.text() == "Durum":
+                status_col_idx = col
+                break
+
         for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(self.table.columnCount())
-            )
-            self.table.setRowHidden(row, not match)
+            # Search filter
+            search_match = True
+            if self._search_text:
+                search_match = False
+                for col in range(self.table.columnCount()):
+                    item = self.table.item(row, col)
+                    if item and self._search_text in item.text().lower():
+                        search_match = True
+                        break
+
+            # Status filter
+            status_match = True
+            if status_filter != "Tümü" and status_col_idx != -1:
+                item = self.table.item(row, status_col_idx)
+                if item:
+                    status_text = item.text()
+                    is_active = "Aktif" in status_text
+                    is_passive = "Pasif" in status_text
+
+                    if status_filter == "Aktif" and not is_active:
+                        status_match = False
+                    elif status_filter == "Pasif" and not is_passive:
+                        status_match = False
+
+            self.table.setRowHidden(row, not (search_match and status_match))
 
     def _show_context_menu(self, position):
         row = self.table.rowAt(position.y())

@@ -69,6 +69,14 @@ class LotSizingProcedure(enum.Enum):
     PERIOD = "period"  # Periyodik (Haftalık, Aylık vb.)
 
 
+class StockRequestStatus(enum.Enum):
+    """Stok talep durumları"""
+
+    PENDING = "pending"  # Beklemede
+    APPROVED = "approved"  # Onaylandı
+    REJECTED = "rejected"  # Reddedildi
+
+
 class Unit(BaseModel):
     """Birim tanımları"""
 
@@ -560,3 +568,48 @@ class StockMovement(BaseModel):
 
     def __repr__(self):
         return f"<StockMovement(type={self.movement_type.value}, item={self.item_code}, qty={self.quantity})>"
+
+
+class StockRequest(BaseModel):
+    """Stok kartı açma talepleri"""
+
+    __tablename__ = "stock_requests"
+
+    # Talep Bilgileri
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    request_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(
+        Enum(StockRequestStatus), default=StockRequestStatus.PENDING, nullable=False
+    )
+
+    # Önerilen Stok Bilgileri
+    proposed_name = Column(String(300), nullable=False)
+    proposed_code = Column(String(50), nullable=True)
+    item_type = Column(Enum(ItemType), default=ItemType.HAMMADDE, nullable=False)
+    category_id = Column(Integer, ForeignKey("item_categories.id"), nullable=True)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+
+    # Referans
+    reference_stock_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+
+    # Açıklama
+    description = Column(Text, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+
+    # Sonuç
+    created_stock_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+
+    # İlişkiler
+    requester = relationship("User", foreign_keys=[requester_id])
+    category = relationship("ItemCategory")
+    unit = relationship("Unit")
+    reference_stock = relationship("Item", foreign_keys=[reference_stock_id])
+    created_stock = relationship("Item", foreign_keys=[created_stock_id])
+
+    __table_args__ = (
+        Index("idx_request_status", "status"),
+        Index("idx_request_requester", "requester_id"),
+    )
+
+    def __repr__(self):
+        return f"<StockRequest(id={self.id}, name={self.proposed_name}, status={self.status.value})>"

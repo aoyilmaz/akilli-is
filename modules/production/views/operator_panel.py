@@ -18,8 +18,10 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QLineEdit,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSize
 from PyQt6.QtGui import QFont
+import qtawesome as qta
+from config.icons import ICONS
 
 from modules.production.services import WorkOrderService, WorkStationService
 from database.models.production import WorkOrderOperation, WorkOrderLine
@@ -174,7 +176,8 @@ class MaterialIssueDialog(QDialog):
 
         # Butonlar
         btn_layout = QHBoxLayout()
-        self.btn_issue = QPushButton("📉 Stoktan Düş")
+        self.btn_issue = QPushButton("Stoktan Düş")
+        self.btn_issue.setIcon(qta.icon(ICONS.PACKAGE_MINUS, color="white"))
         self.btn_issue.setStyleSheet(make_btn_style(WARNING, WARNING))
         self.btn_issue.clicked.connect(self._on_issue)
 
@@ -316,7 +319,9 @@ class OperatorPanel(QWidget):
         h_layout.addWidget(self.barcode_input)
 
         # İstasyon değiştir
-        change_btn = QPushButton("⚙")
+        change_btn = QPushButton()
+        change_btn.setIcon(qta.icon(ICONS.SETTINGS, color="#64748b"))
+        change_btn.setIconSize(QSize(24, 24))
         change_btn.setFixedSize(36, 36)
         change_btn.setProperty("class", "btn-icon-circle")
         change_btn.clicked.connect(self._select_station)
@@ -396,13 +401,17 @@ class OperatorPanel(QWidget):
         btn_grid = QGridLayout()
         btn_grid.setSpacing(10)
 
-        self.btn_start = QPushButton("▶ BAŞLAT")
+        self.btn_start = QPushButton("BAŞLAT")
+        self.btn_start.setIcon(qta.icon(ICONS.PLAY, color="white"))
+        self.btn_start.setIconSize(QSize(32, 32))
         self.btn_start.setProperty("class", "btn-large-green")
         self.btn_start.setMinimumHeight(60)
         self.btn_start.clicked.connect(self._start_operation)
         btn_grid.addWidget(self.btn_start, 0, 0)
 
-        self.btn_pause = QPushButton("⏸ DURAKLAT")
+        self.btn_pause = QPushButton("DURAKLAT")
+        self.btn_pause.setIcon(qta.icon(ICONS.PAUSE, color="white"))
+        self.btn_pause.setIconSize(QSize(32, 32))
         self.btn_pause.setProperty("class", "btn-large-yellow")
         self.btn_pause.setMinimumHeight(60)
         self.btn_pause.clicked.connect(self._pause_operation)
@@ -410,27 +419,35 @@ class OperatorPanel(QWidget):
         btn_grid.addWidget(self.btn_pause, 0, 0)
 
         # Üretim Gir Butonu (YENİ)
-        self.btn_produce = QPushButton("📦 ÜRETİM GİR")
+        self.btn_produce = QPushButton("ÜRETİM GİR")
+        self.btn_produce.setIcon(qta.icon(ICONS.INVENTORY, color="white"))
+        self.btn_produce.setIconSize(QSize(32, 32))
         self.btn_produce.setProperty("class", "btn-large-teal")
         self.btn_produce.setMinimumHeight(60)
         self.btn_produce.clicked.connect(self._report_production)
         self.btn_produce.setEnabled(False)  # Sadece çalışırken aktif
         btn_grid.addWidget(self.btn_produce, 0, 1)
 
-        self.btn_material = QPushButton("🧪 MALZEME")
+        self.btn_material = QPushButton("MALZEME")
+        self.btn_material.setIcon(qta.icon(ICONS.FLASK, color="white"))
+        self.btn_material.setIconSize(QSize(32, 32))
         self.btn_material.setProperty("class", "btn-large-yellow")
         self.btn_material.setMinimumHeight(60)
         self.btn_material.clicked.connect(self._issue_material)
         self.btn_material.setEnabled(False)
         btn_grid.addWidget(self.btn_material, 1, 0)
 
-        self.btn_scrap = QPushButton("🗑 HURDA")
+        self.btn_scrap = QPushButton("HURDA")
+        self.btn_scrap.setIcon(qta.icon(ICONS.DELETE, color="white"))
+        self.btn_scrap.setIconSize(QSize(32, 32))
         self.btn_scrap.setProperty("class", "btn-large-red")
         self.btn_scrap.setMinimumHeight(60)
         self.btn_scrap.clicked.connect(self._report_scrap)
         btn_grid.addWidget(self.btn_scrap, 1, 1)
 
-        self.btn_finish = QPushButton("✅ BİTİR")
+        self.btn_finish = QPushButton("BİTİR")
+        self.btn_finish.setIcon(qta.icon(ICONS.SUCCESS, color="white"))
+        self.btn_finish.setIconSize(QSize(32, 32))
         self.btn_finish.setProperty("class", "btn-large-blue")
         self.btn_finish.setMinimumHeight(60)
         self.btn_finish.clicked.connect(self._finish_operation)
@@ -465,7 +482,8 @@ class OperatorPanel(QWidget):
         right_layout.addWidget(self.personnel_list)
 
         # Personel çıkar butonu
-        remove_btn = QPushButton("➖ Çıkar")
+        remove_btn = QPushButton("Çıkar")
+        remove_btn.setIcon(qta.icon(ICONS.MINUS_CIRCLE))
         remove_btn.setProperty("class", "btn-secondary")
         remove_btn.clicked.connect(self._remove_personnel)
         right_layout.addWidget(remove_btn)

@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal, QDate, Qt
 from database.models.crm import OpportunityStage, Lead
 from modules.development import ErrorHandler
+from ui.components import CurrencyInput
 
 
 class OpportunityFormPage(QWidget):
@@ -87,9 +88,10 @@ class OpportunityFormPage(QWidget):
         group_finance = QGroupBox("Finansal Detaylar")
         form_finance = QFormLayout(group_finance)
 
-        self.inp_revenue = QDoubleSpinBox()
-        self.inp_revenue.setRange(0, 1000000000)
-        self.inp_revenue.setPrefix("₺")
+        self.inp_revenue = CurrencyInput()
+        self.inp_revenue.setDecimals(2)
+        # Suffix is added by default by CurrencyInput (if not disabled)
+        # CurrencyInput constructor accepts currency_symbol if we want default or custom. Default is "₺".
         form_finance.addRow("Beklenen Gelir:", self.inp_revenue)
 
         self.inp_probability = QSpinBox()

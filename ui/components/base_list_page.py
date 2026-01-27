@@ -6,7 +6,6 @@ Tüm liste sayfalarının türeyeceği temel sınıf.
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QMessageBox,
 )
 from PyQt6.QtCore import pyqtSignal
@@ -14,7 +13,7 @@ from typing import List, Dict, Optional
 
 from ui.components.page_header import PageHeader
 from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
-from ui.components.stat_cards import MiniStatCard
+from ui.components.stat_cards import MiniStatCard, ScrollableCardContainer
 
 
 class BaseListPage(QWidget):
@@ -105,10 +104,10 @@ class BaseListPage(QWidget):
 
         # İstatistik Kartları Alanı
         if self.show_stats:
-            self.stats_layout = QHBoxLayout()
-            self.stats_layout.setSpacing(12)
+            self.stats_container = ScrollableCardContainer()
+            self.stats_layout = self.stats_container.layout
             self.stats_layout.addStretch()
-            layout.addLayout(self.stats_layout)
+            layout.addWidget(self.stats_container)
         else:
             self.stats_layout = None
 

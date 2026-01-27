@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from ui.components import CurrencyInput
+
 
 class ItemSelectorDialog(QDialog):
     """Stok kartı seçim dialogu"""
@@ -55,12 +57,8 @@ class ItemSelectorDialog(QDialog):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Kod", "Ad", "Birim", "Stok"])
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch
@@ -72,8 +70,7 @@ class ItemSelectorDialog(QDialog):
 
         # Butonlar
         btn_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
@@ -89,12 +86,8 @@ class ItemSelectorDialog(QDialog):
             self.table.setItem(row, 0, code_item)
 
             self.table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-            self.table.setItem(
-                row, 2, QTableWidgetItem(item.get("unit_name", ""))
-            )
-            self.table.setItem(
-                row, 3, QTableWidgetItem(str(item.get("stock", 0)))
-            )
+            self.table.setItem(row, 2, QTableWidgetItem(item.get("unit_name", "")))
+            self.table.setItem(row, 3, QTableWidgetItem(str(item.get("stock", 0))))
 
     def _on_search(self, text: str):
         text = text.lower()
@@ -117,6 +110,7 @@ class ItemSelectorDialog(QDialog):
             if item:
                 self.selected_item = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
+
 
 class CustomerSelectorDialog(QDialog):
     """Müşteri seçim dialogu"""
@@ -143,15 +137,9 @@ class CustomerSelectorDialog(QDialog):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            ["Kod", "Ad", "Telefon", "E-posta"]
-        )
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.table.setHorizontalHeaderLabels(["Kod", "Ad", "Telefon", "E-posta"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch
@@ -163,8 +151,7 @@ class CustomerSelectorDialog(QDialog):
 
         # Butonlar
         btn_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
@@ -179,9 +166,7 @@ class CustomerSelectorDialog(QDialog):
             code_item.setData(Qt.ItemDataRole.UserRole, customer)
             self.table.setItem(row, 0, code_item)
 
-            self.table.setItem(
-                row, 1, QTableWidgetItem(customer.get("name", ""))
-            )
+            self.table.setItem(row, 1, QTableWidgetItem(customer.get("name", "")))
             self.table.setItem(
                 row, 2, QTableWidgetItem(customer.get("phone", "") or "-")
             )
@@ -210,6 +195,7 @@ class CustomerSelectorDialog(QDialog):
             if item:
                 self.selected_customer = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
+
 
 class SalesOrderFormPage(QWidget):
     """Satış sipariş formu"""
@@ -255,9 +241,7 @@ class SalesOrderFormPage(QWidget):
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
-        title_text = (
-            "Sipariş Düzenle" if self.is_edit_mode else "Yeni Satış Siparişi"
-        )
+        title_text = "Sipariş Düzenle" if self.is_edit_mode else "Yeni Satış Siparişi"
         title = QLabel(f"🛒 {title_text}")
         header_layout.addWidget(title)
         header_layout.addStretch()
@@ -332,7 +316,7 @@ class SalesOrderFormPage(QWidget):
         general_layout.addWidget(self._create_label("Para Birimi"), row, 0)
         self.currency_input = QComboBox()
         for c in self.currencies:
-            self.currency_input.addItem(f"{c['code']} - {c['name']}", c['id'])
+            self.currency_input.addItem(f"{c['code']} - {c['name']}", c["id"])
         general_layout.addWidget(self.currency_input, row, 1)
         row += 1
 
@@ -353,17 +337,23 @@ class SalesOrderFormPage(QWidget):
         # Kalem ekleme butonu
         add_item_btn = QPushButton("➕ Kalem Ekle")
         add_item_btn.clicked.connect(self._add_item_row)
-        items_layout.addWidget(
-            add_item_btn, alignment=Qt.AlignmentFlag.AlignLeft
-        )
+        items_layout.addWidget(add_item_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Kalemler tablosu
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(8)
-        self.items_table.setHorizontalHeaderLabels([
-            "Stok Kodu", "Stok Adı", "Miktar", "Birim",
-            "Birim Fiyat", "İskonto %", "Tutar", "İşlem"
-        ])
+        self.items_table.setHorizontalHeaderLabels(
+            [
+                "Stok Kodu",
+                "Stok Adı",
+                "Miktar",
+                "Birim",
+                "Birim Fiyat",
+                "İskonto %",
+                "Tutar",
+                "İşlem",
+            ]
+        )
         self.items_table.setMinimumHeight(200)
         self.items_table.verticalHeader().setVisible(False)
 
@@ -425,17 +415,13 @@ class SalesOrderFormPage(QWidget):
 
     def _create_label(self, text: str) -> QLabel:
         label = QLabel(text)
-        label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return label
 
     def _select_customer(self):
         """Müşteri seç"""
         if not self.customers:
-            QMessageBox.warning(
-                self, "Uyarı", "Önce müşteri kaydı oluşturmalısınız!"
-            )
+            QMessageBox.warning(self, "Uyarı", "Önce müşteri kaydı oluşturmalısınız!")
             return
 
         dialog = CustomerSelectorDialog(self.customers, self)
@@ -450,9 +436,7 @@ class SalesOrderFormPage(QWidget):
     def _add_item_row(self):
         """Yeni kalem satırı ekle"""
         if not self.items:
-            QMessageBox.warning(
-                self, "Uyarı", "Önce stok kartları yüklenmelidir!"
-            )
+            QMessageBox.warning(self, "Uyarı", "Önce stok kartları yüklenmelidir!")
             return
 
         dialog = ItemSelectorDialog(self.items, self)
@@ -604,7 +588,7 @@ class SalesOrderFormPage(QWidget):
             self.selected_customer = {
                 "id": customer_id,
                 "name": customer_name,
-                "code": customer_code
+                "code": customer_code,
             }
             self.customer_input.setText(f"{customer_code} - {customer_name}")
 
@@ -612,11 +596,7 @@ class SalesOrderFormPage(QWidget):
         if delivery_date:
             if isinstance(delivery_date, date):
                 self.delivery_date_input.setDate(
-                    QDate(
-                        delivery_date.year,
-                        delivery_date.month,
-                        delivery_date.day
-                    )
+                    QDate(delivery_date.year, delivery_date.month, delivery_date.day)
                 )
 
         currency = self.order_data.get("currency")
@@ -633,9 +613,7 @@ class SalesOrderFormPage(QWidget):
         items_data = self.order_data.get("items", [])
         for item_data in items_data:
             item_id = item_data.get("item_id")
-            item_info = next(
-                (i for i in self.items if i.get("id") == item_id), None
-            )
+            item_info = next((i for i in self.items if i.get("id") == item_id), None)
             if item_info:
                 self._insert_item_row(
                     item_info,
@@ -652,9 +630,7 @@ class SalesOrderFormPage(QWidget):
             return
 
         if self.items_table.rowCount() == 0:
-            QMessageBox.warning(
-                self, "Uyarı", "En az bir kalem eklemelisiniz!"
-            )
+            QMessageBox.warning(self, "Uyarı", "En az bir kalem eklemelisiniz!")
             return
 
         # Kalemleri topla
@@ -678,13 +654,15 @@ class SalesOrderFormPage(QWidget):
             discount_rate = discount_widget.value() if discount_widget else 0
 
             if item_id and quantity > 0:
-                items_data.append({
-                    "item_id": item_id,
-                    "quantity": Decimal(str(quantity)),
-                    "unit_id": unit_id,
-                    "unit_price": Decimal(str(unit_price)),
-                    "discount_rate": Decimal(str(discount_rate)),
-                })
+                items_data.append(
+                    {
+                        "item_id": item_id,
+                        "quantity": Decimal(str(quantity)),
+                        "unit_id": unit_id,
+                        "unit_price": Decimal(str(unit_price)),
+                        "discount_rate": Decimal(str(discount_rate)),
+                    }
+                )
 
         if not items_data:
             QMessageBox.warning(self, "Uyarı", "Geçerli kalem bulunamadı!")
@@ -700,9 +678,7 @@ class SalesOrderFormPage(QWidget):
             "order_date": date(qdate.year(), qdate.month(), qdate.day()),
             "customer_id": self.selected_customer.get("id"),
             "delivery_date": date(
-                delivery_qdate.year(),
-                delivery_qdate.month(),
-                delivery_qdate.day()
+                delivery_qdate.year(), delivery_qdate.month(), delivery_qdate.day()
             ),
             "currency": currency_code,
             "notes": self.notes_input.toPlainText().strip() or None,

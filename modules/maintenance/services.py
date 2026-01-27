@@ -27,7 +27,7 @@ from database.models.maintenance import (
     MaintenancePlan,
     MaintenancePriority,
     MaintenanceStatus,
-    WorkOrderStatus,
+    MaintenanceWorkOrderStatus as WorkOrderStatus,
     MaintenanceType,
     CriticalityLevel,
     EquipmentStatus,
@@ -502,7 +502,9 @@ class MaintenanceService:
                 self.db.add(result)
             self.db.commit()
 
-    def get_work_order_by_id(self, work_order_id: int) -> Optional[MaintenanceWorkOrder]:
+    def get_work_order_by_id(
+        self, work_order_id: int
+    ) -> Optional[MaintenanceWorkOrder]:
         """ID'ye göre iş emri getirir"""
         return self.db.query(MaintenanceWorkOrder).get(work_order_id)
 
@@ -577,7 +579,9 @@ class MaintenanceService:
                 if req:
                     req.status = MaintenanceStatus.RESOLVED
                     req.completed_date = datetime.utcnow()
-                    req.resolution_notes = f"İş emri {wo.order_no} ile tamamlandı. {notes or ''}"
+                    req.resolution_notes = (
+                        f"İş emri {wo.order_no} ile tamamlandı. {notes or ''}"
+                    )
 
             # Ekipman durumunu güncelle
             equipment = self.db.query(Equipment).get(wo.equipment_id)
@@ -587,7 +591,9 @@ class MaintenanceService:
             self.db.commit()
         return wo
 
-    def update_work_order_notes(self, work_order_id: int, notes: str) -> MaintenanceWorkOrder:
+    def update_work_order_notes(
+        self, work_order_id: int, notes: str
+    ) -> MaintenanceWorkOrder:
         """İş emri notlarını günceller"""
         wo = self.db.query(MaintenanceWorkOrder).get(work_order_id)
         if wo:
@@ -647,7 +653,9 @@ class MaintenanceService:
         self.db.commit()
         return part
 
-    def get_work_order_attachments(self, work_order_id: int) -> List[WorkOrderAttachment]:
+    def get_work_order_attachments(
+        self, work_order_id: int
+    ) -> List[WorkOrderAttachment]:
         """İş emri eklerini getirir"""
         return (
             self.db.query(WorkOrderAttachment)
@@ -692,7 +700,9 @@ class MaintenanceService:
         """ID'ye göre kontrol listesi getirir"""
         return self.db.query(MaintenanceChecklist).get(checklist_id)
 
-    def create_checklist(self, name: str, items: List[Dict], **kwargs) -> MaintenanceChecklist:
+    def create_checklist(
+        self, name: str, items: List[Dict], **kwargs
+    ) -> MaintenanceChecklist:
         """Kontrol listesi oluşturur"""
         checklist = MaintenanceChecklist(name=name, **kwargs)
         self.db.add(checklist)
@@ -710,7 +720,9 @@ class MaintenanceService:
         self.db.commit()
         return checklist
 
-    def update_checklist(self, checklist_id: int, items: List[Dict] = None, **kwargs) -> MaintenanceChecklist:
+    def update_checklist(
+        self, checklist_id: int, items: List[Dict] = None, **kwargs
+    ) -> MaintenanceChecklist:
         """Kontrol listesini günceller"""
         checklist = self.db.query(MaintenanceChecklist).get(checklist_id)
         if not checklist:
@@ -943,7 +955,9 @@ class MaintenanceService:
 
     # ==================== KPI HESAPLAMALARI ====================
 
-    def get_equipment_kpis(self, equipment_id: int, period_days: int = 30) -> Dict[str, Any]:
+    def get_equipment_kpis(
+        self, equipment_id: int, period_days: int = 30
+    ) -> Dict[str, Any]:
         """Ekipman KPI'larını hesaplar (MTBF, MTTR, Kullanılabilirlik)"""
         start_date = datetime.utcnow() - timedelta(days=period_days)
 
@@ -1075,7 +1089,9 @@ class MaintenanceService:
                 func.sum(MaintenanceWorkOrder.total_cost).label("total_cost"),
                 func.count(MaintenanceWorkOrder.id).label("work_order_count"),
             )
-            .join(MaintenanceWorkOrder, MaintenanceWorkOrder.equipment_id == Equipment.id)
+            .join(
+                MaintenanceWorkOrder, MaintenanceWorkOrder.equipment_id == Equipment.id
+            )
             .filter(
                 MaintenanceWorkOrder.completed_date >= start_date,
                 MaintenanceWorkOrder.completed_date <= end_date,
@@ -1124,7 +1140,8 @@ class MaintenanceService:
         return [
             {
                 "user_id": r.id,
-                "name": f"{r.first_name or ''} {r.last_name or ''}".strip() or "Bilinmiyor",
+                "name": f"{r.first_name or ''} {r.last_name or ''}".strip()
+                or "Bilinmiyor",
                 "completed_count": r.completed_count,
                 "total_hours": float(r.total_hours or 0),
                 "avg_hours": float(r.total_hours or 0) / max(r.completed_count, 1),

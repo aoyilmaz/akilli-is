@@ -29,6 +29,8 @@ from PyQt6.QtWidgets import (
     QSpinBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from ui.components import CurrencyInput
+
 
 class ItemSelectorDialog(QDialog):
     """Stok kartı seçim dialogu"""
@@ -59,7 +61,9 @@ class ItemSelectorDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
         self.table.doubleClicked.connect(self._on_double_click)
 
         self._load_items()
@@ -108,6 +112,7 @@ class ItemSelectorDialog(QDialog):
                 self.selected_item = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
 
+
 class CustomerSelectorDialog(QDialog):
     """Müşteri seçim dialogu"""
 
@@ -137,7 +142,9 @@ class CustomerSelectorDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
         self.table.doubleClicked.connect(self._on_double_click)
 
         self._load_customers()
@@ -161,8 +168,12 @@ class CustomerSelectorDialog(QDialog):
             self.table.setItem(row, 0, code_item)
 
             self.table.setItem(row, 1, QTableWidgetItem(customer.get("name", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(customer.get("phone", "") or "-"))
-            self.table.setItem(row, 3, QTableWidgetItem(customer.get("email", "") or "-"))
+            self.table.setItem(
+                row, 2, QTableWidgetItem(customer.get("phone", "") or "-")
+            )
+            self.table.setItem(
+                row, 3, QTableWidgetItem(customer.get("email", "") or "-")
+            )
 
     def _on_search(self, text: str):
         text = text.lower()
@@ -185,6 +196,7 @@ class CustomerSelectorDialog(QDialog):
             if item:
                 self.selected_customer = item.data(Qt.ItemDataRole.UserRole)
                 self.accept()
+
 
 class SalesQuoteFormPage(QWidget):
     """Satış teklif formu"""
@@ -305,7 +317,7 @@ class SalesQuoteFormPage(QWidget):
         general_layout.addWidget(self._create_label("Para Birimi"), row, 0)
         self.currency_input = QComboBox()
         for c in self.currencies:
-            self.currency_input.addItem(f"{c['code']} - {c['name']}", c['id'])
+            self.currency_input.addItem(f"{c['code']} - {c['name']}", c["id"])
         general_layout.addWidget(self.currency_input, row, 1)
         row += 1
 
@@ -331,10 +343,18 @@ class SalesQuoteFormPage(QWidget):
         # Kalemler tablosu
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(8)
-        self.items_table.setHorizontalHeaderLabels([
-            "Stok Kodu", "Stok Adı", "Miktar", "Birim",
-            "Birim Fiyat", "İskonto %", "Tutar", "İşlem"
-        ])
+        self.items_table.setHorizontalHeaderLabels(
+            [
+                "Stok Kodu",
+                "Stok Adı",
+                "Miktar",
+                "Birim",
+                "Birim Fiyat",
+                "İskonto %",
+                "Tutar",
+                "İşlem",
+            ]
+        )
         self.items_table.setMinimumHeight(200)
         self.items_table.verticalHeader().setVisible(False)
 
@@ -468,8 +488,7 @@ class SalesQuoteFormPage(QWidget):
         self.items_table.setCellWidget(row, 3, unit_combo)
 
         # Birim Fiyat
-        price_spin = QDoubleSpinBox()
-        price_spin.setRange(0, 999999999)
+        price_spin = CurrencyInput()
         price_spin.setDecimals(4)
         price_spin.setValue(unit_price)
         price_spin.setStyleSheet(self._spin_style())
@@ -518,7 +537,11 @@ class SalesQuoteFormPage(QWidget):
             if qty_widget and price_widget:
                 qty = Decimal(str(qty_widget.value()))
                 price = Decimal(str(price_widget.value()))
-                discount_rate = Decimal(str(discount_widget.value())) if discount_widget else Decimal("0")
+                discount_rate = (
+                    Decimal(str(discount_widget.value()))
+                    if discount_widget
+                    else Decimal("0")
+                )
 
                 line_total = qty * price
                 line_discount = line_total * discount_rate / 100
@@ -561,7 +584,11 @@ class SalesQuoteFormPage(QWidget):
         customer_name = self.quote_data.get("customer_name", "")
         customer_code = self.quote_data.get("customer_code", "")
         if customer_id:
-            self.selected_customer = {"id": customer_id, "name": customer_name, "code": customer_code}
+            self.selected_customer = {
+                "id": customer_id,
+                "name": customer_name,
+                "code": customer_code,
+            }
             self.customer_input.setText(f"{customer_code} - {customer_name}")
 
         valid_until = self.quote_data.get("valid_until")
@@ -624,13 +651,15 @@ class SalesQuoteFormPage(QWidget):
             discount_rate = discount_widget.value() if discount_widget else 0
 
             if item_id and quantity > 0:
-                items_data.append({
-                    "item_id": item_id,
-                    "quantity": Decimal(str(quantity)),
-                    "unit_id": unit_id,
-                    "unit_price": Decimal(str(unit_price)),
-                    "discount_rate": Decimal(str(discount_rate)),
-                })
+                items_data.append(
+                    {
+                        "item_id": item_id,
+                        "quantity": Decimal(str(quantity)),
+                        "unit_id": unit_id,
+                        "unit_price": Decimal(str(unit_price)),
+                        "discount_rate": Decimal(str(discount_rate)),
+                    }
+                )
 
         if not items_data:
             QMessageBox.warning(self, "Uyarı", "Geçerli kalem bulunamadı!")
@@ -645,7 +674,9 @@ class SalesQuoteFormPage(QWidget):
         data = {
             "quote_date": date(qdate.year(), qdate.month(), qdate.day()),
             "customer_id": self.selected_customer.get("id"),
-            "valid_until": date(valid_qdate.year(), valid_qdate.month(), valid_qdate.day()),
+            "valid_until": date(
+                valid_qdate.year(), valid_qdate.month(), valid_qdate.day()
+            ),
             "currency": currency_code,
             "notes": self.notes_input.toPlainText().strip() or None,
             "items": items_data,

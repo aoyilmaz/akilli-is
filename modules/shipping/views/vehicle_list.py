@@ -8,6 +8,10 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from ui.components import (
     BaseListPage,
@@ -43,7 +47,7 @@ class VehicleListPage(BaseListPage):
 
         super().__init__(
             title="Araçlar",
-            icon="🚛",
+            icon=ICONS.TRUCK,
             table_id="vehicles",
             columns=columns,
             show_stats=True,
@@ -85,7 +89,9 @@ class VehicleListPage(BaseListPage):
             capacity = item.get("capacity_kg", 0)
             capacity_str = f"{capacity:,.0f}" if capacity else "-"
             capacity_item = QTableWidgetItem(capacity_str)
-            capacity_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            capacity_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             self.table.setItem(row, 3, capacity_item)
 
             # Palet
@@ -96,14 +102,29 @@ class VehicleListPage(BaseListPage):
             self.table.setItem(row, 4, pallet_item)
 
             # Durum
-            status_item = QTableWidgetItem(item.get("status_display", ""))
+            # Durum
+            status_item = QTableWidgetItem()
+            t = get_theme()
             status = item.get("status", "")
+
             if status == "aktif":
-                status_item.setForeground(Qt.GlobalColor.darkGreen)
+                status_item.setText("Aktif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                )
+                status_item.setForeground(QColor(t.success))
             elif status == "bakimda":
-                status_item.setForeground(Qt.GlobalColor.darkYellow)
-            elif status == "pasif":
-                status_item.setForeground(Qt.GlobalColor.gray)
+                status_item.setText("Bakımda")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["warning"], color=t.warning)
+                )
+                status_item.setForeground(QColor(t.warning))
+            else:
+                status_item.setText("Pasif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                )
+                status_item.setForeground(QColor(t.text_muted))
             self.table.setItem(row, 5, status_item)
 
             # İşlemler
@@ -115,13 +136,19 @@ class VehicleListPage(BaseListPage):
             vehicle_id = item.get("id")
 
             view_btn = create_view_button()
-            view_btn.clicked.connect(lambda checked, vid=vehicle_id: self.view_clicked.emit(vid))
+            view_btn.clicked.connect(
+                lambda checked, vid=vehicle_id: self.view_clicked.emit(vid)
+            )
 
             edit_btn = create_edit_button()
-            edit_btn.clicked.connect(lambda checked, vid=vehicle_id: self.edit_clicked.emit(vid))
+            edit_btn.clicked.connect(
+                lambda checked, vid=vehicle_id: self.edit_clicked.emit(vid)
+            )
 
             delete_btn = create_delete_button()
-            delete_btn.clicked.connect(lambda checked, vid=vehicle_id: self.delete_clicked.emit(vid))
+            delete_btn.clicked.connect(
+                lambda checked, vid=vehicle_id: self.delete_clicked.emit(vid)
+            )
 
             actions_layout.addWidget(view_btn)
             actions_layout.addWidget(edit_btn)

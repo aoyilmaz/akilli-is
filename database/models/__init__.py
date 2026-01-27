@@ -30,6 +30,8 @@ from database.models.inventory import (
     ItemType,
     StockMovementType,
     LotSizingProcedure,
+    StockRequest,
+    StockRequestStatus,
 )
 
 # Ortak tablolar
@@ -105,6 +107,10 @@ from .production import (
     WorkOrderOperation,
     WorkOrderStatus,
     WorkOrderPriority,
+    # MPS (Master Production Scheduling)
+    ProductionPlan,
+    ProductionPlanLine,
+    ProductionPlanStatus,
 )
 from .calendar import ProductionShift, ProductionHoliday, WorkstationSchedule
 from .shift_teams import ShiftTeam, RotationPattern, RotationSchedule
@@ -316,6 +322,16 @@ from database.models.shipping import (
     ShipmentLoad,
 )
 
+# Workflow (İş Akışı) Modülü
+from database.models.workflow import (
+    WorkflowStatus,
+    WorkflowActionType,
+    WorkflowDefinition,
+    WorkflowStep,
+    WorkflowInstance,
+    WorkflowAction,
+)
+
 __all__.extend(
     [
         "TransportUnit",
@@ -332,5 +348,12 @@ __all__.extend(
         "ShipmentStatus",
         "ShipmentItem",
         "ShipmentLoad",
+        # Workflow
+        "WorkflowStatus",
+        "WorkflowActionType",
+        "WorkflowDefinition",
+        "WorkflowStep",
+        "WorkflowInstance",
+        "WorkflowAction",
     ]
 )

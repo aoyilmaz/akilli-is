@@ -23,6 +23,7 @@ from PyQt6.QtCore import Qt
 
 from PyQt6.QtGui import QColor
 from config.styles import get_button_style, SUCCESS, INFO, WARNING, ERROR
+from config.icons import ICONS
 from modules.maintenance.views.base import MaintenanceBaseWidget
 from database.models.maintenance import (
     MaintenancePriority,
@@ -44,7 +45,7 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
 
         self.header = PageHeader(
             title="Arıza/Bakım Talepleri",
-            icon="🔧",
+            icon=ICONS.MAINTENANCE,
             show_search=False,
             show_refresh=True,
             show_add=True,

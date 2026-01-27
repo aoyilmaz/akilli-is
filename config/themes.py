@@ -296,17 +296,17 @@ DARK_THEME = Theme(
     text_primary="#cccccc",
     text_secondary="#d4d4d4",
     text_muted="#969696",
-    text_accent="#007acc",
-    # Accent - VS Code blue
-    accent_primary="#007acc",
+    text_accent="#a855f7",
+    # Accent - Akıllı İş Purple
+    accent_primary="#a855f7",
     accent_secondary="#4ec9b0",
-    accent_gradient_start="#007acc",
+    accent_gradient_start="#a855f7",
     accent_gradient_end="#4ec9b0",
     # Status colors
     success="#4ec9b0",
     warning="#dcdcaa",
     error="#f14c4c",
-    info="#007acc",
+    info="#a855f7",
     # Areas
     sidebar_bg="#252526",
     header_bg="#1e1e1e",

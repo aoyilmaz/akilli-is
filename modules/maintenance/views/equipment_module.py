@@ -3,6 +3,7 @@ Bakım Modülü - Ekipman Yönetimi
 """
 
 from typing import Optional
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -29,6 +30,9 @@ from PyQt6.QtWidgets import (
     QSplitter,
 )
 from PyQt6.QtCore import Qt, QDate
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from modules.maintenance.views.base import MaintenanceBaseWidget
 from database.models.maintenance import (
@@ -58,7 +62,7 @@ class EquipmentListWidget(MaintenanceBaseWidget):
 
         self.header = PageHeader(
             title="Ekipman Yönetimi",
-            icon="🏭",
+            icon=ICONS.PRODUCTION,
             show_search=False,
             show_refresh=False,
             show_add=True,
@@ -161,9 +165,22 @@ class EquipmentListWidget(MaintenanceBaseWidget):
             self.table.setItem(i, 5, QTableWidgetItem(f"{hours:.1f} saat"))
 
             # Durum
-            status_item = QTableWidgetItem("Aktif" if eq.is_active else "Pasif")
-            if not eq.is_active:
-                status_item.setForeground(Qt.GlobalColor.gray)
+            # Durum
+            status_item = QTableWidgetItem()
+            t = get_theme()
+            if eq.is_active:
+                status_item.setText("Aktif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                )
+                status_item.setForeground(QColor(t.success))
+            else:
+                status_item.setText("Pasif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                )
+                status_item.setForeground(QColor(t.text_muted))
+
             self.table.setItem(i, 6, status_item)
 
             # Son bakım

@@ -36,6 +36,7 @@ from PyQt6.QtGui import (
 )
 
 from config import APP_NAME, APP_VERSION
+from config.icons import ICONS
 
 try:
     import qtawesome as qta
@@ -409,7 +410,7 @@ class LoginScreen(QWidget):
 
         # Kullanıcı adı
         self.username_input = GlassLineEdit(
-            placeholder="Kullanıcı Adı", icon="fa5s.user"
+            placeholder="Kullanıcı Adı", icon=ICONS.USER
         )
         card_layout.addWidget(self.username_input)
 
@@ -417,7 +418,7 @@ class LoginScreen(QWidget):
 
         # Şifre
         self.password_input = GlassLineEdit(
-            placeholder="Şifre", icon="fa5s.lock", is_password=True
+            placeholder="Şifre", icon=ICONS.LOCKED, is_password=True
         )
         self.password_input.returnPressed.connect(self._on_login)
         card_layout.addWidget(self.password_input)

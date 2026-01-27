@@ -31,6 +31,7 @@ from ui.components import (
     PageHeader,
     create_save_button,
     create_cancel_button,
+    CurrencyInput,
 )
 
 
@@ -234,10 +235,8 @@ class PurchaseInvoiceFormPage(QWidget):
         self.qty_input.setMinimumWidth(120)
         add_layout.addWidget(self.qty_input)
 
-        self.price_input = QDoubleSpinBox()
-        self.price_input.setRange(0, 999999999)
+        self.price_input = CurrencyInput()
         self.price_input.setValue(0)
-        self.price_input.setPrefix(f"{self.currency_symbol}")
         self.price_input.setMinimumWidth(120)
         add_layout.addWidget(self.price_input)
 

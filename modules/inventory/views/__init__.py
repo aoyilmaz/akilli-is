@@ -25,6 +25,8 @@ from .warehouse_operator import WarehouseOperatorPage
 from .sscc_list import SSCCListPage
 from .sscc_form import SSCCFormPage
 from .sscc_module import SSCCModule
+from .stock_request_form import StockRequestFormPage
+from .stock_request_list import StockRequestListPage
 
 __all__ = [
     "StockListPage",

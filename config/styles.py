@@ -82,6 +82,7 @@ BTN_PADDING_SMALL = "4px 8px"  # Küçük padding
 FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif"
 # PyQt için basit font adı - Platform bağımsız
 import sys
+
 if sys.platform == "darwin":
     FONT_FAMILY_QT = ".AppleSystemUIFont"  # macOS sistem fontu
 elif sys.platform == "win32":
@@ -713,20 +714,16 @@ COLORS = {
     "bg_card": BG_TERTIARY,
     "bg_hover": BG_HOVER,
     "bg_selected": BG_SELECTED,
-
     # Border
     "border": BORDER,
     "border_light": BORDER_LIGHT,
-
     # Text
     "text_primary": TEXT_PRIMARY,
     "text_secondary": TEXT_SECONDARY,
     "text_muted": TEXT_MUTED,
-
     # Accent/Primary
     "primary": ACCENT,
     "primary_hover": ACCENT_HOVER,
-
     # Status
     "success": SUCCESS,
     "warning": WARNING,
@@ -735,3 +732,22 @@ COLORS = {
     "info": INFO,
 }
 
+
+class Colors:
+    """
+    Backward compatibility class for accessing colors as attributes.
+    Ref: workflow_timeline.py usage
+    """
+
+    BACKGROUND = BG_PRIMARY
+    SECONDARY = BG_SECONDARY
+    TERTIARY = BG_TERTIARY
+    TEXT = TEXT_PRIMARY
+    TEXT_SECONDARY = TEXT_SECONDARY
+    TEXT_MUTED = TEXT_MUTED
+    BORDER = BORDER
+    DANGER = ERROR
+    SUCCESS = SUCCESS
+    WARNING = WARNING
+    INFO = INFO
+    PRIMARY = ACCENT

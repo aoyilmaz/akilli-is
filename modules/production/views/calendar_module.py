@@ -27,10 +27,12 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QColorDialog,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTime, QDate
+from PyQt6.QtCore import Qt, pyqtSignal, QTime, QDate, QSize
+import qtawesome as qta
 from PyQt6.QtGui import QColor
 
 from config.styles import ACCENT
+from config.icons import ICONS
 
 
 class ShiftDialog(QDialog):
@@ -96,7 +98,8 @@ class ShiftDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("💾 Kaydet")
+        save_btn = QPushButton("Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="white"))
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -184,7 +187,8 @@ class HolidayDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("💾 Kaydet")
+        save_btn = QPushButton("Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="white"))
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -277,7 +281,8 @@ class TeamDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("💾 Kaydet")
+        save_btn = QPushButton("Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="white"))
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -348,7 +353,7 @@ class CalendarModule(QWidget):
 
         self.header = PageHeader(
             title="Üretim Takvimi",
-            icon="📅",
+            icon=ICONS.CALENDAR,
             show_search=False,
             show_refresh=False,
             show_add=False,
@@ -359,11 +364,11 @@ class CalendarModule(QWidget):
 
         # Tabs
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._create_shifts_tab(), "⏰ Vardiyalar")
-        self.tabs.addTab(self._create_teams_tab(), "👥 Ekipler")
-        self.tabs.addTab(self._create_rotation_tab(), "🔄 Rotasyon")
-        self.tabs.addTab(self._create_holidays_tab(), "🎉 Tatiller")
-        self.tabs.addTab(self._create_schedule_tab(), "📋 İstasyon Takvimi")
+        self.tabs.addTab(self._create_shifts_tab(), "Vardiyalar")
+        self.tabs.addTab(self._create_teams_tab(), "Ekipler")
+        self.tabs.addTab(self._create_rotation_tab(), "Rotasyon")
+        self.tabs.addTab(self._create_holidays_tab(), "Tatiller")
+        self.tabs.addTab(self._create_schedule_tab(), "İstasyon Takvimi")
 
         layout.addWidget(self.tabs)
 
@@ -376,13 +381,15 @@ class CalendarModule(QWidget):
         # Toolbar
         toolbar = QHBoxLayout()
 
-        add_btn = QPushButton("➕ Vardiya Ekle")
+        add_btn = QPushButton("Vardiya Ekle")
+        add_btn.setIcon(qta.icon(ICONS.PLUS))
         add_btn.clicked.connect(self._add_shift)
         toolbar.addWidget(add_btn)
 
         toolbar.addStretch()
 
-        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn = QPushButton("Yenile")
+        refresh_btn.setIcon(qta.icon(ICONS.REFRESH))
         refresh_btn.clicked.connect(self._load_shifts)
         toolbar.addWidget(refresh_btn)
 
@@ -418,13 +425,15 @@ class CalendarModule(QWidget):
         # Toolbar
         toolbar = QHBoxLayout()
 
-        add_btn = QPushButton("➕ Ekip Ekle")
+        add_btn = QPushButton("Ekip Ekle")
+        add_btn.setIcon(qta.icon(ICONS.PLUS))
         add_btn.clicked.connect(self._add_team)
         toolbar.addWidget(add_btn)
 
         toolbar.addStretch()
 
-        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn = QPushButton("Yenile")
+        refresh_btn.setIcon(qta.icon(ICONS.REFRESH))
         refresh_btn.clicked.connect(self._load_teams)
         toolbar.addWidget(refresh_btn)
 
@@ -468,13 +477,15 @@ class CalendarModule(QWidget):
         )
         toolbar.addWidget(self.rotation_pattern_combo)
 
-        add_pattern_btn = QPushButton("➕ Yeni Şablon")
+        add_pattern_btn = QPushButton("Yeni Şablon")
+        add_pattern_btn.setIcon(qta.icon(ICONS.PLUS))
         add_pattern_btn.clicked.connect(self._add_rotation_pattern)
         toolbar.addWidget(add_pattern_btn)
 
         toolbar.addStretch()
 
-        save_rotation_btn = QPushButton("💾 Kaydet")
+        save_rotation_btn = QPushButton("Kaydet")
+        save_rotation_btn.setIcon(qta.icon(ICONS.SAVE))
         save_rotation_btn.clicked.connect(self._save_rotation_schedule)
         toolbar.addWidget(save_rotation_btn)
 
@@ -501,10 +512,18 @@ class CalendarModule(QWidget):
         self.rotation_combos = {}  # {(day, shift_id): QComboBox}
 
         # Bilgi
-        info = QLabel(
-            "ℹ️ Her döngü günü için hangi ekibin hangi vardiyada " "çalışacağını seçin"
+        info_lbl = QLabel(
+            "Her döngü günü için hangi ekibin hangi vardiyada çalışacağını seçin"
         )
-        layout.addWidget(info)
+        info_layout_lbl = QHBoxLayout()
+        info_layout_lbl.addWidget(QLabel())
+        info_layout_lbl.itemAt(0).widget().setPixmap(
+            qta.icon(ICONS.INFO, color="#64748b").pixmap(16, 16)
+        )
+        info_layout_lbl.addWidget(info_lbl)
+        info_layout_lbl.addStretch()
+
+        layout.addLayout(info_layout_lbl)
 
         layout.addStretch()
         return tab
@@ -518,7 +537,8 @@ class CalendarModule(QWidget):
         # Toolbar
         toolbar = QHBoxLayout()
 
-        add_btn = QPushButton("➕ Tatil Ekle")
+        add_btn = QPushButton("Tatil Ekle")
+        add_btn.setIcon(qta.icon(ICONS.PLUS))
         add_btn.clicked.connect(self._add_holiday)
         toolbar.addWidget(add_btn)
 
@@ -533,7 +553,8 @@ class CalendarModule(QWidget):
         self.year_combo.currentIndexChanged.connect(self._load_holidays)
         toolbar.addWidget(self.year_combo)
 
-        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn = QPushButton("Yenile")
+        refresh_btn.setIcon(qta.icon(ICONS.REFRESH))
         refresh_btn.clicked.connect(self._load_holidays)
         toolbar.addWidget(refresh_btn)
 
@@ -577,7 +598,8 @@ class CalendarModule(QWidget):
 
         toolbar.addStretch()
 
-        save_btn = QPushButton("💾 Takvimi Kaydet")
+        save_btn = QPushButton("Takvimi Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE))
         save_btn.clicked.connect(self._save_station_schedule)
         toolbar.addWidget(save_btn)
 
@@ -616,8 +638,15 @@ class CalendarModule(QWidget):
         layout.addWidget(schedule_frame)
 
         # Bilgi
-        info = QLabel("ℹ️ Her gün için çalışılacak vardiyaları işaretleyin")
-        layout.addWidget(info)
+        info_sched_lbl = QLabel("Her gün için çalışılacak vardiyaları işaretleyin")
+        info_sched_layout = QHBoxLayout()
+        info_sched_layout.addWidget(QLabel())
+        info_sched_layout.itemAt(0).widget().setPixmap(
+            qta.icon(ICONS.INFO, color="#64748b").pixmap(16, 16)
+        )
+        info_sched_layout.addWidget(info_sched_lbl)
+        info_sched_layout.addStretch()
+        layout.addLayout(info_sched_layout)
 
         layout.addStretch()
 
@@ -691,12 +720,14 @@ class CalendarModule(QWidget):
                 btn_layout.setContentsMargins(4, 4, 4, 4)
                 btn_layout.setSpacing(4)
 
-                edit_btn = QPushButton("✏️")
+                edit_btn = QPushButton()
+                edit_btn.setIcon(qta.icon(ICONS.EDIT, color="#3498db"))
                 edit_btn.setFixedSize(28, 28)
                 edit_btn.clicked.connect(lambda checked, s=shift: self._edit_shift(s))
                 btn_layout.addWidget(edit_btn)
 
-                del_btn = QPushButton("🗑")
+                del_btn = QPushButton()
+                del_btn.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
                 del_btn.setFixedSize(28, 28)
                 del_btn.clicked.connect(lambda checked, s=shift: self._delete_shift(s))
                 btn_layout.addWidget(del_btn)
@@ -787,14 +818,16 @@ class CalendarModule(QWidget):
                 btn_layout.setContentsMargins(4, 4, 4, 4)
                 btn_layout.setSpacing(4)
 
-                edit_btn = QPushButton("✏️")
+                edit_btn = QPushButton()
+                edit_btn.setIcon(qta.icon("ph.pencil-simple", color="#3498db"))
                 edit_btn.setFixedSize(28, 28)
                 edit_btn.clicked.connect(
                     lambda checked, h=holiday: self._edit_holiday(h)
                 )
                 btn_layout.addWidget(edit_btn)
 
-                del_btn = QPushButton("🗑")
+                del_btn = QPushButton()
+                del_btn.setIcon(qta.icon("ph.trash", color="#ef4444"))
                 del_btn.setFixedSize(28, 28)
                 del_btn.clicked.connect(
                     lambda checked, h=holiday: self._delete_holiday(h)
@@ -1009,12 +1042,14 @@ class CalendarModule(QWidget):
                 btn_layout.setContentsMargins(4, 4, 4, 4)
                 btn_layout.setSpacing(4)
 
-                edit_btn = QPushButton("✏️")
+                edit_btn = QPushButton()
+                edit_btn.setIcon(qta.icon("ph.pencil-simple", color="#3498db"))
                 edit_btn.setFixedSize(28, 28)
                 edit_btn.clicked.connect(lambda checked, t=team: self._edit_team(t))
                 btn_layout.addWidget(edit_btn)
 
-                del_btn = QPushButton("🗑")
+                del_btn = QPushButton()
+                del_btn.setIcon(qta.icon("ph.trash", color="#ef4444"))
                 del_btn.setFixedSize(28, 28)
                 del_btn.clicked.connect(lambda checked, t=team: self._delete_team(t))
                 btn_layout.addWidget(del_btn)

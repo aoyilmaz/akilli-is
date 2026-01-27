@@ -19,7 +19,10 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont
+import qtawesome as qta
+from config.icons import ICONS
 
 from config.styles import COLORS
 from modules.hr.services import HRDashboardService
@@ -47,9 +50,24 @@ class StatCard(QFrame):
         layout.setContentsMargins(16, 12, 16, 12)
 
         # Üst satır (icon + title)
-        title_lbl = QLabel(f"{icon} {title}")
-        title_lbl.setStyleSheet("color: #94a3b8; font-size: 13px;")
-        layout.addWidget(title_lbl)
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+
+        if icon.startswith("ph."):
+            icon_lbl = QLabel()
+            icon_lbl.setPixmap(qta.icon(icon, color="#94a3b8").pixmap(16, 16))
+            title_layout.addWidget(icon_lbl)
+
+            txt_lbl = QLabel(title)
+            txt_lbl.setStyleSheet("color: #94a3b8; font-size: 13px;")
+            title_layout.addWidget(txt_lbl)
+        else:
+            title_lbl = QLabel(f"{icon} {title}")
+            title_lbl.setStyleSheet("color: #94a3b8; font-size: 13px;")
+            title_layout.addWidget(title_lbl)
+
+        title_layout.addStretch()
+        layout.addLayout(title_layout)
 
         # Değer
         value_lbl = QLabel(value)
@@ -85,16 +103,16 @@ class HRDashboardModule(QWidget):
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(16)
 
-        self.total_card = StatCard("Toplam Çalışan", "0", "👥", "#3b82f6")
+        self.total_card = StatCard("Toplam Çalışan", "0", ICONS.USERS, "#3b82f6")
         cards_layout.addWidget(self.total_card)
 
-        self.present_card = StatCard("Bugün Katılım", "0%", "✅", "#10b981")
+        self.present_card = StatCard("Bugün Katılım", "0%", ICONS.CHECK, "#10b981")
         cards_layout.addWidget(self.present_card)
 
-        self.leave_card = StatCard("İzinli", "0", "🏖️", "#f59e0b")
+        self.leave_card = StatCard("İzinli", "0", ICONS.CALENDAR, "#f59e0b")
         cards_layout.addWidget(self.leave_card)
 
-        self.pending_card = StatCard("Bekleyen İzin", "0", "⏳", "#8b5cf6")
+        self.pending_card = StatCard("Bekleyen İzin", "0", ICONS.TIME, "#8b5cf6")
         cards_layout.addWidget(self.pending_card)
 
         layout.addLayout(cards_layout)

@@ -24,6 +24,7 @@ class PlanningModule(QWidget):
         self.wo_service = None
         self.ws_service = None
         self.holiday_service = None
+        self.aps_service = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -81,6 +82,16 @@ class PlanningModule(QWidget):
             except Exception as e:
                 print(f"Tatil servisi yükleme hatası: {e}")
 
+        # APS servisini yükle
+        if not self.aps_service:
+            try:
+                from modules.aps import APSService
+
+                self.aps_service = APSService()
+                self.planning_page.set_aps_service(self.aps_service)
+            except Exception as e:
+                print(f"APS servisi yükleme hatası: {e}")
+
     def _load_holidays(self) -> list:
         """Tatilleri yükle"""
         holidays = []
@@ -123,12 +134,19 @@ class PlanningModule(QWidget):
 
     def _load_capacity_data(self):
         """Kapasite verilerini yükle"""
+        # Servislerin yüklü olduğundan emin ol
+        self._ensure_services()
+
         if hasattr(self, "capacity_page"):
             self.capacity_page.load_data()
 
     def _load_data(self):
         """Gantt verilerini yükle"""
+        # Servislerin yüklü olduğundan emin ol
+        self._ensure_services()
+
         if not self.wo_service or not self.ws_service:
+            print("Uyarı: Servisler yüklenemedi, veri yüklenemiyor")
             return
 
         try:

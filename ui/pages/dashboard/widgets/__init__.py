@@ -17,6 +17,7 @@ from .quick_action_widget import QuickActionWidget
 from .currency_widget import CurrencyWidget
 from .weather_widget import WeatherWidget
 from .expiry_widget import ExpiryAlertWidget
+from .bottleneck_widget import CapacityBottleneckDashboardWidget
 
 __all__ = [
     # Base
@@ -31,6 +32,7 @@ __all__ = [
     # List widgets
     "NotificationWidget",
     "ExpiryAlertWidget",
+    "CapacityBottleneckDashboardWidget",
     # Action widgets
     "QuickActionWidget",
     # External data widgets

@@ -35,6 +35,7 @@ import qtawesome as qta
 from database.base import get_session
 from database.models.user import AuditLog, User
 from config.themes import get_theme
+from config.icons import ICONS
 
 
 # İşlem türleri ve renkleri
@@ -42,7 +43,7 @@ ACTION_COLORS = {
     "CREATE": "#27ae60",  # Yeşil
     "UPDATE": "#3498db",  # Mavi
     "DELETE": "#e74c3c",  # Kırmızı
-    "LOGIN": "#9b59b6",   # Mor
+    "LOGIN": "#9b59b6",  # Mor
     "LOGOUT": "#95a5a6",  # Gri
     "EXPORT": "#f39c12",  # Turuncu
     "IMPORT": "#1abc9c",  # Turkuaz
@@ -84,17 +85,25 @@ class AuditLogDetailDialog(QDialog):
         info_layout = QFormLayout(info_group)
 
         info_layout.addRow("ID:", QLabel(str(self.log.id)))
-        info_layout.addRow("Tarih:", QLabel(self.log.created_at.strftime("%d.%m.%Y %H:%M:%S")))
+        info_layout.addRow(
+            "Tarih:", QLabel(self.log.created_at.strftime("%d.%m.%Y %H:%M:%S"))
+        )
         info_layout.addRow("Kullanıcı:", QLabel(self.log.username or "-"))
         info_layout.addRow("IP Adresi:", QLabel(self.log.ip_address or "-"))
 
         action_label = QLabel(self.log.action)
-        action_label.setStyleSheet(f"color: {ACTION_COLORS.get(self.log.action, '#333')}; font-weight: bold;")
+        action_label.setStyleSheet(
+            f"color: {ACTION_COLORS.get(self.log.action, '#333')}; font-weight: bold;"
+        )
         info_layout.addRow("İşlem:", action_label)
 
-        info_layout.addRow("Modül:", QLabel(MODULE_NAMES.get(self.log.module, self.log.module)))
+        info_layout.addRow(
+            "Modül:", QLabel(MODULE_NAMES.get(self.log.module, self.log.module))
+        )
         info_layout.addRow("Tablo:", QLabel(self.log.table_name or "-"))
-        info_layout.addRow("Kayıt ID:", QLabel(str(self.log.record_id) if self.log.record_id else "-"))
+        info_layout.addRow(
+            "Kayıt ID:", QLabel(str(self.log.record_id) if self.log.record_id else "-")
+        )
         info_layout.addRow("Açıklama:", QLabel(self.log.description or "-"))
 
         layout.addWidget(info_group)
@@ -170,14 +179,14 @@ class AuditLogViewer(QWidget):
 
         # Yenile butonu
         btn_refresh = QPushButton()
-        btn_refresh.setIcon(qta.icon("fa5s.sync-alt"))
+        btn_refresh.setIcon(qta.icon(ICONS.REFRESH))
         btn_refresh.setToolTip("Yenile")
         btn_refresh.clicked.connect(self.load_data)
         header.addWidget(btn_refresh)
 
         # Export butonu
         btn_export = QPushButton()
-        btn_export.setIcon(qta.icon("fa5s.file-export"))
+        btn_export.setIcon(qta.icon(ICONS.EXPORT))
         btn_export.setToolTip("CSV Olarak Dışa Aktar")
         btn_export.clicked.connect(self.export_csv)
         header.addWidget(btn_export)
@@ -223,7 +232,15 @@ class AuditLogViewer(QWidget):
         self.cmb_action = QComboBox()
         self.cmb_action.setMinimumWidth(100)
         self.cmb_action.addItem("Tümü", None)
-        for action in ["CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT", "EXPORT", "IMPORT"]:
+        for action in [
+            "CREATE",
+            "UPDATE",
+            "DELETE",
+            "LOGIN",
+            "LOGOUT",
+            "EXPORT",
+            "IMPORT",
+        ]:
             self.cmb_action.addItem(action, action)
         filter_layout.addWidget(self.cmb_action)
 
@@ -236,7 +253,7 @@ class AuditLogViewer(QWidget):
 
         # Filtrele butonu
         btn_filter = QPushButton("Filtrele")
-        btn_filter.setIcon(qta.icon("fa5s.filter"))
+        btn_filter.setIcon(qta.icon(ICONS.FILTER))
         btn_filter.clicked.connect(self.load_data)
         filter_layout.addWidget(btn_filter)
 
@@ -251,9 +268,18 @@ class AuditLogViewer(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Tarih", "Kullanıcı", "İşlem", "Modül", "Tablo", "Kayıt ID", "Açıklama"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "ID",
+                "Tarih",
+                "Kullanıcı",
+                "İşlem",
+                "Modül",
+                "Tablo",
+                "Kayıt ID",
+                "Açıklama",
+            ]
+        )
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -270,13 +296,13 @@ class AuditLogViewer(QWidget):
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
 
-        self.table.setColumnWidth(0, 60)   # ID
+        self.table.setColumnWidth(0, 60)  # ID
         self.table.setColumnWidth(1, 140)  # Tarih
         self.table.setColumnWidth(2, 120)  # Kullanıcı
-        self.table.setColumnWidth(3, 80)   # İşlem
+        self.table.setColumnWidth(3, 80)  # İşlem
         self.table.setColumnWidth(4, 100)  # Modül
         self.table.setColumnWidth(5, 120)  # Tablo
-        self.table.setColumnWidth(6, 80)   # Kayıt ID
+        self.table.setColumnWidth(6, 80)  # Kayıt ID
 
         layout.addWidget(self.table, 1)
 
@@ -289,7 +315,7 @@ class AuditLogViewer(QWidget):
         pagination.addStretch()
 
         self.btn_prev = QPushButton("Önceki")
-        self.btn_prev.setIcon(qta.icon("fa5s.chevron-left"))
+        self.btn_prev.setIcon(qta.icon(ICONS.BACK))
         self.btn_prev.clicked.connect(self.prev_page)
         pagination.addWidget(self.btn_prev)
 
@@ -297,7 +323,7 @@ class AuditLogViewer(QWidget):
         pagination.addWidget(self.lbl_page)
 
         self.btn_next = QPushButton("Sonraki")
-        self.btn_next.setIcon(qta.icon("fa5s.chevron-right"))
+        self.btn_next.setIcon(qta.icon(ICONS.FORWARD))
         self.btn_next.clicked.connect(self.next_page)
         pagination.addWidget(self.btn_next)
 
@@ -307,7 +333,12 @@ class AuditLogViewer(QWidget):
         """Kullanıcı listesini yükler"""
         session = get_session()
         try:
-            users = session.query(User).filter(User.is_active == True).order_by(User.username).all()
+            users = (
+                session.query(User)
+                .filter(User.is_active == True)
+                .order_by(User.username)
+                .all()
+            )
             for user in users:
                 self.cmb_user.addItem(f"{user.username} ({user.full_name})", user.id)
         finally:
@@ -348,8 +379,8 @@ class AuditLogViewer(QWidget):
             if search:
                 search_filter = f"%{search}%"
                 query = query.filter(
-                    (AuditLog.table_name.ilike(search_filter)) |
-                    (AuditLog.description.ilike(search_filter))
+                    (AuditLog.table_name.ilike(search_filter))
+                    | (AuditLog.description.ilike(search_filter))
                 )
 
             # Toplam sayı
@@ -357,7 +388,12 @@ class AuditLogViewer(QWidget):
 
             # Sayfalama
             offset = self.current_page * self.page_size
-            self.logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(self.page_size).all()
+            self.logs = (
+                query.order_by(AuditLog.created_at.desc())
+                .offset(offset)
+                .limit(self.page_size)
+                .all()
+            )
 
             self._populate_table()
             self._update_pagination()
@@ -487,8 +523,8 @@ class AuditLogViewer(QWidget):
             if search:
                 search_filter = f"%{search}%"
                 query = query.filter(
-                    (AuditLog.table_name.ilike(search_filter)) |
-                    (AuditLog.description.ilike(search_filter))
+                    (AuditLog.table_name.ilike(search_filter))
+                    | (AuditLog.description.ilike(search_filter))
                 )
 
             logs = query.order_by(AuditLog.created_at.desc()).limit(10000).all()
@@ -496,22 +532,25 @@ class AuditLogViewer(QWidget):
             # CSV yaz
             with open(file_path, "w", encoding="utf-8-sig") as f:
                 # Header
-                f.write("ID;Tarih;Kullanıcı;IP Adresi;İşlem;Modül;Tablo;Kayıt ID;Açıklama\n")
+                f.write(
+                    "ID;Tarih;Kullanıcı;IP Adresi;İşlem;Modül;Tablo;Kayıt ID;Açıklama\n"
+                )
 
                 for log in logs:
                     date_str = log.created_at.strftime("%d.%m.%Y %H:%M:%S")
                     module_name = MODULE_NAMES.get(log.module, log.module)
                     desc = (log.description or "").replace(";", ",").replace("\n", " ")
 
-                    f.write(f"{log.id};{date_str};{log.username or ''};{log.ip_address or ''};"
-                           f"{log.action};{module_name};{log.table_name or ''};{log.record_id or ''};"
-                           f"{desc}\n")
+                    f.write(
+                        f"{log.id};{date_str};{log.username or ''};{log.ip_address or ''};"
+                        f"{log.action};{module_name};{log.table_name or ''};{log.record_id or ''};"
+                        f"{desc}\n"
+                    )
 
             session.close()
 
             QMessageBox.information(
-                self, "Başarılı",
-                f"{len(logs)} kayıt dışa aktarıldı:\n{file_path}"
+                self, "Başarılı", f"{len(logs)} kayıt dışa aktarıldı:\n{file_path}"
             )
 
         except Exception as e:

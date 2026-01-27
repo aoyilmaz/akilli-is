@@ -297,8 +297,9 @@ class ReportsService:
         on_time_count = 0
 
         details = []
+        details = []
         for wo in work_orders:
-            planned = wo.quantity or Decimal(0)
+            planned = wo.planned_quantity or Decimal(0)
             actual = wo.completed_quantity or Decimal(0)
             # Kabul edilen = tamamlanan (kalite kontrolü varsa ayarlanabilir)
             good = actual
@@ -314,7 +315,7 @@ class ReportsService:
 
             details.append(
                 {
-                    "work_order_no": wo.work_order_no,
+                    "work_order_no": wo.order_no,
                     "item_name": wo.item.name if wo.item else "",
                     "planned_qty": float(planned),
                     "actual_qty": float(actual),

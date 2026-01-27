@@ -57,6 +57,7 @@ class MRPService:
         consider_safety: bool = True,
         include_work_orders: bool = True,
         include_sales_orders: bool = True,
+        check_capacity: bool = False,
     ) -> MRPRun:
         """
         MRP çalıştır
@@ -66,6 +67,11 @@ class MRPService:
         3. Brüt ihtiyaçları topla (Bağımsız + Bağımlı İhtiyaçlar)
         4. Net ihtiyaç hesapla
         5. Tedarik önerileri oluştur ve alt bileşenlere ihtiyaç aktar
+        6. (Opsiyonel) Kapasite kontrolü ve öteleme
+
+        Args:
+            check_capacity: True ise WorkStation kapasitelerini kontrol eder,
+                           kapasite doluysa ihtiyacı sonraki güne öteler
         """
         # MRP Run oluştur
         run = MRPRun(
@@ -139,7 +145,9 @@ class MRPService:
 
                 # Tedarik önerisi ve BOM Patlatma
                 if req["net"] > 0:
-                    created_line = self._create_suggestion(line, item, req)
+                    created_line = self._create_suggestion(
+                        line, item, req, check_capacity=check_capacity
+                    )
                     items_with_shortage += 1
                     total_suggestions += 1
 
@@ -513,8 +521,19 @@ class MRPService:
     # TEDARİK ÖNERİSİ
     # =====================
 
-    def _create_suggestion(self, line: MRPLine, item: Item, req: Dict) -> MRPLine:
-        """Tedarik önerisi oluştur"""
+    def _create_suggestion(
+        self,
+        line: MRPLine,
+        item: Item,
+        req: Dict,
+        check_capacity: bool = False,
+    ) -> MRPLine:
+        """
+        Tedarik önerisi oluştur.
+
+        Args:
+            check_capacity: True ise üretim önerileri için kapasite kontrolü yapar
+        """
         net = req["net"]
         req_date = req["date"]
 
@@ -533,6 +552,17 @@ class MRPService:
         proc_type = item.procurement_type or "purchase"
         if proc_type == "manufacture" or item.is_producible:
             sug_type = SuggestionType.MANUFACTURE
+
+            # Kapasite kontrolü (sadece üretim önerileri için)
+            if check_capacity:
+                adjusted_date, conflicts = self._schedule_with_capacity(
+                    item, qty, order_date
+                )
+                if adjusted_date != order_date:
+                    order_date = adjusted_date
+                    # Kapasite çakışması bilgisini kaydet
+                    if conflicts:
+                        line.notes = f"Kapasite nedeniyle ötelendi: {', '.join(conflicts)}"
         else:
             sug_type = SuggestionType.PURCHASE
 
@@ -545,6 +575,166 @@ class MRPService:
         line.planned_order_release = qty  # Sipariş tarihinde işleme girecek miktar
 
         return line
+
+    def _schedule_with_capacity(
+        self,
+        item: Item,
+        quantity: Decimal,
+        required_date: date,
+    ) -> Tuple[date, List[str]]:
+        """
+        Kapasite kontrollü çizelgeleme.
+
+        1. BOM'dan operasyonları al
+        2. Her operasyon için istasyon kapasitesini kontrol et
+        3. Kapasite yoksa sonraki güne kaydır
+
+        Returns:
+            (ayarlanan_tarih, çakışma_listesi)
+        """
+        from database.models.production import WorkStation
+
+        conflicts = []
+        adjusted_date = required_date
+
+        # Aktif BOM bul
+        bom = (
+            self.session.query(BillOfMaterials)
+            .filter(
+                BillOfMaterials.item_id == item.id,
+                BillOfMaterials.status == BOMStatus.ACTIVE,
+                BillOfMaterials.is_active.is_(True),
+            )
+            .first()
+        )
+
+        if not bom:
+            return adjusted_date, conflicts
+
+        # BOM operasyonlarını kontrol et
+        from database.models.production import BOMOperation
+
+        operations = (
+            self.session.query(BOMOperation)
+            .filter(
+                BOMOperation.bom_id == bom.id,
+                BOMOperation.is_active.is_(True),
+            )
+            .all()
+        )
+
+        for op in operations:
+            if not op.work_station_id:
+                continue
+
+            station = self.session.query(WorkStation).get(op.work_station_id)
+            if not station:
+                continue
+
+            # Operasyon süresi (dakika)
+            setup = op.setup_time or 0
+            run_total = float(op.run_time_per_unit or 0) * float(quantity)
+            op_minutes = int(setup + run_total)
+
+            # Kalan kapasiteyi kontrol et
+            remaining = station.get_remaining_capacity(adjusted_date, self.session)
+
+            if remaining < op_minutes:
+                # Kapasite yetersiz
+                conflicts.append(f"{station.code} ({adjusted_date})")
+
+                # Alternatif istasyonları dene
+                alt_found = False
+                for alt in station.alternatives:
+                    alt_remaining = alt.get_remaining_capacity(
+                        adjusted_date, self.session
+                    )
+                    if alt_remaining >= op_minutes:
+                        alt_found = True
+                        break
+
+                if not alt_found:
+                    # Sonraki iş gününe kaydır
+                    adjusted_date = self._find_next_working_day(adjusted_date)
+
+        return adjusted_date, conflicts
+
+    def _find_next_working_day(self, from_date: date) -> date:
+        """Sonraki iş gününü bul (hafta sonu ve tatilleri atla)."""
+        from database.models.calendar import ProductionHoliday
+
+        current = from_date + timedelta(days=1)
+        max_iterations = 30  # Max 30 gün ileriye bak
+
+        for _ in range(max_iterations):
+            # Hafta sonu kontrolü
+            if current.weekday() >= 5:
+                current += timedelta(days=1)
+                continue
+
+            # Tatil kontrolü
+            holiday = (
+                self.session.query(ProductionHoliday)
+                .filter(
+                    ProductionHoliday.holiday_date == current,
+                    ProductionHoliday.is_active.is_(True),
+                )
+                .first()
+            )
+
+            if holiday:
+                current += timedelta(days=1)
+                continue
+
+            return current
+
+        return from_date + timedelta(days=1)  # Fallback
+
+    def _get_workstation_daily_load(
+        self,
+        station_id: int,
+        target_date: date,
+    ) -> Dict:
+        """
+        İstasyonun günlük yükünü hesapla.
+
+        Returns:
+            {
+                "total_capacity_minutes": int,
+                "scheduled_minutes": int,
+                "remaining_minutes": int,
+                "utilization_percent": float,
+                "operations": List[WorkOrderOperation]
+            }
+        """
+        from database.models.production import WorkStation, WorkOrderOperation
+
+        station = self.session.query(WorkStation).get(station_id)
+        if not station:
+            return {}
+
+        total = station.daily_capacity_minutes
+        remaining = station.get_remaining_capacity(target_date, self.session)
+        scheduled = total - remaining
+
+        # Planlanan operasyonları getir
+        operations = (
+            self.session.query(WorkOrderOperation)
+            .filter(
+                WorkOrderOperation.work_station_id == station_id,
+                func.date(WorkOrderOperation.planned_start) == target_date,
+                WorkOrderOperation.status.notin_(["completed", "cancelled"]),
+            )
+            .all()
+        )
+
+        return {
+            "total_capacity_minutes": total,
+            "scheduled_minutes": scheduled,
+            "remaining_minutes": remaining,
+            "utilization_percent": (scheduled / total * 100) if total > 0 else 0,
+            "operations": operations,
+        }
 
     def _apply_lot_sizing(self, net: Decimal, item: Item) -> Decimal:
         """

@@ -14,6 +14,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from config import COLORS
 from ui.components import (
@@ -54,7 +57,7 @@ class WarehouseListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Depolar",
-            icon="🏭",
+            icon=ICONS.WAREHOUSE,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -147,10 +150,20 @@ class WarehouseListPage(QWidget):
 
             elif col_key == "status":
                 is_active = wh.is_active
-                item = QTableWidgetItem("✅ Aktif" if is_active else "❌ Pasif")
-                item.setForeground(
-                    QColor(COLORS["success"] if is_active else COLORS["error"])
-                )
+                t = get_theme()
+                item = QTableWidgetItem()
+                if is_active:
+                    item.setText("Aktif")
+                    item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                    )
+                    item.setForeground(QColor(t.success))
+                else:
+                    item.setText("Pasif")
+                    item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                    )
+                    item.setForeground(QColor(t.text_muted))
                 self.table.setItem(row, col_idx, item)
 
         self.table.setRowHeight(row, 48)

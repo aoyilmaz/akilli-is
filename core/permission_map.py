@@ -107,7 +107,7 @@ MENU_TO_MODULE = {
 PAGE_DEFINITIONS = {
     "inventory": {
         "name": "Stok Yönetimi",
-        "icon": "fa5s.boxes",
+        "icon": "ph.package",
         "pages": [
             ("stock-cards", "Stok Kartları"),
             ("categories", "Kategoriler"),
@@ -120,7 +120,7 @@ PAGE_DEFINITIONS = {
     },
     "production": {
         "name": "Üretim",
-        "icon": "fa5s.industry",
+        "icon": "ph.factory",
         "pages": [
             ("work-orders", "İş Emirleri"),
             ("bom", "Ürün Ağaçları"),
@@ -132,7 +132,7 @@ PAGE_DEFINITIONS = {
     },
     "purchasing": {
         "name": "Satın Alma",
-        "icon": "fa5s.shopping-cart",
+        "icon": "ph.shopping-cart",
         "pages": [
             ("suppliers", "Tedarikçiler"),
             ("purchase-requests", "Satın Alma Talepleri"),
@@ -143,7 +143,7 @@ PAGE_DEFINITIONS = {
     },
     "sales": {
         "name": "Satış",
-        "icon": "fa5s.chart-line",
+        "icon": "ph.chart-line",
         "pages": [
             ("customers", "Müşteriler"),
             ("sales-quotes", "Teklifler"),
@@ -155,7 +155,7 @@ PAGE_DEFINITIONS = {
     },
     "finance": {
         "name": "Finans",
-        "icon": "fa5s.money-bill-wave",
+        "icon": "ph.money",
         "pages": [
             ("receipts", "Tahsilatlar"),
             ("payments", "Ödemeler"),
@@ -165,7 +165,7 @@ PAGE_DEFINITIONS = {
     },
     "accounting": {
         "name": "Muhasebe",
-        "icon": "fa5s.calculator",
+        "icon": "ph.calculator",
         "pages": [
             ("accounts", "Hesap Planı"),
             ("journals", "Yevmiye"),
@@ -174,7 +174,7 @@ PAGE_DEFINITIONS = {
     },
     "hr": {
         "name": "İnsan Kaynakları",
-        "icon": "fa5s.users",
+        "icon": "ph.users",
         "pages": [
             ("employees", "Çalışanlar"),
             ("departments", "Departmanlar"),
@@ -186,7 +186,7 @@ PAGE_DEFINITIONS = {
     },
     "maintenance": {
         "name": "Bakım",
-        "icon": "fa5s.tools",
+        "icon": "ph.wrench",
         "pages": [
             ("equipments", "Ekipmanlar"),
             ("maintenance-requests", "Bakım Talepleri"),
@@ -197,7 +197,7 @@ PAGE_DEFINITIONS = {
     },
     "crm": {
         "name": "CRM",
-        "icon": "fa5s.handshake",
+        "icon": "ph.handshake",
         "pages": [
             ("leads", "Potansiyel Müşteriler"),
             ("opportunities", "Fırsatlar"),
@@ -206,7 +206,7 @@ PAGE_DEFINITIONS = {
     },
     "reports": {
         "name": "Raporlar",
-        "icon": "fa5s.chart-bar",
+        "icon": "ph.chart-bar",
         "pages": [
             ("sales-reports", "Satış Raporları"),
             ("stock-aging", "Stok Yaşlandırma"),
@@ -217,7 +217,7 @@ PAGE_DEFINITIONS = {
     },
     "system": {
         "name": "Sistem",
-        "icon": "fa5s.cog",
+        "icon": "ph.gear",
         "pages": [
             ("users", "Kullanıcı Yönetimi"),
             ("audit-logs", "İşlem Geçmişi"),

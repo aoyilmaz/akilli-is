@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from ui.components import CurrencyInput
 
 
 class WorkStationFormPage(QWidget):
@@ -248,10 +249,7 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("Saatlik Maliyet"), row, 0)
         hourly_layout = QHBoxLayout()
         hourly_layout.setSpacing(8)
-        self.hourly_rate_input = QDoubleSpinBox()
-        self.hourly_rate_input.setRange(0, 999999)
-        self.hourly_rate_input.setDecimals(2)
-        self.hourly_rate_input.setPrefix("₺ ")
+        self.hourly_rate_input = CurrencyInput()
         self.hourly_rate_input.setMinimumWidth(150)
         hourly_layout.addWidget(self.hourly_rate_input)
         hourly_layout.addStretch()
@@ -262,10 +260,7 @@ class WorkStationFormPage(QWidget):
         form_layout.addWidget(self._create_label("Hazırlık Maliyeti"), row, 0)
         setup_layout = QHBoxLayout()
         setup_layout.setSpacing(8)
-        self.setup_cost_input = QDoubleSpinBox()
-        self.setup_cost_input.setRange(0, 999999)
-        self.setup_cost_input.setDecimals(2)
-        self.setup_cost_input.setPrefix("₺ ")
+        self.setup_cost_input = CurrencyInput()
         self.setup_cost_input.setMinimumWidth(150)
         setup_layout.addWidget(self.setup_cost_input)
         setup_layout.addStretch()

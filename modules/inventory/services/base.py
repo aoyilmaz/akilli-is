@@ -10,7 +10,7 @@ KRİTİK DÜZELTMELER:
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
-from sqlalchemy import func, and_
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from database.models import (
     StockMovement,
     StockMovementType,
     StockBalance,
+    Currency,
 )
 
 # Alias for backward compatibility
@@ -81,7 +82,11 @@ class ItemService(ServiceBase):
     def get_all(self, active_only: bool = True) -> List[Item]:
         from sqlalchemy.orm import joinedload
 
-        query = self.session.query(Item).options(joinedload(Item.currency))
+        query = self.session.query(Item).options(
+            joinedload(Item.currency),
+            joinedload(Item.unit),
+            joinedload(Item.category),
+        )
         if active_only:
             query = query.filter(Item.is_active == True)
         return query.order_by(Item.code).all()
@@ -163,23 +168,49 @@ class ItemService(ServiceBase):
 
     def delete(self, item_id: int) -> bool:
         item = self.get_by_id(item_id)
-        if item:
+        if not item:
+            return False
+
+        # 1. Hareket kontrolü
+        movement_count = (
+            self.session.query(StockMovement)
+            .filter(StockMovement.item_id == item_id)
+            .count()
+        )
+        if movement_count > 0:
+            raise ValueError(
+                "Bu stok kartına ait hareket kayıtları (giriş/çıkış) olduğu için silinemez.\n\n"
+                "Bunun yerine kartı düzenleyip 'Aktif' işaretini kaldırarak pasife çekebilirsiniz."
+            )
+
+        try:
             self.session.delete(item)
             self.session.commit()
             return True
-        return False
+        except IntegrityError:
+            self.session.rollback()
+            raise ValueError(
+                "Bu stok kartı başka kayıtlarda kullanıldığı için silinemez."
+            )
 
     def search(
         self,
         query: str = None,
         keyword: str = None,
         item_type: str = None,
+        is_active: bool = True,
+        stock_status: str = None,
         limit: int = 50,
+        offset: int = 0,
     ) -> List[Item]:
         """Stok kartı ara - keyword, query veya item_type parametresi ile"""
         search_term = keyword or query or ""
 
-        q = self.session.query(Item).filter(Item.is_active == True)
+        q = self.session.query(Item)
+
+        # Aktiflik filtresi (None ise hepsi, True/False ise ona göre)
+        if is_active is not None:
+            q = q.filter(Item.is_active == is_active)
 
         if search_term:
             q = q.filter(
@@ -193,7 +224,162 @@ class ItemService(ServiceBase):
         if item_type:
             q = q.filter(Item.item_type == item_type)
 
-        return q.limit(limit).all()
+        if stock_status:
+            q = self._apply_stock_status_filter(q, stock_status)
+
+        return q.order_by(Item.code.asc()).offset(offset).limit(limit).all()
+
+    def count_search(
+        self,
+        query: str = None,
+        keyword: str = None,
+        item_type: str = None,
+        is_active: bool = True,
+        stock_status: str = None,
+    ) -> int:
+        """Arama kriterlerine uyan toplam kayıt sayısını döner"""
+        search_term = keyword or query or ""
+
+        # Eğer stok durumu filtresi varsa, COUNT(*) yerine subquery kullanmalıyız
+        if stock_status:
+            q = self.session.query(Item.id)
+        else:
+            q = self.session.query(func.count(Item.id))
+
+        # Aktiflik filtresi
+        if is_active is not None:
+            q = q.filter(Item.is_active == is_active)
+
+        if search_term:
+            q = q.filter(
+                (
+                    Item.code.ilike(f"%{search_term}%")
+                    | Item.name.ilike(f"%{search_term}%")
+                    | Item.barcode.ilike(f"%{search_term}%")
+                )
+            )
+
+        if item_type:
+            q = q.filter(Item.item_type == item_type)
+
+        if stock_status:
+            q = self._apply_stock_status_filter(q, stock_status)
+            return q.count()
+
+        return q.scalar()
+
+    def get_stats(
+        self,
+        query: str = None,
+        keyword: str = None,
+        item_type: str = None,
+        is_active: bool = True,
+        stock_status: str = None,
+    ) -> dict:
+        """Stok istatistiklerini hesapla"""
+        search_term = keyword or query or ""
+
+        q = self.session.query(Item)
+
+        if is_active is not None:
+            q = q.filter(Item.is_active == is_active)
+
+        if search_term:
+            q = q.filter(
+                (
+                    Item.code.ilike(f"%{search_term}%")
+                    | Item.name.ilike(f"%{search_term}%")
+                    | Item.barcode.ilike(f"%{search_term}%")
+                )
+            )
+
+        if item_type:
+            q = q.filter(Item.item_type == item_type)
+
+        # Performans için sadece gerekli kolonları ve ilişkileri çekmek gerekebilir
+        # Şimdilik tutarlılık için model üzerinden gidiyoruz
+        items = q.all()
+
+        stats = {
+            "total": len(items),
+            "normal": 0,
+            "low": 0,
+            "critical": 0,
+            "out_of_stock": 0,
+            "total_value": Decimal(0),
+        }
+
+        for item in items:
+            status = item.stock_status
+            if status == "normal":
+                stats["normal"] += 1
+            elif status == "low":
+                stats["low"] += 1
+            elif status == "critical":
+                stats["critical"] += 1
+            elif status == "out_of_stock":
+                stats["out_of_stock"] += 1
+
+            # Stok değeri
+            qty = item.total_stock
+            price = item.purchase_price or Decimal(0)
+            stats["total_value"] += qty * price
+
+        return stats
+
+    def get_last_purchase_price(self, item_id: int) -> Optional[Decimal]:
+        """Stok kartının son satınalma fiyatını getir"""
+        from database.models import StockMovement, StockMovementType
+
+        last_purchase = (
+            self.session.query(StockMovement)
+            .filter(
+                StockMovement.item_id == item_id,
+                StockMovement.movement_type == StockMovementType.SATIN_ALMA,
+            )
+            .order_by(StockMovement.created_at.desc())
+            .first()
+        )
+
+        return last_purchase.unit_price if last_purchase else None
+
+    def _apply_stock_status_filter(self, query, status):
+        """Stok durumu filtresini uygula"""
+        if not status:
+            return query
+
+        # Join ve Group By ekle
+        # Not: outerjoin kullanıyoruz çünkü stoğu 0 olan (kaydı olmayan) ürünler de listede olmalı
+        query = query.outerjoin(StockBalance, Item.id == StockBalance.item_id).group_by(
+            Item.id
+        )
+
+        # Toplam stok miktarı ifadesi
+        total_stock = func.sum(func.coalesce(StockBalance.quantity, 0))
+
+        if status == "out_of_stock":
+            query = query.having(total_stock <= 0)
+        elif status == "critical":
+            # Min stok varsa ve stok <= min_stock
+            query = query.having(
+                (total_stock > 0) & (total_stock <= func.coalesce(Item.min_stock, 0))
+            )
+        elif status == "low":
+            # Model: elif self.reorder_point and total <= self.reorder_point: return "low"
+            # Ayrıca kritik veya bitik olmamalı
+            query = query.having(
+                (total_stock > func.coalesce(Item.min_stock, 0))
+                & (total_stock <= func.coalesce(Item.reorder_point, 0))
+            )
+        elif status == "normal":
+            # Diğer durumların tersi
+            query = query.having(
+                (total_stock > 0)
+                & (total_stock > func.coalesce(Item.min_stock, 0))
+                & (total_stock > func.coalesce(Item.reorder_point, 0))
+            )
+
+        return query
 
     def get_next_code(self, prefix: str = "STK") -> str:
         """
@@ -685,23 +871,34 @@ class StockMovementService(ServiceBase):
                 secondary_unit_id=secondary_unit_id,
             )
 
-            # 3. Stok Kartı Fiyatını Güncelle (Genel Ortalama Maliyet)
-            if movement_type in [StockMovementType.SATIN_ALMA, StockMovementType.GIRIS]:
+            # 3. Stok Kartı Fiyatını Güncelle
+            if movement_type == StockMovementType.SATIN_ALMA:
+                # Satınalma işleminde: Son Alış Fiyatı = İşlem Fiyatı
+                item = self.session.query(Item).filter(Item.id == item_id).first()
+                if item:
+                    item.purchase_price = movement_cost
+                    # Eğer işlemde para birimi varsa güncelle
+                    if currency_id:
+                        item.currency_id = currency_id
+                    self.session.add(item)
+
+            elif movement_type == StockMovementType.GIRIS:
+                # Diğer girişlerde: Genel Ortalama Maliyet
                 summary = self.get_stock_summary(item_id)
                 avg_cost = summary.get("average_cost", Decimal(0))
                 if avg_cost > 0:
                     item = self.session.query(Item).filter(Item.id == item_id).first()
                     if item:
                         item.purchase_price = avg_cost
-                        # Para birimini TL (TRY) yap
-                        # Eğer TRY yoksa ilk currency'i al veya None bırak
-                        try_currency = (
-                            self.session.query(Currency)
-                            .filter(Currency.code == "TRY")
-                            .first()
-                        )
-                        if try_currency:
-                            item.currency_id = try_currency.id
+                        # Girişlerde para birimi zorunlu değil, varsayılan TRY kontrolü
+                        if not item.currency_id:
+                            try_currency = (
+                                self.session.query(Currency)
+                                .filter(Currency.code == "TRY")
+                                .first()
+                            )
+                            if try_currency:
+                                item.currency_id = try_currency.id
 
                         self.session.add(item)
 

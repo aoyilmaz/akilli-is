@@ -14,8 +14,9 @@ from PyQt6.QtWidgets import (
     QDateEdit,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from PyQt6.QtCore import Qt, pyqtSignal, QDate, QSize
 from PyQt6.QtGui import QColor
+import qtawesome as qta
 from decimal import Decimal
 
 from ui.components import (
@@ -24,6 +25,7 @@ from ui.components import (
     ColumnConfig,
     MiniStatCard,
 )
+from config.icons import ICONS
 
 
 class PaymentListPage(QWidget):
@@ -37,17 +39,17 @@ class PaymentListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     STATUS_MAP = {
-        "pending": ("⏳ Beklemede", "#f59e0b"),
-        "completed": ("✅ Tamamlandı", "#10b981"),
-        "cancelled": ("❌ İptal", "#ef4444"),
+        "pending": ("Beklemede", "#f59e0b", ICONS.TIME),
+        "completed": ("Tamamlandı", "#10b981", ICONS.SUCCESS),
+        "cancelled": ("İptal", "#ef4444", ICONS.CANCEL),
     }
 
     METHOD_MAP = {
-        "cash": "💵 Nakit",
-        "bank_transfer": "🏦 Havale/EFT",
-        "check": "📝 Çek",
-        "credit_card": "💳 Kredi Kartı",
-        "promissory_note": "📄 Senet",
+        "cash": ("Nakit", ICONS.MONEY),
+        "bank_transfer": ("Havale/EFT", ICONS.BANK),
+        "check": ("Çek", ICONS.INVOICE),
+        "credit_card": ("Kredi Kartı", ICONS.PAYMENT),
+        "promissory_note": ("Senet", ICONS.WORK_ORDER),
     }
 
     def __init__(self, parent=None):
@@ -64,7 +66,7 @@ class PaymentListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Ödemeler",
-            icon="💳",
+            icon=ICONS.PAYMENT,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -109,9 +111,16 @@ class PaymentListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["completed"] = MiniStatCard("✅ Tamamlanan", "0", "#10b981")
-        self.stat_cards["amount"] = MiniStatCard("💰 Toplam Tutar", "₺0", "#ef4444")
+        self.stat_cards = {}
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVENTORY
+        )
+        self.stat_cards["completed"] = MiniStatCard(
+            "Tamamlanan", "0", "success", icon=ICONS.SUCCESS
+        )
+        self.stat_cards["amount"] = MiniStatCard(
+            "Toplam Tutar", "₺0", "error", icon=ICONS.MONEY
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -202,14 +211,27 @@ class PaymentListPage(QWidget):
 
             elif col_key == "payment_method":
                 method = pmt.get("payment_method", "")
-                text = self.METHOD_MAP.get(method, method)
-                self.table.setItem(row, col_idx, QTableWidgetItem(text))
+                text, icon = self.METHOD_MAP.get(method, (method, ICONS.TYPE_OTHER))
+                item = QTableWidgetItem(text)
+                if icon:
+                    item.setIcon(qta.icon(icon, color="#475569"))
+                self.table.setItem(row, col_idx, item)
 
             elif col_key == "status":
                 status = pmt.get("status", "")
-                text, color = self.STATUS_MAP.get(status, (status, "#ffffff"))
+                # STATUS_MAP artık 3 değer döndürüyor: text, color, icon
+                # Ancak eski koda uyumlu olması için get ile default'u tuple 3'lü yapalım
+                status_Info = self.STATUS_MAP.get(status, (status, "#ffffff", ""))
+                if len(status_Info) == 3:
+                    text, color, icon = status_Info
+                else:
+                    text, color = status_Info
+                    icon = ""
+
                 item = QTableWidgetItem(text)
                 item.setForeground(QColor(color))
+                if icon:
+                    item.setIcon(qta.icon(icon, color=color))
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "description":
@@ -231,14 +253,16 @@ class PaymentListPage(QWidget):
         btn_layout.setContentsMargins(4, 4, 4, 4)
         btn_layout.setSpacing(4)
 
-        view_btn = QPushButton("👁")
+        view_btn = QPushButton()
+        view_btn.setIcon(qta.icon(ICONS.EYE, color="#475569"))
         view_btn.setFixedSize(28, 26)
         view_btn.setProperty("class", "action-view")
         view_btn.clicked.connect(lambda: self.view_clicked.emit(pmt_id))
         btn_layout.addWidget(view_btn)
 
         if pmt.get("status") != "cancelled":
-            cancel_btn = QPushButton("❌")
+            cancel_btn = QPushButton()
+            cancel_btn.setIcon(qta.icon(ICONS.CANCEL, color="#ef4444"))
             cancel_btn.setFixedSize(28, 26)
             cancel_btn.setProperty("class", "action-delete")
             cancel_btn.setToolTip("İptal Et")

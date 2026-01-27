@@ -23,8 +23,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from ui.components.toast import show_toast
 import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from database.base import get_session
 from database.models.user import User, Role, UserPagePermission
@@ -429,12 +432,12 @@ class UserManagement(QWidget):
         top_layout.addStretch()
 
         self.btn_refresh = QPushButton("Yenile")
-        self.btn_refresh.setIcon(qta.icon("fa5s.sync"))
+        self.btn_refresh.setIcon(qta.icon(ICONS.REFRESH))
         self.btn_refresh.clicked.connect(self.refresh_list)
         top_layout.addWidget(self.btn_refresh)
 
         self.btn_add = QPushButton("Yeni Kullanıcı")
-        self.btn_add.setIcon(qta.icon("fa5s.plus"))
+        self.btn_add.setIcon(qta.icon(ICONS.PLUS))
         self.btn_add.setStyleSheet("background-color: #3498db; color: white;")
         self.btn_add.clicked.connect(self.add_user)
         top_layout.addWidget(self.btn_add)
@@ -474,13 +477,21 @@ class UserManagement(QWidget):
                 roles = ", ".join([r.name for r in user.roles])
                 self.table.setItem(i, 4, QTableWidgetItem(roles))
 
-                status = "Aktif" if user.is_active else "Pasif"
-                item = QTableWidgetItem(status)
+                t = get_theme()
+                status_item = QTableWidgetItem()
                 if user.is_active:
-                    item.setForeground(Qt.GlobalColor.green)
+                    status_item.setText("Aktif")
+                    status_item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                    )
+                    status_item.setForeground(QColor(t.success))
                 else:
-                    item.setForeground(Qt.GlobalColor.red)
-                self.table.setItem(i, 5, item)
+                    status_item.setText("Pasif")
+                    status_item.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                    )
+                    status_item.setForeground(QColor(t.text_muted))
+                self.table.setItem(i, 5, status_item)
 
                 # İşlem butonları
                 btn_widget = QWidget()
@@ -490,7 +501,7 @@ class UserManagement(QWidget):
                 btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
                 edit_btn = QPushButton()
-                edit_btn.setIcon(qta.icon("fa5s.pen", color="#3498db"))
+                edit_btn.setIcon(qta.icon(ICONS.EDIT, color="#3498db"))
                 edit_btn.setFixedSize(32, 32)
                 edit_btn.setToolTip("Düzenle")
                 edit_btn.clicked.connect(
@@ -499,7 +510,7 @@ class UserManagement(QWidget):
                 btn_layout.addWidget(edit_btn)
 
                 del_btn = QPushButton()
-                del_btn.setIcon(qta.icon("fa5s.trash", color="#ef4444"))
+                del_btn.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
                 del_btn.setFixedSize(32, 32)
                 del_btn.setToolTip("Sil")
                 del_btn.clicked.connect(

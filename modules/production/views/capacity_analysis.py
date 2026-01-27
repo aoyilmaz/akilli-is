@@ -4,8 +4,7 @@ Akıllı İş - Kapasite Analizi Modülü
 """
 
 from datetime import datetime, date, timedelta
-from decimal import Decimal
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from PyQt6.QtWidgets import (
     QWidget,
@@ -14,17 +13,15 @@ from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
     QFrame,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
     QPushButton,
-    QProgressBar,
+    QTableWidgetItem,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QBrush, QPen
 
 from ui.components.stat_cards import MiniStatCard
 from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class CapacityChart(QWidget):
@@ -32,7 +29,7 @@ class CapacityChart(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.data = []  # [{"station": str, "capacity": float, "load": float}, ...]
+        self.data = []  # List of dicts with station, capacity, load
         self.setMinimumHeight(300)
 
     def set_data(self, data: List[Dict]):
@@ -73,7 +70,10 @@ class CapacityChart(QWidget):
             margin_left, margin_top, margin_left, margin_top + height
         )  # Y ekseni
         painter.drawLine(
-            margin_left, margin_top + height, margin_left + width, margin_top + height
+            margin_left,
+            margin_top + height,
+            margin_left + width,
+            margin_top + height,
         )  # X ekseni
 
         # Kılavuz çizgileri ve Değerler
@@ -133,7 +133,7 @@ class CapacityChart(QWidget):
             painter.setBrush(QBrush(load_color))
             painter.drawRoundedRect(*load_rect, 4, 4)
 
-            # İstasyon adı
+            # İstasyon adı (veya kodu)
             painter.setPen(QPen(QColor("#cbd5e1")))
             painter.drawText(
                 int(x),
@@ -141,7 +141,7 @@ class CapacityChart(QWidget):
                 int(bar_width * 2),
                 30,
                 Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
-                item["station"],
+                item.get("code", item["station"]),
             )
 
 
@@ -171,10 +171,11 @@ class CapacityAnalysisPage(QWidget):
             title="Kapasite Analizi",
             icon="📊",
             show_search=False,
-            show_refresh=True,
+            show_refresh=False,  # Manuel ekleyeceğiz
+            show_add=False,
             parent=self,
         )
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
+        # self.header.refresh_clicked.connect(self.refresh_requested.emit)
 
         h_layout = self.header.header_layout()
 
@@ -188,6 +189,14 @@ class CapacityAnalysisPage(QWidget):
         self.period_combo.setMinimumWidth(120)
         h_layout.addWidget(self.period_combo)
 
+        # Refresh butonu (En sağa)
+        h_layout.addSpacing(16)
+        refresh_btn = QPushButton("🔄 Yenile")
+        refresh_btn.setProperty("class", "btn-refresh")
+        refresh_btn.setFixedHeight(30)
+        refresh_btn.clicked.connect(self.refresh_requested.emit)
+        h_layout.addWidget(refresh_btn)
+
         layout.addWidget(self.header)
 
         # === İçerik ===
@@ -195,17 +204,21 @@ class CapacityAnalysisPage(QWidget):
 
         # Sol Taraf - Grafik
         chart_frame = QFrame()
-        chart_frame.setStyleSheet(
-            ".QFrame { background-color: #1e293b; border-radius: 8px; }"
-        )
+        # chart_frame.setStyleSheet(
+        #     ".QFrame { background-color: #1e293b; border-radius: 8px; }"
+        # )
+        chart_frame.setProperty("class", "card")
         chart_layout = QVBoxLayout(chart_frame)
 
         chart_layout.addWidget(QLabel("<b>İş İstasyonu Yük Grafiği</b>"))
         self.chart = CapacityChart()
-        chart_layout.addWidget(self.chart)
+        self.chart.setMinimumHeight(450)
+        chart_layout.addWidget(self.chart, 1)
 
         # Lejant
         legend_layout = QHBoxLayout()
+        legend_layout.setSpacing(12)
+        legend_layout.addStretch()
         legend_layout.addWidget(self._create_legend_item("Kapasite", "#3b82f6"))
         legend_layout.addWidget(self._create_legend_item("Normal Yük", "#10b981"))
         legend_layout.addWidget(
@@ -214,34 +227,35 @@ class CapacityAnalysisPage(QWidget):
         legend_layout.addWidget(
             self._create_legend_item("Aşırı Yük (>%100)", "#ef4444")
         )
+        legend_layout.addStretch()
         chart_layout.addLayout(legend_layout)
 
         content_layout.addWidget(chart_frame, stretch=1)
 
         # Sağ Taraf - Özet Tablo
         table_frame = QFrame()
-        table_frame.setStyleSheet(
-            ".QFrame { background-color: #1e293b; border-radius: 8px; }"
-        )
+        # table_frame.setStyleSheet(
+        #     ".QFrame { background-color: #1e293b; border-radius: 8px; }"
+        # )
+        table_frame.setProperty("class", "card")
         table_layout = QVBoxLayout(table_frame)
+        table_layout.setContentsMargins(
+            0, 0, 0, 0
+        )  # EnhancedTable zaten marginli olabilir, sıfırlayalım
 
         table_layout.addWidget(QLabel("<b>Doluluk Detayları</b>"))
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            ["İstasyon", "Kapasite", "Yük", "Doluluk %"]
-        )
-        self.table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        self.table.verticalHeader().setVisible(False)
-        self.table.setStyleSheet(
-            """
-            QTableWidget { background-color: transparent; border: none; }
-            QHeaderView::section { background-color: #0f172a; color: #94a3b8; padding: 8px; }
-            QTableWidget::item { padding: 8px; color: #e2e8f0; }
-        """
+        columns = [
+            ColumnConfig("station", "İstasyon", width=150, stretch=True),
+            ColumnConfig("capacity", "Kapasite", width=100),
+            ColumnConfig("load", "Yük", width=100),
+            ColumnConfig("utilization", "Doluluk %", width=100),
+        ]
+
+        self.table = EnhancedTableWidget(
+            table_id="capacity_analysis_list",
+            columns=columns,
+            parent=self,
         )
         table_layout.addWidget(self.table)
 
@@ -266,14 +280,15 @@ class CapacityAnalysisPage(QWidget):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
 
         box = QLabel()
-        box.setFixedSize(12, 12)
+        box.setFixedSize(10, 10)
         box.setStyleSheet(f"background-color: {color_code}; border-radius: 2px;")
         layout.addWidget(box)
 
         label = QLabel(text)
-        label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        label.setStyleSheet("color: #94a3b8; font-size: 10px;")
         layout.addWidget(label)
 
         return widget
@@ -356,6 +371,7 @@ class CapacityAnalysisPage(QWidget):
                 analysis_data.append(
                     {
                         "station": station.name,
+                        "code": station.code,
                         "capacity": capacity_hours,
                         "load": station_load,
                     }
@@ -366,26 +382,37 @@ class CapacityAnalysisPage(QWidget):
 
             # Tablo Güncelle
             self.table.setRowCount(len(analysis_data))
+            visible_cols = self.table.get_visible_columns()
+
             for row, data in enumerate(analysis_data):
                 util = (
                     data["load"] / data["capacity"] * 100 if data["capacity"] > 0 else 0
                 )
 
-                self.table.setItem(row, 0, QTableWidgetItem(data["station"]))
-                self.table.setItem(
-                    row, 1, QTableWidgetItem(f"{data['capacity']:.1f} sa")
-                )
-                self.table.setItem(row, 2, QTableWidgetItem(f"{data['load']:.1f} sa"))
-
-                util_item = QTableWidgetItem(f"%{util:.1f}")
-                if util > 100:
-                    util_item.setForeground(QColor("#ef4444"))
-                elif util > 80:
-                    util_item.setForeground(QColor("#f59e0b"))
-                else:
-                    util_item.setForeground(QColor("#10b981"))
-
-                self.table.setItem(row, 3, util_item)
+                for col_idx, col_key in enumerate(visible_cols):
+                    if col_key == "station":
+                        self.table.setItem(
+                            row, col_idx, QTableWidgetItem(data["station"])
+                        )
+                    elif col_key == "capacity":
+                        self.table.setItem(
+                            row,
+                            col_idx,
+                            QTableWidgetItem(f"{data['capacity']:.1f} sa"),
+                        )
+                    elif col_key == "load":
+                        self.table.setItem(
+                            row, col_idx, QTableWidgetItem(f"{data['load']:.1f} sa")
+                        )
+                    elif col_key == "utilization":
+                        util_item = QTableWidgetItem(f"%{util:.1f}")
+                        if util > 100:
+                            util_item.setForeground(QColor("#ef4444"))
+                        elif util > 80:
+                            util_item.setForeground(QColor("#f59e0b"))
+                        else:
+                            util_item.setForeground(QColor("#10b981"))
+                        self.table.setItem(row, col_idx, util_item)
 
             # Kartları Güncelle
             self.total_load_card.update_value(f"{total_load:.1f} Sa")

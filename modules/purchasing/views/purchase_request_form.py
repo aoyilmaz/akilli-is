@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from ui.components.page_header import PageHeader
+from ui.components import CurrencyInput
 
 
 class ItemSelectorDialog(QDialog):
@@ -348,10 +349,8 @@ class PurchaseRequestFormPage(QWidget):
         self.items_table.setCellWidget(row, 3, unit_combo)
 
         # Tahmini Fiyat
-        price_spin = QDoubleSpinBox()
-        price_spin.setRange(0, 999999999)
+        price_spin = CurrencyInput()
         price_spin.setDecimals(2)
-        price_spin.setPrefix("₺ ")
         price_spin.setValue(estimated_price)
         self.items_table.setCellWidget(row, 4, price_spin)
 

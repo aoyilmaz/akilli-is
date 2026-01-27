@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from config.icons import ICONS
 
 from ui.components import (
     BaseListPage,
@@ -45,7 +46,7 @@ class ShipmentListPage(BaseListPage):
 
         super().__init__(
             title="Sevkiyatlar",
-            icon="📦",
+            icon=ICONS.TRUCK,
             table_id="shipments",
             columns=columns,
             show_stats=True,
@@ -95,7 +96,9 @@ class ShipmentListPage(BaseListPage):
             weight = item.get("total_weight_kg", 0)
             weight_str = f"{weight:,.0f}" if weight else "-"
             weight_item = QTableWidgetItem(weight_str)
-            weight_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            weight_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             # Kapasite aşımı varsa uyarı
             if item.get("is_capacity_exceeded"):
                 weight_item.setForeground(QColor("#ef4444"))
@@ -126,16 +129,22 @@ class ShipmentListPage(BaseListPage):
             shipment_id = item.get("id")
 
             view_btn = create_view_button()
-            view_btn.clicked.connect(lambda checked, sid=shipment_id: self.view_clicked.emit(sid))
+            view_btn.clicked.connect(
+                lambda checked, sid=shipment_id: self.view_clicked.emit(sid)
+            )
 
             edit_btn = create_edit_button()
-            edit_btn.clicked.connect(lambda checked, sid=shipment_id: self.edit_clicked.emit(sid))
+            edit_btn.clicked.connect(
+                lambda checked, sid=shipment_id: self.edit_clicked.emit(sid)
+            )
             # Teslim edilmiş sevkiyatlar düzenlenemez
             if status in ["teslim", "iptal"]:
                 edit_btn.setEnabled(False)
 
             delete_btn = create_delete_button()
-            delete_btn.clicked.connect(lambda checked, sid=shipment_id: self.delete_clicked.emit(sid))
+            delete_btn.clicked.connect(
+                lambda checked, sid=shipment_id: self.delete_clicked.emit(sid)
+            )
             # Yolda veya teslim edilmiş sevkiyatlar silinemez
             if status in ["yolda", "teslim"]:
                 delete_btn.setEnabled(False)
@@ -153,7 +162,9 @@ class ShipmentListPage(BaseListPage):
     def _update_stats(self):
         """İstatistikleri güncelle"""
         total = len(self.shipments)
-        planlanan = sum(1 for s in self.shipments if s.get("status") in ["planlandi", "yukleniyor"])
+        planlanan = sum(
+            1 for s in self.shipments if s.get("status") in ["planlandi", "yukleniyor"]
+        )
         yolda = sum(1 for s in self.shipments if s.get("status") == "yolda")
         teslim = sum(1 for s in self.shipments if s.get("status") == "teslim")
 

@@ -361,6 +361,14 @@ class DashboardPage(QWidget):
         except ImportError as e:
             print(f"QuickAction widget import hatası: {e}")
 
+        # Üretim/APS widget'ları
+        try:
+            from .widgets.bottleneck_widget import CapacityBottleneckDashboardWidget
+
+            WidgetManager.register(CapacityBottleneckDashboardWidget)
+        except ImportError as e:
+            print(f"Bottleneck widget import hatası: {e}")
+
     def _load_layout(self):
         """Kullanıcı düzenini yükle"""
         self._user_context = get_current_user()

@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from config.icons import ICONS
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -65,7 +66,7 @@ class InvoiceListPage(QWidget):
         # Page Header (arama ve butonlar için)
         self.header = PageHeader(
             title="Faturalar",
-            icon="📄",
+            icon=ICONS.INVOICE,
             show_search=True,
             show_refresh=True,
             show_add=True,

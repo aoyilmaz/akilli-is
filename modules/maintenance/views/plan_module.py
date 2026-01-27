@@ -31,6 +31,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QTextCharFormat, QColor
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 from modules.maintenance.views.base import MaintenanceBaseWidget
 
@@ -159,9 +162,21 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
             )
 
             # Durum
-            status_item = QTableWidgetItem("Aktif" if plan.is_active else "Pasif")
-            if not plan.is_active:
-                status_item.setForeground(Qt.GlobalColor.gray)
+            status_item = QTableWidgetItem()
+            t = get_theme()
+            if plan.is_active:
+                status_item.setText("Aktif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                )
+                status_item.setForeground(QColor(t.success))
+            else:
+                status_item.setText("Pasif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                )
+                status_item.setForeground(QColor(t.text_muted))
+
             self.table.setItem(i, 6, status_item)
 
             # Kalan gün

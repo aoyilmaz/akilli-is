@@ -13,7 +13,9 @@ from PyQt6.QtWidgets import (
     QFrame,
     QSizePolicy,
 )
-from PyQt6.QtCore import pyqtSignal, QTimer, Qt
+from PyQt6.QtCore import pyqtSignal, QTimer, Qt, QSize
+import qtawesome as qta
+from config.icons import ICONS
 
 
 class PageHeader(QWidget):
@@ -106,7 +108,9 @@ class PageHeader(QWidget):
 
         # Geri butonu
         if show_back:
-            self.back_btn = QPushButton("←")
+            self.back_btn = QPushButton()
+            self.back_btn.setIcon(qta.icon(ICONS.BACK, color="#64748b"))
+            self.back_btn.setIconSize(QSize(20, 20))
             self.back_btn.setFixedSize(36, 36)
             self.back_btn.setProperty("class", "btn-secondary")
             self.back_btn.clicked.connect(self.back_clicked.emit)
@@ -116,9 +120,10 @@ class PageHeader(QWidget):
             self.back_btn = None
 
         # Başlık ve Alt Başlık
-        # Başlık ve Alt Başlık
-        title_text = f"{icon} {title}" if icon else title
-        self.title_label = QLabel(title_text)
+        self.title_label = QLabel(title)
+        self.title_label = QLabel(title)
+        # Icon handling is done below to support subtitle layout correctly
+
         self.title_label.setProperty("class", "page-title")
 
         if subtitle:
@@ -128,7 +133,19 @@ class PageHeader(QWidget):
             title_layout.setSpacing(0)
             title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-            title_layout.addWidget(self.title_label)
+            if icon and icon.startswith("ph."):
+                h_title = QHBoxLayout()
+                h_title.setContentsMargins(0, 0, 0, 0)
+                h_title.setSpacing(8)
+
+                icon_lbl = QLabel()
+                icon_lbl.setPixmap(qta.icon(icon, color="#475569").pixmap(24, 24))
+                h_title.addWidget(icon_lbl)
+                h_title.addWidget(self.title_label)
+                h_title.addStretch()
+                title_layout.addLayout(h_title)
+            else:
+                title_layout.addWidget(self.title_label)
 
             self.subtitle_label = QLabel(subtitle)
             self.subtitle_label.setProperty("class", "page-subtitle")
@@ -139,6 +156,11 @@ class PageHeader(QWidget):
 
             header_layout.addWidget(title_container)
         else:
+            if icon and icon.startswith("ph."):
+                icon_lbl = QLabel()
+                icon_lbl.setPixmap(qta.icon(icon, color="#475569").pixmap(24, 24))
+                header_layout.addWidget(icon_lbl)
+
             header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
@@ -149,7 +171,11 @@ class PageHeader(QWidget):
         # Arama kutusu
         if show_search:
             self.search_input = QLineEdit()
-            self.search_input.setPlaceholderText(f"🔍 {search_placeholder}")
+            self.search_input.setPlaceholderText(f"{search_placeholder}")
+            self.search_input.addAction(
+                qta.icon(ICONS.SEARCH, color="#94a3b8"),
+                QLineEdit.ActionPosition.LeadingPosition,
+            )
             self.search_input.setProperty("class", "search-input")
             self.search_input.setFixedSize(280, BTN_HEIGHT)
             self.search_input.textChanged.connect(self._on_search_text_changed)
@@ -159,7 +185,11 @@ class PageHeader(QWidget):
 
         # Filtre butonu
         if show_filter:
-            self.filter_btn = QPushButton("⚡ Filtrele")
+            self.filter_btn = QPushButton("Filtrele")
+            # self.filter_btn.setIcon(qta.icon("ph.funnel", color="#64748b")) # CSS class ile ikon rengi çakışabilir
+            # Buton text only veya ikonlu. Tasarım tercihi: İkon + Text
+            self.filter_btn.setIcon(qta.icon(ICONS.FILTER))
+            self.filter_btn.setIconSize(QSize(16, 16))
             self.filter_btn.setProperty("class", "btn-filter")
             self.filter_btn.setFixedHeight(BTN_HEIGHT)
             self.filter_btn.clicked.connect(self.filter_clicked.emit)
@@ -169,7 +199,9 @@ class PageHeader(QWidget):
 
         # Export butonu
         if show_export:
-            self.export_btn = QPushButton("📊 Dışa Aktar")
+            self.export_btn = QPushButton("Dışa Aktar")
+            self.export_btn.setIcon(qta.icon(ICONS.EXPORT))
+            self.export_btn.setIconSize(QSize(16, 16))
             self.export_btn.setProperty("class", "btn-export")
             self.export_btn.setFixedHeight(BTN_HEIGHT)
             self.export_btn.clicked.connect(self.export_clicked.emit)
@@ -179,7 +211,9 @@ class PageHeader(QWidget):
 
         # Yenile butonu
         if show_refresh:
-            self.refresh_btn = QPushButton("🔄 Yenile")
+            self.refresh_btn = QPushButton("Yenile")
+            self.refresh_btn.setIcon(qta.icon(ICONS.REFRESH))
+            self.refresh_btn.setIconSize(QSize(16, 16))
             self.refresh_btn.setProperty("class", "btn-refresh")
             self.refresh_btn.setFixedHeight(BTN_HEIGHT)
             self.refresh_btn.clicked.connect(self.refresh_clicked.emit)
@@ -189,7 +223,9 @@ class PageHeader(QWidget):
 
         # Ekle butonu
         if show_add:
-            self.add_btn = QPushButton(f"➕ {add_text}")
+            self.add_btn = QPushButton(f"{add_text}")
+            self.add_btn.setIcon(qta.icon(ICONS.PLUS))
+            self.add_btn.setIconSize(QSize(16, 16))
             self.add_btn.setProperty("class", "btn-add")
             self.add_btn.setFixedHeight(BTN_HEIGHT)
             self.add_btn.clicked.connect(self.add_clicked.emit)
@@ -210,8 +246,9 @@ class PageHeader(QWidget):
 
     def set_title(self, title: str, icon: str = ""):
         """Başlık metnini güncelle"""
-        title_text = f"{icon} {title}" if icon else title
-        self.title_label.setText(title_text)
+        # Burada ikonu güncellemek zor olabilir çünkü widget yapısı dinamik.
+        # Basitçe title'ı güncelleyelim.
+        self.title_label.setText(title)
 
     def get_search_text(self) -> str:
         """Arama metnini döndür"""
@@ -232,6 +269,11 @@ class PageHeader(QWidget):
         if self.refresh_btn:
             self.refresh_btn.setEnabled(enabled)
 
+    def set_add_text(self, text: str):
+        """Ekle butonu metnini güncelle"""
+        if self.add_btn:
+            self.add_btn.setText(text)
+
     def header_layout(self):
         """Header frame içindeki layout'u döndür (widget ekleme için)"""
         return self.header_frame.layout()
@@ -239,7 +281,4 @@ class PageHeader(QWidget):
     def add_action_button(self, widget: QWidget):
         """Header'a özel aksiyon butonu ekle"""
         # Layout'un sonundaki butonların önüne ekle
-        # Stretch'ten sonra eklemek için layout count'u alabiliriz veya direkt addWidget
-        # Standart butonlar layout'un sonunda.
-        # Bizim eklediğimiz butonlar da onların yanında olmalı.
         self.header_frame.layout().addWidget(widget)

@@ -22,6 +22,8 @@ from ui.components import (
     MiniStatCard,
 )
 from database.models.crm import LeadStatus
+from config.icons import ICONS
+import qtawesome as qta
 
 
 class LeadListPage(QWidget):
@@ -35,11 +37,11 @@ class LeadListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     STATUS_DISPLAY = {
-        "new": ("✨ Yeni", "#3b82f6"),
-        "contacted": ("📞 İletişim", "#f59e0b"),
-        "qualified": ("✅ Kalifiye", "#10b981"),
-        "unqualified": ("❌ Uygun Değil", "#ef4444"),
-        "converted": ("🎉 Dönüştürüldü", "#8b5cf6"),
+        "new": ("Yeni", "#3b82f6", ICONS.SPARKLE),
+        "contacted": ("İletişim", "#f59e0b", ICONS.PHONE),
+        "qualified": ("Kalifiye", "#10b981", ICONS.CHECK),
+        "unqualified": ("Uygun Değil", "#ef4444", ICONS.DANGER),
+        "converted": ("Dönüştürüldü", "#8b5cf6", ICONS.SUCCESS),
     }
 
     def __init__(self, parent=None):
@@ -56,7 +58,7 @@ class LeadListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Aday Müşteriler (Leads)",
-            icon="🚀",
+            icon=ICONS.ROCKET,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -71,10 +73,18 @@ class LeadListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["new"] = MiniStatCard("✨ Yeni", "0", "#3b82f6")
-        self.stat_cards["contacted"] = MiniStatCard("📞 Görüşüldü", "0", "#f59e0b")
-        self.stat_cards["qualified"] = MiniStatCard("✅ Kalifiye", "0", "#10b981")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "#6366f1", icon=ICONS.CRM
+        )
+        self.stat_cards["new"] = MiniStatCard(
+            "Yeni", "0", "#3b82f6", icon=ICONS.SPARKLE
+        )
+        self.stat_cards["contacted"] = MiniStatCard(
+            "Görüşüldü", "0", "#f59e0b", icon=ICONS.PHONE
+        )
+        self.stat_cards["qualified"] = MiniStatCard(
+            "Kalifiye", "0", "#10b981", icon=ICONS.CHECK
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -153,8 +163,18 @@ class LeadListPage(QWidget):
 
             elif col_key == "status":
                 status = lead.get("status", "")
-                text, color = self.STATUS_DISPLAY.get(status, (status, "#ffffff"))
+                display_info = self.STATUS_DISPLAY.get(
+                    status, (status, "#ffffff", None)
+                )
+                if len(display_info) == 3:
+                    text, color, icon_name = display_info
+                else:
+                    text, color = display_info
+                    icon_name = None
+
                 item = QTableWidgetItem(text)
+                if icon_name:
+                    item.setIcon(qta.icon(icon_name, color=color))
                 item.setForeground(QColor(color))
                 self.table.setItem(row, col_idx, item)
 
@@ -190,14 +210,16 @@ class LeadListPage(QWidget):
 
         # Dönüştür butonu
         if status != LeadStatus.CONVERTED.value:
-            convert_btn = QPushButton("🎯")
-            convert_btn.setFixedSize(28, 26)
+            convert_btn = QPushButton("Dönüştür")
+            convert_btn.setIcon(qta.icon(ICONS.TARGET, color="#8b5cf6"))
+            convert_btn.setFixedSize(90, 26)
             convert_btn.setToolTip("Müşteriye Dönüştür")
             convert_btn.clicked.connect(lambda: self.convert_clicked.emit(lead_id))
             btn_layout.addWidget(convert_btn)
 
         # Düzenle butonu
-        edit_btn = QPushButton("✏")
+        edit_btn = QPushButton()
+        edit_btn.setIcon(qta.icon(ICONS.EDIT, color="#3b82f6"))
         edit_btn.setFixedSize(28, 26)
         edit_btn.setProperty("class", "action-edit")
         edit_btn.setToolTip("Düzenle")
@@ -205,7 +227,8 @@ class LeadListPage(QWidget):
         btn_layout.addWidget(edit_btn)
 
         # Sil butonu
-        del_btn = QPushButton("🗑")
+        del_btn = QPushButton()
+        del_btn.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
         del_btn.setFixedSize(28, 26)
         del_btn.setProperty("class", "action-delete")
         del_btn.setToolTip("Sil")

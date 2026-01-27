@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from config.icons import ICONS
 from ui.components import (
     BaseListPage,
     ColumnConfig,
@@ -45,7 +46,7 @@ class SupplierListPage(BaseListPage):
 
         super().__init__(
             title="Tedarikçiler",
-            icon="🏢",
+            icon=ICONS.BUILDING,
             table_id="suppliers",
             columns=columns,
             show_stats=True,

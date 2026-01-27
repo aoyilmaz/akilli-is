@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 
+from config.icons import ICONS
 from ui.components import (
     BaseListPage,
     ColumnConfig,
@@ -54,7 +55,7 @@ class CustomerListPage(BaseListPage):
 
         super().__init__(
             title="Müşteriler",
-            icon="👥",
+            icon=ICONS.USERS,
             table_id="customers",
             columns=columns,
             show_stats=True,

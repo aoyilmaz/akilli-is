@@ -190,12 +190,56 @@ class PurchaseRequestService:
         self.session.commit()
         return request
 
-    def submit_for_approval(self, request_id: int) -> Optional[PurchaseRequest]:
-        """Talebi onaya gönder"""
+    def submit_for_approval(
+        self, request_id: int, user_id: int = None
+    ) -> Optional[PurchaseRequest]:
+        """
+        Talebi onaya gönder ve workflow başlat.
+
+        Args:
+            request_id: Talep ID'si
+            user_id: Onaya gönderen kullanıcı ID'si
+
+        Returns:
+            Güncellenen talep veya None
+        """
         request = self.get_by_id(request_id)
-        if request and request.status == PurchaseRequestStatus.DRAFT:
-            request.status = PurchaseRequestStatus.PENDING
-            self.session.commit()
+        if not request or request.status != PurchaseRequestStatus.DRAFT:
+            return None
+
+        request.status = PurchaseRequestStatus.PENDING
+        self.session.commit()
+
+        # Workflow başlat (Bridge pattern ile circular import önlenir)
+        try:
+            from modules.workflow.bridge import start_workflow_for_document
+
+            # Koşul değerlendirmesi için context hazırla
+            total_amount = sum(
+                (item.quantity or 0) * (item.unit_price or 0) for item in request.items
+            )
+
+            context = {
+                "total_amount": total_amount,
+                "department": request.department,
+                "item_count": len(request.items),
+            }
+
+            instance_id = start_workflow_for_document(
+                table_name="purchase_requests",
+                document_id=request.id,
+                initiated_by=user_id or request.requested_by,
+                document_no=request.request_no,
+                context=context,
+            )
+
+            if instance_id:
+                print(f"[PurchaseRequest] Workflow başlatıldı: {instance_id}")
+
+        except Exception as e:
+            # Workflow hatası talep durumunu etkilemez
+            print(f"[PurchaseRequest] Workflow başlatma hatası: {e}")
+
         return request
 
     def approve(self, request_id: int, approved_by: str) -> Optional[PurchaseRequest]:

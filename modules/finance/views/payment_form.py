@@ -4,18 +4,37 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QLineEdit, QComboBox, QDateEdit, QTextEdit,
-    QDoubleSpinBox, QMessageBox, QScrollArea, QGroupBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QFrame,
+    QLineEdit,
+    QComboBox,
+    QDateEdit,
+    QTextEdit,
+    QDoubleSpinBox,
+    QMessageBox,
+    QScrollArea,
+    QGroupBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, ERROR,
-    get_button_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    ERROR,
+    get_button_style,
 )
+from ui.components import CurrencyInput
+
 
 class PaymentFormPage(QWidget):
     """Odeme form sayfasi"""
@@ -25,8 +44,7 @@ class PaymentFormPage(QWidget):
 
     supplier_balance_requested = pyqtSignal(int)  # supplier_id
 
-    def __init__(self, payment_data: dict = None,
-                 suppliers: list = None, parent=None):
+    def __init__(self, payment_data: dict = None, suppliers: list = None, parent=None):
         super().__init__(parent)
         self.payment_data = payment_data or {}
         self.suppliers = suppliers or []
@@ -99,9 +117,7 @@ class PaymentFormPage(QWidget):
         supplier_layout.addWidget(supplier_label)
         self.supplier_combo = QComboBox()
         self.supplier_combo.setStyleSheet(self._combo_style())
-        self.supplier_combo.currentIndexChanged.connect(
-            self._on_supplier_changed
-        )
+        self.supplier_combo.currentIndexChanged.connect(self._on_supplier_changed)
         supplier_layout.addWidget(self.supplier_combo)
         row1.addLayout(supplier_layout)
 
@@ -130,10 +146,9 @@ class PaymentFormPage(QWidget):
         amount_layout = QVBoxLayout()
         amount_label = QLabel("Tutar *")
         amount_layout.addWidget(amount_label)
-        self.amount_input = QDoubleSpinBox()
-        self.amount_input.setRange(0, 999999999)
+        self.amount_input = CurrencyInput()
         self.amount_input.setDecimals(2)
-        self.amount_input.setSuffix(" TL")
+        # self.amount_input.setSuffix(" TL") # CurrencyInput uses prefix by default
         self.amount_input.setStyleSheet(self._input_style())
         amount_layout.addWidget(self.amount_input)
         row2.addLayout(amount_layout)
@@ -286,8 +301,7 @@ class PaymentFormPage(QWidget):
         self.supplier_combo.addItem("Secin...", None)
         for sup in self.suppliers:
             self.supplier_combo.addItem(
-                f"{sup.get('code', '')} - {sup.get('name', '')}",
-                sup.get("id")
+                f"{sup.get('code', '')} - {sup.get('name', '')}", sup.get("id")
             )
 
         # Form verisi varsa doldur
@@ -319,12 +333,8 @@ class PaymentFormPage(QWidget):
                     self.method_combo.setCurrentIndex(i)
                     break
 
-            self.bank_input.setText(
-                self.payment_data.get("bank_name", "") or ""
-            )
-            self.check_no_input.setText(
-                self.payment_data.get("check_no", "") or ""
-            )
+            self.bank_input.setText(self.payment_data.get("bank_name", "") or "")
+            self.check_no_input.setText(self.payment_data.get("check_no", "") or "")
 
             if self.payment_data.get("check_date"):
                 date_val = self.payment_data["check_date"]

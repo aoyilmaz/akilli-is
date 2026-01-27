@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from PyQt6.QtCore import Qt
+import qtawesome as qta
 
 from config.styles import (
     BG_PRIMARY,
@@ -30,8 +31,8 @@ from config.styles import (
     get_button_style,
     get_title_style,
     BTN_HEIGHT_NORMAL,
-    ICONS,
 )
+from config.icons import ICONS
 from modules.hr.services import HRService
 from modules.hr.views.employee_form import EmployeeFormDialog
 from modules.hr.views.id_card_dialog import IdCardDialog
@@ -58,7 +59,7 @@ class EmployeeModule(QWidget):
 
         self.header = PageHeader(
             title="Çalışan Listesi",
-            icon="👥",
+            icon=ICONS.EMPLOYEE,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -77,7 +78,8 @@ class EmployeeModule(QWidget):
         h_layout = self.header.header_layout()
 
         # Kimlik Kartı butonu
-        id_card_btn = QPushButton("🪪 Kimlik Kartı")
+        id_card_btn = QPushButton("Kimlik Kartı")
+        id_card_btn.setIcon(qta.icon(ICONS.STOCK_CARD))
         id_card_btn.setFixedSize(140, 36)
         id_card_btn.setProperty("class", "btn-secondary")
         id_card_btn.clicked.connect(self._show_id_card)

@@ -17,17 +17,75 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QFrame,
     QTabWidget,
     QFormLayout,
-    QMessageBox,
+    QDialog,
+    QListWidget,
+    QListWidgetItem,
+    QDialogButtonBox,
+    QSizePolicy,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from ui.components import CurrencyInput
 
 from ui.components.toast import show_toast
 from ui.components.page_header import PageHeader
 from database.models.production import BOMStatus, BOMType
+
+
+class SelectionDialog(QDialog):
+    """Basit arama ve seçim diyaloğu"""
+
+    def __init__(self, items, title="Seçim Yapın", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(500)
+        self.items = items  # list of (id, text) tuples
+        self.selected_id = None
+
+        layout = QVBoxLayout(self)
+
+        # Arama
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Ara...")
+        self.search_input.textChanged.connect(self.filter_items)
+        layout.addWidget(self.search_input)
+
+        # Liste
+        self.list_widget = QListWidget()
+        self.populate_list(self.items)
+        self.list_widget.itemDoubleClicked.connect(self.accept_selection)
+        layout.addWidget(self.list_widget)
+
+        # Butonlar
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept_selection)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def populate_list(self, items_to_show):
+        self.list_widget.clear()
+        for id_val, text in items_to_show:
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, id_val)
+            self.list_widget.addItem(item)
+
+    def filter_items(self, text):
+        search_text = text.lower()
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            item.setHidden(search_text not in item.text().lower())
+
+    def accept_selection(self):
+        if self.list_widget.currentItem():
+            self.selected_id = self.list_widget.currentItem().data(
+                Qt.ItemDataRole.UserRole
+            )
+            self.accept()
 
 
 class BOMFormPage(QWidget):
@@ -52,6 +110,7 @@ class BOMFormPage(QWidget):
         super().__init__(parent)
         self.bom = bom
         self.is_edit = bom is not None
+        self.selected_item_id = None
 
         self.items_map = {}  # id -> item obj
         self.units_map = {}  # id -> code
@@ -96,66 +155,152 @@ class BOMFormPage(QWidget):
     def _create_general_tab(self) -> QWidget:
         """Genel bilgiler ve başlık bilgileri"""
         widget = QWidget()
-        layout = QVBoxLayout(widget)
+        main_layout = QHBoxLayout(widget)
+        main_layout.setSpacing(24)
 
-        # Üst Bilgiler Formu
-        form_frame = QFrame()
-        form_layout = QHBoxLayout(form_frame)
+        # --- Sol Kolon (Ayarlar/Parametreler) ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(16)
 
-        # Sol Kolon
-        left_form = QFormLayout()
-
-        self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("BOM-0001")
-        left_form.addRow("Reçete Kodu *", self.code_input)
-
-        self.name_input = QLineEdit()
-        left_form.addRow("Reçete Adı *", self.name_input)
-
-        self.item_combo = QComboBox()  # Üretilen Ürün
-        left_form.addRow("Ürün *", self.item_combo)
-
+        # 1. Durum
         self.status_combo = QComboBox()
         for label, val in self.STATUS_OPTS:
             self.status_combo.addItem(label, val)
-        left_form.addRow("Durum", self.status_combo)
+        left_layout.addLayout(self._create_v_field("Durum", self.status_combo))
 
+        # 2. Reçete Tipi
         self.type_combo = QComboBox()
         for label, val in self.TYPE_OPTS:
             self.type_combo.addItem(label, val)
-        left_form.addRow("Reçete Tipi", self.type_combo)
+        left_layout.addLayout(self._create_v_field("Reçete Tipi", self.type_combo))
 
-        form_layout.addLayout(left_form)
-
-        # Sağ Kolon
-        right_form = QFormLayout()
-
+        # 3. Baz Miktar
         self.base_qty_input = QDoubleSpinBox()
         self.base_qty_input.setRange(0.0001, 999999)
         self.base_qty_input.setValue(1.0)
-        right_form.addRow("Baz Miktar", self.base_qty_input)
+        self.base_qty_input.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        left_layout.addLayout(self._create_v_field("Baz Miktar", self.base_qty_input))
 
+        # 4. Birim
         self.unit_combo = QComboBox()
-        right_form.addRow("Birim", self.unit_combo)
+        self.unit_combo.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        left_layout.addLayout(self._create_v_field("Birim", self.unit_combo))
+
+        left_layout.addStretch()
+        main_layout.addWidget(left_widget, stretch=1)
+
+        # --- Sağ Kolon (Ana Bilgiler) ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(16)
+
+        # 1. Reçete Kodu
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("BOM-0001")
+        right_layout.addLayout(self._create_v_field("Reçete Kodu *", self.code_input))
+
+        # 2. Versiyon ve Revizyon (Yan Yana)
+        ver_rev_layout = QHBoxLayout()
+        ver_rev_layout.setSpacing(16)
 
         self.version_input = QLineEdit("1")
         self.version_input.setReadOnly(True)
-        right_form.addRow("Versiyon", self.version_input)
+        ver_rev_layout.addLayout(self._create_v_field("Versiyon", self.version_input))
 
         self.revision_input = QLineEdit("A")
-        right_form.addRow("Revizyon", self.revision_input)
+        ver_rev_layout.addLayout(self._create_v_field("Revizyon", self.revision_input))
 
-        form_layout.addLayout(right_form)
-        layout.addWidget(form_frame)
+        right_layout.addLayout(ver_rev_layout)
 
-        # Açıklama
-        layout.addWidget(QLabel("Açıklama"))
+        # 3. Reçete Adı
+        self.name_input = QLineEdit()
+        right_layout.addLayout(self._create_v_field("Reçete Adı *", self.name_input))
+
+        # 4. Ürün
+        self.item_display = QLineEdit()
+        self.item_display.setReadOnly(True)
+        self.item_display.setPlaceholderText("Ürün seçiniz...")
+        self.item_display.setFixedHeight(32)
+
+        select_btn = QPushButton("🔍")
+        select_btn.setFixedSize(32, 32)
+        select_btn.clicked.connect(self._open_product_selection)
+
+        prod_layout = QHBoxLayout()
+        prod_layout.addWidget(self.item_display)
+        prod_layout.addWidget(select_btn)
+        prod_layout.setContentsMargins(0, 0, 0, 0)
+
+        prod_container = QWidget()
+        prod_container.setLayout(prod_layout)
+        prod_container.setFixedHeight(32)
+
+        right_layout.addLayout(self._create_v_field("Ürün *", prod_container))
+
+        # 5. Açıklama
         self.desc_input = QTextEdit()
         self.desc_input.setMaximumHeight(100)
-        layout.addWidget(self.desc_input)
+        right_layout.addLayout(self._create_v_field("Açıklama", self.desc_input))
 
-        layout.addStretch()
+        right_layout.addStretch()
+        main_layout.addWidget(right_widget, stretch=2)
+
         return widget
+
+    def _create_v_field(self, label_text, widget, stretch=1):
+        """Helper to create Label above Widget layout"""
+        lay = QVBoxLayout()
+        lay.setSpacing(5)
+        label = QLabel(label_text)
+        label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        lay.addWidget(label)
+        lay.addWidget(widget)
+        if isinstance(widget, QWidget):
+            # Tek satırlık input'lar için sabit yükseklik (CSS ile zorla)
+            if isinstance(widget, (QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox)):
+                widget.setFixedHeight(32)
+                widget.setStyleSheet(
+                    widget.styleSheet() + " min-height: 32px; max-height: 32px;"
+                )
+
+            # Ensure widget expands horizontally if possible
+            widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, widget.sizePolicy().verticalPolicy()
+            )
+
+        # Container wrapper needed to return a layout? No, return layout directly is fine for addLayout
+        # But addLayout doesn't take stretch easily in one go unless we wrap.
+        # Ideally we return the layout and the caller uses addLayout(lay, stretch)
+
+        # Actually simplest is to return a QVBoxLayout and let caller handle it.
+        # But wait, QLayout cannot be a child of another QLayout directly with stretch easily in standard calls sometimes.
+        # But addLayout(layout, stretch) works.
+
+        # Let's verify _create_v_field usage. I am doing row_layout.addLayout(...).
+
+        return lay
+
+    def _open_product_selection(self):
+        """Ürün seçimi için diyaloğu aç"""
+        items_list = [(i.id, f"{i.code} - {i.name}") for i in self.items_map.values()]
+        dialog = SelectionDialog(items_list, title="Ürün Seç", parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_id:
+            self.selected_item_id = dialog.selected_id
+            item = self.items_map.get(self.selected_item_id)
+            if item:
+                self.item_display.setText(f"{item.code} - {item.name}")
+                # Birim otomatik seçilsin
+                if item.unit_id:
+                    idx = self.unit_combo.findData(item.unit_id)
+                    if idx >= 0:
+                        self.unit_combo.setCurrentIndex(idx)
 
     def _create_materials_tab(self) -> QWidget:
         """Malzeme listesi (BOM Lines)"""
@@ -164,8 +309,8 @@ class BOMFormPage(QWidget):
 
         # Araç çubuğu
         toolbar = QHBoxLayout()
-        add_line_btn = QPushButton("➕ Satır Ekle")
-        add_line_btn.clicked.connect(self._add_material_line)
+        add_line_btn = QPushButton("➕ Malzeme Ekle")
+        add_line_btn.clicked.connect(lambda: self._add_material_line(None))
 
         remove_line_btn = QPushButton("🗑️ Satır Sil")
         remove_line_btn.clicked.connect(self._remove_selected_material)
@@ -205,7 +350,7 @@ class BOMFormPage(QWidget):
         # Araç çubuğu
         toolbar = QHBoxLayout()
         add_op_btn = QPushButton("➕ Operasyon Ekle")
-        add_op_btn.clicked.connect(self._add_operation_line)
+        add_op_btn.clicked.connect(lambda: self._add_operation_line(None))
 
         remove_op_btn = QPushButton("🗑️ Operasyon Sil")
         remove_op_btn.clicked.connect(self._remove_selected_operation)
@@ -218,7 +363,7 @@ class BOMFormPage(QWidget):
 
         # Tablo
         self.ops_table = QTableWidget()
-        self.ops_table.setColumnCount(6)
+        self.ops_table.setColumnCount(7)
         self.ops_table.setHorizontalHeaderLabels(
             [
                 "Operasyon Adı",
@@ -226,6 +371,7 @@ class BOMFormPage(QWidget):
                 "Kurulum (dk)",
                 "Birim Süre (dk)",
                 "Maliyet",
+                "K.K.",
                 "Açıklama",
             ]
         )
@@ -256,14 +402,10 @@ class BOMFormPage(QWidget):
         )
         layout.addRow("Toplam Malzeme Maliyeti:", self.total_material_cost_lbl)
 
-        self.labor_cost_input = QDoubleSpinBox()
-        self.labor_cost_input.setRange(0, 9999999)
-        self.labor_cost_input.setPrefix("₺")
+        self.labor_cost_input = CurrencyInput()
         layout.addRow("İşçilik/Operasyon Maliyeti:", self.labor_cost_input)
 
-        self.overhead_cost_input = QDoubleSpinBox()
-        self.overhead_cost_input.setRange(0, 9999999)
-        self.overhead_cost_input.setPrefix("₺")
+        self.overhead_cost_input = CurrencyInput()
         layout.addRow("Genel Giderler:", self.overhead_cost_input)
 
         self.total_cost_lbl = QLabel("₺0.00")
@@ -289,10 +431,9 @@ class BOMFormPage(QWidget):
         self.units_map = {u.id: u.code for u in units}
         self.stations_map = {s.id: s for s in stations}
 
-        # Ürün Combo
-        self.item_combo.clear()
-        for item in items:
-            self.item_combo.addItem(f"{item.code} - {item.name}", item.id)
+        self.stations_map = {s.id: s for s in stations}
+
+        # item_combo kaldırıldı, sadece map güncelleniyor.
 
         # Birim Combo
         self.unit_combo.clear()
@@ -311,10 +452,12 @@ class BOMFormPage(QWidget):
         self.version_input.setText(str(self.bom.version))
         self.revision_input.setText(self.bom.revision)
 
-        # Comboları set et
-        idx = self.item_combo.findData(self.bom.item_id)
-        if idx >= 0:
-            self.item_combo.setCurrentIndex(idx)
+        # Ürün seçimini yükle
+        if self.bom.item_id:
+            self.selected_item_id = self.bom.item_id
+            item = self.items_map.get(self.bom.item_id)
+            if item:
+                self.item_display.setText(f"{item.code} - {item.name}")
 
         idx = self.unit_combo.findData(self.bom.unit_id)
         if idx >= 0:
@@ -354,16 +497,37 @@ class BOMFormPage(QWidget):
 
     def _add_material_line(self, line_data=None):
         """Tabloya yeni malzeme satırı ekle"""
+
+        selected_item_id = None
+
+        # Eğer manuel ekleme yapılıyorsa (line_data yoksa), diyalog aç
+        if line_data is None:
+            items_list = [
+                (i.id, f"{i.code} - {i.name}") for i in self.items_map.values()
+            ]
+            dialog = SelectionDialog(items_list, title="Malzeme Seç", parent=self)
+            if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_id:
+                selected_item_id = dialog.selected_id
+            else:
+                return  # İptal edildi
+
         row = self.lines_table.rowCount()
         self.lines_table.insertRow(row)
+        self.lines_table.setRowHeight(row, 42)  # Satır yüksekliği
 
         # Malzeme Seçimi (Combo)
         combo = QComboBox()
+        combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         for item_id, item in self.items_map.items():
             combo.addItem(f"{item.code} - {item.name}", item_id)
 
+        # Veri set et
         if line_data:
             idx = combo.findData(line_data.item_id)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        elif selected_item_id:
+            idx = combo.findData(selected_item_id)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
 
@@ -372,11 +536,17 @@ class BOMFormPage(QWidget):
         # Miktar
         qty_spin = QDoubleSpinBox()
         qty_spin.setRange(0, 999999)
+        qty_spin.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         qty_spin.setValue(float(line_data.quantity) if line_data else 1.0)
         self.lines_table.setCellWidget(row, 1, qty_spin)
 
         # Birim (Combo)
         unit_combo = QComboBox()
+        unit_combo.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         for u_id, u_code in self.units_map.items():
             unit_combo.addItem(u_code, u_id)
 
@@ -384,18 +554,34 @@ class BOMFormPage(QWidget):
             idx = unit_combo.findData(line_data.unit_id)
             if idx >= 0:
                 unit_combo.setCurrentIndex(idx)
+        elif selected_item_id:
+            # Seçilen ürünün birimini default yap
+            item = self.items_map.get(selected_item_id)
+            if item and item.unit_id:
+                idx = unit_combo.findData(item.unit_id)
+                if idx >= 0:
+                    unit_combo.setCurrentIndex(idx)
 
         self.lines_table.setCellWidget(row, 2, unit_combo)
 
         # Fire
         scrap_spin = QDoubleSpinBox()
         scrap_spin.setRange(0, 100)
+        scrap_spin.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         scrap_spin.setValue(float(line_data.scrap_rate) if line_data else 0.0)
         self.lines_table.setCellWidget(row, 3, scrap_spin)
 
         # Birim Maliyet (Readonly - Item'dan gelecek)
         cost_item = QTableWidgetItem()
-        cost_val = float(line_data.unit_cost) if line_data else 0.0
+        cost_val = 0.0
+        if line_data:
+            cost_val = float(line_data.unit_cost)
+        elif selected_item_id:
+            item = self.items_map.get(selected_item_id)
+            cost_val = float(item.purchase_price or 0) if item else 0.0
+
         cost_item.setText(f"{cost_val:.2f}")
         cost_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Readonly
         self.lines_table.setItem(row, 4, cost_item)
@@ -405,19 +591,43 @@ class BOMFormPage(QWidget):
         total_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
         self.lines_table.setItem(row, 5, total_item)
 
+        # Yeni satır eklendiğinde maliyetleri güncelle
+        self._calculate_totals()
+
     def _add_operation_line(self, op_data=None):
         """Tabloya yeni operasyon satırı ekle"""
+
+        selected_station_id = None
+
+        # Manuel ekleme ise dialog aç
+        if op_data is None:
+            stations_list = [
+                (s.id, f"{s.code} - {s.name}") for s in self.stations_map.values()
+            ]
+            dialog = SelectionDialog(
+                stations_list, title="İş İstasyonu Seç", parent=self
+            )
+            if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_id:
+                selected_station_id = dialog.selected_id
+            else:
+                return  # İptal
+
         row = self.ops_table.rowCount()
         self.ops_table.insertRow(row)
+        self.ops_table.setRowHeight(row, 42)
 
         # Operasyon Adı
         name_input = QLineEdit()
+        name_input.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         name_input.setText(op_data.name if op_data else "")
         name_input.setPlaceholderText("Örn: Kesim, Montaj")
         self.ops_table.setCellWidget(row, 0, name_input)
 
         # İstasyon Seçimi
         combo = QComboBox()
+        combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         combo.addItem("Seçiniz...", None)
         for s_id, station in self.stations_map.items():
             combo.addItem(f"{station.code} - {station.name}", s_id)
@@ -426,17 +636,27 @@ class BOMFormPage(QWidget):
             idx = combo.findData(op_data.work_station_id)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
+        elif selected_station_id:
+            idx = combo.findData(selected_station_id)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
 
         self.ops_table.setCellWidget(row, 1, combo)
 
         # Süreler
         setup_spin = QSpinBox()  # Dakika
         setup_spin.setRange(0, 9999)
+        setup_spin.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         setup_spin.setValue(int(op_data.setup_time) if op_data else 0)
         self.ops_table.setCellWidget(row, 2, setup_spin)
 
         run_spin = QDoubleSpinBox()  # Dakika/Birim
         run_spin.setRange(0, 9999)
+        run_spin.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         run_spin.setValue(float(op_data.run_time) if op_data else 0)
         self.ops_table.setCellWidget(row, 3, run_spin)
 
@@ -445,22 +665,40 @@ class BOMFormPage(QWidget):
         cost_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
         self.ops_table.setItem(row, 4, cost_item)
 
+        # QC Checkbox
+        qc_widget = QWidget()
+        qc_layout = QHBoxLayout(qc_widget)
+        qc_layout.setContentsMargins(0, 0, 0, 0)
+        qc_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        qc_check = QCheckBox()
+        qc_check.setChecked(bool(op_data.requires_qc) if op_data else False)
+        qc_layout.addWidget(qc_check)
+        self.ops_table.setCellWidget(row, 5, qc_widget)
+
         # Açıklama
         desc_input = QLineEdit()
+        desc_input.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         desc_input.setText(op_data.description if op_data else "")
-        self.ops_table.setCellWidget(row, 5, desc_input)
+        self.ops_table.setCellWidget(row, 6, desc_input)
+
+        self._calculate_totals()
 
     def _remove_selected_material(self):
         """Seçili malzeme satırını sil"""
         current_row = self.lines_table.currentRow()
         if current_row >= 0:
             self.lines_table.removeRow(current_row)
+            self._calculate_totals()
 
     def _remove_selected_operation(self):
         """Seçili operasyon satırını sil"""
         current_row = self.ops_table.currentRow()
         if current_row >= 0:
             self.ops_table.removeRow(current_row)
+            self._calculate_totals()
 
     def _calculate_totals(self):
         """Tüm maliyetleri hesapla"""
@@ -493,6 +731,9 @@ class BOMFormPage(QWidget):
         for row in range(self.ops_table.rowCount()):
             # İstasyon verilerini al
             station_combo = self.ops_table.cellWidget(row, 1)
+            if not station_combo:
+                continue
+
             station_id = station_combo.currentData()
             station = self.stations_map.get(station_id)
 
@@ -534,7 +775,7 @@ class BOMFormPage(QWidget):
             "code": self.code_input.text(),
             "name": self.name_input.text(),
             "description": self.desc_input.toPlainText(),
-            "item_id": self.item_combo.currentData(),
+            "item_id": self.selected_item_id,
             "status": self.status_combo.currentData(),
             "bom_type": self.type_combo.currentData(),
             "base_quantity": Decimal(str(self.base_qty_input.value())),
@@ -560,13 +801,19 @@ class BOMFormPage(QWidget):
 
         # Operasyonlar
         for row in range(self.ops_table.rowCount()):
+            # QC Checkbox reading
+            qc_widget = self.ops_table.cellWidget(row, 5)
+            qc_check = qc_widget.findChild(QCheckBox)
+            requires_qc = qc_check.isChecked() if qc_check else False
+
             op = {
                 "operation_no": (row + 1) * 10,
                 "name": self.ops_table.cellWidget(row, 0).text(),
                 "work_station_id": self.ops_table.cellWidget(row, 1).currentData(),
                 "setup_time": int(self.ops_table.cellWidget(row, 2).value()),
                 "run_time": int(self.ops_table.cellWidget(row, 3).value()),
-                "description": self.ops_table.cellWidget(row, 5).text(),
+                "requires_qc": requires_qc,
+                "description": self.ops_table.cellWidget(row, 6).text(),
             }
             data["operations"].append(op)
 

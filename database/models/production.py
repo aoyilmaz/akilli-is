@@ -19,6 +19,8 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import func
 import enum
 
 from database.base import BaseModel
@@ -90,6 +92,16 @@ class BackflushMode(enum.Enum):
     ON_START = "on_start"  # Üretim başlangıcında (varsayılan)
     ON_COMPLETE = "on_complete"  # Üretim tamamlandığında
     MANUAL = "manual"  # Manuel (kullanıcı tarafından)
+
+
+class ProductionPlanStatus(enum.Enum):
+    """Üretim planı durumları (MPS)"""
+
+    DRAFT = "draft"  # Taslak
+    APPROVED = "approved"  # Onaylandı
+    RELEASED = "released"  # İş emirlerine dönüştürüldü
+    COMPLETED = "completed"  # Tamamlandı
+    CANCELLED = "cancelled"  # İptal edildi
 
 
 class BillOfMaterials(BaseModel):
@@ -244,6 +256,71 @@ class WorkStation(BaseModel):
         secondaryjoin="WorkStation.id == work_station_alternatives.c.alt_station_id",
         backref="alternative_for",
     )
+
+    # ===========================
+    # KAPASİTE HESAPLAMA METODLARİ
+    # ===========================
+
+    @hybrid_property
+    def daily_capacity_minutes(self) -> int:
+        """
+        Günlük toplam kapasite (dakika cinsinden).
+        Verimlilik oranı dikkate alınır.
+        """
+        hours = float(self.working_hours_per_day or 8)
+        efficiency = float(self.efficiency_rate or 100) / 100
+        return int(hours * 60 * efficiency)
+
+    def get_remaining_capacity(self, target_date, session) -> int:
+        """
+        Belirli bir tarih için kalan kapasiteyi hesapla (dakika).
+
+        Args:
+            target_date: Hedef tarih (date objesi)
+            session: SQLAlchemy session
+
+        Returns:
+            Kalan kapasite (dakika)
+        """
+        from datetime import date as date_type
+
+        total_capacity = self.daily_capacity_minutes
+
+        # O gün için planlanmış operasyonların toplam süresi
+        scheduled = (
+            session.query(
+                func.coalesce(
+                    func.sum(
+                        WorkOrderOperation.planned_setup_time
+                        + WorkOrderOperation.planned_run_time
+                    ),
+                    0,
+                )
+            )
+            .filter(
+                WorkOrderOperation.work_station_id == self.id,
+                func.date(WorkOrderOperation.planned_start) == target_date,
+                WorkOrderOperation.status.notin_(["completed", "cancelled"]),
+            )
+            .scalar()
+        )
+
+        return max(0, total_capacity - int(scheduled or 0))
+
+    def get_utilization_rate(self, target_date, session) -> float:
+        """
+        Belirli bir tarih için doluluk oranını hesapla (%).
+
+        Returns:
+            Doluluk oranı (0-100+, 100 üzeri = aşım)
+        """
+        total = self.daily_capacity_minutes
+        if total <= 0:
+            return 0.0
+
+        remaining = self.get_remaining_capacity(target_date, session)
+        used = total - remaining
+        return (used / total) * 100
 
 
 # Alternatif İstasyon İlişki Tablosu
@@ -541,6 +618,10 @@ class WorkOrderOperation(BaseModel):
     requires_qc = Column(Boolean, default=False)
     qc_status = Column(String(20), nullable=True)  # pending, passed, failed
 
+    # APS - Cascade Çizelgeleme Desteği
+    is_locked = Column(Boolean, default=False)  # Manuel kilitleme - otomatik kaydırmayı engeller
+    cascade_group_id = Column(String(50), nullable=True)  # İlişkili operasyonları grupla
+
     work_order = relationship("WorkOrder", back_populates="operations")
     bom_operation = relationship("BOMOperation")
     work_station = relationship("WorkStation")
@@ -664,3 +745,112 @@ class ProductionDowntime(BaseModel):
         Index("idx_downtime_station", "work_station_id"),
         Index("idx_downtime_date", "start_time"),
     )
+
+
+# ============================================
+# MPS (Master Production Scheduling) MODELLERİ
+# ============================================
+
+
+class ProductionPlan(BaseModel):
+    """
+    Ana Üretim Planı (MPS)
+
+    Satış siparişlerinden veya talep tahminlerinden oluşturulan
+    üst düzey üretim planı. MRP çalıştırılmadan önce onaylanmalı.
+    """
+
+    __tablename__ = "production_plans"
+
+    # Temel Bilgiler
+    plan_no = Column(String(50), unique=True, nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Planlama Dönemi
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+
+    # Durum
+    status = Column(
+        Enum(ProductionPlanStatus), default=ProductionPlanStatus.DRAFT, nullable=False
+    )
+
+    # Onay Bilgileri
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    # Ek Bilgiler
+    notes = Column(Text, nullable=True)
+
+    # İlişkiler
+    lines = relationship(
+        "ProductionPlanLine", back_populates="plan", cascade="all, delete-orphan"
+    )
+    approver = relationship("User", foreign_keys=[approved_by])
+
+    __table_args__ = (
+        Index("idx_pp_dates", "period_start", "period_end"),
+        Index("idx_pp_status", "status"),
+    )
+
+    def __repr__(self):
+        return f"<ProductionPlan {self.plan_no}>"
+
+
+class ProductionPlanLine(BaseModel):
+    """
+    Üretim Planı Satırı
+
+    Her satır bir ürün için planlanan üretimi temsil eder.
+    Backward scheduling ile başlangıç tarihi hesaplanır.
+    """
+
+    __tablename__ = "production_plan_lines"
+
+    # Ana Plan Bağlantısı
+    plan_id = Column(
+        Integer, ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Ürün
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+
+    # Talep Kaynağı
+    sales_order_id = Column(Integer, ForeignKey("sales_orders.id"), nullable=True)
+    sales_order_item_id = Column(
+        Integer, ForeignKey("sales_order_items.id"), nullable=True
+    )
+    forecast_id = Column(Integer, nullable=True)  # Gelecek: Talep Tahmini
+
+    # Miktarlar
+    demand_quantity = Column(Numeric(18, 4), nullable=False)
+    planned_quantity = Column(Numeric(18, 4), nullable=False)
+
+    # Tarihler (Backward Scheduling)
+    demand_date = Column(Date, nullable=False)  # Talep tarihi (teslim tarihi)
+    planned_start = Column(DateTime, nullable=True)  # Hesaplanan başlangıç
+    planned_end = Column(DateTime, nullable=True)  # Hesaplanan bitiş
+
+    # Önceliklendirme (0-100)
+    # Müşteri skoru + Gecikme riski kombinasyonu
+    priority_score = Column(Numeric(5, 2), default=Decimal("50.00"))
+
+    # Üretilen İş Emri (Release sonrası)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=True)
+
+    # İlişkiler
+    plan = relationship("ProductionPlan", back_populates="lines")
+    item = relationship("Item")
+    sales_order = relationship("SalesOrder")
+    work_order = relationship("WorkOrder")
+
+    __table_args__ = (
+        Index("idx_ppl_plan", "plan_id"),
+        Index("idx_ppl_item", "item_id"),
+        Index("idx_ppl_demand_date", "demand_date"),
+        Index("idx_ppl_priority", "priority_score"),
+    )
+
+    def __repr__(self):
+        return f"<ProductionPlanLine plan={self.plan_id} item={self.item_id}>"

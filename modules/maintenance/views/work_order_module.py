@@ -28,13 +28,14 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QDateTime
+from config.icons import ICONS
 
 from modules.maintenance.views.base import MaintenanceBaseWidget
 from database.models.maintenance import (
     MaintenancePriority,
     MaintenanceType,
     MaintenanceStatus,
-    WorkOrderStatus,
+    MaintenanceWorkOrderStatus as WorkOrderStatus,
 )
 
 
@@ -57,7 +58,7 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
 
         self.header = PageHeader(
             title="İş Emri Yönetimi",
-            icon="🔧",
+            icon=ICONS.MAINTENANCE,
             show_search=False,
             show_refresh=False,
             show_add=False,  # Custom add butonu kullanacagiz

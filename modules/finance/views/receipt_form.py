@@ -4,19 +4,47 @@ VS Code Dark Theme
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QLineEdit, QComboBox, QDateEdit, QTextEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QDoubleSpinBox, QMessageBox, QScrollArea, QGroupBox, QCheckBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QFrame,
+    QLineEdit,
+    QComboBox,
+    QDateEdit,
+    QTextEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QAbstractItemView,
+    QDoubleSpinBox,
+    QMessageBox,
+    QScrollArea,
+    QGroupBox,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from decimal import Decimal
 
 from config.styles import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_HOVER, BORDER,
-    TEXT_PRIMARY, TEXT_MUTED, ACCENT, SUCCESS, WARNING, ERROR,
-    get_table_style, get_button_style, get_input_style
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BG_HOVER,
+    BORDER,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    ACCENT,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    get_table_style,
+    get_button_style,
+    get_input_style,
 )
+from ui.components import CurrencyInput
+
 
 class ReceiptFormPage(QWidget):
     """Tahsilat form sayfasi"""
@@ -24,8 +52,13 @@ class ReceiptFormPage(QWidget):
     saved = pyqtSignal(dict)
     cancelled = pyqtSignal()
 
-    def __init__(self, receipt_data: dict = None, customers: list = None,
-                 open_invoices: list = None, parent=None):
+    def __init__(
+        self,
+        receipt_data: dict = None,
+        customers: list = None,
+        open_invoices: list = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.receipt_data = receipt_data or {}
         self.customers = customers or []
@@ -75,7 +108,9 @@ class ReceiptFormPage(QWidget):
         no_layout.addWidget(no_label)
         self.receipt_no = QLineEdit()
         self.receipt_no.setReadOnly(True)
-        self.receipt_no.setStyleSheet(self._input_style() + f"background-color: {BG_HOVER};")
+        self.receipt_no.setStyleSheet(
+            self._input_style() + f"background-color: {BG_HOVER};"
+        )
         no_layout.addWidget(self.receipt_no)
         row1.addLayout(no_layout)
 
@@ -191,9 +226,9 @@ class ReceiptFormPage(QWidget):
         # Fatura tablosu
         self.invoice_table = QTableWidget()
         self.invoice_table.setColumnCount(6)
-        self.invoice_table.setHorizontalHeaderLabels([
-            "Sec", "Fatura No", "Tarih", "Toplam", "Kalan", "Bu Tahsilat"
-        ])
+        self.invoice_table.setHorizontalHeaderLabels(
+            ["Sec", "Fatura No", "Tarih", "Toplam", "Kalan", "Bu Tahsilat"]
+        )
         self.invoice_table.setAlternatingRowColors(True)
         self.invoice_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.invoice_table.verticalHeader().setVisible(False)
@@ -311,8 +346,7 @@ class ReceiptFormPage(QWidget):
         self.customer_combo.addItem("Secin...", None)
         for cust in self.customers:
             self.customer_combo.addItem(
-                f"{cust.get('code', '')} - {cust.get('name', '')}",
-                cust.get("id")
+                f"{cust.get('code', '')} - {cust.get('name', '')}", cust.get("id")
             )
 
         # Form verisi varsa doldur
@@ -322,7 +356,9 @@ class ReceiptFormPage(QWidget):
             if self.receipt_data.get("receipt_date"):
                 date_val = self.receipt_data["receipt_date"]
                 if hasattr(date_val, "year"):
-                    self.receipt_date.setDate(QDate(date_val.year, date_val.month, date_val.day))
+                    self.receipt_date.setDate(
+                        QDate(date_val.year, date_val.month, date_val.day)
+                    )
 
             # Musteriyi sec
             customer_id = self.receipt_data.get("customer_id")
@@ -347,9 +383,13 @@ class ReceiptFormPage(QWidget):
             if self.receipt_data.get("check_date"):
                 date_val = self.receipt_data["check_date"]
                 if hasattr(date_val, "year"):
-                    self.check_date.setDate(QDate(date_val.year, date_val.month, date_val.day))
+                    self.check_date.setDate(
+                        QDate(date_val.year, date_val.month, date_val.day)
+                    )
 
-            self.description_input.setPlainText(self.receipt_data.get("description", "") or "")
+            self.description_input.setPlainText(
+                self.receipt_data.get("description", "") or ""
+            )
 
     def _on_customer_changed(self, index):
         """Musteri degistiginde faturalari yukle"""
@@ -364,7 +404,9 @@ class ReceiptFormPage(QWidget):
             return
 
         # Filtrele: sadece bu musterinin faturalari
-        invoices = [inv for inv in self.open_invoices if inv.get("customer_id") == customer_id]
+        invoices = [
+            inv for inv in self.open_invoices if inv.get("customer_id") == customer_id
+        ]
 
         for row, inv in enumerate(invoices):
             self.invoice_table.insertRow(row)
@@ -390,14 +432,18 @@ class ReceiptFormPage(QWidget):
             # Toplam
             total = inv.get("total_amount") or Decimal(0)
             total_item = QTableWidgetItem(f"{float(total):,.2f}")
-            total_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            total_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             self.invoice_table.setItem(row, 3, total_item)
 
             # Kalan
             paid = inv.get("paid_amount") or Decimal(0)
             remaining = float(total) - float(paid)
             remaining_item = QTableWidgetItem(f"{remaining:,.2f}")
-            remaining_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            remaining_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             remaining_item.setData(Qt.ItemDataRole.UserRole, remaining)
             self.invoice_table.setItem(row, 4, remaining_item)
 
@@ -448,7 +494,9 @@ class ReceiptFormPage(QWidget):
             remaining_item = self.invoice_table.item(row, 4)
 
             if checkbox and spin and remaining_item:
-                invoice_remaining = Decimal(str(remaining_item.data(Qt.ItemDataRole.UserRole) or 0))
+                invoice_remaining = Decimal(
+                    str(remaining_item.data(Qt.ItemDataRole.UserRole) or 0)
+                )
 
                 if remaining_amount > 0 and invoice_remaining > 0:
                     alloc = min(remaining_amount, invoice_remaining)
@@ -480,10 +528,12 @@ class ReceiptFormPage(QWidget):
             no_item = self.invoice_table.item(row, 1)
 
             if checkbox and checkbox.isChecked() and spin and spin.value() > 0:
-                allocations.append({
-                    "invoice_id": no_item.data(Qt.ItemDataRole.UserRole),
-                    "amount": Decimal(str(spin.value()))
-                })
+                allocations.append(
+                    {
+                        "invoice_id": no_item.data(Qt.ItemDataRole.UserRole),
+                        "amount": Decimal(str(spin.value())),
+                    }
+                )
 
         data = {
             "id": self.receipt_data.get("id"),
@@ -493,7 +543,11 @@ class ReceiptFormPage(QWidget):
             "payment_method": self.method_combo.currentData(),
             "bank_name": self.bank_input.text().strip() or None,
             "check_no": self.check_no_input.text().strip() or None,
-            "check_date": self.check_date.date().toPyDate() if self.method_combo.currentData() in ("check", "promissory_note") else None,
+            "check_date": (
+                self.check_date.date().toPyDate()
+                if self.method_combo.currentData() in ("check", "promissory_note")
+                else None
+            ),
             "description": self.description_input.toPlainText().strip() or None,
             "allocations": allocations,
         }

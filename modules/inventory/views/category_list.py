@@ -17,6 +17,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 
 from config import COLORS
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 
 class CategoryListPage(QWidget):
@@ -142,11 +145,16 @@ class CategoryListPage(QWidget):
         item.setTextAlignment(2, Qt.AlignmentFlag.AlignCenter)
 
         # Durum
-        status = "✅ Aktif" if category.is_active else "❌ Pasif"
-        item.setText(3, status)
-        item.setForeground(
-            3, QColor(COLORS["success"] if category.is_active else COLORS["error"])
-        )
+        # Durum
+        t = get_theme()
+        if category.is_active:
+            item.setText(3, "Aktif")
+            item.setIcon(3, qta.icon(ICONS.STATUS_ICONS["active"], color=t.success))
+            item.setForeground(3, QColor(t.success))
+        else:
+            item.setText(3, "Pasif")
+            item.setIcon(3, qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted))
+            item.setForeground(3, QColor(t.text_muted))
 
         return item
 

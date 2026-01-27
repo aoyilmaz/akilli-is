@@ -34,6 +34,9 @@ from config.styles import (
     BORDER,
     TEXT_PRIMARY,
 )
+import qtawesome as qta
+from config.icons import ICONS
+from config.themes import get_theme
 
 
 class UnitDialog(QDialog):
@@ -363,9 +366,21 @@ class UnitManagementPage(QWidget):
             self.units_table.setItem(row, 1, QTableWidgetItem(unit.name))
             self.units_table.setItem(row, 2, QTableWidgetItem(unit.short_name or ""))
 
-            status = "Aktif" if unit.is_active else "Pasif"
-            status_item = QTableWidgetItem(status)
-            status_item.setForeground(QColor(SUCCESS if unit.is_active else ERROR))
+            t = get_theme()
+            status_item = QTableWidgetItem()
+            if unit.is_active:
+                status_item.setText("Aktif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
+                )
+                status_item.setForeground(QColor(t.success))
+            else:
+                status_item.setText("Pasif")
+                status_item.setIcon(
+                    qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                )
+                status_item.setForeground(QColor(t.text_muted))
+
             self.units_table.setItem(row, 3, status_item)
 
     def load_conversions(self, conversions: list):

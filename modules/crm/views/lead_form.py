@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from database.models.crm import LeadStatus, LeadSource
+from config.icons import ICONS
+import qtawesome as qta
 
 
 class LeadFormPage(QWidget):
@@ -42,18 +44,23 @@ class LeadFormPage(QWidget):
         # Header
         header_layout = QHBoxLayout()
 
-        back_btn = QPushButton("← Geri")
+        back_btn = QPushButton("Geri")
+        back_btn.setIcon(qta.icon(ICONS.BACK))
         back_btn.clicked.connect(self.cancelled.emit)
         header_layout.addWidget(back_btn)
 
         title_text = (
             "Aday Müşteri Düzenle" if self.is_edit_mode else "Yeni Aday Müşteri"
         )
-        title = QLabel(f"🚀 {title_text}")
+        title = QLabel(title_text)
+        title.setStyleSheet(
+            f"font-size: 18px; font-weight: bold; color: {ICONS.ACCENT if hasattr(ICONS, 'ACCENT') else '#a855f7'};"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
 
-        save_btn = QPushButton("💾 Kaydet")
+        save_btn = QPushButton("Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE))
         save_btn.clicked.connect(self._on_save)
         header_layout.addWidget(save_btn)
 
@@ -64,11 +71,13 @@ class LeadFormPage(QWidget):
 
         # Tab 1: Temel Bilgiler
         tab1 = self._create_basic_tab()
-        self.tabs.addTab(tab1, "📋 Kimlik & İletişim")
+        self.tabs.addTab(tab1, "Kimlik & İletişim")
+        self.tabs.setTabIcon(0, qta.icon(ICONS.USER))
 
         # Tab 2: Detaylar (Adres, Durum)
         tab2 = self._create_details_tab()
-        self.tabs.addTab(tab2, "📍 Detaylar")
+        self.tabs.addTab(tab2, "Detaylar")
+        self.tabs.setTabIcon(1, qta.icon(ICONS.LOCATION))
 
         layout.addWidget(self.tabs)
 
