@@ -118,6 +118,7 @@ class BaseListPage(QWidget):
             user_id=self.user_id,
             parent=self,
         )
+        self.table.set_standard_row_height(48)
         layout.addWidget(self.table)
 
     def _connect_signals(self):
@@ -150,14 +151,14 @@ class BaseListPage(QWidget):
         key: str,
         title: str,
         value: str = "0",
-        color: str = "#007acc",
-        icon: str = "📊",
+        color: str = "primary",
+        icon: str = "",
     ) -> Optional[MiniStatCard]:
         """İstatistik kartı ekle"""
         if not self.stats_layout:
             return None
 
-        card = MiniStatCard(f"{icon} {title}", value, color)
+        card = MiniStatCard(title=title, value=value, color_type=color, icon=icon)
         self.stat_cards[key] = card
 
         # Stretch'ten önce ekle

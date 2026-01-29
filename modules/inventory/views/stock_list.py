@@ -255,7 +255,7 @@ class StockListPage(QWidget):
         footer_layout.addStretch()
 
         # Sayfalama kontrolleri
-        self.btn_prev = QPushButton("◀ Önceki")
+        self.btn_prev = QPushButton("Önceki")
         self.btn_prev.clicked.connect(self.prev_page_clicked.emit)
         self.btn_prev.setIcon(qta.icon(ICONS.BACK))
         self.btn_prev.setEnabled(False)
@@ -265,7 +265,7 @@ class StockListPage(QWidget):
         self.page_label.setStyleSheet("font-weight: bold; margin: 0 10px;")
         footer_layout.addWidget(self.page_label)
 
-        self.btn_next = QPushButton("Sonraki ▶")
+        self.btn_next = QPushButton("Sonraki")
         self.btn_next.clicked.connect(self.next_page_clicked.emit)
         self.btn_next.setIcon(qta.icon(ICONS.FORWARD))
         self.btn_next.setEnabled(False)
@@ -421,8 +421,6 @@ class StockListPage(QWidget):
                         )
                         cell.setForeground(QColor(color))
                 self.table.setItem(row, col_idx, cell)
-
-        self.table.setRowHeight(row, 48)
 
     def _on_search_changed(self, text: str):
         self.search_timer.stop()

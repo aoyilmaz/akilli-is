@@ -295,7 +295,7 @@ class HRService:
         """ID ile izin getir"""
         return self.session.query(Leave).filter(Leave.id == leave_id).first()
 
-    def create_leave(self, data: Dict) -> Leave:
+    def create_leave(self, data: Dict, user_id: int = None) -> Leave:
         """İzin talebi oluştur"""
         # Gün hesabı
         if "days" not in data:
@@ -307,9 +307,36 @@ class HRService:
         self.session.add(leave)
         self.session.commit()
         self.session.refresh(leave)
+
+        # Workflow başlat (Bridge pattern ile circular import önlenir)
+        try:
+            from modules.workflow.bridge import start_workflow_for_document
+
+            # Çalışan bilgisi
+            employee = leave.employee
+            department = employee.department.name if employee and employee.department else None
+
+            context = {
+                "days": float(leave.days),
+                "leave_type": leave.leave_type.value if leave.leave_type else None,
+                "department": department,
+                "employee_name": employee.full_name if employee else None,
+            }
+            instance_id = start_workflow_for_document(
+                table_name="leaves",
+                document_id=leave.id,
+                initiated_by=user_id or 1,  # Varsayılan: admin user (employee_id users tablosunda yok)
+                document_no=f"LEAVE-{leave.id}",
+                context=context,
+            )
+            if instance_id:
+                print(f"[Leave] Workflow başlatıldı: instance_id={instance_id}")
+        except Exception as e:
+            print(f"[Leave] Workflow başlatma hatası: {e}")
+
         return leave
 
-    def approve_leave(self, leave_id: int, approver_id: int) -> Optional[Leave]:
+    def approve_leave(self, leave_id: int, approver_id: int, comment: str = None) -> Optional[Leave]:
         """İzni onayla"""
         leave = self.get_leave_by_id(leave_id)
         if leave and leave.status == LeaveStatus.PENDING:
@@ -318,6 +345,24 @@ class HRService:
             leave.approved_at = datetime.now()
             self.session.commit()
             self.session.refresh(leave)
+
+            # Workflow action kaydet
+            try:
+                from modules.workflow.bridge import (
+                    get_document_workflow_status,
+                    process_workflow_action,
+                )
+                workflow_status = get_document_workflow_status("leaves", leave.id)
+                if workflow_status and workflow_status.get("instance_id"):
+                    process_workflow_action(
+                        instance_id=workflow_status["instance_id"],
+                        user_id=approver_id,
+                        action="approve",
+                        comment=comment,
+                    )
+            except Exception as e:
+                print(f"[Leave] Workflow action hatası: {e}")
+
         return leave
 
     def reject_leave(
@@ -332,6 +377,24 @@ class HRService:
             leave.rejection_reason = reason
             self.session.commit()
             self.session.refresh(leave)
+
+            # Workflow action kaydet
+            try:
+                from modules.workflow.bridge import (
+                    get_document_workflow_status,
+                    process_workflow_action,
+                )
+                workflow_status = get_document_workflow_status("leaves", leave.id)
+                if workflow_status and workflow_status.get("instance_id"):
+                    process_workflow_action(
+                        instance_id=workflow_status["instance_id"],
+                        user_id=approver_id,
+                        action="reject",
+                        comment=reason,
+                    )
+            except Exception as e:
+                print(f"[Leave] Workflow action hatası: {e}")
+
         return leave
 
     def get_leave_balance(self, employee_id: int, year: int = None) -> Dict:

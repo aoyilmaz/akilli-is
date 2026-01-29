@@ -12,7 +12,9 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import qtawesome as qta
 
+from config.icons import ICONS
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -45,7 +47,7 @@ class PriceListListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Fiyat Listeleri",
-            icon="💰",
+            icon=ICONS.MONEY,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -60,10 +62,18 @@ class PriceListListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["sales"] = MiniStatCard("📤 Satış", "0", "#10b981")
-        self.stat_cards["purchase"] = MiniStatCard("📥 Alış", "0", "#f59e0b")
-        self.stat_cards["default"] = MiniStatCard("⭐ Varsayılan", "0", "#3b82f6")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVOICE
+        )
+        self.stat_cards["sales"] = MiniStatCard(
+            "Satış", "0", "success", icon=ICONS.EXPORT
+        )
+        self.stat_cards["purchase"] = MiniStatCard(
+            "Alış", "0", "warning", icon=ICONS.IMPORT
+        )
+        self.stat_cards["default"] = MiniStatCard(
+            "Varsayılan", "0", "primary", icon=ICONS.STAR
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -110,12 +120,12 @@ class PriceListListPage(QWidget):
         total = len(price_lists)
         sales_count = sum(1 for p in price_lists if p.get("list_type") == "sales")
         purchase_count = total - sales_count
-        default_count = sum(1 for p in price_lists if p.get("is_default"))
+        default = sum(1 for p in price_lists if p.get("is_default"))
 
         self.stat_cards["total"].update_value(str(total))
         self.stat_cards["sales"].update_value(str(sales_count))
         self.stat_cards["purchase"].update_value(str(purchase_count))
-        self.stat_cards["default"].update_value(str(default_count))
+        self.stat_cards["default"].update_value(str(default))
 
         # Tabloyu doldur
         visible_cols = self.table.get_visible_columns()
@@ -140,72 +150,57 @@ class PriceListListPage(QWidget):
                 self.table.setItem(row, col_idx, QTableWidgetItem(type_text))
 
             elif col_key == "currency":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(pl.get("currency", "TRY"))
-                )
+                curr = pl.get("currency", "TRY")
+                self.table.setItem(row, col_idx, QTableWidgetItem(curr))
 
             elif col_key == "validity":
-                valid_from = pl.get("valid_from")
-                valid_until = pl.get("valid_until")
+                v_from = pl.get("valid_from")
+                v_until = pl.get("valid_until")
                 validity = ""
-                if valid_from:
-                    validity = str(valid_from)
-                if valid_until:
-                    validity += f" - {valid_until}"
+                if v_from:
+                    validity = str(v_from)
+                if v_until:
+                    validity += f" - {v_until}"
                 if not validity:
                     validity = "Süresiz"
                 self.table.setItem(row, col_idx, QTableWidgetItem(validity))
 
             elif col_key == "is_default":
                 is_default = pl.get("is_default", False)
-                text = "✓ Evet" if is_default else "-"
+                text = "Evet" if is_default else "-"
                 item = QTableWidgetItem(text)
                 if is_default:
                     item.setForeground(Qt.GlobalColor.green)
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "items":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(str(pl.get("item_count", 0)))
-                )
+                item_count = str(pl.get("item_count", 0))
+                self.table.setItem(row, col_idx, QTableWidgetItem(item_count))
 
             elif col_key == "actions":
                 self._add_action_buttons(row, col_idx, pl_id)
 
-        self.table.setRowHeight(row, 52)
-
     def _add_action_buttons(self, row: int, col: int, pl_id: int):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(lambda checked, pid=pl_id: self.view_clicked.emit(pid))
-        btn_layout.addWidget(view_btn)
-
-        edit_btn = QPushButton("✏")
-        edit_btn.setFixedSize(28, 26)
-        edit_btn.clicked.connect(lambda checked, pid=pl_id: self.edit_clicked.emit(pid))
-        btn_layout.addWidget(edit_btn)
-
-        del_btn = QPushButton("🗑")
-        del_btn.setFixedSize(28, 26)
-        del_btn.clicked.connect(lambda checked, pid=pl_id: self._confirm_delete(pid))
-        btn_layout.addWidget(del_btn)
-
-        self.table.setCellWidget(row, col, btn_widget)
+        callbacks = {
+            "view": lambda pid=pl_id: self.view_clicked.emit(pid),
+            "edit": lambda pid=pl_id: self.edit_clicked.emit(pid),
+            "delete": lambda pid=pl_id: self._confirm_delete(pid),
+        }
+        widget = self.table.create_action_widget(
+            pl_id, ["view", "edit", "delete"], callbacks
+        )
+        self.table.setCellWidget(row, col, widget)
 
     def _on_search(self, text: str):
         text = text.lower()
         for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(4)
-            )
+            match = False
+            # İlk 4 kolona bak
+            for col in range(min(4, self.table.columnCount())):
+                item = self.table.item(row, col)
+                if item and text in item.text().lower():
+                    match = True
+                    break
             self.table.setRowHidden(row, not match)
 
     def _confirm_delete(self, pl_id: int):

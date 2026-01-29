@@ -67,6 +67,7 @@ except ImportError:
 
 from config import APP_NAME, APP_DESCRIPTION
 from config.themes import ThemeManager, get_theme
+from config.menu_data import MENU_DATA
 
 # --- IMPORTLAR ---
 from ui.pages.placeholder import PlaceholderPage
@@ -189,9 +190,11 @@ except ImportError:
     MRPModule = MissingModule
 
 try:
-    from modules.mps import MPSPage
+    from modules.planning.views.mps_cockpit import MPSCockpitPage
+    from modules.planning.views.plan_list import MPSPlanListPage
+    from modules.planning.views.capacity_page import CapacityAnalysisPage
 except ImportError:
-    MPSPage = MissingModule
+    MPSCockpitPage = MPSPlanListPage = CapacityAnalysisPage = MissingModule
 
 try:
     from modules.reports.views.sales_reports_module import SalesReportsModule
@@ -239,9 +242,9 @@ except ImportError:
     ) = ReportingWidget = MissingModule
 
 try:
-    from modules.shipping import ShippingMainModule
+    from modules.shipping import ShippingMainModule, FleetMainModule
 except ImportError:
-    ShippingMainModule = MissingModule
+    ShippingMainModule = FleetMainModule = MissingModule
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -552,148 +555,7 @@ class HomeDashboard(QWidget):
 
 
 # --- MENÜ VERİSİ ---
-MENU_DATA = {
-    "dashboard": {
-        "title": "GENEL BAKIŞ",
-        "items": [("Dashboard", "ph.house", "dashboard")],
-    },
-    "inventory": {
-        "title": "STOK YÖNETİMİ",
-        "items": [
-            ("Stok Kartları", "ph.tag", "stock-cards"),
-            ("Kategoriler", "ph.squares-four", "categories"),
-            ("Birimler", "ph.ruler", "units"),
-            ("Depolar", "ph.buildings", "warehouses"),
-            ("Lokasyonlar", "ph.map-pin", "locations"),
-            ("Hareketler", "ph.arrows-left-right", "movements"),
-            ("Sayım İşlemleri", "ph.list-dashes", "stock-count"),
-            ("Taşıma Birimleri (SSCC)", "ph.cube", "sscc-units"),
-            ("Depocu Paneli", "ph.user-gear", "warehouse-operator"),
-            ("Raporlar", "ph.chart-bar", "stock-reports"),
-        ],
-    },
-    "purchasing": {
-        "title": "SATINALMA",
-        "items": [
-            ("Tedarikçiler", "ph.truck", "suppliers"),
-            ("Talepler", "ph.file-text", "purchase-requests"),
-            ("Siparişler", "ph.receipt", "purchase-orders"),
-            ("Mal Kabul", "ph.package", "goods-receipts"),
-            ("Faturalar", "ph.file-text", "purchase-invoices"),
-        ],
-    },
-    "planning": {
-        "title": "PLANLAMA",
-        "items": [
-            ("Ana Üretim Planı (MPS)", "ph.chart-bar", "mps"),
-            ("MRP", "ph.tree-structure", "mrp"),
-            ("Üretim Planlama", "ph.calendar-check", "planning"),
-            ("Ürün Reçeteleri", "ph.file-text", "bom"),
-            ("İş İstasyonları", "ph.factory", "work-stations"),
-            ("Takvim", "ph.calendar-blank", "calendar"),
-        ],
-    },
-    "production": {
-        "title": "ÜRETİM (İMALAT)",
-        "items": [
-            ("İş Emirleri", "ph.clipboard-text", "work-orders"),
-            ("Operatör Paneli", "ph.desktop", "operator-panel"),
-        ],
-    },
-    "maintenance": {
-        "title": "BAKIM & ONARIM",
-        "items": [
-            ("Ekipmanlar", "ph.wrench", "equipments"),
-            ("Arıza Talepleri", "ph.warning", "maintenance-requests"),
-            ("İş Emirleri", "ph.clipboard", "maintenance-work-orders"),
-            ("Bakım Planları", "ph.calendar", "maintenance-plans"),
-            ("Raporlar", "ph.chart-pie", "maintenance-reports"),
-        ],
-    },
-    "crm": {
-        "title": "CRM",
-        "items": [
-            ("Potansiyel Müşteriler (Leads)", "ph.user-plus", "leads"),
-            ("Fırsatlar", "ph.lightbulb", "opportunities"),
-            ("Aktiviteler", "ph.list-dashes", "activities"),
-            ("Teklifler", "ph.file-text", "sales-quotes"),
-            ("Siparişler", "ph.shopping-bag", "sales-orders"),
-        ],
-    },
-    "sales": {
-        "title": "SATIŞ YÖNETİMİ",
-        "items": [
-            ("Müşteriler", "ph.user-circle", "customers"),
-            ("Teklifler", "ph.chat-dots", "sales-quotes"),
-            ("Siparişler", "ph.shopping-cart", "sales-orders"),
-            ("İrsaliyeler", "ph.truck", "delivery-notes"),
-            ("Faturalar", "ph.receipt", "invoices"),
-            ("Fiyat Listeleri", "ph.list", "price-lists"),
-        ],
-    },
-    "shipping": {
-        "title": "SEVKİYAT",
-        "items": [
-            ("Sevkiyat Yönetimi", "ph.truck", "shipping"),
-        ],
-    },
-    "accounting": {
-        "title": "MUHASEBE",
-        "items": [
-            ("Hesap Planı", "ph.tree-structure", "accounts"),
-            ("Yevmiye Fişleri", "ph.book", "journals"),
-            ("Muhasebe Raporları", "ph.file", "accounting-reports"),
-        ],
-    },
-    "finance": {
-        "title": "FİNANS",
-        "items": [
-            ("Tahsilatlar", "ph.money", "receipts"),
-            ("Ödemeler", "ph.money", "payments"),
-            ("Mutabakat", "ph.scales", "reconciliation"),
-            ("Cari Hesaplar", "ph.address-book", "account-statements"),
-        ],
-    },
-    "hr": {
-        "title": "İNSAN KAYNAKLARI",
-        "items": [
-            ("İK Dashboard", "ph.gauge", "hr-dashboard"),
-            ("Çalışanlar", "ph.user", "employees"),
-            ("Departmanlar", "ph.buildings", "departments"),
-            ("Pozisyonlar", "ph.tag", "positions"),
-            ("Puantaj", "ph.clock", "attendance"),
-            ("İzin Yönetimi", "ph.calendar-x", "leaves"),
-            ("Organizasyon", "ph.tree-structure", "org-chart"),
-            ("Vardiya Ekipleri", "ph.users-three", "shift-teams"),
-            ("Performans", "ph.chart-line", "performance"),
-            ("Eğitim", "ph.graduation-cap", "trainings"),
-            ("Özlük Dosyası", "ph.folder", "personnel"),
-            ("Vardiya Planlama", "ph.calendar", "shift-planning"),
-        ],
-    },
-    "reports": {
-        "title": "RAPORLAR",
-        "items": [
-            ("Satış Raporları", "ph.chart-line", "sales-reports"),
-            ("Stok Yaşlandırma", "ph.hourglass", "stock-aging"),
-            ("Üretim OEE", "ph.gauge", "production-oee"),
-            ("Tedarikçi Performans", "ph.star", "supplier-performance"),
-            ("Alacak Yaşlandırma", "ph.credit-card", "receivables-aging"),
-        ],
-    },
-    "settings": {
-        "title": "GELİŞTİRME",
-        "items": [
-            ("Firma Kartı", "ph.buildings", "company-card"),
-            ("Kullanıcı Yönetimi", "ph.users-three", "users"),
-            ("Tema Ayarları", "ph.palette", "theme-settings"),
-            ("İşlem Geçmişi", "ph.clock-counter-clockwise", "audit-logs"),
-            ("Genel Ayarlar", "ph.sliders", "settings"),
-            ("Yazdırma Şablonları", "ph.printer", "label-templates"),
-            ("Hata Kayıtları", "ph.bug", "error-logs"),
-        ],
-    },
-}
+
 
 # --- BİLEŞENLER ---
 
@@ -1097,7 +959,9 @@ class MainWindow(QMainWindow):
         self.pages["calendar"] = CalendarModule()
         self.pages["calendar"] = CalendarModule()
         self.pages["mrp"] = MRPModule()
-        self.pages["mps"] = MPSPage()
+        self.pages["mps-cockpit"] = MPSCockpitPage()
+        self.pages["plan-list"] = MPSPlanListPage()
+        self.pages["capacity-analysis"] = CapacityAnalysisPage()
         self.pages["operator-panel"] = OperatorPanel()
         # Satınalma modülü sayfaları
         self.pages["suppliers"] = SupplierModule()
@@ -1114,6 +978,7 @@ class MainWindow(QMainWindow):
         self.pages["price-lists"] = PriceListModule()
         # Sevkiyat modülü sayfaları
         self.pages["shipping"] = ShippingMainModule()
+        self.pages["fleet-management"] = FleetMainModule()
         # Muhasebe modülü sayfaları
         self.pages["accounts"] = AccountModule()
         self.pages["journals"] = JournalModule()

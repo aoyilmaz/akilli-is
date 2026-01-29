@@ -5,36 +5,27 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 
 from PyQt6.QtWidgets import (
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QLabel,
-    QPushButton,
     QTableWidgetItem,
     QMessageBox,
 )
+import qtawesome as qta
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 from database.models.crm import LeadStatus
 from config.icons import ICONS
-import qtawesome as qta
 
 
-class LeadListPage(QWidget):
+class LeadListPage(BaseListPage):
     """Aday Müşteri (Lead) listesi sayfası."""
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
+    # Sinyaller (Ek sinyaller)
     convert_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_DISPLAY = {
         "new": ("Yeni", "#3b82f6", ICONS.SPARKLE),
@@ -45,53 +36,6 @@ class LeadListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.leads = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Aday Müşteriler (Leads)",
-            icon=ICONS.ROCKET,
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni Aday",
-            search_placeholder="Ad, şirket ara...",
-            parent=self,
-        )
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "#6366f1", icon=ICONS.CRM
-        )
-        self.stat_cards["new"] = MiniStatCard(
-            "Yeni", "0", "#3b82f6", icon=ICONS.SPARKLE
-        )
-        self.stat_cards["contacted"] = MiniStatCard(
-            "Görüşüldü", "0", "#f59e0b", icon=ICONS.PHONE
-        )
-        self.stat_cards["qualified"] = MiniStatCard(
-            "Kalifiye", "0", "#10b981", icon=ICONS.CHECK
-        )
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("full_name", "Ad Soyad", stretch=True),
             ColumnConfig("company_name", "Şirket", stretch=True),
@@ -102,22 +46,28 @@ class LeadListPage(QWidget):
             ColumnConfig("actions", "İşlemler", width=140),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Aday Müşteriler (Leads)",
+            icon=ICONS.ROCKET,
             table_id="lead_list",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Aday",
+            search_placeholder="Ad, şirket ara...",
+            parent=parent,
         )
-        layout.addWidget(self.table)
 
-        # Alt bilgi
-        self.count_label = QLabel("Toplam: 0 aday")
-        layout.addWidget(self.count_label)
+        self.leads = []
+        self._setup_stat_cards()
 
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.edit_clicked.emit)
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.CRM)
+        self.add_stat_card("new", "Yeni", "0", "info", ICONS.SPARKLE)
+        self.add_stat_card("contacted", "Görüşüldü", "0", "warning", ICONS.PHONE)
+        self.add_stat_card("qualified", "Kalifiye", "0", "success", ICONS.CHECK)
 
     def load_data(self, leads: list):
         self.leads = leads
@@ -138,10 +88,10 @@ class LeadListPage(QWidget):
                 qualified_count += 1
 
         # Kartları güncelle
-        self.stat_cards["total"].update_value(str(len(leads)))
-        self.stat_cards["new"].update_value(str(new_count))
-        self.stat_cards["contacted"].update_value(str(contacted_count))
-        self.stat_cards["qualified"].update_value(str(qualified_count))
+        self.update_stat_card("total", str(len(leads)))
+        self.update_stat_card("new", str(new_count))
+        self.update_stat_card("contacted", str(contacted_count))
+        self.update_stat_card("qualified", str(qualified_count))
 
         self.count_label.setText(f"Toplam: {len(leads)} aday")
 
@@ -157,9 +107,8 @@ class LeadListPage(QWidget):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "company_name":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(lead.get("company_name", "") or "-")
-                )
+                val = lead.get("company_name", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "status":
                 status = lead.get("status", "")
@@ -179,64 +128,62 @@ class LeadListPage(QWidget):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "phone":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(lead.get("phone", "") or "-")
-                )
+                val = lead.get("phone", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "email":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(lead.get("email", "") or "-")
-                )
+                val = lead.get("email", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "source":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(lead.get("source", "") or "-")
-                )
+                val = lead.get("source", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, lead)
+                actions = ["edit", "delete"]
+                if status != LeadStatus.CONVERTED.value:
+                    actions.insert(0, "convert")
 
-        self.table.setRowHeight(row, 48)
+                callbacks = {
+                    "edit": lambda sid=lead_id: self.edit_clicked.emit(sid),
+                    "delete": lambda sid=lead_id: self._confirm_delete(sid),
+                    "convert": lambda sid=lead_id: self.convert_clicked.emit(sid),
+                }
 
-    def _add_action_buttons(self, row: int, col: int, lead: dict):
-        lead_id = lead.get("id")
-        status = lead.get("status")
+                # BaseListPage'teki create_action_widget'ı özelleştirelim
+                # veya burda manuel kuralım.
 
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(4, 4, 4, 4)
-        btn_layout.setSpacing(4)
+                widget = QWidget()
+                layout = QHBoxLayout(widget)
+                layout.setContentsMargins(4, 2, 4, 2)
+                layout.setSpacing(4)
 
-        # Dönüştür butonu
-        if status != LeadStatus.CONVERTED.value:
-            convert_btn = QPushButton("Dönüştür")
-            convert_btn.setIcon(qta.icon(ICONS.TARGET, color="#8b5cf6"))
-            convert_btn.setFixedSize(90, 26)
-            convert_btn.setToolTip("Müşteriye Dönüştür")
-            convert_btn.clicked.connect(lambda: self.convert_clicked.emit(lead_id))
-            btn_layout.addWidget(convert_btn)
+                # Convert (Özel)
+                if "convert" in actions:
+                    from ui.components.action_buttons import create_custom_button
 
-        # Düzenle butonu
-        edit_btn = QPushButton()
-        edit_btn.setIcon(qta.icon(ICONS.EDIT, color="#3b82f6"))
-        edit_btn.setFixedSize(28, 26)
-        edit_btn.setProperty("class", "action-edit")
-        edit_btn.setToolTip("Düzenle")
-        edit_btn.clicked.connect(lambda: self.edit_clicked.emit(lead_id))
-        btn_layout.addWidget(edit_btn)
+                    c_btn = create_custom_button(
+                        widget, ICONS.TARGET, "Dönüştür", "purple"
+                    )
+                    c_btn.clicked.connect(callbacks["convert"])
+                    layout.addWidget(c_btn)
 
-        # Sil butonu
-        del_btn = QPushButton()
-        del_btn.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
-        del_btn.setFixedSize(28, 26)
-        del_btn.setProperty("class", "action-delete")
-        del_btn.setToolTip("Sil")
-        del_btn.clicked.connect(lambda: self._confirm_delete(lead_id))
-        btn_layout.addWidget(del_btn)
+                # Edit & Delete (Standart)
+                from ui.components.action_buttons import (
+                    create_edit_button,
+                    create_delete_button,
+                )
 
-        btn_layout.addStretch()
-        self.table.setCellWidget(row, col, btn_widget)
+                e_btn = create_edit_button(widget)
+                e_btn.clicked.connect(callbacks["edit"])
+                layout.addWidget(e_btn)
+
+                d_btn = create_delete_button(widget)
+                d_btn.clicked.connect(callbacks["delete"])
+                layout.addWidget(d_btn)
+
+                layout.addStretch()
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _on_search(self, text: str):
         text = text.lower()

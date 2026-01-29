@@ -216,7 +216,7 @@ class PurchaseRequestService:
 
             # Koşul değerlendirmesi için context hazırla
             total_amount = sum(
-                (item.quantity or 0) * (item.unit_price or 0) for item in request.items
+                (item.quantity or 0) * (item.estimated_price or 0) for item in request.items
             )
 
             context = {
@@ -228,7 +228,7 @@ class PurchaseRequestService:
             instance_id = start_workflow_for_document(
                 table_name="purchase_requests",
                 document_id=request.id,
-                initiated_by=user_id or request.requested_by,
+                initiated_by=user_id or 1,  # Varsayılan: admin user
                 document_no=request.request_no,
                 context=context,
             )

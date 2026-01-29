@@ -282,27 +282,15 @@ class WidgetManager:
         # NOT: Harici API gerektiren widget'lar şu an devre dışı
         widgets.extend(
             [
-                # {
-                #     "widget_code": "weather",
-                #     "position": {"row": 0, "col": 3},
-                #     "size": {"width": 1, "height": 1},
-                #     "config": {"city": "Istanbul"}
-                # },
-                # {
-                #     "widget_code": "currency_rates",
-                #     "position": {"row": 0, "col": 0},
-                #     "size": {"width": 2, "height": 1},
-                #     "config": {"currencies": ["USD", "EUR", "GBP"]}
-                # },
                 {
                     "widget_code": "notifications",
-                    "position": {"row": 0, "col": 3},
+                    "position": {"row": 1, "col": 3},
                     "size": {"width": 1, "height": 2},
                     "config": {},
                 },
                 {
                     "widget_code": "quick_actions",
-                    "position": {"row": 0, "col": 0},
+                    "position": {"row": 1, "col": 0},
                     "size": {"width": 1, "height": 1},
                     "config": {},
                 },
@@ -317,7 +305,7 @@ class WidgetManager:
                 widgets.append(
                     {
                         "widget_code": "stat_sales_today",
-                        "position": {"row": 1, "col": 0},
+                        "position": {"row": 0, "col": 0},
                         "size": {"width": 1, "height": 1},
                         "config": {},
                     }
@@ -327,7 +315,7 @@ class WidgetManager:
                 widgets.append(
                     {
                         "widget_code": "stat_low_stock",
-                        "position": {"row": 1, "col": 1},
+                        "position": {"row": 0, "col": 1},
                         "size": {"width": 1, "height": 1},
                         "config": {},
                     }
@@ -337,7 +325,7 @@ class WidgetManager:
                 widgets.append(
                     {
                         "widget_code": "stat_open_work_orders",
-                        "position": {"row": 1, "col": 2},
+                        "position": {"row": 0, "col": 2},
                         "size": {"width": 1, "height": 1},
                         "config": {},
                     }

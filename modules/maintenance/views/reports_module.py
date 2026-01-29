@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QComboBox,
@@ -19,8 +18,13 @@ from PyQt6.QtWidgets import (
     QGridLayout,
 )
 from PyQt6.QtCore import Qt, QDate
+import qtawesome as qta
 
+from config.icons import ICONS
 from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.page_header import PageHeader
+from ui.components.stat_cards import MiniStatCard
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class ReportingWidget(MaintenanceBaseWidget):
@@ -31,21 +35,18 @@ class ReportingWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Bakım Raporları",
-            icon="📊",
+            icon=ICONS.CHART,
             show_search=False,
-            show_refresh=False,  # Custom refresh button used
+            show_refresh=False,
             show_add=False,
             parent=self,
         )
 
-        # Header Layout - Filtreler
         h_layout = self.header.header_layout()
-        h_layout.addStretch()  # Push content to right
+        h_layout.addStretch()
 
         h_layout.addWidget(QLabel("Başlangıç:"))
         self.date_start = QDateEdit()
@@ -63,10 +64,9 @@ class ReportingWidget(MaintenanceBaseWidget):
         h_layout.addWidget(self.date_end)
 
         h_layout.addSpacing(10)
-        btn_refresh = QPushButton("Raporu Güncelle")
-        btn_refresh.setStyleSheet(
-            "background-color: #007acc; color: white; padding: 0 16px; border-radius: 4px;"
-        )
+        btn_refresh = QPushButton("Güncelle")
+        btn_refresh.setIcon(qta.icon(ICONS.REFRESH, color="#ffffff"))
+        btn_refresh.setProperty("class", "btn-primary")
         btn_refresh.setFixedHeight(36)
         btn_refresh.clicked.connect(self.refresh_data)
         h_layout.addWidget(btn_refresh)
@@ -101,234 +101,192 @@ class ReportingWidget(MaintenanceBaseWidget):
 
     def setup_summary_tab(self):
         layout = QVBoxLayout(self.tab_summary)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        # KPI Kartları
-        self.kpi_layout = QHBoxLayout()
-        layout.addLayout(self.kpi_layout)
+        self.summary_stats_layout = QHBoxLayout()
+        self.summary_stats = {
+            "total": MiniStatCard("Toplam İş Emri", "0", "info", icon=ICONS.INVOICE),
+            "completed": MiniStatCard("Tamamlanan", "0", "success", icon=ICONS.CHECK),
+            "in_progress": MiniStatCard("Devam Eden", "0", "warning", icon=ICONS.TIME),
+            "cost": MiniStatCard("Toplam Maliyet", "₺0.00", "error", icon=ICONS.MONEY),
+        }
+        for card in self.summary_stats.values():
+            self.summary_stats_layout.addWidget(card)
+        layout.addLayout(self.summary_stats_layout)
 
-        # İş emri tablosu
-        self.summary_table = QTableWidget()
-        self.summary_table.setColumnCount(5)
-        self.summary_table.setHorizontalHeaderLabels(
-            ["Metrik", "Toplam", "Tamamlanan", "Devam Eden", "İptal"]
-        )
-        self.summary_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        cols = [
+            ColumnConfig("metric", "Metrik", width=200, stretch=True),
+            ColumnConfig("total", "Toplam", width=120),
+            ColumnConfig("completed", "Tamamlanan", width=120),
+            ColumnConfig("in_progress", "Devam Eden", width=120),
+            ColumnConfig("cancelled", "İptal", width=120),
+        ]
+        self.summary_table = EnhancedTableWidget(
+            table_id="maint_summary", columns=cols, parent=self
         )
         layout.addWidget(self.summary_table)
 
     def setup_cost_tab(self):
         layout = QVBoxLayout(self.tab_cost)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        # Ekipman bazlı maliyet tablosu
-        self.cost_table = QTableWidget()
-        self.cost_table.setColumnCount(5)
-        self.cost_table.setHorizontalHeaderLabels(
-            ["Ekipman", "Malzeme", "İşçilik", "Toplam", "İş Emri Sayısı"]
-        )
-        self.cost_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        cols = [
+            ColumnConfig("equipment", "Ekipman", width=250, stretch=True),
+            ColumnConfig("material", "Malzeme", width=120),
+            ColumnConfig("labor", "İşçilik", width=120),
+            ColumnConfig("total", "Toplam", width=120),
+            ColumnConfig("count", "İş Emri Sayısı", width=120),
+        ]
+        self.cost_table = EnhancedTableWidget(
+            table_id="maint_cost", columns=cols, parent=self
         )
         layout.addWidget(self.cost_table)
 
     def setup_technician_tab(self):
         layout = QVBoxLayout(self.tab_technician)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        self.tech_table = QTableWidget()
-        self.tech_table.setColumnCount(5)
-        self.tech_table.setHorizontalHeaderLabels(
-            ["Teknisyen", "Tamamlanan İş", "Toplam Saat", "Ort. Süre", "Başarı Oranı"]
-        )
-        self.tech_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        cols = [
+            ColumnConfig("name", "Teknisyen", width=200, stretch=True),
+            ColumnConfig("completed", "Tamamlanan İş", width=120),
+            ColumnConfig("hours", "Toplam Saat", width=120),
+            ColumnConfig("avg", "Ort. Süre", width=120),
+            ColumnConfig("rate", "Başarı Oranı", width=120),
+        ]
+        self.tech_table = EnhancedTableWidget(
+            table_id="maint_tech", columns=cols, parent=self
         )
         layout.addWidget(self.tech_table)
 
     def setup_overdue_tab(self):
         layout = QVBoxLayout(self.tab_overdue)
+        layout.setContentsMargins(16, 16, 16, 16)
 
-        self.overdue_table = QTableWidget()
-        self.overdue_table.setColumnCount(5)
-        self.overdue_table.setHorizontalHeaderLabels(
-            ["Ekipman", "Plan Adı", "Planlanan Tarih", "Gecikme (Gün)", "Kritiklik"]
-        )
-        self.overdue_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        cols = [
+            ColumnConfig("equipment", "Ekipman", width=200, stretch=True),
+            ColumnConfig("plan", "Plan Adı", width=200),
+            ColumnConfig("date", "Planlanan Tarih", width=120),
+            ColumnConfig("delay", "Gecikme (Gün)", width=120),
+            ColumnConfig("criticality", "Kritiklik", width=120),
+        ]
+        self.overdue_table = EnhancedTableWidget(
+            table_id="maint_overdue", columns=cols, parent=self
         )
         layout.addWidget(self.overdue_table)
 
     def refresh_data(self):
-        start_date = self.date_start.date().toPyDate()
-        end_date = self.date_end.date().toPyDate()
-
-        self._refresh_summary(start_date, end_date)
-        self._refresh_cost(start_date, end_date)
-        self._refresh_technician(start_date, end_date)
+        start = self.date_start.date().toPyDate()
+        end = self.date_end.date().toPyDate()
+        self._refresh_summary(start, end)
+        self._refresh_cost(start, end)
+        self._refresh_technician(start, end)
         self._refresh_overdue()
 
-    def _refresh_summary(self, start_date, end_date):
-        # KPI kartlarını temizle ve yeniden oluştur
-        while self.kpi_layout.count():
-            item = self.kpi_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+    def _refresh_summary(self, start, end):
+        stats = self.service.get_work_order_stats(start, end)
+        self.summary_stats["total"].update_value(str(stats.get("total", 0)))
+        self.summary_stats["completed"].update_value(str(stats.get("completed", 0)))
+        self.summary_stats["in_progress"].update_value(str(stats.get("in_progress", 0)))
+        self.summary_stats["cost"].update_value(f"₺{stats.get('total_cost', 0):,.2f}")
 
-        stats = self.service.get_work_order_stats(start_date, end_date)
-
-        self.kpi_layout.addWidget(
-            self._create_kpi_card(
-                "Toplam İş Emri", str(stats.get("total", 0)), "#3b82f6"
-            )
-        )
-        self.kpi_layout.addWidget(
-            self._create_kpi_card(
-                "Tamamlanan", str(stats.get("completed", 0)), "#22c55e"
-            )
-        )
-        self.kpi_layout.addWidget(
-            self._create_kpi_card(
-                "Devam Eden", str(stats.get("in_progress", 0)), "#f97316"
-            )
-        )
-        self.kpi_layout.addWidget(
-            self._create_kpi_card(
-                "Toplam Maliyet", f"₺{stats.get('total_cost', 0):,.2f}", "#8b5cf6"
-            )
-        )
-
-        # Özet tablo
-        self.summary_table.setRowCount(3)
-        rows = [
-            (
-                "İş Emirleri",
-                stats.get("total", 0),
-                stats.get("completed", 0),
-                stats.get("in_progress", 0),
-                stats.get("cancelled", 0),
-            ),
-            (
-                "Arıza Talepleri",
-                stats.get("requests_total", 0),
-                stats.get("requests_resolved", 0),
-                stats.get("requests_pending", 0),
-                0,
-            ),
-            (
-                "Periyodik Bakımlar",
-                stats.get("preventive_total", 0),
-                stats.get("preventive_done", 0),
-                stats.get("preventive_pending", 0),
-                0,
-            ),
+        data = [
+            {
+                "metric": "İş Emirleri",
+                "total": stats.get("total", 0),
+                "completed": stats.get("completed", 0),
+                "in_progress": stats.get("in_progress", 0),
+                "cancelled": stats.get("cancelled", 0),
+            },
+            {
+                "metric": "Arıza Talepleri",
+                "total": stats.get("requests_total", 0),
+                "completed": stats.get("requests_resolved", 0),
+                "in_progress": stats.get("requests_pending", 0),
+                "cancelled": 0,
+            },
+            {
+                "metric": "Periyodik Bakımlar",
+                "total": stats.get("preventive_total", 0),
+                "completed": stats.get("preventive_done", 0),
+                "in_progress": stats.get("preventive_pending", 0),
+                "cancelled": 0,
+            },
         ]
-        for i, row in enumerate(rows):
-            for j, val in enumerate(row):
-                self.summary_table.setItem(i, j, QTableWidgetItem(str(val)))
+        self.summary_table.setRowCount(len(data))
+        cols = self.summary_table.get_visible_columns()
+        for r, row in enumerate(data):
+            for c, key in enumerate(cols):
+                self.summary_table.setItem(
+                    r, c, QTableWidgetItem(str(row.get(key, "")))
+                )
 
-    def _refresh_cost(self, start_date, end_date):
-        costs = self.service.get_equipment_cost_report(start_date, end_date)
-
+    def _refresh_cost(self, start, end):
+        costs = self.service.get_equipment_cost_report(start, end)
         self.cost_table.setRowCount(len(costs))
+        cols = self.cost_table.get_visible_columns()
         for i, cost in enumerate(costs):
-            self.cost_table.setItem(
-                i, 0, QTableWidgetItem(cost.get("equipment_name", "-"))
-            )
-            self.cost_table.setItem(
-                i, 1, QTableWidgetItem(f"₺{cost.get('material_cost', 0):,.2f}")
-            )
-            self.cost_table.setItem(
-                i, 2, QTableWidgetItem(f"₺{cost.get('labor_cost', 0):,.2f}")
-            )
-            self.cost_table.setItem(
-                i, 3, QTableWidgetItem(f"₺{cost.get('total_cost', 0):,.2f}")
-            )
-            self.cost_table.setItem(
-                i, 4, QTableWidgetItem(str(cost.get("work_order_count", 0)))
-            )
+            for c, key in enumerate(cols):
+                if key == "equipment":
+                    val = cost.get("equipment_name", "-")
+                elif key == "material":
+                    val = f"₺{cost.get('material_cost', 0):,.2f}"
+                elif key == "labor":
+                    val = f"₺{cost.get('labor_cost', 0):,.2f}"
+                elif key == "total":
+                    val = f"₺{cost.get('total_cost', 0):,.2f}"
+                elif key == "count":
+                    val = str(cost.get("work_order_count", 0))
+                self.cost_table.setItem(i, c, QTableWidgetItem(val))
 
-    def _refresh_technician(self, start_date, end_date):
-        techs = self.service.get_technician_performance(start_date, end_date)
-
+    def _refresh_technician(self, start, end):
+        techs = self.service.get_technician_performance(start, end)
         self.tech_table.setRowCount(len(techs))
+        cols = self.tech_table.get_visible_columns()
         for i, tech in enumerate(techs):
-            self.tech_table.setItem(i, 0, QTableWidgetItem(tech.get("name", "-")))
-            self.tech_table.setItem(
-                i, 1, QTableWidgetItem(str(tech.get("completed_count", 0)))
-            )
-            self.tech_table.setItem(
-                i, 2, QTableWidgetItem(f"{tech.get('total_hours', 0):.1f}")
-            )
-            self.tech_table.setItem(
-                i, 3, QTableWidgetItem(f"{tech.get('avg_hours', 0):.1f}")
-            )
-            self.tech_table.setItem(
-                i, 4, QTableWidgetItem(f"{tech.get('success_rate', 0):.1f}%")
-            )
+            for c, key in enumerate(cols):
+                if key == "name":
+                    val = tech.get("name", "-")
+                elif key == "completed":
+                    val = str(tech.get("completed_count", 0))
+                elif key == "hours":
+                    val = f"{tech.get('total_hours', 0):.1f}"
+                elif key == "avg":
+                    val = f"{tech.get('avg_hours', 0):.1f}"
+                elif key == "rate":
+                    val = f"{tech.get('success_rate', 0):.1f}%"
+                self.tech_table.setItem(i, c, QTableWidgetItem(val))
 
     def _refresh_overdue(self):
         overdue = self.service.get_overdue_maintenance_plans()
-
         self.overdue_table.setRowCount(len(overdue))
         today = datetime.now().date()
-
+        cols = self.overdue_table.get_visible_columns()
         for i, plan in enumerate(overdue):
-            self.overdue_table.setItem(
-                i, 0, QTableWidgetItem(plan.equipment.name if plan.equipment else "-")
-            )
-            self.overdue_table.setItem(i, 1, QTableWidgetItem(plan.name))
-
-            next_date = plan.next_maintenance_date
-            self.overdue_table.setItem(
-                i,
-                2,
-                QTableWidgetItem(next_date.strftime("%d.%m.%Y") if next_date else "-"),
-            )
-
-            if next_date:
-                days_overdue = (today - next_date.date()).days
-                overdue_item = QTableWidgetItem(str(days_overdue))
-                overdue_item.setForeground(Qt.GlobalColor.red)
-                self.overdue_table.setItem(i, 3, overdue_item)
-            else:
-                self.overdue_table.setItem(i, 3, QTableWidgetItem("-"))
-
-            self.overdue_table.setItem(
-                i,
-                4,
-                QTableWidgetItem(
-                    plan.equipment.criticality.value
-                    if plan.equipment and plan.equipment.criticality
-                    else "-"
-                ),
-            )
-
-    def _create_kpi_card(self, title: str, value: str, color: str) -> QWidget:
-        """KPI kartı widget'ı oluşturur"""
-        card = QFrame()
-        card.setFrameStyle(QFrame.Shape.Box)
-        card.setStyleSheet(
-            """
-            QFrame {
-                background-color: white;
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                padding: 16px;
-            }
-        """
-        )
-
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
-
-        lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("color: #6b7280; font-size: 12px;")
-        card_layout.addWidget(lbl_title)
-
-        lbl_value = QLabel(value)
-        lbl_value.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold;")
-        card_layout.addWidget(lbl_value)
-
-        return card
+            for c, key in enumerate(cols):
+                if key == "equipment":
+                    val = plan.equipment.name if plan.equipment else "-"
+                elif key == "plan":
+                    val = plan.name
+                elif key == "date":
+                    dt = plan.next_maintenance_date
+                    val = dt.strftime("%d.%m.%Y") if dt else "-"
+                elif key == "delay":
+                    dt = plan.next_maintenance_date
+                    if dt:
+                        days = (today - dt.date()).days
+                        item = QTableWidgetItem(str(days))
+                        item.setForeground(Qt.GlobalColor.red)
+                        self.overdue_table.setItem(i, c, item)
+                        continue
+                    else:
+                        val = "-"
+                elif key == "criticality":
+                    val = (
+                        plan.equipment.criticality.value
+                        if plan.equipment and plan.equipment.criticality
+                        else "-"
+                    )
+                self.overdue_table.setItem(i, c, QTableWidgetItem(val))
 
 
 class KPIDashboardWidget(MaintenanceBaseWidget):
@@ -339,23 +297,18 @@ class KPIDashboardWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Bakım KPI Dashboard",
-            icon="📈",
+            icon=ICONS.CHART,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=False,
             parent=self,
         )
-        self.header.show_refresh = True
         self.header.refresh_clicked.connect(self.refresh_data)
 
-        # Header Layout - Filtreler
         h_layout = self.header.header_layout()
-
         h_layout.addWidget(QLabel("Ekipman:"))
         self.cmb_equipment = QComboBox()
         self.cmb_equipment.addItem("- Tüm Ekipmanlar -", None)
@@ -379,210 +332,86 @@ class KPIDashboardWidget(MaintenanceBaseWidget):
         h_layout.addStretch()
         self.layout.addWidget(self.header)
 
-        # KPI Grid
-        self.kpi_grid = QGridLayout()
-        self.layout.addLayout(self.kpi_grid)
+        # KPI Summary
+        self.kpi_layout = QHBoxLayout()
+        self.kpi_cards = {
+            "mtbf": MiniStatCard("Ort. MTBF", "0 saat", "info", icon=ICONS.TIME),
+            "mttr": MiniStatCard("Ort. MTTR", "0 saat", "warning", icon=ICONS.TIME),
+            "availability": MiniStatCard(
+                "Kullanılabilirlik", "100%", "success", icon=ICONS.CHECK
+            ),
+            "failures": MiniStatCard("Toplam Arıza", "0", "error", icon=ICONS.CLOSE),
+        }
+        for card in self.kpi_cards.values():
+            self.kpi_layout.addWidget(card)
+        self.layout.addLayout(self.kpi_layout)
 
-        # Alt detay tablosu
-        self.detail_table = QTableWidget()
-        self.detail_table.setColumnCount(6)
-        self.detail_table.setHorizontalHeaderLabels(
-            [
-                "Ekipman",
-                "MTBF (saat)",
-                "MTTR (saat)",
-                "Kullanılabilirlik (%)",
-                "Arıza Sayısı",
-                "Toplam Duruş (saat)",
-            ]
-        )
-        self.detail_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        # Tablo
+        cols = [
+            ColumnConfig("equipment", "Ekipman", width=200, stretch=True),
+            ColumnConfig("mtbf", "MTBF (saat)", width=120),
+            ColumnConfig("mttr", "MTTR (saat)", width=120),
+            ColumnConfig("avail", "Kullanılabilirlik (%)", width=150),
+            ColumnConfig("count", "Arıza Sayısı", width=120),
+            ColumnConfig("downtime", "Toplam Duruş (saat)", width=150),
+        ]
+        self.detail_table = EnhancedTableWidget(
+            table_id="maint_kpi_detail", columns=cols, parent=self
         )
         self.layout.addWidget(self.detail_table)
 
         self.refresh_data()
 
     def refresh_data(self):
-        equipment_id = self.cmb_equipment.currentData()
-        period_days = self.cmb_period.currentData()
-
-        # KPI grid temizle
-        while self.kpi_grid.count():
-            item = self.kpi_grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        if equipment_id:
-            # Tek ekipman KPI'ları
-            kpis = self.service.get_equipment_kpis(equipment_id, period_days)
-            self._display_single_equipment_kpis(kpis)
+        eq_id = self.cmb_equipment.currentData()
+        period = self.cmb_period.currentData()
+        if eq_id:
+            kpis = self.service.get_equipment_kpis(eq_id, period)
+            self._update_kpi_cards([kpis])
+            self._update_table([kpis])
         else:
-            # Tüm ekipmanlar özet
-            all_kpis = self.service.get_all_equipment_kpis(period_days)
-            self._display_all_equipment_kpis(all_kpis)
+            all_kpis = self.service.get_all_equipment_kpis(period)
+            self._update_kpi_cards(all_kpis)
+            self._update_table(all_kpis)
 
-    def _display_single_equipment_kpis(self, kpis: dict):
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "MTBF",
-                f"{kpis.get('mtbf', 0):.1f} saat",
-                "Arızalar Arası Ortalama Süre",
-                "#3b82f6",
-            ),
-            0,
-            0,
-        )
+    def _update_kpi_cards(self, kpi_list):
+        if not kpi_list:
+            return
+        mtbf = sum(k.get("mtbf", 0) for k in kpi_list) / len(kpi_list)
+        mttr = sum(k.get("mttr", 0) for k in kpi_list) / len(kpi_list)
+        avail = sum(k.get("availability", 100) for k in kpi_list) / len(kpi_list)
+        fails = sum(k.get("failure_count", 0) for k in kpi_list)
 
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "MTTR",
-                f"{kpis.get('mttr', 0):.1f} saat",
-                "Ortalama Onarım Süresi",
-                "#f97316",
-            ),
-            0,
-            1,
-        )
+        self.kpi_cards["mtbf"].update_value(f"{mtbf:.1f} saat")
+        self.kpi_cards["mttr"].update_value(f"{mttr:.1f} saat")
+        self.kpi_cards["availability"].update_value(f"{avail:.1f}%")
+        self.kpi_cards["failures"].update_value(str(fails))
 
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Kullanılabilirlik",
-                f"{kpis.get('availability', 100):.1f}%",
-                "Çalışma Süresi Oranı",
-                "#22c55e",
-            ),
-            0,
-            2,
-        )
-
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Arıza Sayısı",
-                str(kpis.get("failure_count", 0)),
-                "Dönem İçi Toplam",
-                "#ef4444",
-            ),
-            0,
-            3,
-        )
-
-        # Tablo tek satır
-        self.detail_table.setRowCount(0)
-
-    def _display_all_equipment_kpis(self, all_kpis: list):
-        # Ortalamalar
-        avg_mtbf = (
-            sum(k.get("mtbf", 0) for k in all_kpis) / len(all_kpis) if all_kpis else 0
-        )
-        avg_mttr = (
-            sum(k.get("mttr", 0) for k in all_kpis) / len(all_kpis) if all_kpis else 0
-        )
-        avg_avail = (
-            sum(k.get("availability", 100) for k in all_kpis) / len(all_kpis)
-            if all_kpis
-            else 100
-        )
-        total_failures = sum(k.get("failure_count", 0) for k in all_kpis)
-
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Ort. MTBF", f"{avg_mtbf:.1f} saat", "Tüm Ekipmanlar", "#3b82f6"
-            ),
-            0,
-            0,
-        )
-
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Ort. MTTR", f"{avg_mttr:.1f} saat", "Tüm Ekipmanlar", "#f97316"
-            ),
-            0,
-            1,
-        )
-
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Ort. Kullanılabilirlik",
-                f"{avg_avail:.1f}%",
-                "Tüm Ekipmanlar",
-                "#22c55e",
-            ),
-            0,
-            2,
-        )
-
-        self.kpi_grid.addWidget(
-            self._create_big_kpi_card(
-                "Toplam Arıza", str(total_failures), "Tüm Ekipmanlar", "#ef4444"
-            ),
-            0,
-            3,
-        )
-
-        # Detay tablosu
-        self.detail_table.setRowCount(len(all_kpis))
-        for i, kpi in enumerate(all_kpis):
-            self.detail_table.setItem(
-                i, 0, QTableWidgetItem(kpi.get("equipment_name", "-"))
-            )
-            self.detail_table.setItem(
-                i, 1, QTableWidgetItem(f"{kpi.get('mtbf', 0):.1f}")
-            )
-            self.detail_table.setItem(
-                i, 2, QTableWidgetItem(f"{kpi.get('mttr', 0):.1f}")
-            )
-
-            avail_item = QTableWidgetItem(f"{kpi.get('availability', 100):.1f}")
-            if kpi.get("availability", 100) < 90:
-                avail_item.setForeground(Qt.GlobalColor.red)
-            elif kpi.get("availability", 100) < 95:
-                avail_item.setForeground(Qt.GlobalColor.darkYellow)
-            self.detail_table.setItem(i, 3, avail_item)
-
-            self.detail_table.setItem(
-                i, 4, QTableWidgetItem(str(kpi.get("failure_count", 0)))
-            )
-            self.detail_table.setItem(
-                i, 5, QTableWidgetItem(f"{kpi.get('total_downtime', 0):.1f}")
-            )
-
-    def _create_big_kpi_card(
-        self, title: str, value: str, subtitle: str, color: str
-    ) -> QWidget:
-        card = QFrame()
-        card.setFrameStyle(QFrame.Shape.Box)
-        card.setMinimumHeight(120)
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: white;
-                border: 2px solid {color};
-                border-radius: 12px;
-            }}
-        """
-        )
-
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(20, 20, 20, 20)
-        card_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("color: #6b7280; font-size: 14px;")
-        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card_layout.addWidget(lbl_title)
-
-        lbl_value = QLabel(value)
-        lbl_value.setStyleSheet(f"color: {color}; font-size: 32px; font-weight: bold;")
-        lbl_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card_layout.addWidget(lbl_value)
-
-        lbl_subtitle = QLabel(subtitle)
-        lbl_subtitle.setStyleSheet("color: #9ca3af; font-size: 11px;")
-        lbl_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card_layout.addWidget(lbl_subtitle)
-
-        return card
+    def _update_table(self, kpis):
+        self.detail_table.setRowCount(len(kpis))
+        cols = self.detail_table.get_visible_columns()
+        for i, kpi in enumerate(kpis):
+            for c, key in enumerate(cols):
+                if key == "equipment":
+                    val = kpi.get("equipment_name", "-")
+                elif key == "mtbf":
+                    val = f"{kpi.get('mtbf', 0):.1f}"
+                elif key == "mttr":
+                    val = f"{kpi.get('mttr', 0):.1f}"
+                elif key == "avail":
+                    v = kpi.get("availability", 100)
+                    item = QTableWidgetItem(f"{v:.1f}")
+                    if v < 90:
+                        item.setForeground(Qt.GlobalColor.red)
+                    elif v < 95:
+                        item.setForeground(Qt.GlobalColor.darkYellow)
+                    self.detail_table.setItem(i, c, item)
+                    continue
+                elif key == "count":
+                    val = str(kpi.get("failure_count", 0))
+                elif key == "downtime":
+                    val = f"{kpi.get('total_downtime', 0):.1f}"
+                self.detail_table.setItem(i, c, QTableWidgetItem(val))
 
 
 class CostAnalysisWidget(MaintenanceBaseWidget):
@@ -593,23 +422,18 @@ class CostAnalysisWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Bakım Maliyet Analizi",
-            icon="💰",
+            icon=ICONS.MONEY,
             show_search=False,
             show_refresh=False,
             show_add=False,
             parent=self,
         )
         self.layout.addWidget(self.header)
-
-        # Bu widget ReportingWidget'ın maliyet tab'ına benzer
-        # ama daha detaylı analiz için ayrı bir ekran olarak tasarlanabilir
-        info_label = QLabel(
+        info = QLabel(
             "Detaylı maliyet analizi için Raporlar > Maliyet Analizi sekmesini kullanın."
         )
-        info_label.setStyleSheet("color: #6b7280; font-size: 14px;")
-        self.layout.addWidget(info_label)
+        info.setStyleSheet("color: #6b7280; font-size: 14px; margin: 20px;")
+        self.layout.addWidget(info)

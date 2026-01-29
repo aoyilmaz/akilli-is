@@ -3,8 +3,19 @@ Akıllı İş - Stok Hareketleri Modülü
 """
 
 from datetime import datetime
-from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QMessageBox
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import (
+    QWidget,
+    QStackedWidget,
+    QVBoxLayout,
+    QMessageBox,
+    QDialog,
+    QFormLayout,
+    QLabel,
+    QDialogButtonBox,
+    QScrollArea,
+    QFrame,
+)
+from PyQt6.QtCore import Qt
 
 from modules.inventory.services import (
     StockMovementService,
@@ -15,6 +26,7 @@ from modules.inventory.services import (
 from modules.finance.services.currency_service import CurrencyService
 from modules.inventory.views.movement_list import MovementListPage
 from modules.inventory.views.movement_form import MovementFormPage
+from database.models import StockMovementType
 
 
 class MovementModule(QWidget):
@@ -27,7 +39,6 @@ class MovementModule(QWidget):
         self.movement_service = None
         self.item_service = None
         self.warehouse_service = None
-        self.warehouse_service = None
         self.unit_service = None  # Dual-Unit için
         self.currency_service = None
         self.setup_ui()
@@ -36,7 +47,6 @@ class MovementModule(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
         self.stack = QStackedWidget()
 
         # Liste sayfası
@@ -47,7 +57,6 @@ class MovementModule(QWidget):
         self.list_page.refresh_requested.connect(self.load_data)
         self.list_page.view_clicked.connect(self.show_detail)
         self.stack.addWidget(self.list_page)
-
         layout.addWidget(self.stack)
 
     def _get_services(self):
@@ -75,40 +84,32 @@ class MovementModule(QWidget):
         if self.unit_service:
             self.unit_service.close()
             self.unit_service = None
-        if self.currency_service:
-            # CurrencyService session kullanıyor mu? Evet, basit init ile.
-            # close metodu yoksa hata verebilir, ama service base kullanmıyor şimdilik.
-            # Yine de kontrol edelim. base.py'deki ServiceBase close methoduna sahip.
-            # Benim yazdığım CurrencyService ServiceBase inherit etmedi, ama session.close yapmalı.
-            pass
 
     def load_data(self):
         try:
             self._get_services()
-
             filters = self.list_page.get_filters()
 
             # Hareket türü filtresi
             movement_type = None
             type_filter = filters.get("movement_type")
             if type_filter:
-                from database.models import StockMovementType
-
                 type_map = {
                     "giris": StockMovementType.GIRIS,
                     "cikis": StockMovementType.CIKIS,
                     "transfer": StockMovementType.TRANSFER,
-                    "satin_alma": StockMovementType.SATIN_ALMA,
+                    "sarin_alma": StockMovementType.SATIN_ALMA,
                     "satis": StockMovementType.SATIS,
                 }
                 movement_type = type_map.get(type_filter)
 
+            start_dt = datetime.combine(filters.get("start_date"), datetime.min.time())
+            end_dt = datetime.combine(filters.get("end_date"), datetime.max.time())
+
             movements = self.movement_service.get_movements(
                 movement_type=movement_type,
-                start_date=datetime.combine(
-                    filters.get("start_date"), datetime.min.time()
-                ),
-                end_date=datetime.combine(filters.get("end_date"), datetime.max.time()),
+                start_date=start_dt,
+                end_date=end_dt,
                 limit=500,
             )
 
@@ -124,7 +125,6 @@ class MovementModule(QWidget):
                 ]
 
             self.list_page.load_data(movements)
-
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Veriler yüklenirken hata:\n{str(e)}")
         finally:
@@ -134,37 +134,22 @@ class MovementModule(QWidget):
         """Form göster"""
         try:
             self._get_services()
-
-            # Mevcut formu kaldır
             if self.stack.count() > 1:
                 old = self.stack.widget(1)
                 self.stack.removeWidget(old)
                 old.deleteLater()
 
-            # Yeni form
             form = MovementFormPage(movement_type)
             form.saved.connect(self.save_movement)
             form.cancelled.connect(self.show_list)
 
-            # Stok kartlarını yükle
-            items = self.item_service.get_all()
-            form.load_items(items)
-
-            # Depolari yükle
-            warehouses = self.warehouse_service.get_all()
-            form.load_warehouses(warehouses)
-
-            # Birimleri yükle (Dual-Unit için)
-            units = self.unit_service.get_all()
-            form.load_units(units)
-
-            # Dövizleri yükle
-            currencies = self.currency_service.get_all()
-            form.load_currencies(currencies)
+            form.load_items(self.item_service.get_all())
+            form.load_warehouses(self.warehouse_service.get_all())
+            form.load_units(self.unit_service.get_all())
+            form.load_currencies(self.currency_service.get_all())
 
             self.stack.addWidget(form)
             self.stack.setCurrentIndex(1)
-
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Form açılırken hata:\n{str(e)}")
         finally:
@@ -178,36 +163,32 @@ class MovementModule(QWidget):
         """Hareketi kaydet"""
         try:
             self._get_services()
-
             lines = data.pop("lines", [])
-            movement_type = data.pop("movement_type")
-            from_warehouse_id = data.pop("from_warehouse_id", None)
-            to_warehouse_id = data.pop("to_warehouse_id", None)
+            m_type = data.pop("movement_type")
+            f_wh = data.pop("from_warehouse_id", None)
+            t_wh = data.pop("to_warehouse_id", None)
 
-            # Her satır için hareket oluştur
-            for line in lines:
+            for ln in lines:
                 self.movement_service.create_movement(
-                    item_id=line["item_id"],
-                    movement_type=movement_type,
-                    quantity=line["quantity"],
-                    from_warehouse_id=from_warehouse_id,
-                    to_warehouse_id=to_warehouse_id,
-                    unit_price=line["unit_price"],
-                    lot_number=line.get("lot_number"),
+                    item_id=ln["item_id"],
+                    movement_type=m_type,
+                    quantity=ln["quantity"],
+                    from_warehouse_id=f_wh,
+                    to_warehouse_id=t_wh,
+                    unit_price=ln["unit_price"],
+                    lot_number=ln.get("lot_number"),
                     document_no=data.get("document_no"),
                     document_type="manual",
                     description=data.get("description"),
-                    # Dual-Unit
-                    secondary_quantity=line.get("secondary_quantity"),
-                    secondary_unit_id=line.get("secondary_unit_id"),
-                    # Currency
-                    currency_id=line.get("currency_id"),
-                    exchange_rate=line.get("exchange_rate"),
+                    secondary_quantity=ln.get("secondary_quantity"),
+                    secondary_unit_id=ln.get("secondary_unit_id"),
+                    currency_id=ln.get("currency_id"),
+                    exchange_rate=ln.get("exchange_rate"),
                 )
 
-            QMessageBox.information(self, "Başarılı", f"{len(lines)} satır kaydedildi!")
+            msg = f"{len(lines)} satır kaydedildi!"
+            QMessageBox.information(self, "Başarılı", msg)
             self.show_list()
-
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Kaydetme hatası:\n{str(e)}")
         finally:
@@ -221,25 +202,13 @@ class MovementModule(QWidget):
             if not movement:
                 QMessageBox.warning(self, "Hata", "Hareket bulunamadı!")
                 return
-
             dialog = MovementDetailDialog(movement, self)
             dialog.exec()
-
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Detay görüntüleme hatası:\n{str(e)}")
+            err_msg = f"Detay görüntüleme hatası:\n{str(e)}"
+            QMessageBox.critical(self, "Hata", err_msg)
         finally:
             self._close_services()
-
-
-from PyQt6.QtWidgets import (
-    QDialog,
-    QFormLayout,
-    QLabel,
-    QDialogButtonBox,
-    QScrollArea,
-    QFrame,
-)
-from PyQt6.QtCore import Qt
 
 
 class MovementDetailDialog(QDialog):
@@ -248,14 +217,13 @@ class MovementDetailDialog(QDialog):
     def __init__(self, movement, parent=None):
         super().__init__(parent)
         self.movement = movement
-        self.setWindowTitle(f"Hareket Detayı - {movement.document_no or 'Belgesiz'}")
+        doc = movement.document_no or "Belgesiz"
+        self.setWindowTitle(f"Hareket Detayı - {doc}")
         self.setMinimumSize(450, 500)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-
-        # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -266,38 +234,36 @@ class MovementDetailDialog(QDialog):
         form_layout = QFormLayout(content)
         form_layout.setSpacing(12)
 
-        # Helper
         def add_row(label, value, color=None):
-            lbl = QLabel(str(value) if value is not None else "-")
+            val_str = str(value) if value is not None else "-"
+            lbl = QLabel(val_str)
             if color:
                 lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
             lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             form_layout.addRow(QLabel(f"<b>{label}:</b>"), lbl)
 
         m = self.movement
-
-        # Temel Bilgiler
-        add_row("Tarih", m.movement_date.strftime("%d.%m.%Y %H:%M"))
+        dt_str = m.movement_date.strftime("%d.%m.%Y %H:%M")
+        add_row("Tarih", dt_str)
         add_row("Belge No", m.document_no)
-        add_row("Tür", m.movement_type.name)  # Enum name
+        add_row("Tür", m.movement_type.name)
 
-        # Stok Bilgileri
-        item_text = f"{m.item.code} - {m.item.name}" if m.item else (m.item_code or "-")
-        add_row("Stok Kartı", item_text, "#818cf8")
+        it_text = f"{m.item.code} - {m.item.name}" if m.item else (m.item_code or "-")
+        add_row("Stok Kartı", it_text, "#818cf8")
 
-        # Depo Bilgileri
-        from_wh = m.from_warehouse.name if m.from_warehouse else "-"
-        to_wh = m.to_warehouse.name if m.to_warehouse else "-"
-        add_row("Kaynak Depo", from_wh)
-        add_row("Hedef Depo", to_wh)
+        f_wh = m.from_warehouse.name if m.from_warehouse else "-"
+        t_wh = m.to_warehouse.name if m.to_warehouse else "-"
+        add_row("Kaynak Depo", f_wh)
+        add_row("Hedef Depo", t_wh)
 
-        # Miktar ve Fiyat
-        quantity = f"{m.quantity:,.4f} {m.unit.code if m.unit else ''}"
-        add_row("Miktar", quantity, "#10b981")
+        u_code = m.unit.code if m.unit else ""
+        qty_str = f"{m.quantity:,.4f} {u_code}"
+        add_row("Miktar", qty_str, "#10b981")
 
         if m.secondary_quantity:
-            sec_qty = f"{m.secondary_quantity:,.4f} {m.secondary_unit.code if m.secondary_unit else ''}"
-            add_row("İkincil Miktar", sec_qty)
+            su_code = m.secondary_unit.code if m.secondary_unit else ""
+            sq = f"{m.secondary_quantity:,.4f} {su_code}"
+            add_row("İkincil Miktar", sq)
 
         add_row("Birim Fiyat", f"₺{m.unit_price:,.2f}")
         add_row("Toplam Tutar", f"₺{m.total_price:,.2f}")
@@ -306,17 +272,13 @@ class MovementDetailDialog(QDialog):
             add_row("Döviz", m.currency.code)
             add_row("Kur", m.exchange_rate)
 
-        # Diğer
         if m.lot_number:
             add_row("Lot No", m.lot_number)
-
         if m.description:
             add_row("Açıklama", m.description)
-
         if m.created_by:
             add_row("Oluşturan ID", m.created_by)
 
-        # Kapat butonu
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.accept)
-        layout.addWidget(buttons)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btns.rejected.connect(self.accept)
+        layout.addWidget(btns)

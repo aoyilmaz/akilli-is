@@ -27,7 +27,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 
 from database.models.inventory import LocationType
-from config.styles import TEXT_SECONDARY, ERROR
+from config.icons import ICONS
+import qtawesome as qta
 
 
 class LocationManagementPage(QWidget):
@@ -51,7 +52,7 @@ class LocationManagementPage(QWidget):
 
         self.header = PageHeader(
             title="Lokasyon Yönetimi",
-            icon="📍",
+            icon="ph.map-pin",  # Explicit icon
             show_search=True,
             show_refresh=False,
             show_add=True,
@@ -67,9 +68,10 @@ class LocationManagementPage(QWidget):
         self.warehouse_combo.currentIndexChanged.connect(self.on_warehouse_changed)
 
         # Toplu oluştur butonu
-        self.bulk_btn = QPushButton("📦 Toplu Oluştur")
+        self.bulk_btn = QPushButton("Toplu Oluştur")
         self.bulk_btn.setProperty("class", "btn-secondary")
         self.bulk_btn.setFixedHeight(36)
+        self.bulk_btn.setIcon(qta.icon(ICONS.GRID, color="#475569"))
         self.bulk_btn.clicked.connect(self.bulk_create)
 
         # Header'a widget'ları ekle

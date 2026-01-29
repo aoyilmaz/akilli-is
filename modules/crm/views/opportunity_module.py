@@ -5,6 +5,7 @@ from modules.development import ErrorHandler
 from database.base import get_session
 from modules.crm.services import CRMService
 from database.models.crm import Lead, OpportunityStage
+from config.icons import ICONS
 
 
 class OpportunityModule(QWidget):
@@ -25,19 +26,14 @@ class OpportunityModule(QWidget):
 
         self.header = PageHeader(
             title="Fırsat Yönetimi",
-            icon="💰",
+            icon=ICONS.MONEY,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=True,
             add_text="Yeni Fırsat",
             parent=self,
         )
         self.header.add_clicked.connect(self._show_add_form)
-
-        # Toolbar'daki Yenile butonu yerine header refresh butonu
-        # PageHeader default refresh butonu yoksa layout'a ekleyebiliriz
-        # PageHeader constructor'da show_refresh=True yapsak daha temiz
-        self.header.show_refresh = True
         self.header.refresh_clicked.connect(self._load_data)
 
         layout.addWidget(self.header)
@@ -46,8 +42,6 @@ class OpportunityModule(QWidget):
 
         # Kanban Panosu
         self.board_page = OpportunityBoard()
-        # Board içindeki toolbar kaldırılacak, bu yüzden sinyalleri buraya değil header'a bağlıyoruz
-        # Ancak board page double click gibi sinyalleri korumalı
         self.board_page.add_clicked.connect(self._show_add_form)
         self.board_page.card_clicked.connect(self._show_edit_form)
         self.board_page.refresh_clicked.connect(self._load_data)
@@ -64,11 +58,6 @@ class OpportunityModule(QWidget):
             # Fırsatları çek
             opportunities = self.service.list_opportunities()
 
-            # Lead isimlerini de eklememiz lazım (Join yapmadık serviste basic list var)
-            # Service list_opportunities desc sırası ile Opportunity objeleri döner
-            # KanbanCard için lead_name veya customer_name lazım.
-            # Lazy loading loop'ta sorun olabilir ama MVP için yapalım.
-
             data = []
             for opp in opportunities:
                 d = opp.to_dict()
@@ -77,9 +66,6 @@ class OpportunityModule(QWidget):
                     d["lead_name"] = f"{opp.lead.first_name} {opp.lead.last_name}"
                 elif opp.customer:
                     d["customer_name"] = opp.customer.name
-
-                # to_dict status/stage value dönüyor, enum key değil.
-                # OpportunityBoard value'yu key'e çeviriyor.
                 data.append(d)
 
             self.board_page.load_data(data)
@@ -106,15 +92,6 @@ class OpportunityModule(QWidget):
             opp = self.service.get_opportunity(opp_id)
             if opp:
                 d = opp.to_dict()
-                # Stage enum name'i ekleyelim ki form doğru seçsin (form name bekliyor, data value dönüyor)
-                # Model'de stage column Enum(OpportunityStage). to_dict -> self.stage.value ("Yeni")
-                # Bizim Form findData(name) yapıyor, ama value ("Yeni") daha mantıklı user-facing için.
-                # Dur, Form koduna bak:
-                # idx = self.combo_stage.findData(stage_name) -> Data olarak Enum.name tutuyor.
-                # Opportunity modelinde stage bir Enum objesi döner Python'da.
-                # to_dict'te value alınıyor.
-
-                # Form'a enum name lazım:
                 if opp.stage:
                     d["stage_name"] = opp.stage.name  # Enum key (NEW, WON etc)
 
@@ -158,26 +135,8 @@ class OpportunityModule(QWidget):
         try:
             opp_id = data.pop("id", None)
 
-            # Enum Key -> Enum Value/Object conversion Service tarafından halledilmeli mi?
-            # Service create_opportunity(data) yapar, data içinde "stage" string key mi olmalı yoksa enum objesi mi?
-            # Service koduna bakmak lazım:
-            # opp = Opportunity(**data)
-            # SQLAlchemy Enum column, string key (veya enum objesi) kabul eder genelde ama
-            # model tanımında enum class verdik. SQLAlchemy string name 'NEW' kabul eder genelde.
-            # Biz formdan 'NEW' (name) gönderiyoruz (combo.currentData()).
-            # Sorun yok gibi.
-
             if opp_id:
                 self.service.update_opportunity_stage(opp_id, data["stage"])
-                # Update metodumuz sadece stage update için mi?
-                # Service'de update_opportunity genel metodu yok mu?
-                # Servis koduna bakmıştım: list_opportunities, update_opportunity_stage var.
-                # update_opportunity yok gibiydi. Kontrol etmem lazım.
-                # Eğer yoksa eklemeliyim.
-
-                # Geçici çözüm: Stage update ayrı, diğer fieldlar için generic update lazım.
-                # Şimdilik basic SQL update yapalım session ile service methodu yoksa.
-
                 from database.models.crm import Opportunity
 
                 opp = self.session.query(Opportunity).get(opp_id)
@@ -189,7 +148,6 @@ class OpportunityModule(QWidget):
                     opp.closing_date = data["closing_date"]
                     opp.description = data["description"]
                     opp.next_step = data["next_step"]
-                    # Stage'i ayrıca set et (Enum conversion)
                     if isinstance(data["stage"], str):
                         opp.stage = OpportunityStage[data["stage"]]
 
@@ -197,13 +155,6 @@ class OpportunityModule(QWidget):
                     QMessageBox.information(self, "Başarılı", "Fırsat güncellendi!")
 
             else:
-                # Create: Service create_opportunity
-                # data["stage"] string key 'NEW'.
-                # Service: opp = Opportunity(**data) -> stage='NEW' str -> Enum mapping automatic in SQLA?
-                # Genelde Enum(OpportunityStage) kullanıyorsak name string çalışır.
-
-                # Ancak service kodunu hatırlıyorum, create_opportunity basic **data pass ediyordu.
-                # Enum mapping hatası alabiliriz. Garanti olsun diye çevirelim.
                 if isinstance(data["stage"], str):
                     data["stage"] = OpportunityStage[data["stage"]]
 

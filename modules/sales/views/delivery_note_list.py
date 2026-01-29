@@ -12,9 +12,12 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
+    QLabel,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import qtawesome as qta
 
+from config.icons import ICONS
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -38,10 +41,10 @@ class DeliveryNoteListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "shipped": ("📦 Sevk Edildi", "#f59e0b"),
-        "delivered": ("✅ Teslim Edildi", "#10b981"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "shipped": ("Sevk Edildi", "#f59e0b"),
+        "delivered": ("Teslim Edildi", "#10b981"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     def __init__(self, parent=None):
@@ -58,7 +61,7 @@ class DeliveryNoteListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Teslimat İrsaliyeleri",
-            icon="🚚",
+            icon=ICONS.TRUCK,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -70,10 +73,10 @@ class DeliveryNoteListPage(QWidget):
         # Filtre
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("📦 Sevk Edildi", "shipped")
-        self.status_filter.addItem("✅ Teslim Edildi", "delivered")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Sevk Edildi", "shipped")
+        self.status_filter.addItem("Teslim Edildi", "delivered")
+        self.status_filter.addItem("İptal", "cancelled")
         self.status_filter.setMinimumWidth(160)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
 
@@ -89,10 +92,16 @@ class DeliveryNoteListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
-        self.stat_cards["shipped"] = MiniStatCard("📦 Sevk", "0", "#f59e0b")
-        self.stat_cards["delivered"] = MiniStatCard("✅ Teslim", "0", "#10b981")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVOICE
+        )
+        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
+        self.stat_cards["shipped"] = MiniStatCard(
+            "Sevk", "0", "warning", icon=ICONS.TRUCK
+        )
+        self.stat_cards["delivered"] = MiniStatCard(
+            "Teslim", "0", "success", icon=ICONS.CHECK
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -160,33 +169,24 @@ class DeliveryNoteListPage(QWidget):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "date":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(note.get("note_date"))),
-                )
+                dt = self._format_date(note.get("note_date"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "customer":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(note.get("customer_name", "") or "-")
-                )
+                name = note.get("customer_name", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(name))
 
             elif col_key == "order_no":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(note.get("order_no", "") or "-")
-                )
+                no = note.get("order_no", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(no))
 
             elif col_key == "items":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(str(note.get("total_items", 0)))
-                )
+                item_count = str(note.get("total_items", 0))
+                self.table.setItem(row, col_idx, QTableWidgetItem(item_count))
 
             elif col_key == "ship_date":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(note.get("ship_date"))),
-                )
+                dt = self._format_date(note.get("ship_date"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "status":
                 status = note.get("status", "draft")
@@ -196,8 +196,6 @@ class DeliveryNoteListPage(QWidget):
             elif col_key == "actions":
                 self._add_action_buttons(row, col_idx, note)
 
-        self.table.setRowHeight(row, 52)
-
     def _format_date(self, dt) -> str:
         if dt:
             if isinstance(dt, date):
@@ -206,74 +204,57 @@ class DeliveryNoteListPage(QWidget):
         return "-"
 
     def _add_action_buttons(self, row: int, col: int, note: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
         note_id = note.get("id")
         status = note.get("status", "draft")
 
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(
-            lambda checked, nid=note_id: self.view_clicked.emit(nid)
-        )
-        btn_layout.addWidget(view_btn)
+        actions = ["view"]
+        callbacks = {"view": lambda nid=note_id: self.view_clicked.emit(nid)}
 
         if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, nid=note_id: self.edit_clicked.emit(nid)
-            )
-            btn_layout.addWidget(edit_btn)
+            actions.append("edit")
+            callbacks["edit"] = lambda nid=note_id: self.edit_clicked.emit(nid)
 
-            ship_btn = QPushButton("📦")
-            ship_btn.setFixedSize(28, 26)
-            ship_btn.setToolTip("Sevk Et")
-            ship_btn.clicked.connect(
-                lambda checked, nid=note_id: self.ship_clicked.emit(nid)
-            )
-            btn_layout.addWidget(ship_btn)
+        widget = self.table.create_action_widget(note_id, actions, callbacks)
+        layout = widget.layout()
+
+        from ui.components.action_buttons import create_custom_button
+
+        if status == "draft":
+            ship_btn = create_custom_button(widget, ICONS.TRUCK, "Sevk Et", "warning")
+            ship_btn.clicked.connect(lambda nid=note_id: self.ship_clicked.emit(nid))
+            layout.insertWidget(layout.count() - 1, ship_btn)
 
         if status == "shipped":
-            complete_btn = QPushButton("✓")
-            complete_btn.setFixedSize(28, 26)
-            complete_btn.setToolTip("Teslim Et")
-            complete_btn.clicked.connect(
-                lambda checked, nid=note_id: self.complete_clicked.emit(nid)
+            complete_btn = create_custom_button(
+                widget, ICONS.CHECK, "Teslim Et", "success"
             )
-            btn_layout.addWidget(complete_btn)
+            complete_btn.clicked.connect(
+                lambda nid=note_id: self.complete_clicked.emit(nid)
+            )
+            layout.insertWidget(layout.count() - 1, complete_btn)
 
         if status == "delivered":
-            invoice_btn = QPushButton("📄")
-            invoice_btn.setFixedSize(28, 26)
-            invoice_btn.setToolTip("Fatura Oluştur")
-            invoice_btn.clicked.connect(
-                lambda checked, nid=note_id: self.create_invoice_clicked.emit(nid)
+            invoice_btn = create_custom_button(
+                widget, ICONS.INVOICE, "Fatura Oluştur", "info"
             )
-            btn_layout.addWidget(invoice_btn)
+            invoice_btn.clicked.connect(
+                lambda nid=note_id: self.create_invoice_clicked.emit(nid)
+            )
+            layout.insertWidget(layout.count() - 1, invoice_btn)
 
         if status in ["draft", "shipped"]:
-            cancel_btn = QPushButton("❌")
-            cancel_btn.setFixedSize(28, 26)
+            cancel_btn = create_custom_button(widget, ICONS.CLOSE, "İptal Et", "error")
             cancel_btn.clicked.connect(
-                lambda checked, nid=note_id: self.cancel_clicked.emit(nid)
+                lambda nid=note_id: self.cancel_clicked.emit(nid)
             )
-            btn_layout.addWidget(cancel_btn)
+            layout.insertWidget(layout.count() - 1, cancel_btn)
 
         if status == "draft":
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, nid=note_id: self._confirm_delete(nid)
-            )
-            btn_layout.addWidget(del_btn)
+            del_btn = create_custom_button(widget, ICONS.DELETE, "Sil", "error")
+            del_btn.clicked.connect(lambda nid=note_id: self._confirm_delete(nid))
+            layout.insertWidget(layout.count() - 1, del_btn)
 
-        self.table.setCellWidget(row, col, btn_widget)
+        self.table.setCellWidget(row, col, widget)
 
     def _update_stats(self):
         total = len(self.notes)
@@ -289,11 +270,12 @@ class DeliveryNoteListPage(QWidget):
     def _on_search(self, text: str):
         text = text.lower()
         for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(self.table.columnCount() - 1)
-            )
+            match = False
+            for col in range(self.table.columnCount() - 1):
+                item = self.table.item(row, col)
+                if item and text in item.text().lower():
+                    match = True
+                    break
             self.table.setRowHidden(row, not match)
 
     def _on_filter_changed(self):

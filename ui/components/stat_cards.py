@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 import qtawesome as qta
 from config.styles import TEXT_MUTED, STAT_COLORS, ACCENT
 
@@ -24,7 +24,9 @@ class MiniStatCard(QFrame):
     Global tema üzerinden stillendirilir (class="stat-card")
 
     Kullanım:
-        card = MiniStatCard("� Taslak", "5", "warning")
+        card = MiniStatCard(
+            title=title, value=value, color_type=color, icon=icon
+        )
     """
 
     COLOR_CLASSES = {
@@ -51,7 +53,8 @@ class MiniStatCard(QFrame):
         self._color_type = color_type
         self._orientation = orientation
         self._icon = icon
-        self._icon_color = icon_color or TEXT_MUTED
+        # Eger icon_color belirtilmemisse, color_type'a gore renklendir
+        self._icon_color = icon_color or STAT_COLORS.get(color_type, TEXT_MUTED)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -74,8 +77,8 @@ class MiniStatCard(QFrame):
             # Başlık
             title_label = QLabel(self._title)
             title_label.setProperty("class", "card-title")
-            # Horizontal modda başlık fontunu biraz daha küçük tutmak isteyebiliriz
-            # ama şimdilik standart bırakalım
+            # Horizontal modda başlık fontunu biraz daha küçük tutmak
+            # isteyebiliriz ama şimdilik standart bırakalım
             layout.addWidget(title_label)
 
             # Arada boşluk bırakmak istenirse:
@@ -84,7 +87,8 @@ class MiniStatCard(QFrame):
             # Değer
             self.value_label = QLabel(self._value)
             self.value_label.setProperty("class", "card-value")
-            # Yatay modda değerin fontu çok büyük olmamalı, CSS ile ayarlanabilir
+            # Yatay modda değerin fontu çok büyük olmamalı,
+            # CSS ile ayarlanabilir
             # ama biz renk sınıfını ekleyelim
             color_class = self.COLOR_CLASSES.get(self._color_type, "value-primary")
             self.value_label.setProperty("class", color_class)
@@ -92,8 +96,8 @@ class MiniStatCard(QFrame):
 
         else:
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(12, 10, 12, 10)  # Reduced padding
-            layout.setSpacing(4)  # Reduced spacing
+            layout.setContentsMargins(8, 6, 8, 6)
+            layout.setSpacing(2)
 
             # Başlık satırı (İkon + Title)
             h_layout = QHBoxLayout()
@@ -102,14 +106,17 @@ class MiniStatCard(QFrame):
 
             h_layout.addStretch()
 
-            if self._icon and self._icon.startswith("ph."):
+            if self._icon:
                 icon_lbl = QLabel()
-                # Rengi title rengine yakın yapalım
-                icon_lbl.setPixmap(
-                    qta.icon(self._icon, color=self._icon_color).pixmap(
-                        16, 16
-                    )  # Slightly smaller icon
-                )
+                if self._icon.startswith("ph."):
+                    icon_lbl.setPixmap(
+                        qta.icon(self._icon, color=self._icon_color).pixmap(
+                            16, 16
+                        )  # Slightly smaller icon
+                    )
+                else:
+                    icon_lbl.setText(self._icon)
+                    icon_lbl.setProperty("class", "card-icon-text")
                 h_layout.addWidget(icon_lbl)
 
             title_label = QLabel(self._title)
@@ -257,10 +264,8 @@ class ScrollableCardContainer(QScrollArea):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setMinimumWidth(
-            100
-        )  # Prevent window expansion logic from forcing wide width
-        self.setFixedHeight(100)  # Yeterli yükseklik
+        self.setMinimumWidth(100)  # Prevent window expansion logic
+        self.setFixedHeight(85)  # Yeterli yükseklik
 
         self.container = QWidget()
         self.layout = QHBoxLayout(self.container)

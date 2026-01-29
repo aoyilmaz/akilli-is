@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal, QTimer, Qt, QSize
 import qtawesome as qta
 from config.icons import ICONS
+from config.menu_data import MENU_DATA
 
 
 class PageHeader(QWidget):
@@ -91,6 +92,45 @@ class PageHeader(QWidget):
         search_placeholder,
         subtitle,
     ):
+        # Doğru ikonu MENU_DATA'dan bulmaya çalış (Fuzzy Matching)
+        best_match_icon = None
+        max_score = 0
+
+        # Unidecode veya basit normalizasyon için yardımcı fonksiyon
+        def normalize(text):
+            return text.lower().replace("İ", "i").replace("I", "ı").strip()
+
+        search_title = normalize(title)
+
+        for group in MENU_DATA.values():
+            for m_name, m_icon, m_id in group["items"]:
+                m_norm = normalize(m_name)
+                score = 0
+
+                # 1. Tam Eşleşme
+                if search_title == m_norm:
+                    score = 100
+
+                # 2. Menü öğesi başlıkta geçiyor (Örn: "Stok Kartları" başlık, "Kartlar" menü - pek olası değil)
+                #    Daha ziyade: "Stok Kategorileri" (Başlık) -> "Kategoriler" (Menü)
+                elif m_norm in search_title:
+                    score = 80 + len(m_norm)  # Uzun eşleşmeleri tercih et
+
+                # 3. Başlık menü öğesinde geçiyor (Örn: "Leads" başlık, "Aday Müşteriler (Leads)" menü)
+                elif search_title in m_norm:
+                    score = 60 + len(search_title)
+
+                if score > max_score:
+                    max_score = score
+                    best_match_icon = m_icon
+
+        # Eğer yeterince iyi bir eşleşme bulunduysa kullan
+        # Eşik değer: 50
+        resolved_icon = best_match_icon if max_score > 50 else icon
+
+        # Eğer özel bir icon bulunamadıysa ve parametre boşsa, varsayılan bir şeyler yapılabilir
+        # Ancak şimdilik bulunan iconu veya parametreyi kullanıyoruz.
+
         # Ana layout - margin olmadan
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -133,13 +173,15 @@ class PageHeader(QWidget):
             title_layout.setSpacing(0)
             title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-            if icon and icon.startswith("ph."):
+            if resolved_icon and resolved_icon.startswith("ph."):
                 h_title = QHBoxLayout()
                 h_title.setContentsMargins(0, 0, 0, 0)
                 h_title.setSpacing(8)
 
                 icon_lbl = QLabel()
-                icon_lbl.setPixmap(qta.icon(icon, color="#475569").pixmap(24, 24))
+                icon_lbl.setPixmap(
+                    qta.icon(resolved_icon, color="#475569").pixmap(24, 24)
+                )
                 h_title.addWidget(icon_lbl)
                 h_title.addWidget(self.title_label)
                 h_title.addStretch()
@@ -156,9 +198,11 @@ class PageHeader(QWidget):
 
             header_layout.addWidget(title_container)
         else:
-            if icon and icon.startswith("ph."):
+            if resolved_icon and resolved_icon.startswith("ph."):
                 icon_lbl = QLabel()
-                icon_lbl.setPixmap(qta.icon(icon, color="#475569").pixmap(24, 24))
+                icon_lbl.setPixmap(
+                    qta.icon(resolved_icon, color="#475569").pixmap(24, 24)
+                )
                 header_layout.addWidget(icon_lbl)
 
             header_layout.addWidget(self.title_label)

@@ -7,22 +7,16 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
     QComboBox,
-    QFrame,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
-from ui.components.stat_cards import MiniStatCard
 
-from config.styles import (
-    SUCCESS,
-    WARNING,
-    ERROR,
-)
+from config.icons import ICONS
+from ui.components.stat_cards import MiniStatCard
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class StockAgingPage(QWidget):
@@ -38,23 +32,16 @@ class StockAgingPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Stok Yaşlandırma",
-            icon="⏳",
+            icon=ICONS.TIME,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
-
-        # Filtre
         h_layout = self.header.header_layout()
-
         h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Depo:"))
         self.warehouse_combo = QComboBox()
@@ -62,163 +49,113 @@ class StockAgingPage(QWidget):
         self.warehouse_combo.setMinimumWidth(150)
         self.warehouse_combo.setFixedHeight(36)
         h_layout.addWidget(self.warehouse_combo)
-
         layout.addWidget(self.header)
 
-        # Yaşlandırma kartları
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        c_layout = QHBoxLayout()
+        c_layout.setSpacing(16)
+        self.cards = {
+            "0-30": MiniStatCard("0-30 Gün", "₺0", "success", icon=ICONS.TIME),
+            "31-60": MiniStatCard("31-60 Gün", "₺0", "warning", icon=ICONS.TIME),
+            "61-90": MiniStatCard("61-90 Gün", "₺0", "error", icon=ICONS.TIME),
+            "90+": MiniStatCard("90+ Gün", "₺0", "error", icon=ICONS.CLOSE),
+        }
+        for card in self.cards.values():
+            c_layout.addWidget(card)
+        layout.addLayout(c_layout)
 
-        self.fresh_card = self._create_card("0-30 Gün", "₺0", SUCCESS, "Yeni Stok")
-        cards_layout.addWidget(self.fresh_card)
-
-        self.normal_card = self._create_card("31-60 Gün", "₺0", WARNING, "Normal")
-        cards_layout.addWidget(self.normal_card)
-
-        self.slow_card = self._create_card(
-            "61-90 Gün", "₺0", "#f97316", "Yavaş Hareket"
-        )
-        cards_layout.addWidget(self.slow_card)
-
-        self.dead_card = self._create_card("90+ Gün", "₺0", ERROR, "Ölü Stok Riski")
-        cards_layout.addWidget(self.dead_card)
-
-        layout.addLayout(cards_layout)
-
-        # Tablo
-        self.table = QTableWidget()
-        self._setup_table(
-            self.table,
-            [
-                ("Yaş Grubu", 100),
-                ("Stok Kodu", 100),
-                ("Stok Adı", 200),
-                ("Depo", 120),
-                ("Miktar", 80),
-                ("Birim Maliyet", 110),
-                ("Toplam Değer", 120),
-                ("Gün Sayısı", 80),
-                ("Son Giriş", 100),
-            ],
+        cols = [
+            ColumnConfig("group", "Yaş Grubu", width=100),
+            ColumnConfig("code", "Stok Kodu", width=120),
+            ColumnConfig("name", "Stok Adı", stretch=True),
+            ColumnConfig("wh", "Depo", width=120),
+            ColumnConfig("qty", "Miktar", width=100),
+            ColumnConfig("cost", "Birim Maliyet", width=120),
+            ColumnConfig("val", "Toplam Değer", width=120),
+            ColumnConfig("days", "Gün", width=80),
+            ColumnConfig("last", "Son Giriş", width=110),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="report_stock_aging", columns=cols, parent=self
         )
         layout.addWidget(self.table)
 
-    def _create_card(
-        self, title: str, value: str, color: str, subtitle: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _setup_table(self, table: QTableWidget, columns: list):
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 2:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                table.setColumnWidth(i, width)
-
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
-
     def load_data(self, data: dict):
         groups = data.get("groups", {})
+        for k, card in self.cards.items():
+            g = groups.get(k, {})
+            card.update_value(f"₺{g.get('value', 0):,.2f}")
 
-        # Kartları güncelle
-        self._update_group_card(self.fresh_card, groups.get("0-30", {}))
-        self._update_group_card(self.normal_card, groups.get("31-60", {}))
-        self._update_group_card(self.slow_card, groups.get("61-90", {}))
-        self._update_group_card(self.dead_card, groups.get("90+", {}))
-
-        # Tüm ürünleri tabloya ekle
-        all_items = []
-        group_colors = {
-            "0-30": SUCCESS,
-            "31-60": WARNING,
+        all_items, clrs = [], {
+            "0-30": "#10b981",
+            "31-60": "#f59e0b",
             "61-90": "#f97316",
-            "90+": ERROR,
+            "90+": "#ef4444",
         }
-
-        for group_name, group_data in groups.items():
-            for item in group_data.get("items", []):
-                item["group"] = group_name
-                item["group_color"] = group_colors.get(group_name, "#ffffff")
+        for gname, gdata in groups.items():
+            for item in gdata.get("items", []):
+                item["group"] = gname
+                item["color"] = clrs.get(gname, "#ffffff")
                 all_items.append(item)
-
-        # Gün sayısına göre sırala (en eski en üstte)
         all_items.sort(key=lambda x: x.get("days_old", 0), reverse=True)
 
         self.table.setRowCount(len(all_items))
-        for row, item in enumerate(all_items):
-            group_item = QTableWidgetItem(item.get("group", ""))
-            group_item.setForeground(QColor(item.get("group_color", "#fff")))
-            self.table.setItem(row, 0, group_item)
+        vcols = self.table.get_visible_columns()
+        for r, itm in enumerate(all_items):
+            for c, key in enumerate(vcols):
+                if key == "group":
+                    it = QTableWidgetItem(itm.get("group", ""))
+                    it.setForeground(QColor(itm.get("color", "#fff")))
+                    self.table.setItem(r, c, it)
+                elif key == "code":
+                    self.table.setItem(r, c, QTableWidgetItem(itm.get("item_code", "")))
+                elif key == "name":
+                    self.table.setItem(r, c, QTableWidgetItem(itm.get("item_name", "")))
+                elif key == "wh":
+                    self.table.setItem(r, c, QTableWidgetItem(itm.get("warehouse", "")))
+                elif key == "qty":
+                    val = itm.get("quantity", 0)
+                    it = QTableWidgetItem(f"{val:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "cost":
+                    val = itm.get("unit_cost", 0)
+                    it = QTableWidgetItem(f"₺{val:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "val":
+                    val = itm.get("total_value", 0)
+                    it = QTableWidgetItem(f"₺{val:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "days":
+                    d = itm.get("days_old", 0)
+                    it = QTableWidgetItem(str(d))
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    if d > 90:
+                        it.setForeground(QColor("#ef4444"))
+                    self.table.setItem(r, c, it)
+                elif key == "last":
+                    last = itm.get("last_entry")
+                    lst = (
+                        last.strftime("%d.%m.%Y")
+                        if hasattr(last, "strftime")
+                        else (str(last)[:10] if last else "-")
+                    )
+                    self.table.setItem(r, c, QTableWidgetItem(lst))
 
-            self.table.setItem(row, 1, QTableWidgetItem(item.get("item_code", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(item.get("item_name", "")))
-            self.table.setItem(row, 3, QTableWidgetItem(item.get("warehouse", "")))
-
-            qty = item.get("quantity", 0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 4, qty_item)
-
-            cost = item.get("unit_cost", 0)
-            cost_item = QTableWidgetItem(f"₺{cost:,.2f}")
-            cost_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 5, cost_item)
-
-            total = item.get("total_value", 0)
-            total_item = QTableWidgetItem(f"₺{total:,.2f}")
-            total_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 6, total_item)
-
-            days = item.get("days_old", 0)
-            days_item = QTableWidgetItem(str(days))
-            days_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            if days > 90:
-                days_item.setForeground(QColor(ERROR))
-            self.table.setItem(row, 7, days_item)
-
-            last_entry = item.get("last_entry")
-            if last_entry:
-                if hasattr(last_entry, "strftime"):
-                    last_str = last_entry.strftime("%d.%m.%Y")
-                else:
-                    last_str = str(last_entry)[:10]
-            else:
-                last_str = "-"
-            self.table.setItem(row, 8, QTableWidgetItem(last_str))
-
-    def _update_group_card(self, card: QFrame, group_data: dict):
-        value = group_data.get("value", 0)
-        count = group_data.get("count", 0)
-
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(f"₺{value:,.2f}")
-
-        count_label = card.findChild(QLabel, "count")
-        if count_label:
-            count_label.setText(f"{count} ürün")
-
-    def load_warehouses(self, warehouses: list):
+    def load_warehouses(self, whs: list):
         self.warehouse_combo.clear()
         self.warehouse_combo.addItem("Tüm Depolar", None)
-        for wh in warehouses:
-            self.warehouse_combo.addItem(wh.name, wh.id)
+        for w in whs:
+            self.warehouse_combo.addItem(w.name, w.id)
 
     def get_warehouse_id(self):
         return self.warehouse_combo.currentData()

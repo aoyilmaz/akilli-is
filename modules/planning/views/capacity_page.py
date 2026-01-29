@@ -172,7 +172,7 @@ class CapacityAnalysisPage(QWidget):
 
         # === Header ===
         self.header = PageHeader(
-            title="Kapasite Analizi",
+            title="Kapasite Analizi (CRP)",
             icon=ICONS.PRODUCTION,
             show_search=False,
             show_refresh=False,
@@ -280,6 +280,28 @@ class CapacityAnalysisPage(QWidget):
 
         layout.addLayout(stats_layout)
 
+        # Bağlantılar
+        self.refresh_requested.connect(self.load_data)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._ensure_services()
+        self.load_data()
+
+    def _ensure_services(self):
+        """Servisleri yükle"""
+        if not self.wo_service:
+            try:
+                from modules.production.services import (
+                    WorkOrderService,
+                    WorkStationService,
+                )
+
+                self.wo_service = WorkOrderService()
+                self.ws_service = WorkStationService()
+            except Exception as e:
+                print(f"Servis yükleme hatası: {e}")
+
     def _create_legend_item(self, text, color_code):
         widget = QWidget()
         layout = QHBoxLayout(widget)
@@ -308,8 +330,10 @@ class CapacityAnalysisPage(QWidget):
     def load_data(self):
         """Verileri hesapla ve arayüzü güncelle"""
         if not self.wo_service or not self.ws_service:
-            self.chart.set_data([])
-            return
+            self._ensure_services()
+            if not self.wo_service or not self.ws_service:
+                self.chart.set_data([])
+                return
 
         try:
             stations = self.ws_service.get_all(active_only=True)

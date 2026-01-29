@@ -1,30 +1,27 @@
+"""
+Akıllı İş - Satış Raporları Sayfası
+"""
+
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
     QTabWidget,
     QDateEdit,
     QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from ui.components.stat_cards import MiniStatCard
 
-from config.styles import (
-    SUCCESS,
-    WARNING,
-    ACCENT,
-    # Diğerleri kullanılmıyorsa kaldırdım
-    ERROR,
-)
+from config.icons import ICONS
+from ui.components.stat_cards import MiniStatCard
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class SalesReportsPage(QWidget):
-    """Satis raporlari sayfasi"""
+    """Satış raporları sayfası"""
 
     refresh_requested = pyqtSignal()
 
@@ -36,23 +33,16 @@ class SalesReportsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Satış Raporları",
-            icon="📈",
+            icon=ICONS.CHART,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
-
-        # Filtreler
         h_layout = self.header.header_layout()
-
         h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Başlangıç:"))
         self.start_date = QDateEdit()
@@ -60,7 +50,6 @@ class SalesReportsPage(QWidget):
         self.start_date.setCalendarPopup(True)
         self.start_date.setFixedHeight(36)
         h_layout.addWidget(self.start_date)
-
         h_layout.addSpacing(8)
         h_layout.addWidget(QLabel("Bitiş:"))
         self.end_date = QDateEdit()
@@ -68,201 +57,180 @@ class SalesReportsPage(QWidget):
         self.end_date.setCalendarPopup(True)
         self.end_date.setFixedHeight(36)
         h_layout.addWidget(self.end_date)
-
         layout.addWidget(self.header)
 
-        # Ozet kartlar
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        c_layout = QHBoxLayout()
+        c_layout.setSpacing(12)
+        self.cards = {
+            "val": MiniStatCard("Toplam Satış", "₺0,00", "success", icon=ICONS.MONEY),
+            "cnt": MiniStatCard("Fatura Sayısı", "0", "info", icon=ICONS.INVOICE),
+            "cus": MiniStatCard("Aktif Müşteri", "0", "warning", icon=ICONS.USER),
+            "avg": MiniStatCard("Ort. Sipariş", "₺0,00", "info", icon=ICONS.MONEY),
+        }
+        for card in self.cards.values():
+            c_layout.addWidget(card)
+        layout.addLayout(c_layout)
 
-        self.total_sales_card = self._create_card("Toplam Satis", "0.00", SUCCESS)
-        cards_layout.addWidget(self.total_sales_card)
+        self.tabs = QTabWidget()
+        self._setup_customer_tab()
+        self._setup_product_tab()
+        self._setup_period_tab()
+        layout.addWidget(self.tabs)
 
-        self.invoice_count_card = self._create_card("Fatura Sayisi", "0", ACCENT)
-        cards_layout.addWidget(self.invoice_count_card)
-
-        self.customer_count_card = self._create_card("Aktif Musteri", "0", WARNING)
-        cards_layout.addWidget(self.customer_count_card)
-
-        self.avg_order_card = self._create_card("Ort. Siparis", "0.00", "#5e3b8e")
-        cards_layout.addWidget(self.avg_order_card)
-
-        layout.addLayout(cards_layout)
-
-        # Tab Widget
-        tabs = QTabWidget()
-        tabs.addTab(self._create_customer_tab(), "Musteri Bazli")
-        tabs.addTab(self._create_product_tab(), "Urun Bazli")
-        tabs.addTab(self._create_period_tab(), "Donemsel")
-
-        layout.addWidget(tabs)
-
-    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _create_customer_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 16, 0, 0)
-
-        self.customer_table = QTableWidget()
-        self._setup_table(
-            self.customer_table,
-            [
-                ("Musteri Kodu", 120),
-                ("Musteri Adi", 250),
-                ("Fatura Sayisi", 100),
-                ("Toplam Satis", 150),
-                ("Son Fatura", 120),
-            ],
+    def _setup_customer_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(0, 16, 0, 0)
+        cols = [
+            ColumnConfig("code", "Müşteri Kodu", width=120),
+            ColumnConfig("name", "Müşteri Adı", stretch=True),
+            ColumnConfig("count", "Fatura Sayısı", width=120),
+            ColumnConfig("val", "Toplam Satış", width=150),
+            ColumnConfig("last", "Son Fatura", width=120),
+        ]
+        self.customer_table = EnhancedTableWidget(
+            table_id="report_sales_customer", columns=cols, parent=tab
         )
-        layout.addWidget(self.customer_table)
+        l.addWidget(self.customer_table)
+        self.tabs.addTab(tab, "Müşteri Bazlı")
 
-        return widget
-
-    def _create_product_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 16, 0, 0)
-
-        self.product_table = QTableWidget()
-        self._setup_table(
-            self.product_table,
-            [
-                ("Urun Kodu", 120),
-                ("Urun Adi", 250),
-                ("Satis Adedi", 100),
-                ("Toplam Ciro", 150),
-                ("Islem Sayisi", 100),
-            ],
+    def _setup_product_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(0, 16, 0, 0)
+        cols = [
+            ColumnConfig("code", "Ürün Kodu", width=120),
+            ColumnConfig("name", "Ürün Adı", stretch=True),
+            ColumnConfig("qty", "Satış Adedi", width=120),
+            ColumnConfig("val", "Toplam Ciro", width=150),
+            ColumnConfig("cnt", "İşlem Sayısı", width=120),
+        ]
+        self.product_table = EnhancedTableWidget(
+            table_id="report_sales_product", columns=cols, parent=tab
         )
-        layout.addWidget(self.product_table)
+        l.addWidget(self.product_table)
+        self.tabs.addTab(tab, "Ürün Bazlı")
 
-        return widget
-
-    def _create_period_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 16, 0, 0)
-
-        # Periyod secimi
-        period_layout = QHBoxLayout()
-        lbl = QLabel("Periyod:")
-        period_layout.addWidget(lbl)
+    def _setup_period_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(0, 16, 0, 0)
+        pl = QHBoxLayout()
+        pl.addWidget(QLabel("Periyot:"))
         self.period_combo = QComboBox()
-        self.period_combo.addItem("Gunluk", "daily")
-        self.period_combo.addItem("Haftalik", "weekly")
-        self.period_combo.addItem("Aylik", "monthly")
+        for lbl, val in [
+            ("Günlük", "daily"),
+            ("Haftalık", "weekly"),
+            ("Aylık", "monthly"),
+        ]:
+            self.period_combo.addItem(lbl, val)
         self.period_combo.setCurrentIndex(2)
-        period_layout.addWidget(self.period_combo)
-        period_layout.addStretch()
-        layout.addLayout(period_layout)
-
-        self.period_table = QTableWidget()
-        self._setup_table(
-            self.period_table,
-            [
-                ("Donem", 150),
-                ("Fatura Sayisi", 120),
-                ("Toplam Satis", 150),
-            ],
+        pl.addWidget(self.period_combo)
+        pl.addStretch()
+        l.addLayout(pl)
+        cols = [
+            ColumnConfig("period", "Dönem", stretch=True),
+            ColumnConfig("cnt", "Fatura Sayısı", width=150),
+            ColumnConfig("val", "Toplam Satış", width=180),
+        ]
+        self.period_table = EnhancedTableWidget(
+            table_id="report_sales_period", columns=cols, parent=tab
         )
-        layout.addWidget(self.period_table)
-
-        return widget
-
-    def _setup_table(self, table: QTableWidget, columns: list):
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                table.setColumnWidth(i, width)
-
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
+        l.addWidget(self.period_table)
+        self.tabs.addTab(tab, "Dönemsel")
 
     def load_customer_data(self, data: list):
         self.customer_table.setRowCount(len(data))
-        for row, item in enumerate(data):
-            self.customer_table.setItem(row, 0, QTableWidgetItem(item.get("code", "")))
-            self.customer_table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-
-            count_item = QTableWidgetItem(str(item.get("invoice_count", 0)))
-            count_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.customer_table.setItem(row, 2, count_item)
-
-            amount = item.get("total_amount", 0)
-            amount_item = QTableWidgetItem(f"{amount:,.2f}")
-            amount_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.customer_table.setItem(row, 3, amount_item)
-
-            last_inv = item.get("last_invoice")
-            last_str = last_inv.strftime("%d.%m.%Y") if last_inv else "-"
-            self.customer_table.setItem(row, 4, QTableWidgetItem(last_str))
+        vcols = self.customer_table.get_visible_columns()
+        for r, itm in enumerate(data):
+            for c, key in enumerate(vcols):
+                if key == "code":
+                    self.customer_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("code", ""))
+                    )
+                elif key == "name":
+                    self.customer_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("name", ""))
+                    )
+                elif key == "count":
+                    it = QTableWidgetItem(str(itm.get("invoice_count", 0)))
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.customer_table.setItem(r, c, it)
+                elif key == "val":
+                    it = QTableWidgetItem(f"₺{itm.get('total_amount', 0):,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.customer_table.setItem(r, c, it)
+                elif key == "last":
+                    last = itm.get("last_invoice")
+                    self.customer_table.setItem(
+                        r,
+                        c,
+                        QTableWidgetItem(last.strftime("%d.%m.%Y") if last else "-"),
+                    )
 
     def load_product_data(self, data: list):
         self.product_table.setRowCount(len(data))
-        for row, item in enumerate(data):
-            self.product_table.setItem(row, 0, QTableWidgetItem(item.get("code", "")))
-            self.product_table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-
-            qty = item.get("total_qty", 0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.product_table.setItem(row, 2, qty_item)
-
-            amount = item.get("total_amount", 0)
-            amount_item = QTableWidgetItem(f"{amount:,.2f}")
-            amount_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.product_table.setItem(row, 3, amount_item)
-
-            count_item = QTableWidgetItem(str(item.get("sale_count", 0)))
-            count_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.product_table.setItem(row, 4, count_item)
+        vcols = self.product_table.get_visible_columns()
+        for r, itm in enumerate(data):
+            for c, key in enumerate(vcols):
+                if key == "code":
+                    self.product_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("code", ""))
+                    )
+                elif key == "name":
+                    self.product_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("name", ""))
+                    )
+                elif key == "qty":
+                    it = QTableWidgetItem(f"{itm.get('total_qty', 0):,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "val":
+                    it = QTableWidgetItem(f"₺{itm.get('total_amount', 0):,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "cnt":
+                    it = QTableWidgetItem(str(itm.get("sale_count", 0)))
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
 
     def load_period_data(self, data: list):
         self.period_table.setRowCount(len(data))
-        for row, item in enumerate(data):
-            self.period_table.setItem(row, 0, QTableWidgetItem(item.get("period", "")))
-
-            count_item = QTableWidgetItem(str(item.get("invoice_count", 0)))
-            count_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.period_table.setItem(row, 1, count_item)
-
-            amount = item.get("total_amount", 0)
-            amount_item = QTableWidgetItem(f"{amount:,.2f}")
-            amount_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.period_table.setItem(row, 2, amount_item)
+        vcols = self.period_table.get_visible_columns()
+        for r, itm in enumerate(data):
+            for c, key in enumerate(vcols):
+                if key == "period":
+                    self.period_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("period", ""))
+                    )
+                elif key == "cnt":
+                    it = QTableWidgetItem(str(itm.get("invoice_count", 0)))
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.period_table.setItem(r, c, it)
+                elif key == "val":
+                    it = QTableWidgetItem(f"₺{itm.get('total_amount', 0):,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.period_table.setItem(r, c, it)
 
     def update_summary(self, total: float, count: int, customers: int, avg: float):
-        self._update_card(self.total_sales_card, f"{total:,.2f}")
-        self._update_card(self.invoice_count_card, str(count))
-        self._update_card(self.customer_count_card, str(customers))
-        self._update_card(self.avg_order_card, f"{avg:,.2f}")
-
-    def _update_card(self, card: MiniStatCard, value: str):
-        card.update_value(value)
+        self.cards["val"].update_value(f"₺{total:,.2f}")
+        self.cards["cnt"].update_value(str(count))
+        self.cards["cus"].update_value(str(customers))
+        self.cards["avg"].update_value(f"₺{avg:,.2f}")
 
     def get_date_range(self):
         return (self.start_date.date().toPyDate(), self.end_date.date().toPyDate())

@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QVBoxLayout,
-    QPushButton,
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
@@ -43,12 +42,12 @@ class InvoiceListPage(QWidget):
 
     # Durum etiketleri
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "issued": ("📤 Kesildi", "#3b82f6"),
-        "partial_paid": ("🟡 Kısmi Ödendi", "#f59e0b"),
-        "paid": ("🟢 Ödendi", "#10b981"),
-        "overdue": ("🔴 Vadesi Geçti", "#ef4444"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "issued": ("Kesildi", "#3b82f6"),
+        "partial_paid": ("Kısmi Ödendi", "#f59e0b"),
+        "paid": ("Ödendi", "#10b981"),
+        "overdue": ("Vadesi Geçti", "#ef4444"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     def __init__(self, parent=None):
@@ -78,12 +77,12 @@ class InvoiceListPage(QWidget):
         # Filtreyi header'a ekle (search'ten önce)
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("📤 Kesildi", "issued")
-        self.status_filter.addItem("🟡 Kısmi Ödendi", "partial_paid")
-        self.status_filter.addItem("🟢 Ödendi", "paid")
-        self.status_filter.addItem("🔴 Vadesi Geçti", "overdue")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Kesildi", "issued")
+        self.status_filter.addItem("Kısmi Ödendi", "partial_paid")
+        self.status_filter.addItem("Ödendi", "paid")
+        self.status_filter.addItem("Vadesi Geçti", "overdue")
+        self.status_filter.addItem("İptal", "cancelled")
         self.status_filter.setMinimumWidth(160)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
 
@@ -101,19 +100,27 @@ class InvoiceListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVOICE
+        )
         stats_layout.addWidget(self.stat_cards["total"])
 
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
+        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
         stats_layout.addWidget(self.stat_cards["draft"])
 
-        self.stat_cards["issued"] = MiniStatCard("📤 Kesildi", "0", "#3b82f6")
+        self.stat_cards["issued"] = MiniStatCard(
+            "Kesildi", "0", "primary", icon=ICONS.EXPORT
+        )
         stats_layout.addWidget(self.stat_cards["issued"])
 
-        self.stat_cards["paid"] = MiniStatCard("🟢 Ödendi", "0", "#10b981")
+        self.stat_cards["paid"] = MiniStatCard(
+            "Ödendi", "0", "success", icon=ICONS.CHECK
+        )
         stats_layout.addWidget(self.stat_cards["paid"])
 
-        self.stat_cards["overdue"] = MiniStatCard("🔴 Vadesi Geçti", "0", "#ef4444")
+        self.stat_cards["overdue"] = MiniStatCard(
+            "Vadesi Geçti", "0", "error", icon=ICONS.DANGER
+        )
         stats_layout.addWidget(self.stat_cards["overdue"])
 
         stats_layout.addStretch()
@@ -144,6 +151,7 @@ class InvoiceListPage(QWidget):
             columns=columns,
             parent=self,
         )
+        self.table.set_standard_row_height(48)
         layout.addWidget(self.table)
 
     def _connect_signals(self):
@@ -228,8 +236,6 @@ class InvoiceListPage(QWidget):
             elif col_key == "actions":
                 self._add_action_buttons(row, col_idx, inv)
 
-        self.table.setRowHeight(row, 52)
-
     def _format_date(self, dt) -> str:
         """Tarihi formatla"""
         if dt:
@@ -240,73 +246,63 @@ class InvoiceListPage(QWidget):
 
     def _add_action_buttons(self, row: int, col: int, inv: dict):
         """İşlem butonlarını ekle"""
+        from ui.components.action_buttons import (
+            create_view_button,
+            create_edit_button,
+            create_delete_button,
+            create_cancel_button,
+            create_custom_button,
+        )
+
         btn_widget = QWidget()
         btn_widget.setProperty("class", "action-button-group")
         btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
+        btn_layout.setContentsMargins(4, 2, 4, 2)
+        btn_layout.setSpacing(4)
 
         inv_id = inv.get("id")
         status = inv.get("status", "draft")
 
         # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.setToolTip("Görüntüle")
-        view_btn.clicked.connect(
-            lambda checked, iid=inv_id: self.view_clicked.emit(iid)
-        )
+        view_btn = create_view_button(btn_widget)
+        view_btn.clicked.connect(lambda: self.view_clicked.emit(inv_id))
         btn_layout.addWidget(view_btn)
 
         # Düzenle (sadece taslak)
         if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.setToolTip("Düzenle")
-            edit_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.edit_clicked.emit(iid)
-            )
+            edit_btn = create_edit_button(btn_widget)
+            edit_btn.clicked.connect(lambda: self.edit_clicked.emit(inv_id))
             btn_layout.addWidget(edit_btn)
 
-            # Fatura Kes
-            issue_btn = QPushButton("📤")
-            issue_btn.setFixedSize(28, 26)
-            issue_btn.setToolTip("Fatura Kes")
-            issue_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.issue_clicked.emit(iid)
+            # Fatura Kes (Custom)
+            issue_btn = create_custom_button(
+                btn_widget, ICONS.EXPORT, "Fatura Kes", "success"
             )
+            issue_btn.clicked.connect(lambda: self.issue_clicked.emit(inv_id))
             btn_layout.addWidget(issue_btn)
 
-        # Ödeme Kaydet
+        # Ödeme Kaydet (Custom)
         if status in ["issued", "partial_paid", "overdue"]:
-            pay_btn = QPushButton("💳")
-            pay_btn.setFixedSize(28, 26)
-            pay_btn.setToolTip("Ödeme Kaydet")
-            pay_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.payment_clicked.emit(iid)
+            pay_btn = create_custom_button(
+                btn_widget, ICONS.PAYMENT, "Ödeme Kaydet", "warning"
             )
+            pay_btn.clicked.connect(lambda: self.payment_clicked.emit(inv_id))
             btn_layout.addWidget(pay_btn)
 
         # İptal
         if status in ["draft", "issued"]:
-            cancel_btn = QPushButton("❌")
-            cancel_btn.setFixedSize(28, 26)
-            cancel_btn.setToolTip("İptal Et")
-            cancel_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.cancel_clicked.emit(iid)
-            )
+            cancel_btn = create_cancel_button(btn_widget)
+            cancel_btn.setToolTip("İptal Et")  # Override tooltip if needed
+            cancel_btn.clicked.connect(lambda: self.cancel_clicked.emit(inv_id))
             btn_layout.addWidget(cancel_btn)
 
         # Sil (sadece taslak)
         if status == "draft":
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.setToolTip("Sil")
-            del_btn.clicked.connect(
-                lambda checked, iid=inv_id: self._confirm_delete(iid)
-            )
+            del_btn = create_delete_button(btn_widget)
+            del_btn.clicked.connect(lambda: self._confirm_delete(inv_id))
             btn_layout.addWidget(del_btn)
 
+        btn_layout.addStretch()
         self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):

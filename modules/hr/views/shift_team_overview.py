@@ -7,51 +7,17 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QTabWidget,
-    QFrame,
-    QGridLayout,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
+import qtawesome as qta
 
-from config.themes import get_theme, ThemeManager
+from config.icons import ICONS
 from modules.hr.services import HRService
-
-
-class StatCard(QFrame):
-    """İstatistik kartı widget'ı"""
-
-    def __init__(self, title: str, value: str, color: str = "#6366f1"):
-        super().__init__()
-        self.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {color}20;
-                border: 1px solid {color}40;
-                border-radius: 8px;
-                padding: 12px;
-            }}
-        """
-        )
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {color}; font-size: 11px;")
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setStyleSheet(
-            f"color: {color}; font-size: 24px; font-weight: bold;"
-        )
-        layout.addWidget(value_label)
+from ui.components.page_header import PageHeader
+from ui.components.stat_cards import MiniStatCard
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class TeamTab(QWidget):
@@ -59,107 +25,97 @@ class TeamTab(QWidget):
 
     def __init__(self, team, employees, parent=None):
         super().__init__(parent)
-        self.team = team
-        self.employees = employees
+        self.team, self.employees = team, employees
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
+        c_layout = QHBoxLayout()
+        c_layout.setSpacing(12)
+        tot = len(self.employees)
+        mal = sum(1 for e in self.employees if str(e.gender) == "Gender.MALE")
+        fem = tot - mal
+        c_layout.addWidget(MiniStatCard("Toplam", str(tot), "info", icon=ICONS.USER))
+        c_layout.addWidget(MiniStatCard("Erkek", str(mal), "info", icon=ICONS.USER))
+        c_layout.addWidget(MiniStatCard("Kadın", str(fem), "warning", icon=ICONS.USER))
+        c_layout.addStretch()
+        layout.addLayout(c_layout)
 
-        # Özet kartları
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        poss = {}
+        for e in self.employees:
+            pn = e.position.name if e.position else "Belirsiz"
+            if pn not in poss:
+                poss[pn] = []
+            poss[pn].append(e)
 
-        total = len(self.employees)
-        male_count = sum(1 for e in self.employees if str(e.gender) == "Gender.MALE")
-        female_count = sum(
-            1 for e in self.employees if str(e.gender) == "Gender.FEMALE"
-        )
-
-        cards_layout.addWidget(StatCard("Toplam", str(total), "#6366f1"))
-        cards_layout.addWidget(StatCard("👨 Erkek", str(male_count), "#3b82f6"))
-        cards_layout.addWidget(StatCard("👩 Kadın", str(female_count), "#ec4899"))
-        cards_layout.addStretch()
-
-        layout.addLayout(cards_layout)
-
-        # Pozisyon dağılımı
-        positions = {}
-        for emp in self.employees:
-            pos_name = emp.position.name if emp.position else "Belirsiz"
-            if pos_name not in positions:
-                positions[pos_name] = []
-            positions[pos_name].append(emp)
-
-        # Pozisyon kartları
-        pos_layout = QHBoxLayout()
-        pos_layout.setSpacing(12)
-
-        # Renk paleti
-        colors = ["#f59e0b", "#10b981", "#8b5cf6", "#ef4444", "#06b6d4", "#84cc16"]
-
-        for idx, (pos_name, pos_emps) in enumerate(
-            sorted(positions.items(), key=lambda x: len(x[1]), reverse=True)
+        p_layout = QHBoxLayout()
+        p_layout.setSpacing(12)
+        cols = ["info", "success", "warning", "error"]
+        for i, (pn, pes) in enumerate(
+            sorted(poss.items(), key=lambda x: len(x[1]), reverse=True)[:4]
         ):
-            color = colors[idx % len(colors)]
-            card = StatCard(pos_name, str(len(pos_emps)), color)
-            pos_layout.addWidget(card)
+            p_layout.addWidget(
+                MiniStatCard(pn, str(len(pes)), cols[i % 4], icon=ICONS.LIST)
+            )
+        p_layout.addStretch()
+        layout.addLayout(p_layout)
 
-        pos_layout.addStretch()
-        layout.addLayout(pos_layout)
-
-        # Çalışan tablosu
-        table_label = QLabel("📋 Ekip Üyeleri")
-        table_label.setFont(QFont("", 12, QFont.Weight.Bold))
-        layout.addWidget(table_label)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Ad Soyad", "Pozisyon", "Departman", "Cinsiyet", "Telefon"]
+        l = QLabel("Ekip Üyeleri")
+        l.setFont(QFont("", 12, QFont.Weight.Bold))
+        layout.addWidget(l)
+        tab_cols = [
+            ColumnConfig("name", "Ad Soyad", stretch=True),
+            ColumnConfig("pos", "Pozisyon", width=150),
+            ColumnConfig("dept", "Departman", width=150),
+            ColumnConfig("gen", "Cinsiyet", width=100),
+            ColumnConfig("tel", "Telefon", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id=f"hr_team_{self.team.id if self.team else 'un'}",
+            columns=tab_cols,
+            parent=self,
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setAlternatingRowColors(True)
-
         self._load_table()
         layout.addWidget(self.table)
 
     def _load_table(self):
-        """Tabloyu doldur"""
         self.table.setRowCount(len(self.employees))
-
-        for row, emp in enumerate(
+        vcols = self.table.get_visible_columns()
+        for i, e in enumerate(
             sorted(
                 self.employees,
-                key=lambda e: (e.position.name if e.position else "ZZZ", e.full_name),
+                key=lambda x: (x.position.name if x.position else "ZZZ", x.full_name),
             )
         ):
-            # Ad Soyad
-            name_item = QTableWidgetItem(emp.full_name)
-            name_item.setForeground(QColor("#818cf8"))
-            self.table.setItem(row, 0, name_item)
-
-            # Pozisyon
-            pos_name = emp.position.name if emp.position else "-"
-            self.table.setItem(row, 1, QTableWidgetItem(pos_name))
-
-            # Departman
-            dept_name = emp.department.name if emp.department else "-"
-            self.table.setItem(row, 2, QTableWidgetItem(dept_name))
-
-            # Cinsiyet
-            gender = "Erkek" if str(emp.gender) == "Gender.MALE" else "Kadın"
-            self.table.setItem(row, 3, QTableWidgetItem(gender))
-
-            # Telefon
-            phone = emp.phone or emp.mobile or "-"
-            self.table.setItem(row, 4, QTableWidgetItem(phone))
+            for c, key in enumerate(vcols):
+                if key == "name":
+                    it = QTableWidgetItem(e.full_name)
+                    it.setForeground(QColor("#818cf8"))
+                    self.table.setItem(i, c, it)
+                elif key == "pos":
+                    self.table.setItem(
+                        i, c, QTableWidgetItem(e.position.name if e.position else "-")
+                    )
+                elif key == "dept":
+                    self.table.setItem(
+                        i,
+                        c,
+                        QTableWidgetItem(e.department.name if e.department else "-"),
+                    )
+                elif key == "gen":
+                    self.table.setItem(
+                        i,
+                        c,
+                        QTableWidgetItem(
+                            "Erkek" if str(e.gender) == "Gender.MALE" else "Kadın"
+                        ),
+                    )
+                elif key == "tel":
+                    self.table.setItem(
+                        i, c, QTableWidgetItem(e.phone or e.mobile or "-")
+                    )
 
 
 class ShiftTeamOverview(QWidget):
@@ -169,35 +125,25 @@ class ShiftTeamOverview(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.service = HRService()
-        self.team_service = None
+        self.service, self.team_service = HRService(), None
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Vardiya Ekipleri",
-            icon="👥",
+            icon=ICONS.USER,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self._load_data)
-
         layout.addWidget(self.header)
-
-        # Tab widget - her ekip için bir sekme
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
-
-        # Özet
         self.summary_label = QLabel()
         h_layout = self.header.header_layout()
         h_layout.addStretch()
@@ -214,45 +160,28 @@ class ShiftTeamOverview(QWidget):
                 from modules.production.calendar_services import ShiftTeamService
 
                 self.team_service = ShiftTeamService()
-            except Exception as e:
-                print(f"Servis yükleme hatası: {e}")
+            except:
+                pass
 
     def _load_data(self):
-        """Verileri yükle"""
         self.tabs.clear()
-
         if not self.team_service:
             return
-
         try:
-            teams = self.team_service.get_all()
-            employees = self.service.get_all_employees(limit=1000)
-
-            total_assigned = 0
-
-            for team in teams:
-                team_employees = [e for e in employees if e.shift_team_id == team.id]
-                total_assigned += len(team_employees)
-
-                # Sekme oluştur
-                tab = TeamTab(team, team_employees)
-                icon = "🔵" if team.code == "A" else "🟢" if team.code == "B" else "🟡"
-                self.tabs.addTab(
-                    tab, f"{icon} {team.code} Ekibi ({len(team_employees)})"
-                )
-
-            # Atanmamış çalışanlar
-            unassigned = [e for e in employees if not e.shift_team_id]
-            if unassigned:
-                tab = TeamTab(None, unassigned)
-                self.tabs.addTab(tab, f"⚪ Atanmamış ({len(unassigned)})")
-
-            self.summary_label.setText(
-                f"Toplam: {len(employees)} çalışan, "
-                f"{total_assigned} ekip atanmış, "
-                f"{len(unassigned)} atanmamış"
+            teams, emps = self.team_service.get_all(), self.service.get_all_employees(
+                limit=1000
             )
-
+            total_a = 0
+            for t in teams:
+                tes = [e for e in emps if e.shift_team_id == t.id]
+                total_a += len(tes)
+                self.tabs.addTab(TeamTab(t, tes), f"{t.code} Ekibi ({len(tes)})")
+            un = [e for e in emps if not e.shift_team_id]
+            if un:
+                self.tabs.addTab(TeamTab(None, un), f"Atanmamış ({len(un)})")
+            self.summary_label.setText(
+                f"Toplam: {len(emps)} çalışan, {total_a} ekip atanmış, {len(un)} atanmamış"
+            )
         except Exception as e:
             print(f"Vardiya ekibi yükleme hatası: {e}")
 

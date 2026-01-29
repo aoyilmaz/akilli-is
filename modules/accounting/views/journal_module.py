@@ -10,10 +10,13 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
 )
-from config.styles import get_button_style, BTN_HEIGHT_NORMAL, ICONS
+import qtawesome as qta
+
+from config.icons import ICONS
 from modules.accounting.services import AccountingService
 from modules.accounting.views.journal_list import JournalListWidget
 from modules.accounting.views.journal_form import JournalFormDialog
+from ui.components.page_header import PageHeader
 
 
 class JournalModule(QWidget):
@@ -32,12 +35,10 @@ class JournalModule(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header - PageHeader kullanarak
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Yevmiye Fişleri",
-            icon="📝",
+            icon=ICONS.INVOICE,
             show_search=False,
             show_refresh=True,
             show_add=True,
@@ -46,7 +47,6 @@ class JournalModule(QWidget):
         )
         self.header.refresh_clicked.connect(self.load_data)
         self.header.add_clicked.connect(self._new_journal)
-
         layout.addWidget(self.header)
 
         # Liste
@@ -57,21 +57,21 @@ class JournalModule(QWidget):
 
         # Alt butonlar
         footer = QHBoxLayout()
-
-        post_btn = QPushButton(f"{ICONS['confirm']} Deftere İşle")
-        post_btn.setStyleSheet(get_button_style("confirm"))
-        post_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        post_btn = QPushButton("Deftere İşle")
+        post_btn.setIcon(qta.icon(ICONS.CHECK, color="#ffffff"))
+        post_btn.setProperty("class", "btn-primary")
+        post_btn.setFixedHeight(36)
         post_btn.clicked.connect(self._post_journal)
         footer.addWidget(post_btn)
 
-        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal Et")
-        cancel_btn.setStyleSheet(get_button_style("danger"))
-        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        cancel_btn = QPushButton("İptal Et")
+        cancel_btn.setIcon(qta.icon(ICONS.CLOSE, color="#ffffff"))
+        cancel_btn.setProperty("class", "btn-danger")
+        cancel_btn.setFixedHeight(36)
         cancel_btn.clicked.connect(self._cancel_journal)
         footer.addWidget(cancel_btn)
 
         footer.addStretch()
-
         layout.addLayout(footer)
 
     def _get_service(self):
@@ -117,11 +117,11 @@ class JournalModule(QWidget):
             QMessageBox.warning(self, "Uyarı", "Bir yevmiye seçin!")
             return
 
+        msg = "Seçili yevmiye fişi deftere işlenecek.\n\nİşlendikten sonra değiştirilemez. Devam edilsin mi?"
         reply = QMessageBox.question(
             self,
             "Onay",
-            "Seçili yevmiye fişi deftere işlenecek.\n\n"
-            "İşlendikten sonra değiştirilemez. Devam edilsin mi?",
+            msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
@@ -145,10 +145,11 @@ class JournalModule(QWidget):
             QMessageBox.warning(self, "Uyarı", "Bir yevmiye seçin!")
             return
 
+        msg = "Seçili yevmiye fişi iptal edilecek.\n\nDevam edilsin mi?"
         reply = QMessageBox.question(
             self,
             "Onay",
-            "Seçili yevmiye fişi iptal edilecek.\n\nDevam edilsin mi?",
+            msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 

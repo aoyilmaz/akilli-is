@@ -4,22 +4,14 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QPushButton,
     QTableWidgetItem,
-    QApplication,
-    QStyle,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import Qt
 
 from config.icons import ICONS
 from ui.components import (
     BaseListPage,
     ColumnConfig,
-    create_view_button,
-    create_edit_button,
-    create_delete_button,
 )
 
 
@@ -75,10 +67,10 @@ class CustomerListPage(BaseListPage):
 
     def _setup_stat_cards(self):
         """İstatistik kartlarını oluştur"""
-        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
-        self.add_stat_card("active", "Aktif", "0", "#10b981", "✅")
-        self.add_stat_card("with_orders", "Siparişli", "0", "#f59e0b", "🛒")
-        self.add_stat_card("credit", "Toplam Limit", "₺0", "#3b82f6", "💳")
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.USERS)
+        self.add_stat_card("active", "Aktif", "0", "success", ICONS.CHECK)
+        self.add_stat_card("with_orders", "Siparişli", "0", "warning", ICONS.INVENTORY)
+        self.add_stat_card("credit", "Toplam Limit", "₺0", "primary", ICONS.MONEY)
 
     def load_data(self, customers: list):
         """Verileri yükle"""
@@ -118,7 +110,8 @@ class CustomerListPage(BaseListPage):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "name":
-                self.table.setItem(row, col_idx, QTableWidgetItem(cust.get("name", "")))
+                nm = cust.get("name", "")
+                self.table.setItem(row, col_idx, QTableWidgetItem(nm))
 
             elif col_key == "phone":
                 self.table.setItem(
@@ -126,14 +119,12 @@ class CustomerListPage(BaseListPage):
                 )
 
             elif col_key == "email":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(cust.get("email", "") or "-")
-                )
+                mail = cust.get("email", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(mail))
 
             elif col_key == "city":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(cust.get("city", "") or "-")
-                )
+                ct = cust.get("city", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(ct))
 
             elif col_key == "payment_term":
                 vade = cust.get("payment_term_days", 0) or 0
@@ -145,43 +136,15 @@ class CustomerListPage(BaseListPage):
                 self.table.setItem(row, col_idx, QTableWidgetItem(stars))
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, cust.get("id"))
-
-        self.table.setRowHeight(row, 52)
-
-    def _add_action_buttons(self, row: int, col: int, customer_id: int):
-        """İşlem butonlarını ekle"""
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(4, 4, 4, 4)
-        btn_layout.setSpacing(4)
-
-        # Görüntüle
-        view_btn = create_view_button()
-        view_btn.setProperty("class", "action-view")
-        view_btn.clicked.connect(
-            lambda checked, cid=customer_id: self.view_clicked.emit(cid)
-        )
-        btn_layout.addWidget(view_btn)
-
-        # Düzenle
-        edit_btn = create_edit_button()
-        edit_btn.setProperty("class", "action-edit")
-        edit_btn.clicked.connect(
-            lambda checked, cid=customer_id: self.edit_clicked.emit(cid)
-        )
-        btn_layout.addWidget(edit_btn)
-
-        # Sil
-        del_btn = create_delete_button()
-        del_btn.setProperty("class", "action-delete")
-        del_btn.clicked.connect(
-            lambda checked, cid=customer_id: self._confirm_delete(cid)
-        )
-        btn_layout.addWidget(del_btn)
-
-        self.table.setCellWidget(row, col, btn_widget)
+                callbacks = {
+                    "view": self.view_clicked.emit,
+                    "edit": self.edit_clicked.emit,
+                    "delete": self._confirm_delete,
+                }
+                widget = self.table.create_action_widget(
+                    cust.get("id"), ["view", "edit", "delete"], callbacks
+                )
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _confirm_delete(self, customer_id: int):
         """Silme onayı"""

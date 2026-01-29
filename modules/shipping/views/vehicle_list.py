@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QTableWidgetItem,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 import qtawesome as qta
 from config.icons import ICONS
@@ -64,10 +64,10 @@ class VehicleListPage(BaseListPage):
 
     def _setup_stat_cards(self):
         """İstatistik kartlarını oluştur"""
-        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
-        self.add_stat_card("aktif", "Aktif", "0", "#10b981", "✅")
-        self.add_stat_card("bakimda", "Bakımda", "0", "#f59e0b", "🔧")
-        self.add_stat_card("pasif", "Pasif", "0", "#ef4444", "⛔")
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.TRUCK)
+        self.add_stat_card("aktif", "Aktif", "0", "success", ICONS.CHECK)
+        self.add_stat_card("bakimda", "Bakımda", "0", "warning", ICONS.DANGER)
+        self.add_stat_card("pasif", "Pasif", "0", "error", ICONS.CANCEL)
 
     def load_data(self, data: list):
         """Veriyi tabloya yükle"""

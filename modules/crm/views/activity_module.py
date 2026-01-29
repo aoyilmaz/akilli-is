@@ -5,6 +5,7 @@ from modules.development import ErrorHandler
 from database.base import get_session
 from modules.crm.services import CRMService
 from database.models.crm import ActivityType
+from config.icons import ICONS
 
 
 class ActivityModule(QWidget):
@@ -25,17 +26,14 @@ class ActivityModule(QWidget):
 
         self.header = PageHeader(
             title="Aktivite Takibi",
-            icon="📅",
+            icon=ICONS.TIME,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=True,
             add_text="Yeni Aktivite",
             parent=self,
         )
         self.header.add_clicked.connect(self._show_add_form)
-
-        # Refresh
-        self.header.show_refresh = True
         self.header.refresh_clicked.connect(self._load_data)
 
         layout.addWidget(self.header)
@@ -44,10 +42,7 @@ class ActivityModule(QWidget):
 
         # Zaman Çizelgesi
         self.timeline_page = ActivityTimeline()
-        # Toolbar kaldırıldığı için sinyalleri buraya bağlamaya gerek yok (add_clicked vb. header'dan geliyor)
-        # Ama kart tıklama eventi timeline'dan geliyor
         self.timeline_page.card_clicked.connect(self._show_edit_form)
-        # Refresh sinyalini timeline da tetikleyebilir mi? Toolbar olmadığı için hayır, ama kodda kalsın.
         self.timeline_page.refresh_clicked.connect(self._load_data)
 
         self.stack.addWidget(self.timeline_page)
@@ -59,12 +54,6 @@ class ActivityModule(QWidget):
 
     def _load_data(self):
         try:
-            # Aktiviteleri çek (Şu anki servicete list_activities yok mu? Kontrol edelim)
-            # Service koduna bakmadım ama create_activity, log_activity vardı.
-            # list_activities yoksa eklemeli veya query kullanmalıyım.
-            # Base service query pattern support ediyor mu?
-            # Basic SQLAlchemy ile çekelim.
-
             from database.models.crm import Activity, Lead
 
             # Tarihe göre tersten sırala (En yeni en üstte)
@@ -113,8 +102,6 @@ class ActivityModule(QWidget):
 
     def _show_edit_form(self, act_id: int):
         try:
-            # Fetch activity dict logic logic duplicated above, best to use service if available.
-            # Re-query
             from database.models.crm import Activity
 
             act = self.session.query(Activity).get(act_id)
@@ -148,7 +135,6 @@ class ActivityModule(QWidget):
 
     def _populate_leads(self, form):
         try:
-            # Reusing logic from OpportunityModule
             leads = self.service.list_leads()
             form.combo_lead.clear()
             form.combo_lead.addItem("İlişkili Aday/Müşteri Yok", None)
@@ -168,20 +154,11 @@ class ActivityModule(QWidget):
     def _save_activity(self, data: dict):
         try:
             act_id = data.pop("id", None)
-
-            # Map enum name back to Enum object?
-            # Service log_activity expects type to be Enum or string?
-            # Model definition says Enum(ActivityType).
-            # If we use log_activity from service, it probably handles creation.
-            # But we are doing partial manual work here.
-
-            # Let's map it safe.
             if isinstance(data["activity_type"], str):
                 data["activity_type"] = ActivityType[data["activity_type"]]
 
             if act_id:
                 # Update
-                # Using session directly as service might lack general update
                 from database.models.crm import Activity
 
                 act = self.session.query(Activity).get(act_id)
@@ -203,11 +180,6 @@ class ActivityModule(QWidget):
                     QMessageBox.information(self, "Başarılı", "Aktivite güncellendi!")
             else:
                 # Create
-                # Service log_activity params: lead_id, type, summary (subject), description
-                # Our form has more fields (due_date, result).
-
-                # Better to use Model direct creation to support all fields or update service.
-                # For now model direct creation.
                 from database.models.crm import Activity
 
                 new_act = Activity(

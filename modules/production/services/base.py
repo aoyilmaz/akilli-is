@@ -585,10 +585,25 @@ class WorkOrderService:
             .first()
         )
 
+    def generate_code(self) -> str:
+        """Otomatik iş emri kodu üret"""
+        # En son ID'yi bul (order_no ile sıralama güvenilir olmayabilir)
+        last = self.session.query(WorkOrder).order_by(WorkOrder.id.desc()).first()
+        if last:
+            num = last.id + 1
+        else:
+            num = 1
+
+        # WO-2024-000001 formatı
+        return f"WO-{datetime.now().year}-{num:06d}"
+
     def create(self, **kwargs) -> WorkOrder:
         """Yeni iş emri oluştur"""
         bom_id = kwargs.get("bom_id")
         planned_quantity = kwargs.get("planned_quantity", Decimal(1))
+
+        if not kwargs.get("order_no"):
+            kwargs["order_no"] = self.generate_code()
 
         order = WorkOrder(**kwargs)
         self.session.add(order)

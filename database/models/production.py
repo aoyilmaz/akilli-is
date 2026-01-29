@@ -619,8 +619,12 @@ class WorkOrderOperation(BaseModel):
     qc_status = Column(String(20), nullable=True)  # pending, passed, failed
 
     # APS - Cascade Çizelgeleme Desteği
-    is_locked = Column(Boolean, default=False)  # Manuel kilitleme - otomatik kaydırmayı engeller
-    cascade_group_id = Column(String(50), nullable=True)  # İlişkili operasyonları grupla
+    is_locked = Column(
+        Boolean, default=False
+    )  # Manuel kilitleme - otomatik kaydırmayı engeller
+    cascade_group_id = Column(
+        String(50), nullable=True
+    )  # İlişkili operasyonları grupla
 
     work_order = relationship("WorkOrder", back_populates="operations")
     bom_operation = relationship("BOMOperation")
@@ -772,8 +776,15 @@ class ProductionPlan(BaseModel):
     period_end = Column(Date, nullable=False)
 
     # Durum
+    # Durum
     status = Column(
-        Enum(ProductionPlanStatus), default=ProductionPlanStatus.DRAFT, nullable=False
+        Enum(
+            ProductionPlanStatus,
+            values_callable=lambda x: [e.value for e in x],
+            name="productionplanstatus",
+        ),
+        default=ProductionPlanStatus.DRAFT,
+        nullable=False,
     )
 
     # Onay Bilgileri

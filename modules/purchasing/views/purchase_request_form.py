@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from ui.components.page_header import PageHeader
 from ui.components import CurrencyInput
+from ui.components.workflow_timeline import WorkflowTimelineWidget
 
 
 class ItemSelectorDialog(QDialog):
@@ -293,6 +294,11 @@ class PurchaseRequestFormPage(QWidget):
 
         layout.addLayout(content_layout)
 
+        # === Workflow Timeline (Edit modunda) ===
+        self.workflow_timeline = WorkflowTimelineWidget(self)
+        self.workflow_timeline.action_taken.connect(self._on_workflow_action)
+        layout.addWidget(self.workflow_timeline)
+
     def _add_item_row(self):
         """Yeni kalem satırı ekle"""
         # Stok kartı seçimi
@@ -432,6 +438,15 @@ class PurchaseRequestFormPage(QWidget):
                     item_data.get("suggested_supplier_id"),
                 )
 
+        # Workflow timeline'ı yükle
+        request_id = self.request_data.get("id")
+        if request_id:
+            self.workflow_timeline.load_workflow(
+                table_name="purchase_requests",
+                document_id=request_id,
+                current_user_id=1,  # TODO: Mevcut kullanıcı ID'si
+            )
+
     def _on_save(self):
         """Kaydet"""
         # Validasyon
@@ -503,3 +518,18 @@ class PurchaseRequestFormPage(QWidget):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.submit_for_approval.emit(self.request_data.get("id"))
+
+    def _on_workflow_action(self, instance_id: int, action: str, comment: str):
+        """Workflow aksiyonu alındığında"""
+        # Timeline'ı yenile
+        if self.request_data:
+            self.workflow_timeline.load_workflow(
+                table_name="purchase_requests",
+                document_id=self.request_data.get("id"),
+                current_user_id=1,
+            )
+            QMessageBox.information(
+                self,
+                "Bilgi",
+                f"Workflow aksiyonu başarılı: {action}",
+            )

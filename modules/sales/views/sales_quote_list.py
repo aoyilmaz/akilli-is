@@ -12,9 +12,12 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
+    QLabel,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import qtawesome as qta
 
+from config.icons import ICONS
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -38,13 +41,13 @@ class SalesQuoteListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "sent": ("📤 Gönderildi", "#3b82f6"),
-        "accepted": ("🟢 Kabul Edildi", "#10b981"),
-        "rejected": ("🔴 Reddedildi", "#ef4444"),
-        "ordered": ("📦 Siparişe Dönüştü", "#8b5cf6"),
-        "expired": ("⏰ Süresi Doldu", "#f59e0b"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "sent": ("Gönderildi", "#3b82f6"),
+        "accepted": ("Kabul Edildi", "#10b981"),
+        "rejected": ("Reddedildi", "#ef4444"),
+        "ordered": ("Siparişe Dönüştü", "#8b5cf6"),
+        "expired": ("Süresi Doldu", "#f59e0b"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     def __init__(self, parent=None):
@@ -61,7 +64,7 @@ class SalesQuoteListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Satış Teklifleri",
-            icon="📄",
+            icon=ICONS.INVOICE,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -73,13 +76,13 @@ class SalesQuoteListPage(QWidget):
         # Filtre
         self.status_filter = QComboBox()
         self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("📤 Gönderildi", "sent")
-        self.status_filter.addItem("🟢 Kabul Edildi", "accepted")
-        self.status_filter.addItem("🔴 Reddedildi", "rejected")
-        self.status_filter.addItem("📦 Siparişe Dönüştü", "ordered")
-        self.status_filter.addItem("⏰ Süresi Doldu", "expired")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Gönderildi", "sent")
+        self.status_filter.addItem("Kabul Edildi", "accepted")
+        self.status_filter.addItem("Reddedildi", "rejected")
+        self.status_filter.addItem("Siparişe Dönüştü", "ordered")
+        self.status_filter.addItem("Süresi Doldu", "expired")
+        self.status_filter.addItem("İptal", "cancelled")
         self.status_filter.setMinimumWidth(180)
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
 
@@ -95,11 +98,19 @@ class SalesQuoteListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
-        self.stat_cards["sent"] = MiniStatCard("📤 Gönderildi", "0", "#3b82f6")
-        self.stat_cards["accepted"] = MiniStatCard("🟢 Kabul", "0", "#10b981")
-        self.stat_cards["rejected"] = MiniStatCard("🔴 Red", "0", "#ef4444")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVOICE
+        )
+        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
+        self.stat_cards["sent"] = MiniStatCard(
+            "Gönderildi", "0", "primary", icon=ICONS.EXPORT
+        )
+        self.stat_cards["accepted"] = MiniStatCard(
+            "Kabul", "0", "success", icon=ICONS.CHECK
+        )
+        self.stat_cards["rejected"] = MiniStatCard(
+            "Red", "0", "error", icon=ICONS.CLOSE
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -168,34 +179,24 @@ class SalesQuoteListPage(QWidget):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "date":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(quote.get("quote_date"))),
-                )
+                dt = self._format_date(quote.get("quote_date"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "customer":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(quote.get("customer_name", "") or "-"),
-                )
+                name = quote.get("customer_name", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(name))
 
             elif col_key == "total":
                 total = quote.get("total_amount", 0) or 0
                 self.table.setItem(row, col_idx, QTableWidgetItem(f"{total:,.2f}"))
 
             elif col_key == "items":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(str(quote.get("total_items", 0)))
-                )
+                item_count = str(quote.get("total_items", 0))
+                self.table.setItem(row, col_idx, QTableWidgetItem(item_count))
 
             elif col_key == "valid_until":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(quote.get("valid_until"))),
-                )
+                dt = self._format_date(quote.get("valid_until"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "status":
                 status = quote.get("status", "draft")
@@ -203,14 +204,11 @@ class SalesQuoteListPage(QWidget):
                 self.table.setItem(row, col_idx, QTableWidgetItem(label))
 
             elif col_key == "currency":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(quote.get("currency_code", "TRY"))
-                )
+                curr = quote.get("currency_code", "TRY")
+                self.table.setItem(row, col_idx, QTableWidgetItem(curr))
 
             elif col_key == "actions":
                 self._add_action_buttons(row, col_idx, quote)
-
-        self.table.setRowHeight(row, 52)
 
     def _format_date(self, dt) -> str:
         if dt:
@@ -220,74 +218,52 @@ class SalesQuoteListPage(QWidget):
         return "-"
 
     def _add_action_buttons(self, row: int, col: int, quote: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
-        quote_id = quote.get("id")
+        qid = quote.get("id")
         status = quote.get("status", "draft")
 
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(
-            lambda checked, qid=quote_id: self.view_clicked.emit(qid)
-        )
-        btn_layout.addWidget(view_btn)
+        actions = ["view"]
+        callbacks = {"view": lambda quote_id=qid: self.view_clicked.emit(quote_id)}
 
         if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, qid=quote_id: self.edit_clicked.emit(qid)
-            )
-            btn_layout.addWidget(edit_btn)
+            actions.append("edit")
+            callbacks["edit"] = lambda quote_id=qid: self.edit_clicked.emit(quote_id)
 
-            send_btn = QPushButton("📤")
-            send_btn.setFixedSize(28, 26)
-            send_btn.setToolTip("Müşteriye Gönder")
-            send_btn.clicked.connect(
-                lambda checked, qid=quote_id: self.send_clicked.emit(qid)
+        widget = self.table.create_action_widget(qid, actions, callbacks)
+        layout = widget.layout()
+
+        from ui.components.action_buttons import create_custom_button
+
+        if status == "draft":
+            send_btn = create_custom_button(
+                widget, ICONS.EXPORT, "Müşteriye Gönder", "primary"
             )
-            btn_layout.addWidget(send_btn)
+            send_btn.clicked.connect(lambda: self.send_clicked.emit(qid))
+            layout.insertWidget(layout.count() - 1, send_btn)
 
         if status == "sent":
-            accept_btn = QPushButton("✓")
-            accept_btn.setFixedSize(28, 26)
-            accept_btn.setToolTip("Kabul Et")
-            accept_btn.clicked.connect(
-                lambda checked, qid=quote_id: self.accept_clicked.emit(qid)
+            accept_btn = create_custom_button(
+                widget, ICONS.CHECK, "Kabul Et", "success"
             )
-            btn_layout.addWidget(accept_btn)
+            accept_btn.clicked.connect(lambda: self.accept_clicked.emit(qid))
+            layout.insertWidget(layout.count() - 1, accept_btn)
 
-            reject_btn = QPushButton("✗")
-            reject_btn.setFixedSize(28, 26)
-            reject_btn.setToolTip("Reddet")
-            reject_btn.clicked.connect(
-                lambda checked, qid=quote_id: self.reject_clicked.emit(qid)
-            )
-            btn_layout.addWidget(reject_btn)
+            reject_btn = create_custom_button(widget, ICONS.CLOSE, "Reddet", "error")
+            reject_btn.clicked.connect(lambda: self.reject_clicked.emit(qid))
+            layout.insertWidget(layout.count() - 1, reject_btn)
 
         if status == "accepted":
-            order_btn = QPushButton("📦")
-            order_btn.setFixedSize(28, 26)
-            order_btn.setToolTip("Siparişe Dönüştür")
-            order_btn.clicked.connect(
-                lambda checked, qid=quote_id: self.convert_to_order_clicked.emit(qid)
+            order_btn = create_custom_button(
+                widget, ICONS.INVENTORY, "Siparişe Dönüştür", "primary"
             )
-            btn_layout.addWidget(order_btn)
+            order_btn.clicked.connect(lambda: self.convert_to_order_clicked.emit(qid))
+            layout.insertWidget(layout.count() - 1, order_btn)
 
         if status == "draft":
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, qid=quote_id: self._confirm_delete(qid)
-            )
-            btn_layout.addWidget(del_btn)
+            del_btn = create_custom_button(widget, ICONS.DELETE, "Sil", "error")
+            del_btn.clicked.connect(lambda: self._confirm_delete(qid))
+            layout.insertWidget(layout.count() - 1, del_btn)
 
-        self.table.setCellWidget(row, col, btn_widget)
+        self.table.setCellWidget(row, col, widget)
 
     def _update_stats(self):
         total = len(self.quotes)
@@ -305,11 +281,12 @@ class SalesQuoteListPage(QWidget):
     def _on_search(self, text: str):
         text = text.lower()
         for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(self.table.columnCount() - 1)
-            )
+            match = False
+            for col in range(self.table.columnCount() - 1):
+                item = self.table.item(row, col)
+                if item and text in item.text().lower():
+                    match = True
+                    break
             self.table.setRowHidden(row, not match)
 
     def _on_filter_changed(self):

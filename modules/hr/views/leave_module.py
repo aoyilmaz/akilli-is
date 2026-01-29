@@ -8,9 +8,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QDialog,
     QFormLayout,
     QTextEdit,
@@ -20,22 +18,14 @@ from PyQt6.QtWidgets import (
     QDateEdit,
 )
 from PyQt6.QtCore import Qt, QDate
+import qtawesome as qta
 
-from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BORDER,
-    TEXT_PRIMARY,
-    ACCENT,
-    SUCCESS,
-    WARNING,
-    get_button_style,
-    get_title_style,
-    BTN_HEIGHT_NORMAL,
-    ICONS,
-)
+from config.icons import ICONS
 from modules.hr.services import HRService
 from database.models.hr import LeaveType, LeaveStatus
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
+
 
 LEAVE_TYPE_LABELS = {
     LeaveType.ANNUAL: "Yıllık İzin",
@@ -62,94 +52,80 @@ class LeaveFormDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.service = HRService()
+        self.setWindowTitle("Yeni İzin Talebi")
+        self.setMinimumSize(400, 350)
         self.setup_ui()
         self.load_combos()
 
     def setup_ui(self):
-        self.setWindowTitle("Yeni İzin Talebi")
-        self.setMinimumSize(400, 350)
-
         layout = QVBoxLayout(self)
         form = QFormLayout()
         form.setSpacing(12)
-
         self.employee = QComboBox()
         form.addRow("Çalışan:", self.employee)
-
         self.leave_type = QComboBox()
-        for lt, label in LEAVE_TYPE_LABELS.items():
-            self.leave_type.addItem(label, lt)
+        for lt, lbl in LEAVE_TYPE_LABELS.items():
+            self.leave_type.addItem(lbl, lt)
         form.addRow("İzin Türü:", self.leave_type)
-
         self.start_date = QDateEdit()
         self.start_date.setCalendarPopup(True)
         self.start_date.setDate(QDate.currentDate())
         form.addRow("Başlangıç:", self.start_date)
-
         self.end_date = QDateEdit()
         self.end_date.setCalendarPopup(True)
         self.end_date.setDate(QDate.currentDate())
         form.addRow("Bitiş:", self.end_date)
-
         self.notes = QTextEdit()
         self.notes.setMaximumHeight(80)
         form.addRow("Açıklama:", self.notes)
-
         layout.addLayout(form)
 
-        # Butonlar
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-
-        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
-        cancel_btn.setStyleSheet(get_button_style("cancel"))
-        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        b_layout = QHBoxLayout()
+        b_layout.addStretch()
+        cancel_btn = QPushButton("İptal")
         cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-
-        save_btn = QPushButton(f"{ICONS['add']} Talep Oluştur")
-        save_btn.setStyleSheet(get_button_style("add"))
-        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        b_layout.addWidget(cancel_btn)
+        save_btn = QPushButton("Talep Oluştur")
+        save_btn.setIcon(qta.icon(ICONS.ADD, color="#ffffff"))
+        save_btn.setProperty("class", "btn-primary")
+        save_btn.setFixedHeight(36)
         save_btn.clicked.connect(self.save)
-        btn_layout.addWidget(save_btn)
-
-        layout.addLayout(btn_layout)
+        b_layout.addWidget(save_btn)
+        layout.addLayout(b_layout)
 
     def load_combos(self):
         self.employee.addItem("Seçiniz...", None)
         try:
             for emp in self.service.get_all_employees(limit=500):
                 self.employee.addItem(f"{emp.full_name} ({emp.employee_no})", emp.id)
-        except Exception:
+        except:
             pass
 
     def save(self):
-        if not self.employee.currentData():
+        eid = self.employee.currentData()
+        if not eid:
             QMessageBox.warning(self, "Uyarı", "Çalışan seçiniz.")
-
-        start = self.start_date.date().toPyDate()
-        end = self.end_date.date().toPyDate()
-
+            return
+        start, end = self.start_date.date().toPyDate(), self.end_date.date().toPyDate()
         if end < start:
             QMessageBox.warning(self, "Uyarı", "Bitiş tarihi başlangıçtan önce olamaz.")
-
+            return
         try:
             data = {
-                "employee_id": self.employee.currentData(),
+                "employee_id": eid,
                 "leave_type": self.leave_type.currentData(),
                 "start_date": start,
                 "end_date": end,
                 "notes": self.notes.toPlainText().strip() or None,
             }
-
             self.service.create_leave(data)
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
 
-    def closeEvent(self, event):
+    def closeEvent(self, e):
         self.service.close()
-        super().closeEvent(event)
+        super().closeEvent(e)
 
 
 class LeaveModule(QWidget):
@@ -167,49 +143,42 @@ class LeaveModule(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="İzin Talepleri",
-            icon="🏖️",
+            icon=ICONS.CALENDAR,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=True,
             add_text="Yeni İzin Talebi",
             parent=self,
         )
         self.header.add_clicked.connect(self._new_leave)
-
-        # Filtreleri header'a ekle
+        self.header.refresh_clicked.connect(self.load_data)
         h_layout = self.header.header_layout()
-
-        # Filtre
         h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Durum:"))
         self.status_combo = QComboBox()
         self.status_combo.setFixedWidth(150)
         self.status_combo.setFixedHeight(36)
         self.status_combo.addItem("Tüm Durumlar", None)
-        for status, label in LEAVE_STATUS_LABELS.items():
-            self.status_combo.addItem(label, status)
+        for s, lbl in LEAVE_STATUS_LABELS.items():
+            self.status_combo.addItem(lbl, s)
         self.status_combo.currentIndexChanged.connect(self.load_data)
         h_layout.addWidget(self.status_combo)
-
         layout.addWidget(self.header)
 
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels(
-            ["Çalışan", "İzin Türü", "Başlangıç", "Bitiş", "Gün", "Durum", "İşlemler"]
+        cols = [
+            ColumnConfig("emp", "Çalışan", stretch=True),
+            ColumnConfig("type", "İzin Türü", width=140),
+            ColumnConfig("start", "Başlangıç", width=100),
+            ColumnConfig("end", "Bitiş", width=100),
+            ColumnConfig("days", "Gün", width=60),
+            ColumnConfig("stat", "Durum", width=120),
+            ColumnConfig("actions", "İşlemler", width=200),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="hr_leaves", columns=cols, parent=self
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
 
     def _get_service(self):
@@ -224,101 +193,123 @@ class LeaveModule(QWidget):
 
     def load_data(self):
         try:
-            service = self._get_service()
-            status = self.status_combo.currentData()
-            leaves = service.get_leaves(status=status, limit=200)
-
+            leaves = self._get_service().get_leaves(
+                status=self.status_combo.currentData(), limit=200
+            )
             self.table.setRowCount(len(leaves))
-            for row, leave in enumerate(leaves):
-                self.table.setItem(
-                    row,
-                    0,
-                    QTableWidgetItem(
-                        leave.employee.full_name if leave.employee else "-"
-                    ),
-                )
-                self.table.setItem(
-                    row,
-                    1,
-                    QTableWidgetItem(LEAVE_TYPE_LABELS.get(leave.leave_type, "-")),
-                )
-                self.table.setItem(
-                    row, 2, QTableWidgetItem(leave.start_date.strftime("%d.%m.%Y"))
-                )
-                self.table.setItem(
-                    row, 3, QTableWidgetItem(leave.end_date.strftime("%d.%m.%Y"))
-                )
-                self.table.setItem(row, 4, QTableWidgetItem(str(leave.days)))
-
-                status_text = LEAVE_STATUS_LABELS.get(leave.status, "-")
-                status_item = QTableWidgetItem(status_text)
-                if leave.status == LeaveStatus.APPROVED:
-                    status_item.setForeground(Qt.GlobalColor.green)
-                elif leave.status == LeaveStatus.REJECTED:
-                    status_item.setForeground(Qt.GlobalColor.red)
-                elif leave.status == LeaveStatus.PENDING:
-                    status_item.setForeground(Qt.GlobalColor.yellow)
-                self.table.setItem(row, 5, status_item)
-
-                # İşlem butonu
-                if leave.status == LeaveStatus.PENDING:
-                    btn_widget = QWidget()
-                    btn_layout = QHBoxLayout(btn_widget)
-                    btn_layout.setContentsMargins(4, 4, 4, 4)
-                    btn_layout.setSpacing(4)
-
-                    approve_btn = QPushButton(f"{ICONS['confirm']} Onayla")
-                    approve_btn.setStyleSheet(get_button_style("confirm"))
-                    approve_btn.setFixedHeight(28)
-                    approve_btn.clicked.connect(
-                        lambda checked, lid=leave.id: self._approve_leave(lid)
-                    )
-                    btn_layout.addWidget(approve_btn)
-
-                    reject_btn = QPushButton(f"{ICONS['cancel']} Reddet")
-                    reject_btn.setStyleSheet(get_button_style("danger"))
-                    reject_btn.setFixedHeight(28)
-                    reject_btn.clicked.connect(
-                        lambda checked, lid=leave.id: self._reject_leave(lid)
-                    )
-                    btn_layout.addWidget(reject_btn)
-
-                    self.table.setCellWidget(row, 6, btn_widget)
-                else:
-                    self.table.setItem(row, 6, QTableWidgetItem("-"))
-
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, leave.id)
-
+            vcols = self.table.get_visible_columns()
+            for r, leave in enumerate(leaves):
+                for c, key in enumerate(vcols):
+                    if key == "emp":
+                        it = QTableWidgetItem(
+                            leave.employee.full_name if leave.employee else "-"
+                        )
+                        it.setData(Qt.ItemDataRole.UserRole, leave.id)
+                        self.table.setItem(r, c, it)
+                    elif key == "type":
+                        self.table.setItem(
+                            r,
+                            c,
+                            QTableWidgetItem(
+                                LEAVE_TYPE_LABELS.get(leave.leave_type, "-")
+                            ),
+                        )
+                    elif key == "start":
+                        self.table.setItem(
+                            r,
+                            c,
+                            QTableWidgetItem(leave.start_date.strftime("%d.%m.%Y")),
+                        )
+                    elif key == "end":
+                        self.table.setItem(
+                            r, c, QTableWidgetItem(leave.end_date.strftime("%d.%m.%Y"))
+                        )
+                    elif key == "days":
+                        self.table.setItem(r, c, QTableWidgetItem(str(leave.days)))
+                    elif key == "stat":
+                        it = QTableWidgetItem(
+                            LEAVE_STATUS_LABELS.get(leave.status, "-")
+                        )
+                        if leave.status == LeaveStatus.APPROVED:
+                            it.setForeground(Qt.GlobalColor.green)
+                        elif leave.status == LeaveStatus.REJECTED:
+                            it.setForeground(Qt.GlobalColor.red)
+                        elif leave.status == LeaveStatus.PENDING:
+                            it.setForeground(Qt.GlobalColor.yellow)
+                        self.table.setItem(r, c, it)
+                    elif key == "actions":
+                        if leave.status == LeaveStatus.PENDING:
+                            w = QWidget()
+                            l = QHBoxLayout(w)
+                            l.setContentsMargins(4, 4, 4, 4)
+                            l.setSpacing(4)
+                            ok = QPushButton("Onayla")
+                            ok.setIcon(qta.icon(ICONS.CHECK, color="#ffffff"))
+                            ok.setProperty("class", "btn-success")
+                            ok.setFixedHeight(28)
+                            ok.clicked.connect(
+                                lambda _, lid=leave.id: self._approve_leave(lid)
+                            )
+                            no = QPushButton("Reddet")
+                            no.setIcon(qta.icon(ICONS.CLOSE, color="#ffffff"))
+                            no.setProperty("class", "btn-danger")
+                            no.setFixedHeight(28)
+                            no.clicked.connect(
+                                lambda _, lid=leave.id: self._reject_leave(lid)
+                            )
+                            l.addWidget(ok)
+                            l.addWidget(no)
+                            self.table.setCellWidget(r, c, w)
+                        else:
+                            self.table.removeCellWidget(r, c)
+                            self.table.setItem(r, c, QTableWidgetItem("-"))
         except Exception as e:
-            QMessageBox.warning(self, "Uyarı", f"Hata: {str(e)}")
+            QMessageBox.warning(self, "Uyarı", str(e))
         finally:
             self._close_service()
 
     def _new_leave(self):
-        dialog = LeaveFormDialog(parent=self)
-        if dialog.exec():
+        if LeaveFormDialog(parent=self).exec():
             self.load_data()
 
-    def _approve_leave(self, leave_id: int):
+    def _get_default_approver_id(self) -> int:
+        """Varsayılan onaylayıcı employee_id'sini getir"""
+        # TODO: Mevcut kullanıcının employee_id'sini kullan
+        # Şimdilik ilk aktif yönetici/çalışanı bul
         try:
-            service = self._get_service()
-            service.approve_leave(leave_id, approver_id=1)  # TODO: Gerçek user id
+            from database.models.hr import Employee
+
+            emp = (
+                self._get_service()
+                .session.query(Employee)
+                .filter(Employee.is_active == True)
+                .order_by(Employee.id)
+                .first()
+            )
+            return emp.id if emp else 471  # Fallback
+        except Exception:
+            return 471  # Varsayılan: ilk aktif çalışan
+
+    def _approve_leave(self, lid: int):
+        try:
+            approver_id = self._get_default_approver_id()
+            self._get_service().approve_leave(lid, approver_id=approver_id)
+            self._close_service()  # Session cache'i temizle
             self.load_data()
             QMessageBox.information(self, "Bilgi", "İzin onaylandı.")
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
-        finally:
             self._close_service()
 
-    def _reject_leave(self, leave_id: int):
+    def _reject_leave(self, lid: int):
         try:
-            service = self._get_service()
-            service.reject_leave(
-                leave_id, approver_id=1, reason="Yönetici tarafından reddedildi"
+            approver_id = self._get_default_approver_id()
+            self._get_service().reject_leave(
+                lid, approver_id=approver_id, reason="Yönetici tarafından reddedildi"
             )
+            self._close_service()  # Session cache'i temizle
             self.load_data()
             QMessageBox.information(self, "Bilgi", "İzin reddedildi.")
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
-        finally:
             self._close_service()

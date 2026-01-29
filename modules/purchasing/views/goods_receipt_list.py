@@ -3,108 +3,38 @@ Akıllı İş - Mal Kabul Liste Sayfası
 Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
-from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
     QPushButton,
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import qtawesome as qta
 
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
+from config.icons import ICONS
 
 
-class GoodsReceiptListPage(QWidget):
+class GoodsReceiptListPage(BaseListPage):
     """Mal kabul listesi."""
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
+    # Sinyaller (Ek sinyaller)
     add_from_order_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
     complete_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "completed": ("🟢 Tamamlandı", "#10b981"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "completed": ("Tamamlandı", "#10b981"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.receipts = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Mal Kabul",
-            icon="📥",
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Manuel Giriş",
-            search_placeholder="Ara... (fiş no, tedarikçi)",
-            parent=self,
-        )
-
-        # Siparişten ekle butonu
-        from_order_btn = QPushButton("📦 Siparişten")
-        from_order_btn.setProperty("class", "btn-secondary")
-        from_order_btn.clicked.connect(self.add_from_order_clicked.emit)
-
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("🟢 Tamamlandı", "completed")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
-        self.status_filter.setMinimumWidth(150)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-            # Add butonu öncesine siparişten ekle butonunu ekle
-            if self.header.add_btn:
-                add_idx = h_layout.indexOf(self.header.add_btn)
-                h_layout.insertWidget(add_idx, from_order_btn)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
-        self.stat_cards["completed"] = MiniStatCard("🟢 Tamamlandı", "0", "#10b981")
-        self.stat_cards["today"] = MiniStatCard("📅 Bugün", "0", "#f59e0b")
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("receipt_no", "Fiş No", width=120),
             ColumnConfig("date", "Tarih", width=100),
@@ -123,12 +53,54 @@ class GoodsReceiptListPage(QWidget):
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Mal Kabul",
+            icon=ICONS.INVENTORY,
             table_id="goods_receipts",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Manuel Giriş",
+            search_placeholder="Ara... (fiş no, tedarikçi)",
+            parent=parent,
         )
-        layout.addWidget(self.table)
+
+        self.receipts = []
+        self._setup_filters()
+        self._setup_stat_cards()
+
+    def _setup_filters(self):
+        # Siparişten ekle butonu
+        from_order_btn = QPushButton("Siparişten")
+        from_order_btn.setIcon(qta.icon(ICONS.INVENTORY, color="#ffffff"))
+        from_order_btn.setProperty("class", "btn-secondary")
+        from_order_btn.clicked.connect(self.add_from_order_clicked.emit)
+
+        # Filtre ekle
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("Tüm Durumlar", None)
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Tamamlandı", "completed")
+        self.status_filter.addItem("İptal", "cancelled")
+        self.status_filter.setMinimumWidth(150)
+        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
+
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
+            # Add butonu öncesine siparişten ekle butonunu ekle
+            if self.header.add_btn:
+                add_idx = h_layout.indexOf(self.header.add_btn)
+                h_layout.insertWidget(add_idx, from_order_btn)
+
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
+        self.add_stat_card("draft", "Taslak", "0", "warning", ICONS.TIME)
+        self.add_stat_card("completed", "Tamamlandı", "0", "success", ICONS.CHECK)
+        self.add_stat_card("today", "Bugün", "0", "info", ICONS.TIME)
 
     def _connect_signals(self):
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
@@ -197,61 +169,68 @@ class GoodsReceiptListPage(QWidget):
                 self.table.setItem(row, col_idx, QTableWidgetItem(label))
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, rec)
+                status = rec.get("status", "draft")
+                actions = ["view"]
 
-        self.table.setRowHeight(row, 52)
+                if status == "draft":
+                    actions.extend(["edit", "complete", "delete"])
+
+                callbacks = {
+                    "view": lambda _, rid=rec_id: self.view_clicked.emit(rid),
+                    "edit": lambda _, rid=rec_id: self.edit_clicked.emit(rid),
+                    "delete": lambda _, rid=rec_id: self._confirm_delete(rid),
+                    "complete": lambda _, rid=rec_id: self.complete_clicked.emit(rid),
+                }
+
+                # Özel butonlar için manuel gruplama
+                widget = QWidget()
+                layout = QHBoxLayout(widget)
+                layout.setContentsMargins(4, 2, 4, 2)
+                layout.setSpacing(4)
+
+                from ui.components.action_buttons import (
+                    create_view_button,
+                    create_edit_button,
+                    create_delete_button,
+                    create_approve_button,
+                )
+
+                if "view" in actions:
+                    btn = create_view_button(widget)
+                    btn.clicked.connect(callbacks["view"])
+                    layout.addWidget(btn)
+
+                if "edit" in actions:
+                    btn = create_edit_button(widget)
+                    btn.clicked.connect(callbacks["edit"])
+                    layout.addWidget(btn)
+
+                if "complete" in actions:
+                    btn = create_approve_button(widget)
+                    btn.setToolTip("Tamamla (Stok Girişi)")
+                    btn.clicked.connect(callbacks["complete"])
+                    layout.addWidget(btn)
+
+                if "delete" in actions:
+                    btn = create_delete_button(widget)
+                    btn.clicked.connect(callbacks["delete"])
+                    layout.addWidget(btn)
+
+                layout.addStretch()
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _format_date(self, dt) -> str:
+        from datetime import date
+
         if dt:
             if isinstance(dt, date):
                 return dt.strftime("%d.%m.%Y")
             return str(dt)
         return "-"
 
-    def _add_action_buttons(self, row: int, col: int, rec: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
-        rec_id = rec.get("id")
-        status = rec.get("status", "draft")
-
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(
-            lambda checked, rid=rec_id: self.view_clicked.emit(rid)
-        )
-        btn_layout.addWidget(view_btn)
-
-        if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, rid=rec_id: self.edit_clicked.emit(rid)
-            )
-            btn_layout.addWidget(edit_btn)
-
-            complete_btn = QPushButton("✓")
-            complete_btn.setFixedSize(28, 26)
-            complete_btn.setToolTip("Tamamla (Stok Girişi)")
-            complete_btn.clicked.connect(
-                lambda checked, rid=rec_id: self.complete_clicked.emit(rid)
-            )
-            btn_layout.addWidget(complete_btn)
-
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, rid=rec_id: self._confirm_delete(rid)
-            )
-            btn_layout.addWidget(del_btn)
-
-        self.table.setCellWidget(row, col, btn_widget)
-
     def _update_stats(self):
+        from datetime import date
+
         total = len(self.receipts)
         draft = sum(1 for r in self.receipts if r.get("status") == "draft")
         completed = sum(1 for r in self.receipts if r.get("status") == "completed")

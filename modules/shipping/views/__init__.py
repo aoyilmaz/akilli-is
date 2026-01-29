@@ -13,6 +13,7 @@ from .driver_module import DriverModule
 from .shipment_list import ShipmentListPage
 from .shipment_form import ShipmentFormPage
 from .shipment_module import ShipmentModule
+from .fleet_module import FleetMainModule
 
 __all__ = [
     # Vehicle
@@ -27,4 +28,6 @@ __all__ = [
     "ShipmentListPage",
     "ShipmentFormPage",
     "ShipmentModule",
+    # Fleet
+    "FleetMainModule",
 ]

@@ -3,12 +3,10 @@ Akıllı İş - Satın Alma Talepleri Liste Sayfası
 Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
-from datetime import date
+import qtawesome as qta
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
@@ -16,100 +14,37 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
+from config.icons import ICONS
 
 
-class PurchaseRequestListPage(QWidget):
+class PurchaseRequestListPage(BaseListPage):
     """Satın alma talepleri listesi."""
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
+    # Sinyaller (Ek sinyaller)
     approve_clicked = pyqtSignal(int)
     reject_clicked = pyqtSignal(int)
     create_order_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "pending": ("🟡 Onay Bekliyor", "#f59e0b"),
-        "approved": ("🟢 Onaylandı", "#10b981"),
-        "rejected": ("🔴 Reddedildi", "#ef4444"),
-        "ordered": ("📦 Sipariş Verildi", "#8b5cf6"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "pending": ("Onay Bekliyor", "#f59e0b"),
+        "approved": ("Onaylandı", "#10b981"),
+        "rejected": ("Reddedildi", "#ef4444"),
+        "ordered": ("Sipariş Verildi", "#8b5cf6"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     PRIORITY_LABELS = {
-        1: ("⬇️ Düşük", "#64748b"),
-        2: ("➡️ Normal", "#3b82f6"),
-        3: ("⬆️ Yüksek", "#f59e0b"),
-        4: ("🔥 Acil", "#ef4444"),
+        1: ("Düşük", "#64748b"),
+        2: ("Normal", "#3b82f6"),
+        3: ("Yüksek", "#f59e0b"),
+        4: ("Acil", "#ef4444"),
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.requests = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Satın Alma Talepleri",
-            icon="📋",
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni Talep",
-            search_placeholder="Ara... (talep no, departman)",
-            parent=self,
-        )
-
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("🟡 Onay Bekliyor", "pending")
-        self.status_filter.addItem("🟢 Onaylandı", "approved")
-        self.status_filter.addItem("🔴 Reddedildi", "rejected")
-        self.status_filter.addItem("📦 Sipariş Verildi", "ordered")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
-        self.stat_cards["pending"] = MiniStatCard("🟡 Bekleyen", "0", "#f59e0b")
-        self.stat_cards["approved"] = MiniStatCard("🟢 Onaylı", "0", "#10b981")
-        self.stat_cards["rejected"] = MiniStatCard("🔴 Ret", "0", "#ef4444")
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("request_no", "Talep No", width=120),
             ColumnConfig("date", "Tarih", width=100),
@@ -129,12 +64,47 @@ class PurchaseRequestListPage(QWidget):
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Satın Alma Talepleri",
+            icon=ICONS.INVOICE,
             table_id="purchase_requests",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Talep",
+            search_placeholder="Ara... (talep no, departman)",
+            parent=parent,
         )
-        layout.addWidget(self.table)
+
+        self.requests = []
+        self._setup_filters()
+        self._setup_stat_cards()
+
+    def _setup_filters(self):
+        # Filtre ekle
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("Tüm Durumlar", None)
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Onay Bekliyor", "pending")
+        self.status_filter.addItem("Onaylandı", "approved")
+        self.status_filter.addItem("Reddedildi", "rejected")
+        self.status_filter.addItem("Sipariş Verildi", "ordered")
+        self.status_filter.setMinimumWidth(160)
+        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
+
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
+
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.CRM)
+        self.add_stat_card("draft", "Taslak", "0", "warning", ICONS.TIME)
+        self.add_stat_card("pending", "Bekleyen", "0", "warning", ICONS.TIME)
+        self.add_stat_card("approved", "Onaylı", "0", "success", ICONS.CHECK)
+        self.add_stat_card("rejected", "Ret", "0", "danger", ICONS.DANGER)
 
     def _connect_signals(self):
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
@@ -210,78 +180,84 @@ class PurchaseRequestListPage(QWidget):
                 )
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, req)
+                status = req.get("status", "draft")
+                actions = ["view"]
 
-        self.table.setRowHeight(row, 52)
+                if status == "draft":
+                    actions.extend(["edit", "delete"])
+                elif status == "pending":
+                    actions.extend(["approve", "cancel"])  # cancel here means reject
+                elif status == "approved":
+                    actions.append("order")
+
+                callbacks = {
+                    "view": lambda _, rid=req_id: self.view_clicked.emit(rid),
+                    "edit": lambda _, rid=req_id: self.edit_clicked.emit(rid),
+                    "delete": lambda _, rid=req_id: self._confirm_delete(rid),
+                    "approve": lambda _, rid=req_id: self.approve_clicked.emit(rid),
+                    "cancel": lambda _, rid=req_id: self.reject_clicked.emit(rid),
+                    "order": lambda _, rid=req_id: self.create_order_clicked.emit(rid),
+                }
+
+                # Özel butonlar için manuel gruplama
+                widget = QWidget()
+                layout = QHBoxLayout(widget)
+                layout.setContentsMargins(4, 2, 4, 2)
+                layout.setSpacing(4)
+
+                from ui.components.action_buttons import (
+                    create_view_button,
+                    create_edit_button,
+                    create_delete_button,
+                    create_approve_button,
+                    create_cancel_button,
+                    create_custom_button,
+                )
+
+                if "view" in actions:
+                    btn = create_view_button(widget)
+                    btn.clicked.connect(callbacks["view"])
+                    layout.addWidget(btn)
+
+                if "edit" in actions:
+                    btn = create_edit_button(widget)
+                    btn.clicked.connect(callbacks["edit"])
+                    layout.addWidget(btn)
+
+                if "approve" in actions:
+                    btn = create_approve_button(widget)
+                    btn.clicked.connect(callbacks["approve"])
+                    layout.addWidget(btn)
+
+                if "cancel" in actions:
+                    btn = create_cancel_button(widget)
+                    btn.setToolTip("Reddet")
+                    btn.clicked.connect(callbacks["cancel"])
+                    layout.addWidget(btn)
+
+                if "order" in actions:
+                    btn = create_custom_button(
+                        widget, ICONS.INVENTORY, "Sipariş Oluştur", "purple"
+                    )
+                    btn.clicked.connect(callbacks["order"])
+                    layout.addWidget(btn)
+
+                if "delete" in actions:
+                    btn = create_delete_button(widget)
+                    btn.clicked.connect(callbacks["delete"])
+                    layout.addWidget(btn)
+
+                layout.addStretch()
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _format_date(self, dt) -> str:
+        from datetime import date
+
         if dt:
             if isinstance(dt, date):
                 return dt.strftime("%d.%m.%Y")
             return str(dt)
         return "-"
-
-    def _add_action_buttons(self, row: int, col: int, req: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
-        req_id = req.get("id")
-        status = req.get("status", "draft")
-
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(
-            lambda checked, rid=req_id: self.view_clicked.emit(rid)
-        )
-        btn_layout.addWidget(view_btn)
-
-        if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, rid=req_id: self.edit_clicked.emit(rid)
-            )
-            btn_layout.addWidget(edit_btn)
-
-        if status == "pending":
-            approve_btn = QPushButton("✓")
-            approve_btn.setFixedSize(28, 26)
-            approve_btn.setToolTip("Onayla")
-            approve_btn.clicked.connect(
-                lambda checked, rid=req_id: self.approve_clicked.emit(rid)
-            )
-            btn_layout.addWidget(approve_btn)
-
-            reject_btn = QPushButton("✗")
-            reject_btn.setFixedSize(28, 26)
-            reject_btn.setToolTip("Reddet")
-            reject_btn.clicked.connect(
-                lambda checked, rid=req_id: self.reject_clicked.emit(rid)
-            )
-            btn_layout.addWidget(reject_btn)
-
-        if status == "approved":
-            order_btn = QPushButton("📦")
-            order_btn.setFixedSize(28, 26)
-            order_btn.setToolTip("Sipariş Oluştur")
-            order_btn.clicked.connect(
-                lambda checked, rid=req_id: self.create_order_clicked.emit(rid)
-            )
-            btn_layout.addWidget(order_btn)
-
-        if status == "draft":
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, rid=req_id: self._confirm_delete(rid)
-            )
-            btn_layout.addWidget(del_btn)
-
-        self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):
         total = len(self.requests)

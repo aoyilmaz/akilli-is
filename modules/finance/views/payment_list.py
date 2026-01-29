@@ -4,39 +4,30 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QTableWidgetItem,
     QComboBox,
     QDateEdit,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate, QSize
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
 import qtawesome as qta
 from decimal import Decimal
 
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 from config.icons import ICONS
 
 
-class PaymentListPage(QWidget):
+class PaymentListPage(BaseListPage):
     """Ödeme listesi sayfası."""
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
+    # Sinyaller (Ek sinyaller)
+    # add, edit, delete, view, refresh zaten BaseListPage'de var
 
     STATUS_MAP = {
         "pending": ("Beklemede", "#f59e0b", ICONS.TIME),
@@ -53,29 +44,36 @@ class PaymentListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.payments = []
-        self._setup_ui()
-        self._connect_signals()
+        columns = [
+            ColumnConfig("payment_no", "Ödeme No", width=120),
+            ColumnConfig("payment_date", "Tarih", width=100),
+            ColumnConfig("supplier_name", "Tedarikçi", stretch=True),
+            ColumnConfig("amount", "Tutar", width=120),
+            ColumnConfig("payment_method", "Ödeme Yöntemi", width=130),
+            ColumnConfig("status", "Durum", width=110),
+            ColumnConfig("description", "Açıklama", width=150),
+            ColumnConfig("actions", "İşlemler", width=120),
+        ]
 
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
+        super().__init__(
             title="Ödemeler",
             icon=ICONS.PAYMENT,
+            table_id="payment_list",
+            columns=columns,
+            show_stats=True,
             show_search=True,
             show_refresh=True,
             show_add=True,
             add_text="Yeni Ödeme",
             search_placeholder="No, tedarikçi ara...",
-            parent=self,
+            parent=parent,
         )
-        layout.addWidget(self.header)
 
+        self.payments = []
+        self._setup_filters()
+        self._setup_stat_cards()
+
+    def _setup_filters(self):
         # Filtre alanı
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(12)
@@ -104,57 +102,23 @@ class PaymentListPage(QWidget):
         filter_layout.addWidget(self.status_combo)
 
         filter_layout.addStretch()
-        layout.addLayout(filter_layout)
 
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
+        # Header'a filtreleri ekle (veya kendi layoutuna ekle)
+        # BaseListPage'de header var ancak filtreleri header altına koymak daha iyi olabilir
+        # Şimdilik mevcut yapıdaki gibi header altına ekleyelim
+        self.layout().insertLayout(1, filter_layout)
 
-        self.stat_cards = {}
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.INVENTORY
-        )
-        self.stat_cards["completed"] = MiniStatCard(
-            "Tamamlanan", "0", "success", icon=ICONS.SUCCESS
-        )
-        self.stat_cards["amount"] = MiniStatCard(
-            "Toplam Tutar", "₺0", "error", icon=ICONS.MONEY
-        )
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
+        self.add_stat_card("completed", "Tamamlanan", "0", "success", ICONS.SUCCESS)
+        self.add_stat_card("amount", "Toplam Tutar", "₺0", "danger", ICONS.MONEY)
 
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
-        columns = [
-            ColumnConfig("payment_no", "Ödeme No", width=120),
-            ColumnConfig("payment_date", "Tarih", width=100),
-            ColumnConfig("supplier_name", "Tedarikçi", stretch=True),
-            ColumnConfig("amount", "Tutar", width=120),
-            ColumnConfig("payment_method", "Ödeme Yöntemi", width=130),
-            ColumnConfig("status", "Durum", width=110),
-            ColumnConfig("description", "Açıklama", width=150),
-            ColumnConfig("actions", "İşlemler", width=120),
-        ]
-
-        self.table = EnhancedTableWidget(
-            table_id="payment_list",
-            columns=columns,
-            parent=self,
-        )
-        layout.addWidget(self.table)
+    def _connect_signals(self):
+        super()._connect_signals()
 
         # Alt bilgi
         self.count_label = QLabel("Toplam: 0 ödeme")
-        layout.addWidget(self.count_label)
-
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
+        self.layout().addWidget(self.count_label)
 
     def load_data(self, payments: list):
         self.payments = payments
@@ -172,9 +136,9 @@ class PaymentListPage(QWidget):
                 total_amount += Decimal(str(pmt.get("amount", 0) or 0))
 
         # Kartları güncelle
-        self.stat_cards["total"].update_value(str(len(payments)))
-        self.stat_cards["completed"].update_value(str(completed))
-        self.stat_cards["amount"].update_value(f"₺{total_amount:,.2f}")
+        self.update_stat_card("total", str(len(payments)))
+        self.update_stat_card("completed", str(completed))
+        self.update_stat_card("amount", f"₺{total_amount:,.2f}")
 
         self.count_label.setText(f"Toplam: {len(payments)} ödeme")
 
@@ -219,15 +183,8 @@ class PaymentListPage(QWidget):
 
             elif col_key == "status":
                 status = pmt.get("status", "")
-                # STATUS_MAP artık 3 değer döndürüyor: text, color, icon
-                # Ancak eski koda uyumlu olması için get ile default'u tuple 3'lü yapalım
-                status_Info = self.STATUS_MAP.get(status, (status, "#ffffff", ""))
-                if len(status_Info) == 3:
-                    text, color, icon = status_Info
-                else:
-                    text, color = status_Info
-                    icon = ""
-
+                status_info = self.STATUS_MAP.get(status, (status, "#ffffff", ""))
+                text, color, icon = status_info
                 item = QTableWidgetItem(text)
                 item.setForeground(QColor(color))
                 if icon:
@@ -240,37 +197,17 @@ class PaymentListPage(QWidget):
                 )
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, pmt)
+                actions = ["view"]
+                if pmt.get("status") != "cancelled":
+                    actions.append("cancel")
 
-        self.table.setRowHeight(row, 48)
+                callbacks = {
+                    "view": lambda sid=pmt_id: self.view_clicked.emit(sid),
+                    "cancel": lambda sid=pmt_id: self._confirm_cancel(sid),
+                }
 
-    def _add_action_buttons(self, row: int, col: int, pmt: dict):
-        pmt_id = pmt.get("id")
-
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(4, 4, 4, 4)
-        btn_layout.setSpacing(4)
-
-        view_btn = QPushButton()
-        view_btn.setIcon(qta.icon(ICONS.EYE, color="#475569"))
-        view_btn.setFixedSize(28, 26)
-        view_btn.setProperty("class", "action-view")
-        view_btn.clicked.connect(lambda: self.view_clicked.emit(pmt_id))
-        btn_layout.addWidget(view_btn)
-
-        if pmt.get("status") != "cancelled":
-            cancel_btn = QPushButton()
-            cancel_btn.setIcon(qta.icon(ICONS.CANCEL, color="#ef4444"))
-            cancel_btn.setFixedSize(28, 26)
-            cancel_btn.setProperty("class", "action-delete")
-            cancel_btn.setToolTip("İptal Et")
-            cancel_btn.clicked.connect(lambda: self._confirm_cancel(pmt_id))
-            btn_layout.addWidget(cancel_btn)
-
-        btn_layout.addStretch()
-        self.table.setCellWidget(row, col, btn_widget)
+                widget = self.table.create_action_widget(pmt_id, actions, callbacks)
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _on_search(self, text: str):
         text = text.lower()

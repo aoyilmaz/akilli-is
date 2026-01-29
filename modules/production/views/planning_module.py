@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox, QTabWidget
 from PyQt6.QtCore import pyqtSignal
 
 from .planning_page import ProductionPlanningPage
-from .capacity_analysis import CapacityAnalysisPage
+
 from database.models.production import WorkOrderStatus
 
 
@@ -40,11 +40,6 @@ class PlanningModule(QWidget):
         self.planning_page.operation_moved.connect(self._on_operation_rescheduled)
         self.tabs.addTab(self.planning_page, "📅 Gantt Şeması")
 
-        # 2. Tab: Kapasite Analizi
-        self.capacity_page = CapacityAnalysisPage()
-        self.capacity_page.refresh_requested.connect(self._load_capacity_data)
-        self.tabs.addTab(self.capacity_page, "📊 Kapasite Analizi")
-
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         layout.addWidget(self.tabs)
@@ -53,7 +48,6 @@ class PlanningModule(QWidget):
         super().showEvent(event)
         self._ensure_services()
         self._load_data()
-        self._load_capacity_data()
 
     def _ensure_services(self):
         """Servisleri yükle"""
@@ -66,9 +60,6 @@ class PlanningModule(QWidget):
 
                 self.wo_service = WorkOrderService()
                 self.ws_service = WorkStationService()
-
-                # Kapasite sayfasına servisleri ver
-                self.capacity_page.set_services(self.wo_service, self.ws_service)
 
             except Exception as e:
                 print(f"Servis yükleme hatası: {e}")
@@ -129,16 +120,6 @@ class PlanningModule(QWidget):
         """Sekme değiştiğinde veriyi yenile"""
         if index == 0:
             self._load_data()
-        elif index == 1:
-            self._load_capacity_data()
-
-    def _load_capacity_data(self):
-        """Kapasite verilerini yükle"""
-        # Servislerin yüklü olduğundan emin ol
-        self._ensure_services()
-
-        if hasattr(self, "capacity_page"):
-            self.capacity_page.load_data()
 
     def _load_data(self):
         """Gantt verilerini yükle"""
@@ -339,7 +320,7 @@ class PlanningModule(QWidget):
             if success:
                 # Verileri yenile
                 self._load_data()
-                self._load_capacity_data()
+
             else:
                 QMessageBox.warning(
                     self, "Hata", "Planlama güncellenemedi veya taşınamaz durumda."

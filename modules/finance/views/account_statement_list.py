@@ -1,39 +1,27 @@
 """
 Akilli Is - Cari Hesap Ekstresi Liste Sayfasi
-VS Code Dark Theme
 """
 
+from decimal import Decimal
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
     QFrame,
-    QHeaderView,
-    QAbstractItemView,
     QComboBox,
     QDateEdit,
     QGroupBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from decimal import Decimal
+import qtawesome as qta
 
-from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
-    ACCENT,
-    SUCCESS,
-    WARNING,
-    ERROR,
-    get_table_style,
-    get_button_style,
-)
+from config.icons import ICONS
+from ui.components.page_header import PageHeader
+from ui.components.stat_cards import MiniStatCard
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class AccountStatementListPage(QWidget):
@@ -54,93 +42,72 @@ class AccountStatementListPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header - PageHeader kullanimi
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Cari Hesap Ekstresi",
-            icon="📋",
+            icon=ICONS.FINANCE,
             show_search=False,
-            show_refresh=False,  # Custom refresh kullanacagiz
-            show_add=False,
+            show_refresh=True,
             show_export=True,
             parent=self,
         )
+        self.header.refresh_clicked.connect(self.refresh_requested.emit)
         self.header.export_clicked.connect(self._on_export)
-
-        # Custom Refresh Button to Header
-        h_layout = self.header.header_layout()
-
-        refresh_btn = QPushButton("🔄 Yenile")
-        refresh_btn.setProperty("class", "btn-refresh")
-        refresh_btn.setFixedHeight(36)
-        refresh_btn.clicked.connect(self.refresh_requested.emit)
-        h_layout.insertWidget(h_layout.count() - 1, refresh_btn)  # Before Export
-
         layout.addWidget(self.header)
 
         # Filtre alani
         filter_group = QGroupBox("Filtreler")
-        filter_group.setStyleSheet(self._group_style())
-
         filter_layout = QHBoxLayout(filter_group)
         filter_layout.setSpacing(16)
 
         # Cari tipi
         type_layout = QVBoxLayout()
-        type_label = QLabel("Cari Tipi")
-        type_layout.addWidget(type_label)
-
+        type_layout.addWidget(QLabel("Cari Tipi"))
         self.type_combo = QComboBox()
-        self.type_combo.addItem("Musteri", "customer")
-        self.type_combo.addItem("Tedarikci", "supplier")
+        self.type_combo.addItem("Müşteri", "customer")
+        self.type_combo.addItem("Tedarikçi", "supplier")
         self.type_combo.setFixedWidth(150)
-        self.type_combo.setStyleSheet(self._combo_style())
+        self.type_combo.setFixedHeight(36)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
         type_layout.addWidget(self.type_combo)
         filter_layout.addLayout(type_layout)
 
         # Cari secimi
         entity_layout = QVBoxLayout()
-        entity_label = QLabel("Cari Hesap")
-        entity_layout.addWidget(entity_label)
-
+        entity_layout.addWidget(QLabel("Cari Hesap"))
         self.entity_combo = QComboBox()
         self.entity_combo.setFixedWidth(250)
-        self.entity_combo.setStyleSheet(self._combo_style())
+        self.entity_combo.setFixedHeight(36)
         self.entity_combo.currentIndexChanged.connect(self._on_entity_changed)
         entity_layout.addWidget(self.entity_combo)
         filter_layout.addLayout(entity_layout)
 
         # Tarih araligi
         date_from_layout = QVBoxLayout()
-        date_from_label = QLabel("Baslangic Tarihi")
-        date_from_layout.addWidget(date_from_label)
-
+        date_from_layout.addWidget(QLabel("Başlangıç Tarihi"))
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
         self.date_from.setDate(QDate.currentDate().addMonths(-1))
         self.date_from.setFixedWidth(140)
-        self.date_from.setStyleSheet(self._date_style())
+        self.date_from.setFixedHeight(36)
         date_from_layout.addWidget(self.date_from)
         filter_layout.addLayout(date_from_layout)
 
         date_to_layout = QVBoxLayout()
-        date_to_label = QLabel("Bitis Tarihi")
-        date_to_layout.addWidget(date_to_label)
-
+        date_to_layout.addWidget(QLabel("Bitiş Tarihi"))
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
         self.date_to.setDate(QDate.currentDate())
         self.date_to.setFixedWidth(140)
-        self.date_to.setStyleSheet(self._date_style())
+        self.date_to.setFixedHeight(36)
         date_to_layout.addWidget(self.date_to)
         filter_layout.addLayout(date_to_layout)
 
         # Filtrele butonu
-        filter_btn = QPushButton("⚡ Filtrele")
-        filter_btn.setFixedSize(110, 42)
-        filter_btn.setStyleSheet(get_button_style("filter"))
+        filter_btn = QPushButton("Filtrele")
+        filter_btn.setIcon(qta.icon(ICONS.FILTER, color="#ffffff"))
+        filter_btn.setFixedSize(120, 36)
+        filter_btn.setProperty("class", "btn-primary")
         filter_btn.clicked.connect(self.refresh_requested.emit)
         filter_layout.addWidget(filter_btn, alignment=Qt.AlignmentFlag.AlignBottom)
 
@@ -149,151 +116,39 @@ class AccountStatementListPage(QWidget):
 
         # Ozet kartlari
         summary_layout = QHBoxLayout()
-        summary_layout.setSpacing(12)
-
-        self.opening_card = self._create_stat_card("Acilis", "0.00 TL", ACCENT)
-        summary_layout.addWidget(self.opening_card)
-
-        self.debit_card = self._create_stat_card("Toplam Borc", "0.00 TL", ERROR)
-        summary_layout.addWidget(self.debit_card)
-
-        self.credit_card = self._create_stat_card("Toplam Alacak", "0.00 TL", SUCCESS)
-        summary_layout.addWidget(self.credit_card)
-
-        self.balance_card = self._create_stat_card("Bakiye", "0.00 TL", WARNING)
-        summary_layout.addWidget(self.balance_card)
-
+        summary_layout.setSpacing(16)
+        self.stat_cards = {
+            "opening": MiniStatCard("Açılış", "0.00 TL", "info", icon=ICONS.MONEY),
+            "debit": MiniStatCard("Toplam Borç", "0.00 TL", "error", icon=ICONS.DANGER),
+            "credit": MiniStatCard(
+                "Toplam Alacak", "0.00 TL", "success", icon=ICONS.CHECK
+            ),
+            "balance": MiniStatCard("Bakiye", "0.00 TL", "warning", icon=ICONS.TIME),
+        }
+        for card in self.stat_cards.values():
+            summary_layout.addWidget(card)
         summary_layout.addStretch()
         layout.addLayout(summary_layout)
 
         # Hareket tablosu
-        self.table = QTableWidget()
-        self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels(
-            ["Tarih", "Hareket No", "Tur", "Aciklama", "Borc", "Alacak", "Bakiye"]
+        cols = [
+            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("transaction_no", "Hareket No", width=130),
+            ColumnConfig("type", "Tür", width=100),
+            ColumnConfig("description", "Açıklama", width=300, stretch=True),
+            ColumnConfig("debit", "Borç", width=120),
+            ColumnConfig("credit", "Alacak", width=120),
+            ColumnConfig("balance", "Bakiye", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="finance_statement", columns=cols, parent=self
         )
-        self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setShowGrid(False)
-
-        # Kolon genislikleri
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-
-        self.table.setColumnWidth(0, 100)
-        self.table.setColumnWidth(1, 130)
-        self.table.setColumnWidth(2, 100)
-        self.table.setColumnWidth(4, 120)
-        self.table.setColumnWidth(5, 120)
-        self.table.setColumnWidth(6, 120)
-
         layout.addWidget(self.table)
-
-    def _group_style(self) -> str:
-        return f"""
-            QGroupBox {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 12px;
-                padding: 16px;
-                margin-top: 8px;
-                color: {TEXT_PRIMARY};
-                font-weight: bold;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 8px;
-            }}
-        """
-
-    def _combo_style(self) -> str:
-        return f"""
-            QComboBox {{
-                background-color: {BG_PRIMARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: {TEXT_PRIMARY};
-                font-size: 14px;
-            }}
-            QComboBox:focus {{ border-color: {ACCENT}; }}
-            QComboBox::drop-down {{
-                border: none;
-                padding-right: 10px;
-            }}
-            QComboBox::down-arrow {{
-                image: none;
-                border: none;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                selection-background-color: {ACCENT};
-                color: {TEXT_PRIMARY};
-            }}
-        """
-
-    def _date_style(self) -> str:
-        return f"""
-            QDateEdit {{
-                background-color: {BG_PRIMARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-                padding: 10px 14px;
-                color: {TEXT_PRIMARY};
-                font-size: 14px;
-            }}
-            QDateEdit:focus {{ border-color: {ACCENT}; }}
-            QDateEdit::drop-down {{
-                border: none;
-                padding-right: 10px;
-            }}
-        """
-
-    def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
-        card = QFrame()
-        card.setFixedSize(180, 80)
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {BG_SECONDARY};
-                border: 1px solid {BORDER};
-                border-radius: 8px;
-            }}
-        """
-        )
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        layout.addWidget(value_label)
-
-        return card
-
-    def _update_card(self, card: QFrame, value: str):
-        label = card.findChild(QLabel, "value")
-        if label:
-            label.setText(value)
 
     def load_entities(self, entity_type: str, entities: list):
         """Cari listesini yukle"""
         self.entity_combo.clear()
-        self.entity_combo.addItem("Secin...", None)
-
+        self.entity_combo.addItem("Seçin...", None)
         for entity in entities:
             display = f"{entity.get('code', '')} - {entity.get('name', '')}"
             self.entity_combo.addItem(display, entity.get("id"))
@@ -301,91 +156,88 @@ class AccountStatementListPage(QWidget):
     def load_data(self, movements: list, summary: dict = None):
         """Hareket verilerini yukle"""
         self.statements = movements
-        self.table.setRowCount(0)
-
+        self.table.setRowCount(len(movements))
+        visible_cols = self.table.get_visible_columns()
         for row, mov in enumerate(movements):
-            self.table.insertRow(row)
+            self._populate_row(row, mov, visible_cols)
 
-            # Tarih
-            date_val = mov.get("date")
-            if hasattr(date_val, "strftime"):
-                date_str = date_val.strftime("%d.%m.%Y")
-            else:
-                date_str = str(date_val) if date_val else ""
-            self.table.setItem(row, 0, QTableWidgetItem(date_str))
-
-            # Hareket No
-            self.table.setItem(row, 1, QTableWidgetItem(mov.get("transaction_no", "")))
-
-            # Tur
-            type_map = {
-                "invoice": "Fatura",
-                "payment": "Odeme",
-                "receipt": "Tahsilat",
-                "opening": "Acilis",
-                "adjustment": "Duzeltme",
-            }
-            type_val = mov.get("type", "")
-            type_display = type_map.get(type_val, type_val)
-            type_item = QTableWidgetItem(type_display)
-            self.table.setItem(row, 2, type_item)
-
-            # Aciklama
-            self.table.setItem(row, 3, QTableWidgetItem(mov.get("description", "")))
-
-            # Borc
-            debit = mov.get("debit") or Decimal(0)
-            debit_item = QTableWidgetItem(f"{debit:,.2f}" if debit else "")
-            debit_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            if debit:
-                debit_item.setForeground(Qt.GlobalColor.red)
-            self.table.setItem(row, 4, debit_item)
-
-            # Alacak
-            credit = mov.get("credit") or Decimal(0)
-            credit_item = QTableWidgetItem(f"{credit:,.2f}" if credit else "")
-            credit_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            if credit:
-                credit_item.setForeground(Qt.GlobalColor.green)
-            self.table.setItem(row, 5, credit_item)
-
-            # Bakiye
-            balance = mov.get("balance") or Decimal(0)
-            balance_item = QTableWidgetItem(f"{balance:,.2f}")
-            balance_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 6, balance_item)
-
-            self.table.setRowHeight(row, 48)
-
-        # Ozet kartlarini guncelle
         if summary:
-            self._update_card(
-                self.debit_card, f"{summary.get('total_debit', 0):,.2f} TL"
-            )
-            self._update_card(
-                self.credit_card, f"{summary.get('total_credit', 0):,.2f} TL"
-            )
-            self._update_card(
-                self.balance_card, f"{summary.get('closing_balance', 0):,.2f} TL"
-            )
+            op = summary.get("opening_balance", 0)
+            self.stat_cards["opening"].update_value(f"₺{op:,.2f}")
+            db = summary.get("total_debit", 0)
+            self.stat_cards["debit"].update_value(f"₺{db:,.2f}")
+            cr = summary.get("total_credit", 0)
+            self.stat_cards["credit"].update_value(f"₺{cr:,.2f}")
+            cl = summary.get("closing_balance", 0)
+            self.stat_cards["balance"].update_value(f"₺{cl:,.2f}")
+
+    def _populate_row(self, row, mov, visible_cols):
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "date":
+                val = mov.get("date")
+                d_str = (
+                    val.strftime("%d.%m.%Y")
+                    if hasattr(val, "strftime")
+                    else str(val or "")
+                )
+                self.table.setItem(row, col_idx, QTableWidgetItem(d_str))
+            elif col_key == "transaction_no":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(mov.get("transaction_no", ""))
+                )
+            elif col_key == "type":
+                t_map = {
+                    "invoice": "Fatura",
+                    "payment": "Ödeme",
+                    "receipt": "Tahsilat",
+                    "opening": "Açılış",
+                    "adjustment": "Düzeltme",
+                }
+                self.table.setItem(
+                    row,
+                    col_idx,
+                    QTableWidgetItem(
+                        t_map.get(mov.get("type", ""), mov.get("type", ""))
+                    ),
+                )
+            elif col_key == "description":
+                self.table.setItem(
+                    row, col_idx, QTableWidgetItem(mov.get("description", ""))
+                )
+            elif col_key == "debit":
+                val = mov.get("debit") or Decimal(0)
+                item = QTableWidgetItem(f"{val:,.2f}" if val else "")
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if val:
+                    item.setForeground(Qt.GlobalColor.red)
+                self.table.setItem(row, col_idx, item)
+            elif col_key == "credit":
+                val = mov.get("credit") or Decimal(0)
+                item = QTableWidgetItem(f"{val:,.2f}" if val else "")
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if val:
+                    item.setForeground(Qt.GlobalColor.green)
+                self.table.setItem(row, col_idx, item)
+            elif col_key == "balance":
+                val = mov.get("balance") or Decimal(0)
+                item = QTableWidgetItem(f"{val:,.2f}")
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.table.setItem(row, col_idx, item)
 
     def _on_type_changed(self, index):
-        """Cari tipi degistiginde"""
         self.current_entity_type = self.type_combo.currentData()
         self.refresh_requested.emit()
 
     def _on_entity_changed(self, index):
-        """Cari secimi degistiginde"""
         self.current_entity_id = self.entity_combo.currentData()
 
     def _on_export(self):
-        """Excel'e aktar"""
         self.export_requested.emit(
             {
                 "entity_type": self.current_entity_type,
@@ -396,7 +248,6 @@ class AccountStatementListPage(QWidget):
         )
 
     def get_filter_data(self) -> dict:
-        """Filtre verilerini getir"""
         return {
             "entity_type": self.type_combo.currentData(),
             "entity_id": self.entity_combo.currentData(),

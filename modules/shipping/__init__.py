@@ -14,6 +14,7 @@ from .views import (
     VehicleModule,
     DriverModule,
     ShipmentModule,
+    FleetMainModule,
 )
 
 from .module import ShippingMainModule
@@ -27,6 +28,7 @@ __all__ = [
     "VehicleModule",
     "DriverModule",
     "ShipmentModule",
+    "FleetMainModule",
     # Main Module
     "ShippingMainModule",
 ]

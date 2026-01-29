@@ -58,8 +58,8 @@ def start_workflow_for_document(
         service = WorkflowService()
         instance = service.start_workflow(
             table_name=table_name,
-            doc_id=document_id,
-            user_id=initiated_by,
+            document_id=document_id,
+            initiated_by=initiated_by,
             document_no=document_no,
             context=context,
         )
@@ -95,7 +95,21 @@ def get_document_workflow_status(
 
     try:
         service = WorkflowService()
-        return service.get_document_workflow(table_name, document_id)
+        instance = service.get_document_workflow(table_name, document_id)
+
+        if not instance:
+            return None
+
+        # WorkflowInstance objesini dict'e çevir
+        return {
+            "instance_id": instance.id,
+            "workflow_name": instance.workflow.name if instance.workflow else None,
+            "status": instance.status.value if instance.status else None,
+            "current_step": instance.current_step.name if instance.current_step else None,
+            "initiated_by": instance.initiated_by,
+            "initiated_at": instance.initiated_at,
+            "can_approve": True,  # TODO: Yetki kontrolü eklenebilir
+        }
     except Exception as e:
         print(f"[Workflow Bridge] Workflow durumu alma hatası: {e}")
         return None

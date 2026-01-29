@@ -18,13 +18,12 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt
+import qtawesome as qta
 
-from config.styles import (
-    get_button_style,
-    BTN_HEIGHT_NORMAL,
-    ICONS,
-)
+from config.icons import ICONS
 from modules.hr.services import HRService
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class DepartmentFormDialog(QDialog):
@@ -41,7 +40,7 @@ class DepartmentFormDialog(QDialog):
 
     def setup_ui(self):
         self.setWindowTitle("Departman Düzenle" if self.dept_id else "Yeni Departman")
-        self.setMinimumSize(400, 300)
+        self.setMinimumSize(400, 350)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -53,39 +52,35 @@ class DepartmentFormDialog(QDialog):
         self.name = QLineEdit()
         form.addRow("Ad:", self.name)
 
-        self.parent = QComboBox()
-        form.addRow("Üst Departman:", self.parent)
+        self.parent_combo = QComboBox()
+        form.addRow("Üst Departman:", self.parent_combo)
 
         self.description = QTextEdit()
-        self.description.setMaximumHeight(80)
+        self.description.setMaximumHeight(100)
         form.addRow("Açıklama:", self.description)
 
         layout.addLayout(form)
 
-        # Butonlar
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
-        cancel_btn.setStyleSheet(get_button_style("cancel"))
-        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        cancel_btn = QPushButton("İptal")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton(f"{ICONS['save']} Kaydet")
-        save_btn.setStyleSheet(get_button_style("save"))
-        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        save_btn = QPushButton("Kaydet")
+        save_btn.setProperty("class", "btn-primary")
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 
         layout.addLayout(btn_layout)
 
     def load_combos(self):
-        self.parent.addItem("Yok (Ana Departman)", None)
+        self.parent_combo.addItem("Yok (Ana Departman)", None)
         try:
             for dept in self.service.get_all_departments():
                 if dept.id != self.dept_id:
-                    self.parent.addItem(dept.name, dept.id)
+                    self.parent_combo.addItem(dept.name, dept.id)
         except Exception:
             pass
 
@@ -97,31 +92,28 @@ class DepartmentFormDialog(QDialog):
                 self.name.setText(dept.name)
                 self.description.setPlainText(dept.description or "")
                 if dept.parent_id:
-                    idx = self.parent.findData(dept.parent_id)
+                    idx = self.parent_combo.findData(dept.parent_id)
                     if idx >= 0:
-                        self.parent.setCurrentIndex(idx)
+                        self.parent_combo.setCurrentIndex(idx)
         except Exception as e:
             QMessageBox.warning(self, "Hata", f"Yükleme hatası: {str(e)}")
 
     def save(self):
-        if not self.code.text().strip():
-            QMessageBox.warning(self, "Uyarı", "Kod alanı zorunludur.")
-        if not self.name.text().strip():
-            QMessageBox.warning(self, "Uyarı", "Ad alanı zorunludur.")
+        if not self.code.text().strip() or not self.name.text().strip():
+            QMessageBox.warning(self, "Uyarı", "Kod ve Ad alanları zorunludur.")
+            return
 
         try:
             data = {
                 "code": self.code.text().strip(),
                 "name": self.name.text().strip(),
                 "description": self.description.toPlainText().strip() or None,
-                "parent_id": self.parent.currentData(),
+                "parent_id": self.parent_combo.currentData(),
             }
-
             if self.dept_id:
                 self.service.update_department(self.dept_id, data)
             else:
                 self.service.create_department(data)
-
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
@@ -144,39 +136,34 @@ class DepartmentModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Departman Listesi",
-            icon="🏢",
+            icon=ICONS.BUILDING,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=True,
             add_text="Yeni Departman",
             parent=self,
         )
         self.header.add_clicked.connect(self._new_department)
-        self.header.show_refresh = True
         self.header.refresh_clicked.connect(self.load_data)
-
         layout.addWidget(self.header)
 
         # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            ["Kod", "Ad", "Üst Departman", "Çalışan Sayısı"]
+        columns = [
+            ColumnConfig("code", "Kod", width=120),
+            ColumnConfig("name", "Ad", width=250, stretch=True),
+            ColumnConfig("parent", "Üst Departman", width=200),
+            ColumnConfig("emp_count", "Çalışan Sayısı", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="hr_departments", columns=columns, parent=self
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.doubleClicked.connect(self._edit_department)
+        self.table.row_double_clicked.connect(self._edit_department)
         layout.addWidget(self.table)
 
     def _get_service(self):
@@ -199,30 +186,35 @@ class DepartmentModule(QWidget):
             }
 
             self.table.setRowCount(len(departments))
+            visible_cols = self.table.get_visible_columns()
             for row, dept in enumerate(departments):
-                self.table.setItem(row, 0, QTableWidgetItem(dept.code))
-                self.table.setItem(row, 1, QTableWidgetItem(dept.name))
-                self.table.setItem(
-                    row, 2, QTableWidgetItem(dept.parent.name if dept.parent else "-")
-                )
-                count = emp_counts.get(dept.name, 0)
-                self.table.setItem(row, 3, QTableWidgetItem(str(count)))
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, dept.id)
+                self._populate_row(row, dept, emp_counts, visible_cols)
         except Exception as e:
             QMessageBox.warning(self, "Uyarı", f"Hata: {str(e)}")
         finally:
             self._close_service()
+
+    def _populate_row(self, row, dept, emp_counts, visible_cols):
+        for col_idx, col_key in enumerate(visible_cols):
+            if col_key == "code":
+                item = QTableWidgetItem(dept.code)
+                item.setData(Qt.ItemDataRole.UserRole, dept.id)
+                self.table.setItem(row, col_idx, item)
+            elif col_key == "name":
+                self.table.setItem(row, col_idx, QTableWidgetItem(dept.name))
+            elif col_key == "parent":
+                p_text = dept.parent.name if dept.parent else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(p_text))
+            elif col_key == "emp_count":
+                count = emp_counts.get(dept.name, 0)
+                self.table.setItem(row, col_idx, QTableWidgetItem(str(count)))
 
     def _new_department(self):
         dialog = DepartmentFormDialog(parent=self)
         if dialog.exec():
             self.load_data()
 
-    def _edit_department(self):
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        dept_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+    def _edit_department(self, dept_id):
         dialog = DepartmentFormDialog(dept_id=dept_id, parent=self)
         if dialog.exec():
             self.load_data()

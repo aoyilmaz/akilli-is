@@ -17,6 +17,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 
+from config.icons import ICONS
+import qtawesome as qta
 from core.export_manager import ExportManager
 from core.label_manager import LabelManager
 from ui.components import (
@@ -39,14 +41,14 @@ class WorkOrderListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     STATUS_DISPLAY = {
-        "draft": ("📝 Taslak", "#94a3b8"),
-        "planned": ("📅 Planlandı", "#3b82f6"),
-        "released": ("🚀 Serbest", "#8b5cf6"),
-        "in_progress": ("🔄 Üretimde", "#f59e0b"),
-        "completed": ("✅ Tamamlandı", "#10b981"),
-        "quality_check": ("🔍 Kalite Kontrol", "#06b6d4"),
-        "closed": ("🔒 Kapatıldı", "#64748b"),
-        "cancelled": ("❌ İptal", "#ef4444"),
+        "draft": ("Taslak", "#94a3b8"),
+        "planned": ("Planlandı", "#3b82f6"),
+        "released": ("Serbest", "#8b5cf6"),
+        "in_progress": ("Üretimde", "#f59e0b"),
+        "completed": ("Tamamlandı", "#10b981"),
+        "quality_check": ("Kalite Kontrol", "#06b6d4"),
+        "closed": ("Kapatıldı", "#64748b"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     PRIORITY_DISPLAY = {
@@ -69,7 +71,7 @@ class WorkOrderListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="İş Emirleri",
-            icon="📋",
+            icon=ICONS.WORK_ORDER,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -83,7 +85,8 @@ class WorkOrderListPage(QWidget):
         if self.header.export_btn:
             export_menu = ExportManager.create_export_menu(self, self._get_export_data)
             export_menu.addSeparator()
-            label_action = QAction("🏷️ Etiket Bas", self)
+            label_action = QAction("Etiket Bas", self)
+            label_action.setIcon(qta.icon(ICONS.TAG, color="#ffffff"))
             label_action.triggered.connect(self._print_labels)
             export_menu.addAction(label_action)
             self.header.export_btn.setMenu(export_menu)
@@ -91,13 +94,14 @@ class WorkOrderListPage(QWidget):
         # Filtre ekle
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem("📝 Taslak", "draft")
-        self.status_combo.addItem("📅 Planlandı", "planned")
-        self.status_combo.addItem("🚀 Serbest", "released")
-        self.status_combo.addItem("🔄 Üretimde", "in_progress")
-        self.status_combo.addItem("🔍 Kalite Kontrol", "quality_check")
-        self.status_combo.addItem("✅ Tamamlandı", "completed")
-        self.status_combo.addItem("🔒 Kapatıldı", "closed")
+        self.status_combo.addItem("Taslak", "draft")
+        self.status_combo.addItem("Planlandı", "planned")
+        self.status_combo.addItem("Serbest", "released")
+        self.status_combo.addItem("Üretimde", "in_progress")
+        self.status_combo.addItem("Kalite Kontrol", "quality_check")
+        self.status_combo.addItem("Tamamlandı", "completed")
+        self.status_combo.addItem("Kapatıldı", "closed")
+        self.status_filter_label = QLabel("Durum:")
         self.status_combo.setMinimumWidth(140)
         self.status_combo.currentIndexChanged.connect(
             lambda: self.refresh_requested.emit()
@@ -106,7 +110,7 @@ class WorkOrderListPage(QWidget):
         if self.header.search_input:
             h_layout = self.header.header_layout()
             idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, QLabel("Durum:"))
+            h_layout.insertWidget(idx, self.status_filter_label)
             h_layout.insertWidget(idx + 1, self.status_combo)
 
         layout.addWidget(self.header)
@@ -116,10 +120,18 @@ class WorkOrderListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📋 Toplam", "0", "#6366f1")
-        self.stat_cards["in_progress"] = MiniStatCard("🔄 Üretimde", "0", "#f59e0b")
-        self.stat_cards["completed"] = MiniStatCard("✅ Tamamlanan", "0", "#10b981")
-        self.stat_cards["delayed"] = MiniStatCard("⚠️ Geciken", "0", "#ef4444")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.WORK_ORDER
+        )
+        self.stat_cards["in_progress"] = MiniStatCard(
+            "Üretimde", "0", "warning", icon=ICONS.PLAY
+        )
+        self.stat_cards["completed"] = MiniStatCard(
+            "Tamamlanan", "0", "success", icon=ICONS.CHECK
+        )
+        self.stat_cards["delayed"] = MiniStatCard(
+            "Geciken", "0", "error", icon=ICONS.WARNING
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -250,8 +262,6 @@ class WorkOrderListPage(QWidget):
                 item = QTableWidgetItem(text)
                 item.setForeground(QColor(color))
                 self.table.setItem(row, col_idx, item)
-
-        self.table.setRowHeight(row, 48)
 
     def get_status_filter(self) -> str:
         return self.status_combo.currentData()

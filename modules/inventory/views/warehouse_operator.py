@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
+import qtawesome as qta
+from config.icons import ICONS
 from ui.widgets.barcode_scanner import BarcodeInput
 
 
@@ -118,16 +120,46 @@ class WarehouseOperatorPage(QWidget):
         grid.setSpacing(20)
 
         buttons = [
-            ("📥", "MAL KABUL", "Mal kabul yerleştirme", self.open_putaway),
-            ("📦", "TOPLAMA", "Sipariş toplama (Picking)", self.open_picking),
-            ("🔄", "TRANSFER", "Depolar arası transfer", self.open_transfer),
-            ("📋", "SAYIM", "Stok sayım işlemi", self.open_count),
-            ("🔍", "STOK SORGULA", "Stok ve lokasyon sorgula", self.open_query),
-            ("📍", "ADRES OKUT", "Lokasyon barkodu okut", self.scan_location),
+            (
+                ICONS.IMPORT,
+                "MAL KABUL",
+                "Mal kabul yerleştirme",
+                self.open_putaway,
+                "#10b981",
+            ),
+            (
+                ICONS.CART,
+                "TOPLAMA",
+                "Sipariş toplama (Picking)",
+                self.open_picking,
+                "#f59e0b",
+            ),
+            (
+                ICONS.MOVEMENT,
+                "TRANSFER",
+                "Depolar arası transfer",
+                self.open_transfer,
+                "#3b82f6",
+            ),
+            (ICONS.CHECK, "SAYIM", "Stok sayım işlemi", self.open_count, "#8b5cf6"),
+            (
+                ICONS.SEARCH,
+                "STOK SORGULA",
+                "Stok ve lokasyon sorgula",
+                self.open_query,
+                "#06b6d4",
+            ),
+            (
+                ICONS.QR,
+                "ADRES OKUT",
+                "Lokasyon barkodu okut",
+                self.scan_location,
+                "#ef4444",
+            ),
         ]
 
-        for i, (icon, title, desc, callback) in enumerate(buttons):
-            btn = self._create_menu_button(icon, title, desc)
+        for i, (icon, title, desc, callback, color) in enumerate(buttons):
+            btn = self._create_menu_button(icon, title, desc, color)
             btn.clicked.connect(callback)
             row = i // 3
             col = i % 3
@@ -144,7 +176,9 @@ class WarehouseOperatorPage(QWidget):
 
         return widget
 
-    def _create_menu_button(self, icon: str, title: str, desc: str) -> QPushButton:
+    def _create_menu_button(
+        self, icon: str, title: str, desc: str, color: str = "#3b82f6"
+    ) -> QPushButton:
         """Büyük menü butonu"""
         btn = QPushButton()
         btn.setMinimumSize(200, 150)
@@ -154,9 +188,16 @@ class WarehouseOperatorPage(QWidget):
         layout = QVBoxLayout(btn)
         layout.setSpacing(8)
 
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Arial", 36))
+        icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        if icon.startswith("ph."):
+            pixmap = qta.icon(icon, color=color).pixmap(64, 64)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText(icon)
+            icon_label.setFont(QFont("Arial", 36))
+
         layout.addWidget(icon_label)
 
         title_label = QLabel(title)

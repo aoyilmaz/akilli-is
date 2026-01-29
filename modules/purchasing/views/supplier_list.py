@@ -6,19 +6,14 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QPushButton,
     QTableWidgetItem,
-    QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 
 from config.icons import ICONS
 from ui.components import (
     BaseListPage,
     ColumnConfig,
-    create_view_button,
-    create_edit_button,
-    create_delete_button,
 )
 
 
@@ -29,15 +24,27 @@ class SupplierListPage(BaseListPage):
         columns = [
             ColumnConfig("code", "Kod", width=100),
             ColumnConfig("name", "Tedarikçi Adı", width=200, stretch=True),
+            ColumnConfig("tax_number", "Vergi No", width=120, visible=False),
+            ColumnConfig("tax_office", "Vergi Dairesi", width=120, visible=False),
             ColumnConfig("phone", "Telefon", width=130),
+            ColumnConfig("mobile", "Mobil", width=130, visible=False),
             ColumnConfig("email", "E-posta", width=180),
+            ColumnConfig("contact_person", "Yetkili", width=150, visible=False),
             ColumnConfig("city", "Şehir", width=100),
+            ColumnConfig("district", "İlçe", width=100, visible=False),
+            ColumnConfig("address", "Adres", width=250, visible=False),
+            ColumnConfig("website", "Web Sitesi", width=150, visible=False),
             ColumnConfig("payment_term", "Vade (Gün)", width=80),
+            ColumnConfig("currency", "Döviz", width=60, visible=False),
+            ColumnConfig("credit_limit", "Limit", width=100, visible=False),
             ColumnConfig("rating", "Puan", width=80),
+            ColumnConfig("notes", "Notlar", width=200, visible=False),
+            ColumnConfig("created_at", "Kayıt Tarihi", width=140, visible=False),
+            ColumnConfig("updated_at", "Güncelleme", width=140, visible=False),
             ColumnConfig(
                 "actions",
                 "İşlemler",
-                width=120,
+                width=140,
                 resizable=False,
                 movable=False,
                 hideable=False,
@@ -62,10 +69,10 @@ class SupplierListPage(BaseListPage):
         self._setup_stat_cards()
 
     def _setup_stat_cards(self):
-        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
-        self.add_stat_card("active", "Aktif", "0", "#10b981", "✅")
-        self.add_stat_card("with_orders", "Siparişli", "0", "#f59e0b", "📦")
-        self.add_stat_card("credit", "Toplam Limit", "₺0", "#3b82f6", "💳")
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.BUILDING)
+        self.add_stat_card("active", "Aktif", "0", "success", ICONS.CHECK)
+        self.add_stat_card("with_orders", "Siparişli", "0", "warning", ICONS.CART)
+        self.add_stat_card("credit", "Toplam Limit", "₺0", "info", ICONS.MONEY)
 
     def load_data(self, suppliers: list):
         self.suppliers = suppliers
@@ -85,35 +92,33 @@ class SupplierListPage(BaseListPage):
         self.update_stat_card("credit", f"₺{total_credit:,.0f}")
 
         self.table.setRowCount(len(suppliers))
-        for row, sup in enumerate(suppliers):
-            self._populate_row(row, sup)
-
-    def _populate_row(self, row: int, sup: dict):
         visible_cols = self.table.get_visible_columns()
+        for row, sup in enumerate(suppliers):
+            self._populate_row(row, sup, visible_cols)
+
+    def _populate_row(self, row: int, sup: dict, visible_cols: list):
+        sup_id = sup.get("id")
 
         for col_idx, col_key in enumerate(visible_cols):
             if col_key == "code":
                 item = QTableWidgetItem(sup.get("code", ""))
-                item.setData(Qt.ItemDataRole.UserRole, sup.get("id"))
+                item.setData(Qt.ItemDataRole.UserRole, sup_id)
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "name":
                 self.table.setItem(row, col_idx, QTableWidgetItem(sup.get("name", "")))
 
             elif col_key == "phone":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(sup.get("phone", "") or "-")
-                )
+                val = sup.get("phone", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "email":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(sup.get("email", "") or "-")
-                )
+                val = sup.get("email", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "city":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(sup.get("city", "") or "-")
-                )
+                val = sup.get("city", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(val))
 
             elif col_key == "payment_term":
                 vade = sup.get("payment_term_days", 0) or 0
@@ -125,36 +130,38 @@ class SupplierListPage(BaseListPage):
                 self.table.setItem(row, col_idx, QTableWidgetItem(stars))
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, sup.get("id"))
+                callbacks = {
+                    "view": lambda rid=sup_id: self.view_clicked.emit(rid),
+                    "edit": lambda rid=sup_id: self.edit_clicked.emit(rid),
+                    "delete": lambda rid=sup_id: self._confirm_delete(rid),
+                }
 
-        self.table.setRowHeight(row, 52)
+                # GRUPLAMA
+                widget = QWidget()
+                layout = QHBoxLayout(widget)
+                layout.setContentsMargins(4, 2, 4, 2)
+                layout.setSpacing(4)
 
-    def _add_action_buttons(self, row: int, col: int, supplier_id: int):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(4, 4, 4, 4)
-        btn_layout.setSpacing(4)
+                from ui.components.action_buttons import (
+                    create_view_button,
+                    create_edit_button,
+                    create_delete_button,
+                )
 
-        view_btn = create_view_button()
-        view_btn.clicked.connect(
-            lambda checked, sid=supplier_id: self.view_clicked.emit(sid)
-        )
-        btn_layout.addWidget(view_btn)
+                btn_view = create_view_button(widget)
+                btn_view.clicked.connect(callbacks["view"])
+                layout.addWidget(btn_view)
 
-        edit_btn = create_edit_button()
-        edit_btn.clicked.connect(
-            lambda checked, sid=supplier_id: self.edit_clicked.emit(sid)
-        )
-        btn_layout.addWidget(edit_btn)
+                btn_edit = create_edit_button(widget)
+                btn_edit.clicked.connect(callbacks["edit"])
+                layout.addWidget(btn_edit)
 
-        del_btn = create_delete_button()
-        del_btn.clicked.connect(
-            lambda checked, sid=supplier_id: self._confirm_delete(sid)
-        )
-        btn_layout.addWidget(del_btn)
+                btn_del = create_delete_button(widget)
+                btn_del.clicked.connect(callbacks["delete"])
+                layout.addWidget(btn_del)
 
-        self.table.setCellWidget(row, col, btn_widget)
+                layout.addStretch()
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _confirm_delete(self, supplier_id: int):
         if self.confirm_delete("tedarikçi"):

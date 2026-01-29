@@ -222,7 +222,7 @@ class UnitManagementPage(QWidget):
 
         self.header = PageHeader(
             title="Birim Yönetimi",
-            icon="📏",
+            icon="ph.ruler",  # Explicit icon
             show_search=False,
             show_refresh=True,
             show_add=True,
@@ -235,18 +235,27 @@ class UnitManagementPage(QWidget):
         # Custom Action Button for Header
         h_layout = self.header.header_layout()
 
-        # Add Stretch to push buttons to right (if not already there)
-        # PageHeader usually handles this, but let's be safe or just add to the layout
-
         new_conv_btn = QPushButton("Yeni Dönüşüm")
         new_conv_btn.setProperty("class", "btn-secondary")
-        new_conv_btn.setIcon(QIcon(":/icons/exchange.png"))  # Optional if icon exists
+        new_conv_btn.setIcon(
+            qta.icon(
+                ICONS.EXCHANGE if hasattr(ICONS, "EXCHANGE") else ICONS.REFRESH,
+                color="#475569",
+            )
+        )
         new_conv_btn.clicked.connect(self._add_conversion)
 
-        # Insert before the standard ADD button if possible, or append
-        h_layout.insertWidget(
-            h_layout.count() - 2, new_conv_btn
-        )  # Approximate position
+        # Insert before the standard ADD button if possible
+        if self.header.add_btn:
+            idx = h_layout.indexOf(self.header.add_btn)
+            h_layout.insertWidget(idx, new_conv_btn)
+        else:
+            h_layout.addWidget(new_conv_btn)
+
+        # Move Refresh button to the far right
+        if self.header.refresh_btn:
+            h_layout.removeWidget(self.header.refresh_btn)
+            h_layout.addWidget(self.header.refresh_btn)
 
         layout.addWidget(self.header)
 

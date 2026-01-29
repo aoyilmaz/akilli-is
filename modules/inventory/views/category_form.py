@@ -4,245 +4,227 @@ Akıllı İş - Kategori Form Sayfası
 
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QTextEdit, QComboBox, QCheckBox, QFrame,
-    QFormLayout, QMessageBox, QGridLayout
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QTextEdit,
+    QComboBox,
+    QCheckBox,
+    QFrame,
+    QFormLayout,
+    QMessageBox,
+    QGridLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import qtawesome as qta
 
+from config.icons import ICONS
+from ui.components import PageHeader
 from database.models import ItemCategory
 
-# Emoji seçenekleri
 CATEGORY_ICONS = [
-    "📁", "📂", "🗂️", "📦", "📋", "🏷️",
-    "🧱", "⚙️", "🔧", "🔩", "🛠️", "⚡",
-    "🎨", "🧪", "💊", "🧴", "🧹", "📱",
-    "💻", "🖥️", "⌨️", "🖨️", "📷", "🔌",
-    "🍎", "🥤", "🍞", "🧀", "🥩", "🐟",
-    "👕", "👖", "👟", "👜", "💍", "⌚",
-    "🚗", "✈️", "🚢", "🏠", "🏢", "🏭",
+    "📁",
+    "📂",
+    "🗂️",
+    "📦",
+    "📋",
+    "🏷️",
+    "🧱",
+    "⚙️",
+    "🔧",
+    "🔩",
+    "🛠️",
+    "⚡",
+    "🎨",
+    "🧪",
+    "💊",
+    "🧴",
+    "🧹",
+    "📱",
+    "💻",
+    "🖥️",
+    "⌨️",
+    "🖨️",
+    "📷",
+    "🔌",
+    "🍎",
+    "🥤",
+    "🍞",
+    "🧀",
+    "🥩",
+    "🐟",
+    "👕",
+    "👖",
+    "👟",
+    "👜",
+    "💍",
+    "⌚",
+    "🚗",
+    "✈️",
+    "🚢",
+    "🏠",
+    "🏢",
+    "🏭",
 ]
+
 
 class CategoryFormPage(QWidget):
     """Kategori ekleme/düzenleme formu"""
-    
-    saved = pyqtSignal(dict)
-    cancelled = pyqtSignal()
-    
-    def __init__(self, category: Optional[ItemCategory] = None, parent_id: Optional[int] = None, parent=None):
+
+    saved, cancelled = pyqtSignal(dict), pyqtSignal()
+
+    def __init__(
+        self,
+        category: Optional[ItemCategory] = None,
+        parent_id: Optional[int] = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.category = category
-        self.parent_id = parent_id  # Alt kategori eklerken üst kategori ID'si
+        self.parent_id = parent_id
         self.is_edit_mode = category is not None
         self.selected_icon = "📁"
         self.setup_ui()
         if self.is_edit_mode:
             self.load_data()
-        
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
-        
-        # === Başlık ===
-        header_layout = QHBoxLayout()
-        
-        back_btn = QPushButton("← Geri")
-        back_btn.clicked.connect(self.cancelled.emit)
-        header_layout.addWidget(back_btn)
-        
-        title_text = "Kategori Düzenle" if self.is_edit_mode else "Yeni Kategori"
-        title = QLabel(title_text)
-        header_layout.addWidget(title)
-        
-        header_layout.addStretch()
-        
-        save_btn = QPushButton("💾 Kaydet")
-        save_btn.clicked.connect(self._on_save)
-        header_layout.addWidget(save_btn)
-        
-        layout.addLayout(header_layout)
-        
-        # === Form ===
-        form_frame = QFrame()
-        form_layout = QVBoxLayout(form_frame)
-        form_layout.setContentsMargins(24, 24, 24, 24)
-        form_layout.setSpacing(20)
-        
-        # --- İkon Seçimi ---
-        icon_section = QVBoxLayout()
-        icon_label = QLabel("📁 Kategori İkonu")
-        icon_section.addWidget(icon_label)
-        
-        icon_grid = QGridLayout()
-        icon_grid.setSpacing(8)
-        
-        self.icon_buttons = []
+        tt = "Kategori Düzenle" if self.is_edit_mode else "Yeni Kategori"
+        self.header = PageHeader(
+            title=tt, icon=ICONS.INVENTORY, show_back=True, parent=self
+        )
+        self.header.back_clicked.connect(self.cancelled.emit)
+        sb = QPushButton("Kaydet")
+        sb.setProperty("class", "btn-primary")
+        sb.setFixedHeight(36)
+        sb.setIcon(qta.icon(ICONS.SAVE, color="#ffffff"))
+        sb.clicked.connect(self._on_save)
+        self.header.header_layout().addWidget(sb)
+        layout.addWidget(self.header)
+
+        ff = QFrame()
+        fl = QVBoxLayout(ff)
+        fl.setContentsMargins(24, 24, 24, 24)
+        fl.setSpacing(20)
+        isec = QVBoxLayout()
+        isec.addWidget(QLabel("📂 Kategori İkonu"))
+        ig = QGridLayout()
+        ig.setSpacing(8)
+        self.icon_btns = []
         for i, icon in enumerate(CATEGORY_ICONS):
             btn = QPushButton(icon)
             btn.setFixedSize(48, 48)
             btn.setCheckable(True)
-            btn.clicked.connect(lambda checked, ic=icon, b=btn: self._select_icon(ic, b))
-            icon_grid.addWidget(btn, i // 12, i % 12)
-            self.icon_buttons.append(btn)
-            
-            # İlk ikonu seç
+            btn.clicked.connect(lambda chk, ic=icon, b=btn: self._select_icon(ic, b))
+            ig.addWidget(btn, i // 12, i % 12)
+            self.icon_btns.append(btn)
             if i == 0:
                 btn.setChecked(True)
-        
-        icon_section.addLayout(icon_grid)
-        form_layout.addLayout(icon_section)
-        
-        # --- Temel Bilgiler ---
-        basic_layout = QHBoxLayout()
-        basic_layout.setSpacing(24)
-        
-        # Sol kolon
-        left_form = QFormLayout()
-        left_form.setSpacing(16)
-        
-        # Kod
-        code_layout = QHBoxLayout()
-        self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("KAT001")
-        auto_btn = QPushButton("🔄")
-        auto_btn.setFixedWidth(40)
-        auto_btn.clicked.connect(self._generate_code)
-        code_layout.addWidget(self.code_input)
-        code_layout.addWidget(auto_btn)
-        left_form.addRow("Kategori Kodu *", code_layout)
-        
-        # Ad
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Kategori adı")
-        left_form.addRow("Kategori Adı *", self.name_input)
-        
-        # Üst Kategori
+        isec.addLayout(ig)
+        fl.addLayout(isec)
+        bl = QHBoxLayout()
+        bl.setSpacing(24)
+        lf = QFormLayout()
+        lf.setSpacing(16)
+        cl = QHBoxLayout()
+        self.code_in = QLineEdit()
+        self.code_in.setPlaceholderText("KAT001")
+        ab = QPushButton()
+        ab.setFixedWidth(40)
+        ab.setIcon(qta.icon(ICONS.REFRESH, color="#475569"))
+        ab.clicked.connect(self._generate_code)
+        cl.addWidget(self.code_in)
+        cl.addWidget(ab)
+        lf.addRow("Kategori Kodu *", cl)
+        self.name_in = QLineEdit()
+        self.name_in.setPlaceholderText("Kategori adı")
+        lf.addRow("Kategori Adı *", self.name_in)
         self.parent_combo = QComboBox()
         self.parent_combo.addItem("— Ana Kategori —", None)
-        left_form.addRow("Üst Kategori", self.parent_combo)
-        
-        basic_layout.addLayout(left_form)
-        
-        # Sağ kolon
-        right_form = QFormLayout()
-        right_form.setSpacing(16)
-        
-        # Renk
-        self.color_input = QLineEdit()
-        self.color_input.setPlaceholderText("#6366f1")
-        self.color_input.setMaxLength(7)
-        right_form.addRow("Renk (Hex)", self.color_input)
-        
-        # Açıklama
-        self.description_input = QTextEdit()
-        self.description_input.setPlaceholderText("Kategori açıklaması...")
-        self.description_input.setMaximumHeight(80)
-        right_form.addRow("Açıklama", self.description_input)
-        
-        # Aktif
-        self.is_active_check = QCheckBox("Aktif")
-        self.is_active_check.setChecked(True)
-        right_form.addRow("", self.is_active_check)
-        
-        basic_layout.addLayout(right_form)
-        
-        form_layout.addLayout(basic_layout)
-        
-        layout.addWidget(form_frame)
+        lf.addRow("Üst Kategori", self.parent_combo)
+        bl.addLayout(lf)
+        rf = QFormLayout()
+        rf.setSpacing(16)
+        self.color_in = QLineEdit()
+        self.color_in.setPlaceholderText("#6366f1")
+        self.color_in.setMaxLength(7)
+        rf.addRow("Renk (Hex)", self.color_in)
+        self.desc_in = QTextEdit()
+        self.desc_in.setPlaceholderText("Kategori açıklaması...")
+        self.desc_in.setMaximumHeight(80)
+        rf.addRow("Açıklama", self.desc_in)
+        self.active_chk = QCheckBox("Aktif")
+        self.active_chk.setChecked(True)
+        rf.addRow("", self.active_chk)
+        bl.addLayout(rf)
+        fl.addLayout(bl)
+        layout.addWidget(ff)
         layout.addStretch()
-        
-    def load_categories(self, categories: list):
-        """Üst kategori listesini yükle"""
+
+    def load_categories(self, cats: list):
         self.parent_combo.clear()
         self.parent_combo.addItem("— Ana Kategori —", None)
-        
-        for cat in categories:
-            # Kendisini ve alt kategorilerini hariç tut
-            if self.category and (cat.id == self.category.id):
+        for c in cats:
+            if self.category and (c.id == self.category.id):
                 continue
-            
-            indent = "  " * (cat.level or 0)
-            icon = cat.icon or "📁"
-            self.parent_combo.addItem(f"{indent}{icon} {cat.name}", cat.id)
-        
-        # Varsayılan üst kategori
+            ind = "  " * (c.level or 0)
+            ic = c.icon or "📁"
+            self.parent_combo.addItem(f"{ind}{ic} {c.name}", c.id)
         if self.parent_id:
             for i in range(self.parent_combo.count()):
                 if self.parent_combo.itemData(i) == self.parent_id:
                     self.parent_combo.setCurrentIndex(i)
                     break
-                    
+
     def load_data(self):
-        """Düzenleme modunda verileri yükle"""
         if not self.category:
             return
-        
-        self.code_input.setText(self.category.code)
-        self.name_input.setText(self.category.name)
-        self.description_input.setPlainText(self.category.description or "")
-        self.color_input.setText(self.category.color or "")
-        self.is_active_check.setChecked(self.category.is_active)
-        
-        # İkon
+        self.code_in.setText(self.category.code)
+        self.name_in.setText(self.category.name)
+        self.desc_in.setPlainText(self.category.description or "")
+        self.color_in.setText(self.category.color or "")
+        self.active_chk.setChecked(self.category.is_active)
         if self.category.icon:
             self.selected_icon = self.category.icon
-            for btn in self.icon_buttons:
-                if btn.text() == self.category.icon:
-                    btn.setChecked(True)
-                else:
-                    btn.setChecked(False)
-        
-        # Üst kategori
+            for b in self.icon_btns:
+                b.setChecked(b.text() == self.category.icon)
         if self.category.parent_id:
             self.parent_id = self.category.parent_id
-            
-    def _select_icon(self, icon: str, button: QPushButton):
-        """İkon seç"""
-        self.selected_icon = icon
-        for btn in self.icon_buttons:
-            btn.setChecked(btn == button)
-            
+
+    def _select_icon(self, ic, b):
+        self.selected_icon = ic
+        for btn in self.icon_btns:
+            btn.setChecked(btn == b)
+
     def _generate_code(self):
-        """Otomatik kod üret"""
         import random
-        code = f"KAT{random.randint(100, 999)}"
-        self.code_input.setText(code)
-        
+
+        self.code_in.setText(f"KAT{random.randint(100, 999)}")
+
     def _on_save(self):
-        if not self._validate():
-            return
-        data = self.get_form_data()
-        self.saved.emit(data)
-        
-    def _validate(self) -> bool:
-        if not self.code_input.text().strip():
+        if not self.code_in.text().strip():
             QMessageBox.warning(self, "Uyarı", "Kategori kodu zorunludur!")
-            self.code_input.setFocus()
-            return False
-        if not self.name_input.text().strip():
+            self.code_in.setFocus()
+            return
+        if not self.name_in.text().strip():
             QMessageBox.warning(self, "Uyarı", "Kategori adı zorunludur!")
-            self.name_input.setFocus()
-            return False
-        return True
-        
-    def get_form_data(self) -> dict:
-        parent_id = self.parent_combo.currentData()
-        
-        # Seviye hesapla
-        level = 0
-        if parent_id:
-            # Üst kategorinin seviyesine göre hesaplanacak
-            level = 1  # Basit hesaplama
-        
-        return {
-            "code": self.code_input.text().strip(),
-            "name": self.name_input.text().strip(),
-            "description": self.description_input.toPlainText().strip() or None,
-            "parent_id": parent_id,
-            "level": level,
-            "icon": self.selected_icon,
-            "color": self.color_input.text().strip() or None,
-            "is_active": self.is_active_check.isChecked(),
-        }
-    
+            self.name_in.setFocus()
+            return
+        self.saved.emit(
+            {
+                "code": self.code_in.text().strip(),
+                "name": self.name_in.text().strip(),
+                "description": self.desc_in.toPlainText().strip() or None,
+                "parent_id": self.parent_combo.currentData(),
+                "level": 1 if self.parent_combo.currentData() else 0,
+                "icon": self.selected_icon,
+                "color": self.color_in.text().strip() or None,
+                "is_active": self.active_chk.isChecked(),
+            }
+        )

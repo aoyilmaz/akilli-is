@@ -39,10 +39,10 @@ class WorkStationListPage(QWidget):
     refresh_requested = pyqtSignal()
 
     TYPE_DISPLAY = {
-        "machine": ("⚙️ Makine", "#3b82f6"),
-        "workstation": ("🔧 İş İstasyonu", "#10b981"),
-        "assembly": ("🔩 Montaj Hattı", "#f59e0b"),
-        "manual": ("✋ Manuel", "#8b5cf6"),
+        "machine": ("Makine", "#3b82f6"),
+        "workstation": ("İş İstasyonu", "#10b981"),
+        "assembly": ("Montaj Hattı", "#f59e0b"),
+        "manual": ("Manuel", "#8b5cf6"),
     }
 
     def __init__(self, parent=None):
@@ -93,17 +93,24 @@ class WorkStationListPage(QWidget):
         # İstatistik kartları
         stats_container = ScrollableCardContainer()
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("🏭 Toplam", "0", "#6366f1")
-        self.stat_cards["machine"] = MiniStatCard("⚙️ Makine", "0", "#3b82f6")
-        self.stat_cards["workstation"] = MiniStatCard("🔧 İş İstasyonu", "0", "#10b981")
-        self.stat_cards["assembly"] = MiniStatCard("🔩 Montaj Hattı", "0", "#f59e0b")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.PRODUCTION
+        )
+        self.stat_cards["machine"] = MiniStatCard(
+            "Makine", "0", "primary", icon=ICONS.TYPE_SEMI
+        )
+        self.stat_cards["workstation"] = MiniStatCard(
+            "İş İstasyonu", "0", "success", icon=ICONS.FIX
+        )
+        self.stat_cards["assembly"] = MiniStatCard(
+            "Montaj Hattı", "0", "warning", icon=ICONS.PRODUCTION
+        )
 
         for card in self.stat_cards.values():
             stats_container.add_card(card)
         stats_container.add_stretch()
 
         filter_stats_layout.addWidget(stats_container)
-
         layout.addLayout(filter_stats_layout)
 
         # Tablo
@@ -163,7 +170,7 @@ class WorkStationListPage(QWidget):
 
         self.count_label.setText(f"Toplam: {len(stations)} istasyon")
 
-        # apply existing filters
+        # filter uygula
         self._apply_filters()
 
     def _populate_row(self, row: int, station: dict, visible_cols: list):
@@ -236,8 +243,6 @@ class WorkStationListPage(QWidget):
                     item.setForeground(QColor(t.text_muted))
                 self.table.setItem(row, col_idx, item)
 
-        self.table.setRowHeight(row, 48)
-
     def _on_search(self, text: str):
         self._search_text = text.lower()
         self._apply_filters()
@@ -285,21 +290,27 @@ class WorkStationListPage(QWidget):
         if row < 0:
             return
 
-        station_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        station_item = self.table.item(row, 0)
+        if not station_item:
+            return
 
+        station_id = station_item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
 
-        edit_action = QAction("✏️ Düzenle", self)
+        edit_action = QAction("Düzenle", self)
+        edit_action.setIcon(qta.icon(ICONS.EDIT, color="#cccccc"))
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(station_id))
         menu.addAction(edit_action)
 
-        copy_action = QAction("📋 Kopyala", self)
+        copy_action = QAction("Kopyala", self)
+        copy_action.setIcon(qta.icon(ICONS.COPY, color="#cccccc"))
         copy_action.triggered.connect(lambda: self.copy_clicked.emit(station_id))
         menu.addAction(copy_action)
 
         menu.addSeparator()
 
-        delete_action = QAction("🗑 Sil", self)
+        delete_action = QAction("Sil", self)
+        delete_action.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
         delete_action.triggered.connect(lambda: self._confirm_delete(station_id))
         menu.addAction(delete_action)
 

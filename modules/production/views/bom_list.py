@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QAction
 
-from config import COLORS
+from config.icons import ICONS
 from database.models.production import BOMStatus
 from ui.components import (
     PageHeader,
@@ -57,7 +57,7 @@ class BOMListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Ürün Reçeteleri",
-            icon="🏭",
+            icon=ICONS.PRODUCTION,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -69,10 +69,10 @@ class BOMListPage(QWidget):
         # Filtreleri header'a ekle
         self.status_combo = QComboBox()
         self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem("✅ Aktif", BOMStatus.ACTIVE)
-        self.status_combo.addItem("✏️ Taslak", BOMStatus.DRAFT)
-        self.status_combo.addItem("🔧 Revizyon", BOMStatus.REVISION)
-        self.status_combo.addItem("❌ İptal", BOMStatus.OBSOLETE)
+        self.status_combo.addItem("Aktif", BOMStatus.ACTIVE)
+        self.status_combo.addItem("Taslak", BOMStatus.DRAFT)
+        self.status_combo.addItem("Revizyon", BOMStatus.REVISION)
+        self.status_combo.addItem("İptal", BOMStatus.OBSOLETE)
         self.status_combo.setMinimumWidth(130)
         self.status_combo.setFixedHeight(36)
         self.status_combo.currentIndexChanged.connect(self._do_search)
@@ -90,10 +90,16 @@ class BOMListPage(QWidget):
         stats_layout.setSpacing(12)
 
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["active"] = MiniStatCard("✅ Aktif", "0", "#10b981")
-        self.stat_cards["draft"] = MiniStatCard("✏️ Taslak", "0", "#94a3b8")
-        self.stat_cards["revision"] = MiniStatCard("🔧 Revizyon", "0", "#f59e0b")
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.PRODUCTION
+        )
+        self.stat_cards["active"] = MiniStatCard(
+            "Aktif", "0", "success", icon=ICONS.CHECK
+        )
+        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
+        self.stat_cards["revision"] = MiniStatCard(
+            "Revizyon", "0", "warning", icon=ICONS.EDIT
+        )
 
         for card in self.stat_cards.values():
             stats_layout.addWidget(card)
@@ -173,7 +179,9 @@ class BOMListPage(QWidget):
                 self.table.setItem(row, col_idx, cell)
 
             elif col_key == "item":
-                item_text = f"{bom.item.code} - {bom.item.name}" if bom.item else "-"
+                item_code = bom.item.code if bom.item else "-"
+                item_name = bom.item.name if bom.item else "-"
+                item_text = f"{item_code} - {item_name}"
                 self.table.setItem(row, col_idx, QTableWidgetItem(item_text))
 
             elif col_key == "version":
@@ -207,8 +215,6 @@ class BOMListPage(QWidget):
                 cell.setForeground(QColor(color))
                 self.table.setItem(row, col_idx, cell)
 
-        self.table.setRowHeight(row, 48)
-
     def _on_search_changed(self, text: str):
         self.search_timer.stop()
         self.search_timer.start(300)
@@ -231,17 +237,26 @@ class BOMListPage(QWidget):
         if row < 0:
             return
 
-        bom_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        bom_item = self.table.item(row, 0)
+        if not bom_item:
+            return
 
+        bom_id = bom_item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
 
-        edit_action = QAction("✏️ Düzenle", self)
+        edit_action = QAction("Düzenle", self)
+        edit_action.setIcon(
+            ICONS.EDIT_ICON if hasattr(ICONS, "EDIT_ICON") else ICONS.EDIT
+        )
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(bom_id))
         menu.addAction(edit_action)
 
         menu.addSeparator()
 
-        delete_action = QAction("🗑 Sil", self)
+        delete_action = QAction("Sil", self)
+        delete_action.setIcon(
+            ICONS.DELETE_ICON if hasattr(ICONS, "DELETE_ICON") else ICONS.DELETE
+        )
         delete_action.triggered.connect(lambda: self._confirm_delete(bom_id))
         menu.addAction(delete_action)
 

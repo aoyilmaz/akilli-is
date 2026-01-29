@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QAbstractItemView,
     QMenu,
+    QWidget,
+    QHBoxLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings
 from PyQt6.QtGui import QAction
@@ -79,8 +81,8 @@ class EnhancedTableWidget(QTableWidget):
         # QSS class ata
         self.setProperty("class", "enhanced-table")
 
-        self._setup_table()
         self._load_settings()
+        self._setup_table()
         self._apply_column_settings()
         self._connect_signals()
 
@@ -144,7 +146,7 @@ class EnhancedTableWidget(QTableWidget):
         saved_widths = settings.value(widths_key)
         if saved_widths and isinstance(saved_widths, dict):
             for key, width in saved_widths.items():
-                if key in self.columns:
+                if key in self.columns and self.columns[key].resizable:
                     self.columns[key].width = int(width)
 
         # Sütun görünürlüğü
@@ -369,3 +371,88 @@ class EnhancedTableWidget(QTableWidget):
         self.user_id = user_id
         self._load_settings()
         self._rebuild_columns()
+
+    # -------------------------------------------------------------------------
+    # STANDARTLAR VE YARDIMCILAR
+    # -------------------------------------------------------------------------
+
+    def set_standard_row_height(self, height: int = 48):
+        """
+        Tüm satırlar için standart yükseklik ayarlar.
+
+        Args:
+            height (int): Satır yüksekliği (piksel). Varsayılan: 48
+        """
+        vertical_header = self.verticalHeader()
+        vertical_header.setDefaultSectionSize(height)
+        vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+
+        # Mevcut satırları da güncelle
+        for i in range(self.rowCount()):
+            self.setRowHeight(i, height)
+
+    def create_action_widget(
+        self,
+        row_id: int,
+        actions: list = ["view", "edit", "delete"],
+        callbacks: dict = None,
+    ) -> QWidget:
+        """
+        Satır için standart işlem butonları içeren widget oluşturur.
+
+        Args:
+            row_id (int): Satır ID'si (sinyaller için)
+            actions (list): İstenen aksiyonlar ('view', 'edit', 'delete', 'approve', 'cancel')
+            callbacks (dict): Opsiyonel override callbackleri. Örn: {'view': custom_func}
+                              Eğer verilmezse tablonun sinyalleri veya parent sinyalleri kullanılır.
+                              Not: Bu metodu çağıran yer genelde sinyalleri kendi bağlar.
+                              Burada sadece standart butonları oluşturup döndürüyoruz.
+
+        Returns:
+            QWidget: Tablo hücresine eklenecek widget
+        """
+        from ui.components.action_buttons import (
+            create_view_button,
+            create_edit_button,
+            create_delete_button,
+            create_approve_button,
+            create_cancel_button,
+        )
+
+        widget = QWidget()
+        widget.setProperty("class", "action-button-group")
+        layout = QHBoxLayout(widget)
+        # Match 'VehicleListPage' style: small margins + left align with stretch
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        # Callback helper
+        def _connect(btn, action_type):
+            btn.setObjectName(f"btn_{action_type}_{row_id}")
+            if callbacks and action_type in callbacks:
+                btn.clicked.connect(callbacks[action_type])
+            return btn
+
+        if "view" in actions:
+            btn = _connect(create_view_button(widget), "view")
+            layout.addWidget(btn)
+
+        if "edit" in actions:
+            btn = _connect(create_edit_button(widget), "edit")
+            layout.addWidget(btn)
+
+        if "approve" in actions:
+            btn = _connect(create_approve_button(widget), "approve")
+            layout.addWidget(btn)
+
+        if "cancel" in actions:
+            btn = _connect(create_cancel_button(widget), "cancel")
+            layout.addWidget(btn)
+
+        if "delete" in actions:
+            btn = _connect(create_delete_button(widget), "delete")
+            layout.addWidget(btn)
+
+        layout.addStretch()
+        return widget

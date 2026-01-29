@@ -3,11 +3,9 @@ Akıllı İş - Satınalma Faturası Liste Sayfası
 Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
-from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
     QPushButton,
     QTableWidgetItem,
     QComboBox,
@@ -16,25 +14,19 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
+from config.icons import ICONS
 
 
-class PurchaseInvoiceListPage(QWidget):
+class PurchaseInvoiceListPage(BaseListPage):
     """Satınalma faturası listesi."""
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
+    # Sinyaller (Ek sinyaller)
     add_from_receipt_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
     confirm_clicked = pyqtSignal(int)
     pay_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
         "draft": ("🔵 Taslak", "#64748b"),
@@ -46,28 +38,44 @@ class PurchaseInvoiceListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.invoices = []
-        self._setup_ui()
-        self._connect_signals()
+        columns = [
+            ColumnConfig("invoice_no", "Fatura No", width=120),
+            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("due_date", "Vade", width=100),
+            ColumnConfig("supplier", "Tedarikçi", width=200, stretch=True),
+            ColumnConfig("total", "Toplam", width=110),
+            ColumnConfig("paid", "Ödenen", width=110),
+            ColumnConfig("balance", "Bakiye", width=110),
+            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig(
+                "actions",
+                "İşlemler",
+                width=160,
+                resizable=False,
+                movable=False,
+                hideable=False,
+            ),
+        ]
 
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
+        super().__init__(
             title="Satınalma Faturaları",
-            icon="📄",
+            icon=ICONS.INVOICE,
+            table_id="purchase_invoices",
+            columns=columns,
+            show_stats=True,
             show_search=True,
             show_refresh=True,
             show_add=True,
             add_text="Yeni Fatura",
             search_placeholder="Ara... (fatura no, tedarikçi)",
-            parent=self,
+            parent=parent,
         )
 
+        self.invoices = []
+        self._setup_filters()
+        self._setup_stat_cards()
+
+    def _setup_filters(self):
         # Mal Kabulden ekle butonu
         from_receipt_btn = QPushButton("📦 Mal Kabulden")
         from_receipt_btn.setProperty("class", "btn-secondary")
@@ -94,50 +102,12 @@ class PurchaseInvoiceListPage(QWidget):
                 add_idx = h_layout.indexOf(self.header.add_btn)
                 h_layout.insertWidget(add_idx, from_receipt_btn)
 
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["open"] = MiniStatCard("📥 Açık", "0", "#f59e0b")
-        self.stat_cards["paid"] = MiniStatCard("🟢 Ödendi", "0", "#10b981")
-        self.stat_cards["overdue"] = MiniStatCard("🔴 Vadesi Geçti", "0", "#ef4444")
-        self.stat_cards["balance"] = MiniStatCard("💰 Borç", "₺0", "#8b5cf6")
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
-        columns = [
-            ColumnConfig("invoice_no", "Fatura No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
-            ColumnConfig("due_date", "Vade", width=100),
-            ColumnConfig("supplier", "Tedarikçi", width=200, stretch=True),
-            ColumnConfig("total", "Toplam", width=110),
-            ColumnConfig("paid", "Ödenen", width=110),
-            ColumnConfig("balance", "Bakiye", width=110),
-            ColumnConfig("status", "Durum", width=120),
-            ColumnConfig(
-                "actions",
-                "İşlemler",
-                width=160,
-                resizable=False,
-                movable=False,
-                hideable=False,
-            ),
-        ]
-
-        self.table = EnhancedTableWidget(
-            table_id="purchase_invoices",
-            columns=columns,
-            parent=self,
-        )
-        layout.addWidget(self.table)
+    def _setup_stat_cards(self):
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
+        self.add_stat_card("open", "Açık", "0", "warning", ICONS.TIME)
+        self.add_stat_card("paid", "Ödendi", "0", "success", ICONS.CHECK)
+        self.add_stat_card("overdue", "Vadesi Geçti", "0", "danger", ICONS.DANGER)
+        self.add_stat_card("balance", "Borç", "₺0", "danger", ICONS.MONEY)
 
     def _connect_signals(self):
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
@@ -220,68 +190,75 @@ class PurchaseInvoiceListPage(QWidget):
                 self.table.setItem(row, col_idx, QTableWidgetItem(label))
 
             elif col_key == "actions":
-                self._add_action_buttons(row, col_idx, inv)
+                status = inv.get("status", "draft")
+                actions = ["view"]
 
-        self.table.setRowHeight(row, 52)
+                if status == "draft":
+                    actions.extend(["edit", "confirm", "delete"])
+                elif status in ["received", "partial", "overdue"]:
+                    actions.append("pay")
+
+                callbacks = {
+                    "view": lambda _, rid=inv_id: self.view_clicked.emit(rid),
+                    "edit": lambda _, rid=inv_id: self.edit_clicked.emit(rid),
+                    "delete": lambda _, rid=inv_id: self._confirm_delete(rid),
+                    "confirm": lambda _, rid=inv_id: self.confirm_clicked.emit(rid),
+                    "pay": lambda _, rid=inv_id: self.pay_clicked.emit(rid),
+                }
+
+                # Özel butonlar için manuel gruplama
+                widget = QWidget()
+                layout = QHBoxLayout(widget)
+                layout.setContentsMargins(4, 2, 4, 2)
+                layout.setSpacing(4)
+
+                from ui.components.action_buttons import (
+                    create_view_button,
+                    create_edit_button,
+                    create_delete_button,
+                    create_approve_button,
+                    create_custom_button,
+                )
+
+                if "view" in actions:
+                    btn = create_view_button(widget)
+                    btn.clicked.connect(callbacks["view"])
+                    layout.addWidget(btn)
+
+                if "edit" in actions:
+                    btn = create_edit_button(widget)
+                    btn.clicked.connect(callbacks["edit"])
+                    layout.addWidget(btn)
+
+                if "confirm" in actions:
+                    btn = create_approve_button(widget)
+                    btn.setToolTip("Onayla")
+                    btn.clicked.connect(callbacks["confirm"])
+                    layout.addWidget(btn)
+
+                if "pay" in actions:
+                    btn = create_custom_button(
+                        widget, ICONS.PAYMENT, "Ödeme Kaydet", "green"
+                    )
+                    btn.clicked.connect(callbacks["pay"])
+                    layout.addWidget(btn)
+
+                if "delete" in actions:
+                    btn = create_delete_button(widget)
+                    btn.clicked.connect(callbacks["delete"])
+                    layout.addWidget(btn)
+
+                layout.addStretch()
+                self.table.setCellWidget(row, col_idx, widget)
 
     def _format_date(self, dt) -> str:
+        from datetime import date
+
         if dt:
             if isinstance(dt, date):
                 return dt.strftime("%d.%m.%Y")
             return str(dt)
         return "-"
-
-    def _add_action_buttons(self, row: int, col: int, inv: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
-        inv_id = inv.get("id")
-        status = inv.get("status", "draft")
-
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.clicked.connect(
-            lambda checked, iid=inv_id: self.view_clicked.emit(iid)
-        )
-        btn_layout.addWidget(view_btn)
-
-        if status == "draft":
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.edit_clicked.emit(iid)
-            )
-            btn_layout.addWidget(edit_btn)
-
-            confirm_btn = QPushButton("✓")
-            confirm_btn.setFixedSize(28, 26)
-            confirm_btn.setToolTip("Onayla")
-            confirm_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.confirm_clicked.emit(iid)
-            )
-            btn_layout.addWidget(confirm_btn)
-
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, iid=inv_id: self._confirm_delete(iid)
-            )
-            btn_layout.addWidget(del_btn)
-
-        elif status in ["received", "partial", "overdue"]:
-            pay_btn = QPushButton("💳")
-            pay_btn.setFixedSize(28, 26)
-            pay_btn.setToolTip("Ödeme Kaydet")
-            pay_btn.clicked.connect(
-                lambda checked, iid=inv_id: self.pay_clicked.emit(iid)
-            )
-            btn_layout.addWidget(pay_btn)
-
-        self.table.setCellWidget(row, col, btn_widget)
 
     def _update_stats(self):
         total = len(self.invoices)

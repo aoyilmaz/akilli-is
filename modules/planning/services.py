@@ -7,11 +7,10 @@ backward scheduling ve önceliklendirme algoritmaları içerir.
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
-import uuid
+from typing import List, Dict, Optional
 
-from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 
 from database.base import get_session
 from database.models.production import (
@@ -19,21 +18,17 @@ from database.models.production import (
     ProductionPlanLine,
     ProductionPlanStatus,
     BillOfMaterials,
-    BOMLine,
     BOMOperation,
     BOMStatus,
     WorkOrder,
-    WorkOrderLine,
-    WorkOrderOperation,
     WorkOrderStatus,
     WorkStation,
 )
-from database.models.inventory import Item, StockBalance
+from database.models.inventory import Item, ItemType
 from database.models.sales import (
     SalesOrder,
     SalesOrderItem,
     SalesOrderStatus,
-    Customer,
 )
 from database.models.calendar import ProductionHoliday
 from modules.production.services.base import WorkOrderService
@@ -41,6 +36,7 @@ from modules.production.services.base import WorkOrderService
 
 class MPSError(Exception):
     """MPS hatası base class"""
+
     pass
 
 
@@ -159,7 +155,7 @@ class MPSService:
             .join(SalesOrder)
             .join(Item, SalesOrderItem.item_id == Item.id)
             .options(
-                joinedload(SalesOrderItem.sales_order).joinedload(SalesOrder.customer),
+                joinedload(SalesOrderItem.order).joinedload(SalesOrder.customer),
                 joinedload(SalesOrderItem.item),
             )
             .filter(
@@ -168,26 +164,30 @@ class MPSService:
                 # Teslim tarihi dönem içinde
                 or_(
                     SalesOrder.delivery_date.between(period_start, period_end),
-                    SalesOrder.requested_delivery_date.between(period_start, period_end),
+                    SalesOrder.requested_delivery_date.between(
+                        period_start, period_end
+                    ),
                 ),
                 # Üretim gerektiren ürünler (mamül veya yarı mamül)
-                Item.item_type.in_(["manufactured", "semi_finished"]),
+                Item.item_type.in_([ItemType.MAMUL, ItemType.YARI_MAMUL]),
             )
         )
 
         if only_confirmed:
             query = query.filter(
-                SalesOrder.status.in_([
-                    SalesOrderStatus.CONFIRMED,
-                    SalesOrderStatus.IN_PRODUCTION,
-                ])
+                SalesOrder.status.in_(
+                    [
+                        SalesOrderStatus.CONFIRMED,
+                        SalesOrderStatus.IN_PRODUCTION,
+                    ]
+                )
             )
 
         order_items = query.all()
 
         # Plan satırları oluştur
         for oi in order_items:
-            so = oi.sales_order
+            so = oi.order
             item = oi.item
 
             # Talep tarihi: delivery_date veya requested_delivery_date
@@ -203,7 +203,9 @@ class MPSService:
             )
 
             # Kalan miktar hesapla (sevk edilmemiş)
-            remaining = (oi.quantity or Decimal(0)) - (oi.delivered_quantity or Decimal(0))
+            remaining = (oi.quantity or Decimal(0)) - (
+                oi.delivered_quantity or Decimal(0)
+            )
 
             if remaining <= 0:
                 continue
@@ -212,7 +214,7 @@ class MPSService:
                 plan_id=plan.id,
                 item_id=item.id,
                 sales_order_id=so.id,
-                sales_order_line_id=oi.id,
+                sales_order_item_id=oi.id,
                 demand_quantity=remaining,
                 planned_quantity=remaining,
                 demand_date=demand_date,
@@ -276,10 +278,9 @@ class MPSService:
             delay_risk = max(0, 50 - (buffer_ratio - 1) * 10)
 
         # 3. Ağırlıklı toplam
-        priority = (
-            Decimal(str(customer_score)) * Decimal(str(customer_weight))
-            + Decimal(str(delay_risk)) * Decimal(str(delay_weight))
-        )
+        priority = Decimal(str(customer_score)) * Decimal(
+            str(customer_weight)
+        ) + Decimal(str(delay_risk)) * Decimal(str(delay_weight))
 
         return min(Decimal("100"), max(Decimal("0"), priority))
 
@@ -296,8 +297,8 @@ class MPSService:
             .first()
         )
 
-        if bom and bom.lead_time:
-            return int(bom.lead_time)
+        if bom and bom.lead_time_days:
+            return int(bom.lead_time_days)
 
         return 7  # Varsayılan 7 gün
 
@@ -342,7 +343,7 @@ class MPSService:
         if bom and bom.operations:
             for op in bom.operations:
                 setup = op.setup_time or 0
-                run_per_unit = float(op.run_time_per_unit or 0)
+                run_per_unit = float(op.run_time or 0)
                 run_total = run_per_unit * float(line.planned_quantity)
                 total_minutes += setup + run_total
         elif bom and bom.lead_time:
@@ -353,10 +354,14 @@ class MPSService:
             total_minutes = 8 * 60
 
         # İş günlerini hesapla
-        production_days = max(1, total_minutes // (8 * 60) + (1 if total_minutes % (8 * 60) > 0 else 0))
+        production_days = max(
+            1, total_minutes // (8 * 60) + (1 if total_minutes % (8 * 60) > 0 else 0)
+        )
 
         # Tatilleri dikkate alarak geriye say
-        planned_end = datetime.combine(line.demand_date, datetime.max.time().replace(microsecond=0))
+        planned_end = datetime.combine(
+            line.demand_date, datetime.max.time().replace(microsecond=0)
+        )
         planned_start = self._subtract_working_days(line.demand_date, production_days)
 
         # Kapasite kontrolü
@@ -371,10 +376,12 @@ class MPSService:
                 # End date'i de güncelle
                 planned_end = datetime.combine(
                     self._add_working_days(planned_start, production_days),
-                    datetime.max.time().replace(microsecond=0)
+                    datetime.max.time().replace(microsecond=0),
                 )
 
-        line.planned_start = datetime.combine(planned_start, datetime.min.time().replace(hour=8))
+        line.planned_start = datetime.combine(
+            planned_start, datetime.min.time().replace(hour=8)
+        )
         line.planned_end = planned_end
 
         self.session.commit()
@@ -440,7 +447,7 @@ class MPSService:
         holiday = (
             self.session.query(ProductionHoliday)
             .filter(
-                ProductionHoliday.holiday_date == check_date,
+                ProductionHoliday.date == check_date,
                 ProductionHoliday.is_active.is_(True),
             )
             .first()
@@ -475,7 +482,7 @@ class MPSService:
 
             # Operasyon süresi
             setup = op.setup_time or 0
-            run_total = (op.run_time_per_unit or 0) * Decimal(str(quantity))
+            run_total = (op.run_time or 0) * Decimal(str(quantity))
             op_minutes = int(setup + float(run_total))
 
             # Kalan kapasite
@@ -595,7 +602,9 @@ class MPSService:
             self.session.query(ProductionPlan)
             .options(
                 joinedload(ProductionPlan.lines).joinedload(ProductionPlanLine.item),
-                joinedload(ProductionPlan.lines).joinedload(ProductionPlanLine.sales_order),
+                joinedload(ProductionPlan.lines).joinedload(
+                    ProductionPlanLine.sales_order
+                ),
             )
             .filter(ProductionPlan.id == plan_id)
             .first()
@@ -621,7 +630,19 @@ class MPSService:
         if period_end:
             query = query.filter(ProductionPlan.period_start <= period_end)
 
-        return query.order_by(ProductionPlan.created_at.desc()).all()
+        return (
+            query.options(
+                joinedload(ProductionPlan.lines).joinedload(ProductionPlanLine.item),
+                joinedload(ProductionPlan.lines).joinedload(
+                    ProductionPlanLine.sales_order
+                ),
+                joinedload(ProductionPlan.lines).joinedload(
+                    ProductionPlanLine.work_order
+                ),
+            )
+            .order_by(ProductionPlan.created_at.desc())
+            .all()
+        )
 
     def get_plan_summary(self, plan_id: int) -> Dict:
         """Plan özeti getir."""
@@ -651,39 +672,240 @@ class MPSService:
     # KAPASİTE ANALİZİ
     # =========================================
 
-    def check_capacity_for_period(
-        self,
-        station_id: int,
-        start_date: date,
-        end_date: date,
-    ) -> Dict[date, Dict]:
+    def get_aggregated_capacity(self, plan_id: int) -> List[Dict]:
         """
-        Belirli bir dönem için istasyon kapasitesini kontrol et.
+        Plandaki üretim miktarlarına göre iş istasyonu doluluklarını simüle eder.
+
+        Args:
+            plan_id: Plan ID
 
         Returns:
-            {date: {"total": int, "scheduled": int, "remaining": int, "utilization": float}}
+            [
+                {
+                    "station_name": "Kesim",
+                    "utilization": 85.5,
+                    "total_load_hours": 120,
+                    "available_hours": 140
+                },
+                ...
+            ]
         """
-        station = self.session.query(WorkStation).get(station_id)
-        if not station:
-            return {}
+        plan = self.get_by_id(plan_id)
+        if not plan:
+            return []
 
-        result = {}
-        current = start_date
+        # 1. İstasyon yüklerini topla (Dakika)
+        station_loads = {}  # {station_id: minutes}
 
-        while current <= end_date:
-            if not self._is_holiday(current) and current.weekday() < 5:
-                total = station.daily_capacity_minutes
-                remaining = station.get_remaining_capacity(current, self.session)
-                scheduled = total - remaining
-                utilization = (scheduled / total * 100) if total > 0 else 0
+        for line in plan.lines:
+            qty = float(line.planned_quantity or 0)
+            if qty <= 0:
+                continue
 
-                result[current] = {
-                    "total_capacity": total,
-                    "scheduled": scheduled,
-                    "remaining": remaining,
-                    "utilization": round(utilization, 1),
-                }
+            # BOM'u bul
+            # NOT: Optimize edilebilir, her satır için sorgu yerine toplu çekim
+            bom = (
+                self.session.query(BillOfMaterials)
+                .options(joinedload(BillOfMaterials.operations))
+                .filter(
+                    BillOfMaterials.item_id == line.item_id,
+                    BillOfMaterials.status == BOMStatus.ACTIVE,
+                    BillOfMaterials.is_active.is_(True),
+                )
+                .first()
+            )
 
-            current += timedelta(days=1)
+            if not bom or not bom.operations:
+                continue
+
+            for op in bom.operations:
+                if not op.work_station_id:
+                    continue
+
+                s_id = op.work_station_id
+                setup = op.setup_time or 0
+                run = float(op.run_time or 0) * qty
+                total_op_load = setup + run
+
+                station_loads[s_id] = station_loads.get(s_id, 0) + total_op_load
+
+        # 2. İstasyon kapasitelerini hesapla ve oranla
+        results = []
+
+        # Dönemdeki iş günü sayısı (kabaca)
+        # Daha hassas hesap için tatiller çıkarılmalı
+        total_days = (plan.period_end - plan.period_start).days
+        work_days = max(1, int(total_days * 5 / 7))  # Haftada 5 gün varsayımı
+
+        stations = (
+            self.session.query(WorkStation)
+            .filter(WorkStation.is_active.is_(True))
+            .all()
+        )
+
+        for st in stations:
+            load_min = station_loads.get(st.id, 0)
+
+            # Kapasite: Günlük Dakika * İş Günü * Verimlilik
+            daily_min = st.daily_capacity_minutes
+            total_capacity_min = daily_min * work_days
+
+            if total_capacity_min <= 0:
+                utilization = 0
+            else:
+                utilization = (load_min / total_capacity_min) * 100
+
+            if utilization > 0:  # Sadece yükü olanları veya darboğazları göster
+                results.append(
+                    {
+                        "station_name": st.name,
+                        "utilization": round(utilization, 1),
+                        "total_load_hours": round(load_min / 60, 1),
+                        "available_hours": round(total_capacity_min / 60, 1),
+                    }
+                )
+
+        # Doluluk oranına göre sırala (Azalan)
+        return sorted(results, key=lambda x: x["utilization"], reverse=True)
+
+    # =========================================
+    # MPS GRID (HÜCRE BAZLI) İŞLEMLER
+    # =========================================
+
+    def get_mps_grid_data(
+        self,
+        plan_id: int,
+        item_id: int,
+        start_date: date,
+        period_days: int = 7,
+        num_periods: int = 6,
+    ) -> Dict:
+        """
+        Grid görünümü için verileri hazırla.
+
+        Args:
+            plan_id: Plan ID
+            item_id: Ürün ID
+            start_date: Başlangıç tarihi
+            period_days: Periyot uzunluğu (gün)
+            num_periods: Periyot sayısı
+
+        Returns:
+            {
+                "periods": ["P1", "P2"...],
+                "demand": [10, 20...],
+                "incoming": [5, 0...],
+                "mps": [15, 25...],
+                "projected_stock": [100, 105...]
+            }
+        """
+        result = {
+            "periods": [],
+            "period_dates": [],
+            "demand": [0] * num_periods,
+            "incoming": [0] * num_periods,
+            "mps": [0] * num_periods,
+            "projected_stock": [0] * num_periods,
+        }
+
+        # Mevcut stok
+        item = self.session.query(Item).get(item_id)
+        current_stock = float(item.total_stock or 0) if item else 0
+
+        # Plan satırlarını çek
+        lines = (
+            self.session.query(ProductionPlanLine)
+            .filter(
+                ProductionPlanLine.plan_id == plan_id,
+                ProductionPlanLine.item_id == item_id,
+                ProductionPlanLine.demand_date >= start_date,
+            )
+            .all()
+        )
+
+        running_stock = current_stock
+
+        for i in range(num_periods):
+            p_start = start_date + timedelta(days=i * period_days)
+            p_end = p_start + timedelta(days=period_days - 1)
+
+            # Period label
+            period_label = f"W{p_start.isocalendar()[1]}"  # Hafta numarası
+            result["periods"].append(period_label)
+            result["period_dates"].append(
+                p_end.isoformat()
+            )  # Hücre tarihi olarak dönem sonunu alıyoruz
+
+            # Bu periyoda düşen satırları topla
+            p_demand = 0
+            p_mps = 0
+
+            for line in lines:
+                if p_start <= line.demand_date <= p_end:
+                    p_demand += float(line.demand_quantity or 0)
+                    p_mps += float(line.planned_quantity or 0)
+
+            # Beklenen girişler (Satınalma / İş Emirleri)
+            # NOT: Şimdilik dummy, ileride PurchaseService'den bağlanacak
+            p_incoming = 0
+
+            # Hesaplamalar
+            running_stock = running_stock + p_incoming + p_mps - p_demand
+
+            result["demand"][i] = p_demand
+            result["incoming"][i] = p_incoming
+            result["mps"][i] = p_mps
+            result["projected_stock"][i] = running_stock
 
         return result
+
+    def update_mps_quantity(
+        self,
+        plan_id: int,
+        item_id: int,
+        target_date: date,
+        quantity: float,
+    ) -> ProductionPlanLine:
+        """
+        MPS Miktarını güncelle.
+
+        Eğer o tarih için (veya dönem için) bir satır varsa onu günceller,
+        yoksa yeni satır oluşturur.
+        Note: Grid genelde dönem sonu tarihi gönderir.
+        """
+        # O tarihteki veya o tarihe denk gelen satırı bul
+        # Basitleştirme: Tam tarih eşleşmesi arıyoruz.
+        # İleride dönem mantığı eklenebilir.
+
+        line = (
+            self.session.query(ProductionPlanLine)
+            .filter(
+                ProductionPlanLine.plan_id == plan_id,
+                ProductionPlanLine.item_id == item_id,
+                ProductionPlanLine.demand_date == target_date,
+            )
+            .first()
+        )
+
+        if line:
+            # Varsa güncelle
+            if quantity <= 0 and line.demand_quantity == 0:
+                # Hem talep hem plan 0 ise silinebilir
+                self.session.delete(line)
+            else:
+                line.planned_quantity = quantity
+        else:
+            # Yoksa oluştur (sadece miktar > 0 ise)
+            if quantity > 0:
+                line = ProductionPlanLine(
+                    plan_id=plan_id,
+                    item_id=item_id,
+                    demand_date=target_date,
+                    demand_quantity=0,  # Manuel giriş olduğu için talep 0
+                    planned_quantity=quantity,
+                    priority_score=50,
+                )
+                self.session.add(line)
+
+        self.session.commit()
+        return line

@@ -5,108 +5,40 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
     QTableWidgetItem,
     QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from config.icons import ICONS
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 
 
-class SalesOrderListPage(QWidget):
+class SalesOrderListPage(BaseListPage):
     """
     Satış siparişleri listesi sayfası.
-    PageHeader ve EnhancedTableWidget kullanır.
     """
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
+    # Sinyaller (Ek sinyaller)
     confirm_clicked = pyqtSignal(int)
     cancel_clicked = pyqtSignal(int)
     create_delivery_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
+    # Durum etiketleri
     STATUS_LABELS = {
-        "draft": ("🔵 Taslak", "#64748b"),
-        "confirmed": ("🟢 Onaylandı", "#10b981"),
-        "partial_delivered": ("🟡 Kısmi Teslim", "#f59e0b"),
-        "delivered": ("✅ Teslim Edildi", "#8b5cf6"),
-        "closed": ("🔒 Kapatıldı", "#475569"),
-        "cancelled": ("⚫ İptal", "#475569"),
+        "draft": ("Taslak", "#64748b"),
+        "confirmed": ("Onaylandı", "#10b981"),
+        "partial_delivered": ("Kısmi Teslim", "#f59e0b"),
+        "delivered": ("Teslim Edildi", "#8b5cf6"),
+        "closed": ("Kapatıldı", "#475569"),
+        "cancelled": ("İptal", "#475569"),
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.orders = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Satış Siparişleri",
-            icon="🛒",
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni Sipariş",
-            search_placeholder="Ara... (sipariş no, müşteri)",
-            parent=self,
-        )
-
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("🟢 Onaylandı", "confirmed")
-        self.status_filter.addItem("🟡 Kısmi Teslim", "partial_delivered")
-        self.status_filter.addItem("✅ Teslim Edildi", "delivered")
-        self.status_filter.addItem("🔒 Kapatıldı", "closed")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["draft"] = MiniStatCard("🔵 Taslak", "0", "#64748b")
-        self.stat_cards["confirmed"] = MiniStatCard("🟢 Onaylandı", "0", "#10b981")
-        self.stat_cards["partial"] = MiniStatCard("🟡 Kısmi Teslim", "0", "#f59e0b")
-        self.stat_cards["delivered"] = MiniStatCard("✅ Teslim", "0", "#8b5cf6")
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("order_no", "Sipariş No", width=120),
             ColumnConfig("date", "Tarih", width=100),
@@ -126,18 +58,61 @@ class SalesOrderListPage(QWidget):
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Satış Siparişleri",
+            icon="ph.shopping-cart",
             table_id="sales_orders",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_refresh=True,
+            show_add=True,
+            add_text="Yeni Sipariş",
+            search_placeholder="Ara... (sipariş no, müşteri)",
+            parent=parent,
         )
-        layout.addWidget(self.table)
+
+        self.orders = []
+        self._setup_filters()
+        self._setup_stat_cards()
+
+    def _format_date(self, dt) -> str:
+        """Tarih formatla (GG.AA.YYYY)"""
+        if dt:
+            if isinstance(dt, date):
+                return dt.strftime("%d.%m.%Y")
+            return str(dt)
+        return "-"
+
+    def _setup_filters(self):
+        # Filtre ekle
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("Tüm Durumlar", None)
+        self.status_filter.addItem("Taslak", "draft")
+        self.status_filter.addItem("Onaylandı", "confirmed")
+        self.status_filter.addItem("Kısmi Teslim", "partial_delivered")
+        self.status_filter.addItem("Teslim Edildi", "delivered")
+        self.status_filter.addItem("Kapatıldı", "closed")
+        self.status_filter.addItem("İptal", "cancelled")
+        self.status_filter.setMinimumWidth(160)
+        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
+
+        if self.header.search_input:
+            h_layout = self.header.header_layout()
+            idx = h_layout.indexOf(self.header.search_input)
+            h_layout.insertWidget(idx, self.status_filter)
+
+    def _setup_stat_cards(self):
+        """İstatistik kartlarını oluştur"""
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVOICE)
+        self.add_stat_card("draft", "Taslak", "0", "info", ICONS.TIME)
+        self.add_stat_card("confirmed", "Onaylandı", "0", "success", ICONS.CHECK)
+        self.add_stat_card("partial", "Kısmi Teslim", "0", "warning", ICONS.TIME)
+        self.add_stat_card("delivered", "Teslim", "0", "primary", ICONS.CHECK)
 
     def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
+        # BaseListPage sinyalleri
+        super()._connect_signals()
 
     def load_data(self, orders: list):
         self.orders = orders
@@ -168,34 +143,24 @@ class SalesOrderListPage(QWidget):
                 self.table.setItem(row, col_idx, item)
 
             elif col_key == "date":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(order.get("order_date"))),
-                )
+                dt = self._format_date(order.get("order_date"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "customer":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(order.get("customer_name", "") or "-"),
-                )
+                cust = order.get("customer_name", "") or "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(cust))
 
             elif col_key == "total":
                 total = order.get("total_amount", 0) or 0
                 self.table.setItem(row, col_idx, QTableWidgetItem(f"{total:,.2f}"))
 
             elif col_key == "items":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(str(order.get("total_items", 0)))
-                )
+                item_count = str(order.get("total_items", 0))
+                self.table.setItem(row, col_idx, QTableWidgetItem(item_count))
 
             elif col_key == "delivery_date":
-                self.table.setItem(
-                    row,
-                    col_idx,
-                    QTableWidgetItem(self._format_date(order.get("delivery_date"))),
-                )
+                dt = self._format_date(order.get("delivery_date"))
+                self.table.setItem(row, col_idx, QTableWidgetItem(dt))
 
             elif col_key == "status":
                 status = order.get("status", "draft")
@@ -203,88 +168,57 @@ class SalesOrderListPage(QWidget):
                 self.table.setItem(row, col_idx, QTableWidgetItem(label))
 
             elif col_key == "currency":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(order.get("currency_code", "TRY"))
-                )
+                curr = order.get("currency_code", "TRY")
+                self.table.setItem(row, col_idx, QTableWidgetItem(curr))
 
             elif col_key == "actions":
                 self._add_action_buttons(row, col_idx, order)
 
-        self.table.setRowHeight(row, 52)
-
-    def _format_date(self, dt) -> str:
-        if dt:
-            if isinstance(dt, date):
-                return dt.strftime("%d.%m.%Y")
-            return str(dt)
-        return "-"
-
     def _add_action_buttons(self, row: int, col: int, order: dict):
-        btn_widget = QWidget()
-        btn_widget.setProperty("class", "action-button-group")
-        btn_layout = QHBoxLayout(btn_widget)
-        btn_layout.setContentsMargins(2, 2, 2, 2)
-        btn_layout.setSpacing(2)
-
         order_id = order.get("id")
         status = order.get("status", "draft")
 
-        # Görüntüle
-        view_btn = QPushButton("👁")
-        view_btn.setFixedSize(28, 26)
-        view_btn.setToolTip("Görüntüle")
-        view_btn.clicked.connect(
-            lambda checked, oid=order_id: self.view_clicked.emit(oid)
-        )
-        btn_layout.addWidget(view_btn)
+        actions = ["view"]
+        callbacks = {"view": lambda sid=order_id: self.view_clicked.emit(sid)}
 
         if status == "draft":
-            # Düzenle
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.clicked.connect(
-                lambda checked, oid=order_id: self.edit_clicked.emit(oid)
+            actions.extend(["edit", "approve", "delete"])
+            callbacks.update(
+                {
+                    "edit": lambda sid=order_id: self.edit_clicked.emit(sid),
+                    "approve": lambda sid=order_id: self.confirm_clicked.emit(sid),
+                    "delete": lambda sid=order_id: self._confirm_delete(sid),
+                }
             )
-            btn_layout.addWidget(edit_btn)
-
-            # Onayla
-            confirm_btn = QPushButton("✓")
-            confirm_btn.setFixedSize(28, 26)
-            confirm_btn.setToolTip("Onayla")
-            confirm_btn.clicked.connect(
-                lambda checked, oid=order_id: self.confirm_clicked.emit(oid)
-            )
-            btn_layout.addWidget(confirm_btn)
 
         if status in ["confirmed", "partial_delivered"]:
-            # İrsaliye Oluştur
-            delivery_btn = QPushButton("📦")
-            delivery_btn.setFixedSize(28, 26)
-            delivery_btn.setToolTip("İrsaliye Oluştur")
-            delivery_btn.clicked.connect(
-                lambda checked, oid=order_id: self.create_delivery_clicked.emit(oid)
-            )
-            btn_layout.addWidget(delivery_btn)
+            # Özel butonlar için create_custom_button kullanılabilir veya actions listesi genişletilebilir
+            # Mevcut create_action_widget 'view', 'edit', 'delete', 'approve', 'cancel' destekliyor
+            pass
 
         if status in ["draft", "confirmed"]:
-            # İptal
-            cancel_btn = QPushButton("❌")
-            cancel_btn.setFixedSize(28, 26)
-            cancel_btn.clicked.connect(
-                lambda checked, oid=order_id: self.cancel_clicked.emit(oid)
-            )
-            btn_layout.addWidget(cancel_btn)
+            actions.append("cancel")
+            callbacks["cancel"] = lambda sid=order_id: self.cancel_clicked.emit(sid)
 
-        if status == "draft":
-            # Sil
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.clicked.connect(
-                lambda checked, oid=order_id: self._confirm_delete(oid)
-            )
-            btn_layout.addWidget(del_btn)
+        # create_action_widget kullan
+        widget = self.table.create_action_widget(order_id, actions, callbacks)
 
-        self.table.setCellWidget(row, col, btn_widget)
+        # 'İrsaliye Oluştur' gibi özel butonları manuel ekleyelim (Şimdilik)
+        if status in ["confirmed", "partial_delivered"]:
+            from ui.components.action_buttons import create_custom_button
+            from config.icons import ICONS
+
+            delivery_btn = create_custom_button(
+                widget, ICONS.INVENTORY, "İrsaliye Oluştur", "info"
+            )
+            delivery_btn.clicked.connect(
+                lambda sid=order_id: self.create_delivery_clicked.emit(sid)
+            )
+            # Layout'a stretch'ten önce ekleyelim
+            layout = widget.layout()
+            layout.insertWidget(layout.count() - 1, delivery_btn)
+
+        self.table.setCellWidget(row, col, widget)
 
     def _update_stats(self):
         total = len(self.orders)
@@ -293,11 +227,11 @@ class SalesOrderListPage(QWidget):
         partial = sum(1 for o in self.orders if o.get("status") == "partial_delivered")
         delivered = sum(1 for o in self.orders if o.get("status") == "delivered")
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["confirmed"].update_value(str(confirmed))
-        self.stat_cards["partial"].update_value(str(partial))
-        self.stat_cards["delivered"].update_value(str(delivered))
+        self.update_stat_card("total", str(total))
+        self.update_stat_card("draft", str(draft))
+        self.update_stat_card("confirmed", str(confirmed))
+        self.update_stat_card("partial", str(partial))
+        self.update_stat_card("delivered", str(delivered))
 
     def _on_search(self, text: str):
         text = text.lower()

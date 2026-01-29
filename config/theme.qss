@@ -699,7 +699,7 @@ QFrame[class="stat-card"] {
     background-color: #252526;
     border: 1px solid #3e3e42;
     border-radius: 8px;
-    padding: 14px 16px;
+    padding: 8px 12px;
 }
 
 QFrame[class="stat-card"]:hover {
@@ -712,7 +712,7 @@ QFrame[class="stat-card"] QLabel[class="card-title"] {
 }
 
 QFrame[class="stat-card"] QLabel[class="card-value"] {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
 }
 

@@ -32,10 +32,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor, QFont
+import qtawesome as qta
 
+from config.icons import ICONS
 from ui.components.page_header import PageHeader
 from core.threads.worker_manager import WorkerManager
-from modules.mps.services import MPSService
+from modules.planning.services import MPSService
 from database.models.production import ProductionPlanStatus
 
 
@@ -46,7 +48,6 @@ class NewPlanDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Yeni Üretim Planı")
         self.setMinimumWidth(400)
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -101,7 +102,6 @@ class GenerateFromOrdersDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Siparişlerden Plan Oluştur")
         self.setMinimumWidth(450)
-
         self.setup_ui()
 
     def setup_ui(self):
@@ -162,15 +162,9 @@ class GenerateFromOrdersDialog(QDialog):
         }
 
 
-class MPSPage(QWidget):
+class MPSPlanListPage(QWidget):
     """
     Ana Üretim Planı (MPS) Sayfası
-
-    Özellikler:
-    - Plan listesi ve detayları
-    - Siparişlerden otomatik plan oluşturma
-    - Backward scheduling
-    - İş emirlerine dönüştürme
     """
 
     page_title = "Ana Üretim Planı"
@@ -195,7 +189,7 @@ class MPSPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Ana Üretim Planı (MPS)",
-            icon="📋",
+            icon=ICONS.PRODUCTION,
             show_search=False,
             show_add=False,
             show_refresh=True,
@@ -206,11 +200,13 @@ class MPSPage(QWidget):
         # Header'a butonlar ekle
         h_layout = self.header.header_layout()
 
-        new_btn = QPushButton("➕ Yeni Plan")
+        new_btn = QPushButton("Yeni Plan")
+        new_btn.setIcon(qta.icon(ICONS.ADD, color="#ffffff"))
         new_btn.clicked.connect(self._create_new_plan)
         h_layout.addWidget(new_btn)
 
-        generate_btn = QPushButton("📦 Siparişlerden Oluştur")
+        generate_btn = QPushButton("Siparişlerden Oluştur")
+        generate_btn.setIcon(qta.icon(ICONS.INVENTORY, color="#ffffff"))
         generate_btn.clicked.connect(self._generate_from_orders)
         h_layout.addWidget(generate_btn)
 
@@ -254,17 +250,20 @@ class MPSPage(QWidget):
 
         detail_header.addStretch()
 
-        self.schedule_btn = QPushButton("⏱ Çizelgele")
+        self.schedule_btn = QPushButton("Çizelgele")
+        self.schedule_btn.setIcon(qta.icon(ICONS.TIME, color="#ffffff"))
         self.schedule_btn.setEnabled(False)
         self.schedule_btn.clicked.connect(self._run_backward_schedule)
         detail_header.addWidget(self.schedule_btn)
 
-        self.approve_btn = QPushButton("✅ Onayla")
+        self.approve_btn = QPushButton("Onayla")
+        self.approve_btn.setIcon(qta.icon(ICONS.CHECK, color="#ffffff"))
         self.approve_btn.setEnabled(False)
         self.approve_btn.clicked.connect(self._approve_plan)
         detail_header.addWidget(self.approve_btn)
 
-        self.release_btn = QPushButton("🚀 İş Emirlerine Dönüştür")
+        self.release_btn = QPushButton("İş Emirlerine Dönüştür")
+        self.release_btn.setIcon(qta.icon(ICONS.WORK_ORDER, color="#ffffff"))
         self.release_btn.setEnabled(False)
         self.release_btn.clicked.connect(self._release_plan)
         detail_header.addWidget(self.release_btn)
@@ -274,10 +273,18 @@ class MPSPage(QWidget):
         # Plan satırları tablosu
         self.lines_table = QTableWidget()
         self.lines_table.setColumnCount(8)
-        self.lines_table.setHorizontalHeaderLabels([
-            "Sipariş", "Ürün", "Miktar", "Talep Tarihi",
-            "Plan Başlangıç", "Plan Bitiş", "Öncelik", "İş Emri"
-        ])
+        self.lines_table.setHorizontalHeaderLabels(
+            [
+                "Sipariş",
+                "Ürün",
+                "Miktar",
+                "Talep Tarihi",
+                "Plan Başlangıç",
+                "Plan Bitiş",
+                "Öncelik",
+                "İş Emri",
+            ]
+        )
         self.lines_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
@@ -288,11 +295,11 @@ class MPSPage(QWidget):
 
         splitter.addWidget(right_panel)
         splitter.setSizes([300, 700])
-
         layout.addWidget(splitter)
 
     def load_plans(self):
         """Planları yükle."""
+
         def fetch():
             return self.mps_service.get_all()
 
@@ -323,27 +330,20 @@ class MPSPage(QWidget):
         }
 
         for row, plan in enumerate(self.plans):
-            # Plan no
             self.plan_list.setItem(row, 0, QTableWidgetItem(plan.plan_no))
-
-            # Dönem
-            period = f"{plan.period_start.strftime('%d.%m')} - {plan.period_end.strftime('%d.%m.%Y')}"
-            self.plan_list.setItem(row, 1, QTableWidgetItem(period))
-
-            # Durum
+            p_start = plan.period_start.strftime("%d.%m")
+            p_end = plan.period_end.strftime("%d.%m.%Y")
+            self.plan_list.setItem(row, 1, QTableWidgetItem(f"{p_start} - {p_end}"))
             status_item = QTableWidgetItem(status_names.get(plan.status, ""))
             status_item.setForeground(QColor(status_colors.get(plan.status, "#000")))
             self.plan_list.setItem(row, 2, status_item)
-
-            # Satır sayısı
-            line_count = len(plan.lines) if plan.lines else 0
-            self.plan_list.setItem(row, 3, QTableWidgetItem(str(line_count)))
+            l_count = len(plan.lines) if plan.lines else 0
+            self.plan_list.setItem(row, 3, QTableWidgetItem(str(l_count)))
 
     def _on_plan_selected(self, row, col):
         """Plan seçildiğinde."""
         if row < 0 or row >= len(self.plans):
             return
-
         self.current_plan = self.plans[row]
         self._update_detail_view()
 
@@ -359,55 +359,41 @@ class MPSPage(QWidget):
             return
 
         self.detail_title.setText(f"{plan.plan_no} - {plan.name}")
-
-        # Buton durumları
         is_draft = plan.status == ProductionPlanStatus.DRAFT
         is_approved = plan.status == ProductionPlanStatus.APPROVED
-
         self.schedule_btn.setEnabled(is_draft)
         self.approve_btn.setEnabled(is_draft)
         self.release_btn.setEnabled(is_approved)
 
-        # Satırları yükle
         self.lines_table.setRowCount(len(plan.lines))
-
         for row, line in enumerate(plan.lines):
-            # Sipariş
             so_no = line.sales_order.order_no if line.sales_order else "-"
             self.lines_table.setItem(row, 0, QTableWidgetItem(so_no))
-
-            # Ürün
-            item_name = line.item.name if line.item else "-"
-            self.lines_table.setItem(row, 1, QTableWidgetItem(item_name))
-
-            # Miktar
+            i_name = line.item.name if line.item else "-"
+            self.lines_table.setItem(row, 1, QTableWidgetItem(i_name))
             qty = f"{float(line.planned_quantity):,.2f}"
             self.lines_table.setItem(row, 2, QTableWidgetItem(qty))
-
-            # Talep tarihi
             demand = line.demand_date.strftime("%d.%m.%Y") if line.demand_date else "-"
             self.lines_table.setItem(row, 3, QTableWidgetItem(demand))
-
-            # Plan başlangıç
-            start = line.planned_start.strftime("%d.%m.%Y %H:%M") if line.planned_start else "-"
-            self.lines_table.setItem(row, 4, QTableWidgetItem(start))
-
-            # Plan bitiş
-            end = line.planned_end.strftime("%d.%m.%Y %H:%M") if line.planned_end else "-"
-            self.lines_table.setItem(row, 5, QTableWidgetItem(end))
-
-            # Öncelik
-            priority_item = QTableWidgetItem(f"{float(line.priority_score or 0):.0f}")
+            p_start = (
+                line.planned_start.strftime("%d.%m.%Y %H:%M")
+                if line.planned_start
+                else "-"
+            )
+            self.lines_table.setItem(row, 4, QTableWidgetItem(p_start))
+            p_end = (
+                line.planned_end.strftime("%d.%m.%Y %H:%M") if line.planned_end else "-"
+            )
+            self.lines_table.setItem(row, 5, QTableWidgetItem(p_end))
+            p_score = f"{float(line.priority_score or 0):.0f}"
+            priority_item = QTableWidgetItem(p_score)
             priority_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            # Renk kodlaması
             priority = float(line.priority_score or 0)
             if priority >= 80:
                 priority_item.setBackground(QColor("#fee2e2"))
             elif priority >= 60:
                 priority_item.setBackground(QColor("#fef3c7"))
             self.lines_table.setItem(row, 6, priority_item)
-
-            # İş emri
             wo_no = line.work_order.order_no if line.work_order else "-"
             self.lines_table.setItem(row, 7, QTableWidgetItem(wo_no))
 
@@ -423,8 +409,7 @@ class MPSPage(QWidget):
             def on_result(plan):
                 self.load_plans()
                 QMessageBox.information(
-                    self, "Plan Oluşturuldu",
-                    f"Plan {plan.plan_no} oluşturuldu."
+                    self, "Plan Oluşturuldu", f"Plan {plan.plan_no} oluşturuldu."
                 )
                 self.plan_created.emit(plan.id)
 
@@ -441,11 +426,12 @@ class MPSPage(QWidget):
 
             def on_result(plan):
                 self.load_plans()
-                line_count = len(plan.lines) if plan.lines else 0
+                l_count = len(plan.lines) if plan.lines else 0
                 QMessageBox.information(
-                    self, "Plan Oluşturuldu",
+                    self,
+                    "Plan Oluşturuldu",
                     f"Plan {plan.plan_no} oluşturuldu.\n"
-                    f"{line_count} satış siparişi satırı eklendi."
+                    f"{l_count} satış siparişi satırı eklendi.",
                 )
                 self.plan_created.emit(plan.id)
 
@@ -458,16 +444,16 @@ class MPSPage(QWidget):
 
         def schedule():
             return self.mps_service.backward_schedule_all(
-                self.current_plan.id,
-                check_capacity=True
+                self.current_plan.id, check_capacity=True
             )
 
         def on_result(plan):
             self.current_plan = plan
             self._update_detail_view()
             QMessageBox.information(
-                self, "Çizelgeleme Tamamlandı",
-                "Tüm satırlar için backward scheduling tamamlandı."
+                self,
+                "Çizelgeleme Tamamlandı",
+                "Tüm satırlar için backward scheduling tamamlandı.",
             )
 
         WorkerManager().run_task(schedule, on_result=on_result)
@@ -476,26 +462,23 @@ class MPSPage(QWidget):
         """Planı onayla."""
         if not self.current_plan:
             return
-
         reply = QMessageBox.question(
-            self, "Plan Onayı",
+            self,
+            "Plan Onayı",
             f"{self.current_plan.plan_no} planını onaylamak istiyor musunuz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-
         if reply != QMessageBox.StandardButton.Yes:
             return
 
         def approve():
-            # TODO: Gerçek kullanıcı ID'si alınmalı
             return self.mps_service.approve_plan(self.current_plan.id, user_id=1)
 
         def on_result(plan):
             self.current_plan = plan
             self.load_plans()
             QMessageBox.information(
-                self, "Plan Onaylandı",
-                f"{plan.plan_no} planı onaylandı."
+                self, "Plan Onaylandı", f"{plan.plan_no} planı onaylandı."
             )
 
         WorkerManager().run_task(approve, on_result=on_result)
@@ -504,14 +487,13 @@ class MPSPage(QWidget):
         """Planı iş emirlerine dönüştür."""
         if not self.current_plan:
             return
-
+        msg = f"{self.current_plan.plan_no} planını iş emirlerine dönüştürmek istiyor musunuz?\nBu işlem geri alınamaz."
         reply = QMessageBox.question(
-            self, "İş Emirlerine Dönüştür",
-            f"{self.current_plan.plan_no} planını iş emirlerine dönüştürmek istiyor musunuz?\n"
-            "Bu işlem geri alınamaz.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self,
+            "İş Emirlerine Dönüştür",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-
         if reply != QMessageBox.StandardButton.Yes:
             return
 
@@ -521,19 +503,14 @@ class MPSPage(QWidget):
         def on_result(work_orders):
             self.load_plans()
             QMessageBox.information(
-                self, "Dönüştürme Tamamlandı",
-                f"{len(work_orders)} iş emri oluşturuldu."
+                self,
+                "Dönüştürme Tamamlandı",
+                f"{len(work_orders)} iş emri oluşturuldu.",
             )
-            self.plan_released.emit(
-                self.current_plan.id,
-                [wo.id for wo in work_orders]
-            )
+            self.plan_released.emit(self.current_plan.id, [wo.id for wo in work_orders])
 
         def on_error(error):
-            QMessageBox.warning(
-                self, "Hata",
-                f"Dönüştürme başarısız: {str(error)}"
-            )
+            QMessageBox.warning(self, "Hata", f"Dönüştürme başarısız: {str(error)}")
 
         WorkerManager().run_task(release, on_result=on_result, on_error=on_error)
 

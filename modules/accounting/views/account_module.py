@@ -12,25 +12,13 @@ from PyQt6.QtWidgets import (
     QLabel,
 )
 from PyQt6.QtCore import Qt
+import qtawesome as qta
 
-from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BG_HOVER,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
-    ACCENT,
-    SUCCESS,
-    get_button_style,
-    get_title_style,
-    BTN_HEIGHT_NORMAL,
-    ICONS,
-)
+from config.icons import ICONS
 from modules.accounting.services import AccountingService
 from modules.accounting.views.account_tree import AccountTreeWidget
 from modules.accounting.views.account_form import AccountFormDialog
+from ui.components.page_header import PageHeader
 
 
 class AccountModule(QWidget):
@@ -49,12 +37,10 @@ class AccountModule(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header - PageHeader kullanarak
-        from ui.components.page_header import PageHeader
-
+        # Header
         self.header = PageHeader(
             title="Hesap Planı",
-            icon="🏦",
+            icon=ICONS.FINANCE,
             show_search=False,
             show_refresh=True,
             show_add=True,
@@ -66,16 +52,16 @@ class AccountModule(QWidget):
 
         # Custom Action Buttons (Seed)
         h_layout = self.header.header_layout()
-
-        # Seed butonu
         seed_btn = QPushButton("Tekdüzen Yükle")
+        seed_btn.setIcon(qta.icon(ICONS.INVOICE, color="#ffffff"))
         seed_btn.setProperty("class", "btn-secondary")
         seed_btn.setToolTip("Tekdüzen Hesap Planı Yükle")
         seed_btn.setFixedHeight(36)
         seed_btn.clicked.connect(self._seed_accounts)
 
         # Add before standard buttons
-        h_layout.insertWidget(h_layout.count() - 2, seed_btn)
+        target_idx = h_layout.count() - 2
+        h_layout.insertWidget(max(0, target_idx), seed_btn)
 
         layout.addWidget(self.header)
 
@@ -119,14 +105,13 @@ class AccountModule(QWidget):
 
     def _seed_accounts(self):
         """Tekdüzen hesap planı yükle"""
+        msg = "Türkiye Tekdüzen Hesap Planı temel hesapları yüklenecek.\n\nMevcut hesaplar varsa atlanır.\n\nDevam edilsin mi?"
         reply = QMessageBox.question(
             self,
             "Onay",
-            "Türkiye Tekdüzen Hesap Planı temel hesapları yüklenecek.\n\n"
-            "Mevcut hesaplar varsa atlanır.\n\nDevam edilsin mi?",
+            msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 service = self._get_service()

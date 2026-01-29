@@ -2,21 +2,14 @@
 Akıllı İş - Sevkiyat Liste Sayfası
 """
 
-from PyQt6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QTableWidgetItem,
-)
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QTableWidgetItem
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from config.icons import ICONS
 
 from ui.components import (
     BaseListPage,
     ColumnConfig,
-    create_view_button,
-    create_edit_button,
-    create_delete_button,
 )
 
 
@@ -63,10 +56,10 @@ class ShipmentListPage(BaseListPage):
 
     def _setup_stat_cards(self):
         """İstatistik kartlarını oluştur"""
-        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
-        self.add_stat_card("planlanan", "Planlandı", "0", "#f59e0b", "📋")
-        self.add_stat_card("yolda", "Yolda", "0", "#3b82f6", "🚛")
-        self.add_stat_card("teslim", "Teslim", "0", "#10b981", "✅")
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.TRUCK)
+        self.add_stat_card("aktif", "Aktif", "0", "success", ICONS.CHECK)
+        self.add_stat_card("bakimda", "Bakımda", "0", "warning", ICONS.DANGER)
+        self.add_stat_card("pasif", "Pasif", "0", "error", ICONS.CANCEL)
 
     def load_data(self, data: list):
         """Veriyi tabloya yükle"""
@@ -78,7 +71,8 @@ class ShipmentListPage(BaseListPage):
             self.table.setItem(row, 0, QTableWidgetItem(item.get("shipment_no", "")))
 
             # Tarih
-            self.table.setItem(row, 1, QTableWidgetItem(item.get("shipment_date", "")))
+            dt_str = item.get("shipment_date", "")
+            self.table.setItem(row, 1, QTableWidgetItem(dt_str))
 
             # Araç
             self.table.setItem(row, 2, QTableWidgetItem(item.get("vehicle", "")))
@@ -121,38 +115,30 @@ class ShipmentListPage(BaseListPage):
             self.table.setItem(row, 6, status_item)
 
             # İşlemler
-            actions_widget = QWidget()
-            actions_layout = QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(4, 2, 4, 2)
-            actions_layout.setSpacing(4)
-
             shipment_id = item.get("id")
+            actions = ["view", "edit", "delete"]
+            callbacks = {
+                "view": lambda checked, sid=shipment_id: self.view_clicked.emit(sid),
+                "edit": lambda checked, sid=shipment_id: self.edit_clicked.emit(sid),
+                "delete": lambda checked, sid=shipment_id: (
+                    self.delete_clicked.emit(sid)
+                ),
+            }
 
-            view_btn = create_view_button()
-            view_btn.clicked.connect(
-                lambda checked, sid=shipment_id: self.view_clicked.emit(sid)
+            actions_widget = self.table.create_action_widget(
+                shipment_id, actions, callbacks
             )
 
-            edit_btn = create_edit_button()
-            edit_btn.clicked.connect(
-                lambda checked, sid=shipment_id: self.edit_clicked.emit(sid)
-            )
-            # Teslim edilmiş sevkiyatlar düzenlenemez
-            if status in ["teslim", "iptal"]:
-                edit_btn.setEnabled(False)
+            # Duruma göre butonları pasifleştir
+            if status in ["teslim", "iptal", "yolda"]:
+                from PyQt6.QtWidgets import QPushButton
 
-            delete_btn = create_delete_button()
-            delete_btn.clicked.connect(
-                lambda checked, sid=shipment_id: self.delete_clicked.emit(sid)
-            )
-            # Yolda veya teslim edilmiş sevkiyatlar silinemez
-            if status in ["yolda", "teslim"]:
-                delete_btn.setEnabled(False)
-
-            actions_layout.addWidget(view_btn)
-            actions_layout.addWidget(edit_btn)
-            actions_layout.addWidget(delete_btn)
-            actions_layout.addStretch()
+                for btn in actions_widget.findChildren(QPushButton):
+                    name = btn.objectName()
+                    if "edit" in name and status in ["teslim", "iptal"]:
+                        btn.setEnabled(False)
+                    if "delete" in name and status in ["yolda", "teslim"]:
+                        btn.setEnabled(False)
 
             self.table.setCellWidget(row, 7, actions_widget)
 

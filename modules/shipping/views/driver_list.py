@@ -7,8 +7,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QTableWidgetItem,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from config.icons import ICONS
 
 from ui.components import (
     BaseListPage,
@@ -45,7 +46,7 @@ class DriverListPage(BaseListPage):
 
         super().__init__(
             title="Sürücüler",
-            icon="👤",
+            icon=ICONS.USER,
             table_id="drivers",
             columns=columns,
             show_stats=True,
@@ -62,10 +63,10 @@ class DriverListPage(BaseListPage):
 
     def _setup_stat_cards(self):
         """İstatistik kartlarını oluştur"""
-        self.add_stat_card("total", "Toplam", "0", "#6366f1", "📊")
-        self.add_stat_card("musait", "Müsait", "0", "#10b981", "✅")
-        self.add_stat_card("gorevde", "Görevde", "0", "#3b82f6", "🚛")
-        self.add_stat_card("expiring", "Belge Dolacak", "0", "#ef4444", "⚠️")
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.USER)
+        self.add_stat_card("musait", "Müsait", "0", "success", ICONS.CHECK)
+        self.add_stat_card("gorevde", "Görevde", "0", "primary", ICONS.TRUCK)
+        self.add_stat_card("expiring", "Belge Dolacak", "0", "error", ICONS.DANGER)
 
     def load_data(self, data: list):
         """Veriyi tabloya yükle"""
@@ -96,19 +97,21 @@ class DriverListPage(BaseListPage):
             self.table.setItem(row, 4, expiry_item)
 
             # Varsayılan araç
-            self.table.setItem(row, 5, QTableWidgetItem(item.get("default_vehicle", "")))
+            self.table.setItem(
+                row, 5, QTableWidgetItem(item.get("default_vehicle", ""))
+            )
 
             # Durum
             status_item = QTableWidgetItem(item.get("status_display", ""))
             status = item.get("status", "")
             if status == "musait":
-                status_item.setForeground(Qt.GlobalColor.darkGreen)
+                status_item.setForeground(QColor("#10b981"))
             elif status == "gorevde":
-                status_item.setForeground(Qt.GlobalColor.blue)
+                status_item.setForeground(QColor("#3b82f6"))
             elif status == "izinli":
-                status_item.setForeground(Qt.GlobalColor.darkYellow)
+                status_item.setForeground(QColor("#f59e0b"))
             elif status == "pasif":
-                status_item.setForeground(Qt.GlobalColor.gray)
+                status_item.setForeground(QColor("#6b7280"))
             self.table.setItem(row, 6, status_item)
 
             # İşlemler
@@ -120,13 +123,19 @@ class DriverListPage(BaseListPage):
             driver_id = item.get("id")
 
             view_btn = create_view_button()
-            view_btn.clicked.connect(lambda checked, did=driver_id: self.view_clicked.emit(did))
+            view_btn.clicked.connect(
+                lambda checked, did=driver_id: self.view_clicked.emit(did)
+            )
 
             edit_btn = create_edit_button()
-            edit_btn.clicked.connect(lambda checked, did=driver_id: self.edit_clicked.emit(did))
+            edit_btn.clicked.connect(
+                lambda checked, did=driver_id: self.edit_clicked.emit(did)
+            )
 
             delete_btn = create_delete_button()
-            delete_btn.clicked.connect(lambda checked, did=driver_id: self.delete_clicked.emit(did))
+            delete_btn.clicked.connect(
+                lambda checked, did=driver_id: self.delete_clicked.emit(did)
+            )
 
             actions_layout.addWidget(view_btn)
             actions_layout.addWidget(edit_btn)
@@ -143,7 +152,11 @@ class DriverListPage(BaseListPage):
         total = len(self.drivers)
         musait = sum(1 for d in self.drivers if d.get("status") == "musait")
         gorevde = sum(1 for d in self.drivers if d.get("status") == "gorevde")
-        expiring = sum(1 for d in self.drivers if d.get("is_license_expiring") or d.get("is_src_expiring"))
+        expiring = sum(
+            1
+            for d in self.drivers
+            if d.get("is_license_expiring") or d.get("is_src_expiring")
+        )
 
         self.update_stat_card("total", str(total))
         self.update_stat_card("musait", str(musait))

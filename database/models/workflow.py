@@ -178,7 +178,10 @@ class WorkflowInstance(BaseModel):
 
     # Mevcut durum
     current_step_id = Column(Integer, ForeignKey("workflow_steps.id"), nullable=True)
-    status = Column(Enum(WorkflowStatus), default=WorkflowStatus.PENDING)
+    status = Column(
+        Enum(WorkflowStatus, values_callable=lambda x: [e.value for e in x]),
+        default=WorkflowStatus.PENDING
+    )
 
     # Kim başlattı
     initiated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -226,7 +229,10 @@ class WorkflowAction(BaseModel):
 
     # Kim, ne zaman
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    action = Column(Enum(WorkflowActionType), nullable=False)
+    action = Column(
+        Enum(WorkflowActionType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False
+    )
 
     # Yorum
     comment = Column(Text, nullable=True)

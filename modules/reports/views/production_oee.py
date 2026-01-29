@@ -1,25 +1,25 @@
+"""
+Akıllı İş - Üretim Performans (OEE) Raporu
+"""
+
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QFrame,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
     QDateEdit,
     QProgressBar,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QColor
+import qtawesome as qta
 
-from config.styles import (
-    ACCENT,
-    SUCCESS,
-    WARNING,
-    ERROR,
-)
+from config.icons import ICONS
+from ui.components.stat_cards import MiniStatCard
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class ProductionOEEPage(QWidget):
@@ -35,23 +35,16 @@ class ProductionOEEPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Üretim OEE Raporu",
-            icon="🏭",
+            icon=ICONS.CHART,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
-
-        # Filtreler (Header'a taşı)
         h_layout = self.header.header_layout()
-
         h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Başlangıç:"))
         self.start_date = QDateEdit()
@@ -59,7 +52,6 @@ class ProductionOEEPage(QWidget):
         self.start_date.setCalendarPopup(True)
         self.start_date.setFixedHeight(36)
         h_layout.addWidget(self.start_date)
-
         h_layout.addSpacing(8)
         h_layout.addWidget(QLabel("Bitiş:"))
         self.end_date = QDateEdit()
@@ -67,216 +59,160 @@ class ProductionOEEPage(QWidget):
         self.end_date.setCalendarPopup(True)
         self.end_date.setFixedHeight(36)
         h_layout.addWidget(self.end_date)
-
         layout.addWidget(self.header)
 
-        # OEE Kartları
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
-
-        # OEE Ana Kart
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(16)
         self.oee_card = self._create_oee_card()
-        cards_layout.addWidget(self.oee_card, 2)
+        top_layout.addWidget(self.oee_card, 2)
+        comp_layout = QVBoxLayout()
+        comp_layout.setSpacing(8)
+        self.bars = {
+            "avail": self._create_metric_bar("Kullanılabilirlik", "#10b981"),
+            "perf": self._create_metric_bar("Performans", "#3b82f6"),
+            "qual": self._create_metric_bar("Kalite", "#f59e0b"),
+        }
+        for b in self.bars.values():
+            comp_layout.addWidget(b)
+        top_layout.addLayout(comp_layout, 3)
+        layout.addLayout(top_layout)
 
-        # Bileşen kartları
-        components_layout = QVBoxLayout()
-        components_layout.setSpacing(8)
-
-        self.availability_bar = self._create_metric_bar("Kullanılabilirlik", SUCCESS)
-        components_layout.addWidget(self.availability_bar)
-
-        self.performance_bar = self._create_metric_bar("Performans", ACCENT)
-        components_layout.addWidget(self.performance_bar)
-
-        self.quality_bar = self._create_metric_bar("Kalite", WARNING)
-        components_layout.addWidget(self.quality_bar)
-
-        cards_layout.addLayout(components_layout, 3)
-
-        layout.addLayout(cards_layout)
-
-        # İstatistikler
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(16)
-
-        self.total_orders_card = self._create_mini_card("Toplam İş Emri", "0")
-        stats_layout.addWidget(self.total_orders_card)
-
-        self.on_time_card = self._create_mini_card("Zamanında", "0")
-        stats_layout.addWidget(self.on_time_card)
-
-        self.planned_card = self._create_mini_card("Plan. Üretim", "0")
-        stats_layout.addWidget(self.planned_card)
-
-        self.actual_card = self._create_mini_card("Gerçek Üretim", "0")
-        stats_layout.addWidget(self.actual_card)
-
+        self.mini_cards = {
+            "orders": MiniStatCard("Toplam İş Emri", "0", "info", icon=ICONS.INVOICE),
+            "on_time": MiniStatCard("Zamanında", "0", "success", icon=ICONS.TIME),
+            "planned": MiniStatCard("Plan. Üretim", "0", "info", icon=ICONS.LIST),
+            "actual": MiniStatCard("Gerçek Üretim", "0", "success", icon=ICONS.CHART),
+        }
+        for card in self.mini_cards.values():
+            stats_layout.addWidget(card)
         layout.addLayout(stats_layout)
 
-        # Detay tablosu
-        self.table = QTableWidget()
-        self._setup_table(
-            self.table,
-            [
-                ("İş Emri No", 120),
-                ("Ürün", 200),
-                ("Planlanan", 100),
-                ("Gerçekleşen", 100),
-                ("Performans", 100),
-            ],
+        cols = [
+            ColumnConfig("wo", "İş Emri No", width=120),
+            ColumnConfig("item", "Ürün", stretch=True),
+            ColumnConfig("planned", "Planlanan", width=100),
+            ColumnConfig("actual", "Gerçekleşen", width=100),
+            ColumnConfig("perf", "Performans", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="report_oee_details", columns=cols, parent=self
         )
         layout.addWidget(self.table)
 
     def _create_oee_card(self) -> QFrame:
         card = QFrame()
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(30, 24, 30, 24)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        title = QLabel("OEE (Overall Equipment Effectiveness)")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
+        card.setStyleSheet(
+            "background-color: #1e1e1e; border: 1px solid #333; border-radius: 12px;"
+        )
+        l = QVBoxLayout(card)
+        l.setContentsMargins(20, 20, 20, 20)
+        l.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        t = QLabel("OEE (Overall Equipment Effectiveness)")
+        t.setStyleSheet("color: #999; font-size: 14px;")
+        t.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        l.addWidget(t)
         self.oee_value = QLabel("0%")
+        self.oee_value.setStyleSheet(
+            "color: #10b981; font-size: 48px; font-weight: bold; margin: 10px 0;"
+        )
         self.oee_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.oee_value)
-
-        formula = QLabel("= Kullanılabilirlik × Performans × Kalite")
-        formula.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(formula)
-
+        l.addWidget(self.oee_value)
+        f = QLabel("Kullanılabilirlik × Performans × Kalite")
+        f.setStyleSheet("color: #666; font-size: 12px; font-style: italic;")
+        f.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        l.addWidget(f)
         return card
 
     def _create_metric_bar(self, title: str, color: str) -> QFrame:
-        frame = QFrame()
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(8)
-
-        header = QHBoxLayout()
-        label = QLabel(title)
-        header.addWidget(label)
-
-        value = QLabel("0%")
-        value.setObjectName("value")
-        header.addWidget(value)
-        layout.addLayout(header)
-
+        f = QFrame()
+        f.setStyleSheet(
+            "background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px;"
+        )
+        l = QVBoxLayout(f)
+        l.setContentsMargins(12, 10, 12, 10)
+        l.setSpacing(6)
+        hl = QHBoxLayout()
+        lbl = QLabel(title)
+        lbl.setStyleSheet("color: #ccc; font-weight: bold;")
+        hl.addWidget(lbl)
+        val = QLabel("0%")
+        val.setObjectName("val")
+        val.setStyleSheet(f"color: {color}; font-weight: bold;")
+        hl.addWidget(val)
+        l.addLayout(hl)
         bar = QProgressBar()
         bar.setObjectName("bar")
         bar.setRange(0, 100)
         bar.setValue(0)
         bar.setTextVisible(False)
-        bar.setFixedHeight(8)
-        layout.addWidget(bar)
-
-        return frame
-
-    def _create_mini_card(self, title: str, value: str) -> QFrame:
-        card = QFrame()
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 12, 16, 12)
-
-        title_label = QLabel(title)
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        layout.addWidget(value_label)
-
-        return card
-
-    def _setup_table(self, table: QTableWidget, columns: list):
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                table.setColumnWidth(i, width)
-
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
+        bar.setFixedHeight(6)
+        bar.setStyleSheet(
+            f"QProgressBar::chunk {{ background-color: {color}; border-radius: 3px; }} QProgressBar {{ background-color: #333; border: none; border-radius: 3px; }}"
+        )
+        l.addWidget(bar)
+        return f
 
     def load_data(self, data: dict):
-        # OEE değeri
         oee = data.get("oee", 0)
         self.oee_value.setText(f"{oee}%")
-
-        # Renk belirle
-        if oee >= 85:
-            color = SUCCESS
-        elif oee >= 60:
-            color = WARNING
-        else:
-            color = ERROR
-
         self.oee_value.setStyleSheet(
-            f"color: {color}; font-size: 24px; font-weight: bold;"
+            f"color: {'#10b981' if oee >= 85 else ('#f59e0b' if oee >= 60 else '#ef4444')}; font-size: 48px; font-weight: bold;"
         )
-        # Bileşenler
-        self._update_metric_bar(self.availability_bar, data.get("availability", 0))
-        self._update_metric_bar(self.performance_bar, data.get("performance", 0))
-        self._update_metric_bar(self.quality_bar, data.get("quality", 0))
+        self._update_bar(self.bars["avail"], data.get("availability", 0))
+        self._update_bar(self.bars["perf"], data.get("performance", 0))
+        self._update_bar(self.bars["qual"], data.get("quality", 0))
 
-        # İstatistikler
-        self._update_mini_card(self.total_orders_card, str(data.get("total_orders", 0)))
-        self._update_mini_card(self.on_time_card, str(data.get("on_time_count", 0)))
-        self._update_mini_card(
-            self.planned_card, f"{data.get('total_planned', 0):,.0f}"
-        )
-        self._update_mini_card(self.actual_card, f"{data.get('total_actual', 0):,.0f}")
+        self.mini_cards["orders"].update_value(str(data.get("total_orders", 0)))
+        self.mini_cards["on_time"].update_value(str(data.get("on_time_count", 0)))
+        self.mini_cards["planned"].update_value(f"{data.get('total_planned', 0):,.0f}")
+        self.mini_cards["actual"].update_value(f"{data.get('total_actual', 0):,.0f}")
 
-        # Detay tablosu
         details = data.get("details", [])
         self.table.setRowCount(len(details))
+        vcols = self.table.get_visible_columns()
+        for r, itm in enumerate(details):
+            for c, key in enumerate(vcols):
+                if key == "wo":
+                    self.table.setItem(
+                        r, c, QTableWidgetItem(itm.get("work_order_no", ""))
+                    )
+                elif key == "item":
+                    self.table.setItem(r, c, QTableWidgetItem(itm.get("item_name", "")))
+                elif key == "planned":
+                    v = itm.get("planned_qty", 0)
+                    it = QTableWidgetItem(f"{v:,.0f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "actual":
+                    v = itm.get("actual_qty", 0)
+                    it = QTableWidgetItem(f"{v:,.0f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(r, c, it)
+                elif key == "perf":
+                    p = itm.get("performance", 0)
+                    it = QTableWidgetItem(f"{p:.1f}%")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    if p >= 100:
+                        it.setForeground(QColor("#10b981"))
+                    elif p < 80:
+                        it.setForeground(QColor("#ef4444"))
+                    self.table.setItem(r, c, it)
 
-        for row, item in enumerate(details):
-            self.table.setItem(row, 0, QTableWidgetItem(item.get("work_order_no", "")))
-            self.table.setItem(row, 1, QTableWidgetItem(item.get("item_name", "")))
-
-            planned = item.get("planned_qty", 0)
-            planned_item = QTableWidgetItem(f"{planned:,.0f}")
-            planned_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 2, planned_item)
-
-            actual = item.get("actual_qty", 0)
-            actual_item = QTableWidgetItem(f"{actual:,.0f}")
-            actual_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 3, actual_item)
-
-            perf = item.get("performance", 0)
-            perf_item = QTableWidgetItem(f"{perf:.1f}%")
-            perf_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            if perf >= 100:
-                perf_item.setForeground(QColor(SUCCESS))
-            elif perf < 80:
-                perf_item.setForeground(QColor(ERROR))
-            self.table.setItem(row, 4, perf_item)
-
-    def _update_metric_bar(self, frame: QFrame, value: float):
-        value_label = frame.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(f"{value:.1f}%")
-
-        bar = frame.findChild(QProgressBar, "bar")
+    def _update_bar(self, f: QFrame, v: float):
+        vlbl = f.findChild(QLabel, "val")
+        if vlbl:
+            vlbl.setText(f"{v:.1f}%")
+        bar = f.findChild(QProgressBar, "bar")
         if bar:
-            bar.setValue(int(value))
-
-    def _update_mini_card(self, card: QFrame, value: str):
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(value)
+            bar.setValue(int(v))
 
     def get_date_range(self):
         return (self.start_date.date().toPyDate(), self.end_date.date().toPyDate())

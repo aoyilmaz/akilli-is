@@ -2,18 +2,17 @@
 Akıllı İş - Stok Raporları Sayfası
 """
 
+from decimal import Decimal
+import csv
+import datetime
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QFrame,
     QComboBox,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
     QTabWidget,
     QFileDialog,
     QMessageBox,
@@ -21,11 +20,16 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QTextDocument
 from PyQt6.QtPrintSupport import QPrinter, QPrintPreviewDialog
-import csv
-import datetime
-from ui.components.stat_cards import MiniStatCard
+import qtawesome as qta
 
-from config import COLORS
+from config.icons import ICONS
+from ui.components import (
+    PageHeader,
+    EnhancedTableWidget,
+    ColumnConfig,
+    MiniStatCard,
+    ScrollableCardContainer,
+)
 
 
 class StockReportsPage(QWidget):
@@ -36,682 +40,504 @@ class StockReportsPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.all_items = []
-        self.all_warehouse_balances = []
-        self.all_movements = []
-        self.movement_stats = {}
+        self.items = []
+        self.wh_balances = []
+        self.movements = []
+        self.mov_stats = {}
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Stok Raporları",
-            icon="📊",
+            icon=ICONS.CHART,
             show_search=False,
             show_refresh=True,
             show_add=False,
             show_export=True,
             parent=self,
         )
-
-        # Yazdır butonu
-        print_btn = QPushButton("🖨 Yazdır")
-        print_btn.setProperty("class", "btn-secondary")
-        print_btn.setFixedHeight(36)
-
-        # Header'a yazdır butonunu ekle
-        h_layout = self.header.header_layout()
+        pb = QPushButton("Yazdır")
+        pb.setProperty("class", "btn-secondary")
+        pb.setFixedHeight(36)
+        pb.setIcon(qta.icon(ICONS.PRINT, color="#ffffff"))
+        h = self.header.header_layout()
         if self.header.refresh_btn:
-            # Refresh butonundan önce ekle
-            idx = h_layout.indexOf(self.header.refresh_btn)
-            h_layout.insertWidget(idx, print_btn)
+            h.insertWidget(h.indexOf(self.header.refresh_btn), pb)
         else:
-            h_layout.addWidget(print_btn)
-
-        # Sinyalleri bağla
-        # Sinyalleri bağla
+            h.addWidget(pb)
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
         self.header.export_clicked.connect(self.export_current_tab)
-        print_btn.clicked.connect(self.print_current_tab)
-
+        pb.clicked.connect(self.print_current_tab)
         layout.addWidget(self.header)
 
-        # === Özet Kartlar ===
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        stats_container = ScrollableCardContainer()
+        self.cards = {
+            "total": MiniStatCard("Toplam Ürün", "0", "info", icon=ICONS.INVENTORY),
+            "val": MiniStatCard("Toplam Değer", "₺0", "success", icon=ICONS.MONEY),
+            "low": MiniStatCard("Düşük Stok", "0", "warning", icon=ICONS.WARNING),
+            "none": MiniStatCard("Stok Yok", "0", "error", icon=ICONS.CLOSE),
+        }
+        for card in self.cards.values():
+            stats_container.add_card(card)
+        stats_container.add_stretch()
+        layout.addWidget(stats_container)
 
-        self.total_items_card = self._create_card("📦 Toplam Ürün", "0", "#6366f1")
-        cards_layout.addWidget(self.total_items_card)
+        self.tabs = QTabWidget()
+        self._setup_status_tab()
+        self._setup_critical_tab()
+        self._setup_movement_tab()
+        self._setup_warehouse_tab()
+        layout.addWidget(self.tabs)
+        self.cat_combo.currentIndexChanged.connect(self._filter_status_table)
+        self.wh_combo.currentIndexChanged.connect(self._filter_status_table)
+        self.wh_rep_combo.currentIndexChanged.connect(self._filter_warehouse_table)
 
-        self.total_value_card = self._create_card("💰 Toplam Değer", "₺0", "#10b981")
-        cards_layout.addWidget(self.total_value_card)
-
-        self.low_stock_card = self._create_card("⚠️ Düşük Stok", "0", "#f59e0b")
-        cards_layout.addWidget(self.low_stock_card)
-
-        self.out_of_stock_card = self._create_card("❌ Stok Yok", "0", "#ef4444")
-        cards_layout.addWidget(self.out_of_stock_card)
-
-        layout.addLayout(cards_layout)
-
-        # === Tab Widget ===
-        tabs = QTabWidget()
-        # Stok Durum Raporu
-        tabs.addTab(self._create_stock_status_tab(), "📋 Stok Durumu")
-
-        # Kritik Stok Raporu
-        tabs.addTab(self._create_critical_stock_tab(), "⚠️ Kritik Stoklar")
-
-        # Hareket Özeti
-        tabs.addTab(self._create_movement_summary_tab(), "📊 Hareket Özeti")
-
-        # Depo Bazlı Rapor
-        tabs.addTab(self._create_warehouse_report_tab(), "🏭 Depo Raporu")
-
-        layout.addWidget(tabs)
-
-        # Filtre sinyalleri (Widgetlar oluşturulduktan sonra bağlanmalı)
-        self.status_category_combo.currentIndexChanged.connect(
-            self._filter_status_table
+    def _setup_status_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(16, 16, 16, 16)
+        fl = QHBoxLayout()
+        fl.addWidget(QLabel("Kategori:"))
+        self.cat_combo = QComboBox()
+        self.cat_combo.addItem("Tümü", None)
+        fl.addWidget(self.cat_combo)
+        fl.addWidget(QLabel("Depo:"))
+        self.wh_combo = QComboBox()
+        self.wh_combo.addItem("Tümü", None)
+        fl.addWidget(self.wh_combo)
+        fl.addStretch()
+        l.addLayout(fl)
+        cols = [
+            ColumnConfig("code", "Stok Kodu", width=120),
+            ColumnConfig("name", "Stok Adı", stretch=True),
+            ColumnConfig("cat", "Kategori", width=120),
+            ColumnConfig("unit", "Birim", width=70),
+            ColumnConfig("qty", "Miktar", width=100),
+            ColumnConfig("min", "Min. Stok", width=100),
+            ColumnConfig("cost", "Birim Maliyet", width=120),
+            ColumnConfig("val", "Toplam Değer", width=120),
+            ColumnConfig("status", "Durum", width=100),
+        ]
+        self.status_table = EnhancedTableWidget(
+            table_id="report_stock_status", columns=cols, parent=tab
         )
-        self.status_warehouse_combo.currentIndexChanged.connect(
-            self._filter_status_table
+        l.addWidget(self.status_table)
+        self.tabs.addTab(tab, "Stok Durumu")
+
+    def _setup_critical_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(16, 16, 16, 16)
+        l.addWidget(
+            QLabel("Minimum stok seviyesinin altında veya stokta olmayan ürünler")
         )
-        self.wh_report_combo.currentIndexChanged.connect(self._filter_warehouse_table)
-
-    def _create_card(self, title: str, value: str, color: str) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _create_stock_status_tab(self) -> QWidget:
-        """Stok durum raporu"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(16, 16, 16, 16)
-
-        # Filtreler
-        filter_layout = QHBoxLayout()
-
-        filter_layout.addWidget(QLabel("Kategori:"))
-        self.status_category_combo = QComboBox()
-        self.status_category_combo.addItem("Tümü", None)
-        filter_layout.addWidget(self.status_category_combo)
-
-        filter_layout.addWidget(QLabel("Depo:"))
-        self.status_warehouse_combo = QComboBox()
-        self.status_warehouse_combo.addItem("Tümü", None)
-        filter_layout.addWidget(self.status_warehouse_combo)
-
-        filter_layout.addStretch()
-        layout.addLayout(filter_layout)
-
-        # Tablo
-        self.status_table = QTableWidget()
-        self._setup_table(
-            self.status_table,
-            [
-                ("Stok Kodu", 100),
-                ("Stok Adı", 250),
-                ("Kategori", 120),
-                ("Birim", 60),
-                ("Miktar", 100),
-                ("Min. Stok", 90),
-                ("Birim Maliyet", 110),
-                ("Toplam Değer", 120),
-                ("Durum", 100),
-            ],
+        cols = [
+            ColumnConfig("code", "Stok Kodu", width=120),
+            ColumnConfig("name", "Stok Adı", stretch=True),
+            ColumnConfig("qty", "Mevcut", width=100),
+            ColumnConfig("min", "Min. Stok", width=100),
+            ColumnConfig("diff", "Eksik", width=100),
+            ColumnConfig("ord", "Sipariş Mik.", width=120),
+            ColumnConfig("lead", "Temin Süresi", width=120),
+            ColumnConfig("status", "Durum", width=120),
+        ]
+        self.critical_table = EnhancedTableWidget(
+            table_id="report_critical_stock", columns=cols, parent=tab
         )
-        layout.addWidget(self.status_table)
+        l.addWidget(self.critical_table)
+        self.tabs.addTab(tab, "Kritik Stoklar")
 
-        return widget
-
-    def _create_critical_stock_tab(self) -> QWidget:
-        """Kritik stok raporu"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(16, 16, 16, 16)
-
-        info_label = QLabel(
-            "⚠️ Minimum stok seviyesinin altında veya stokta olmayan ürünler"
+    def _setup_movement_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(16, 16, 16, 16)
+        sl = QHBoxLayout()
+        self.m_cards = {
+            "in": MiniStatCard("Toplam Giriş", "0", "success", icon=ICONS.ARROW_DOWN),
+            "out": MiniStatCard("Toplam Çıkış", "0", "error", icon=ICONS.ARROW_UP),
+            "tr": MiniStatCard("Transfer", "0", "info", icon=ICONS.MOVEMENT),
+        }
+        for c in self.m_cards.values():
+            sl.addWidget(c)
+        sl.addStretch()
+        l.addLayout(sl)
+        cols = [
+            ColumnConfig("code", "Stok Kodu", width=120),
+            ColumnConfig("name", "Stok Adı", stretch=True),
+            ColumnConfig("in", "Giriş", width=100),
+            ColumnConfig("out", "Çıkış", width=100),
+            ColumnConfig("tr", "Transfer", width=100),
+            ColumnConfig("net", "Net Değişim", width=100),
+            ColumnConfig("last", "Son Hareket", width=150),
+        ]
+        self.movements_table = EnhancedTableWidget(
+            table_id="report_stock_movements", columns=cols, parent=tab
         )
-        layout.addWidget(info_label)
+        l.addWidget(self.movements_table)
+        self.tabs.addTab(tab, "Hareket Özeti")
 
-        self.critical_table = QTableWidget()
-        self._setup_table(
-            self.critical_table,
-            [
-                ("Stok Kodu", 100),
-                ("Stok Adı", 250),
-                ("Mevcut", 90),
-                ("Min. Stok", 90),
-                ("Eksik", 90),
-                ("Sipariş Miktarı", 110),
-                ("Temin Süresi", 100),
-                ("Durum", 100),
-            ],
+    def _setup_warehouse_tab(self):
+        tab = QWidget()
+        l = QVBoxLayout(tab)
+        l.setContentsMargins(16, 16, 16, 16)
+        fl = QHBoxLayout()
+        fl.addWidget(QLabel("Depo:"))
+        self.wh_rep_combo = QComboBox()
+        self.wh_rep_combo.addItem("Tüm Depolar", None)
+        fl.addWidget(self.wh_rep_combo)
+        fl.addStretch()
+        l.addLayout(fl)
+        cols = [
+            ColumnConfig("wh", "Depo", width=150),
+            ColumnConfig("code", "Stok Kodu", width=120),
+            ColumnConfig("name", "Stok Adı", stretch=True),
+            ColumnConfig("qty", "Miktar", width=100),
+            ColumnConfig("unit", "Birim", width=70),
+            ColumnConfig("cost", "Birim Maliyet", width=120),
+            ColumnConfig("val", "Toplam Değer", width=120),
+            ColumnConfig("loc", "Lokasyon", width=120),
+        ]
+        self.wh_table = EnhancedTableWidget(
+            table_id="report_warehouse_stock", columns=cols, parent=tab
         )
-        layout.addWidget(self.critical_table)
-
-        return widget
-
-    def _create_movement_summary_tab(self) -> QWidget:
-        """Hareket özeti"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(16, 16, 16, 16)
-
-        # Özet kartlar
-        summary_layout = QHBoxLayout()
-
-        self.entry_card = self._create_mini_card("📥 Toplam Giriş", "0", "#10b981")
-        summary_layout.addWidget(self.entry_card)
-
-        self.exit_card = self._create_mini_card("📤 Toplam Çıkış", "0", "#ef4444")
-        summary_layout.addWidget(self.exit_card)
-
-        self.transfer_card = self._create_mini_card("🔄 Transfer", "0", "#6366f1")
-        summary_layout.addWidget(self.transfer_card)
-
-        summary_layout.addStretch()
-        layout.addLayout(summary_layout)
-
-        # Tablo
-        self.movement_table = QTableWidget()
-        self._setup_table(
-            self.movement_table,
-            [
-                ("Stok Kodu", 100),
-                ("Stok Adı", 200),
-                ("Giriş", 100),
-                ("Çıkış", 100),
-                ("Transfer", 100),
-                ("Net Değişim", 100),
-                ("Son Hareket", 140),
-            ],
-        )
-        layout.addWidget(self.movement_table)
-
-        return widget
-
-    def _create_warehouse_report_tab(self) -> QWidget:
-        """Depo bazlı rapor"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(16, 16, 16, 16)
-
-        # Depo seçimi
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("Depo:"))
-        self.wh_report_combo = QComboBox()
-        self.wh_report_combo.addItem("Tüm Depolar", None)
-        filter_layout.addWidget(self.wh_report_combo)
-        filter_layout.addStretch()
-        layout.addLayout(filter_layout)
-
-        # Tablo
-        self.warehouse_table = QTableWidget()
-        self._setup_table(
-            self.warehouse_table,
-            [
-                ("Depo", 150),
-                ("Stok Kodu", 100),
-                ("Stok Adı", 200),
-                ("Miktar", 100),
-                ("Birim", 60),
-                ("Birim Maliyet", 110),
-                ("Toplam Değer", 120),
-                ("Lokasyon", 100),
-            ],
-        )
-        layout.addWidget(self.warehouse_table)
-
-        return widget
-
-    def _create_mini_card(self, title: str, value: str, color: str) -> QFrame:
-        """Mini özet kartı"""
-        card = QFrame()
-        card.setFixedWidth(180)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setObjectName("value")
-        layout.addWidget(value_label)
-
-        return card
-
-    def _setup_table(self, table: QTableWidget, columns: list):
-        """Tablo ayarla"""
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 1:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                table.setColumnWidth(i, width)
-
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
+        l.addWidget(self.wh_table)
+        self.tabs.addTab(tab, "Depo Raporu")
 
     def load_data(self, data: dict):
-        """Rapor verilerini yükle"""
-        # Ham verileri sakla
-        self.all_items = data.get("items", [])
-        self.all_warehouse_balances = data.get("warehouse_balances", [])
-        self.all_movements = data.get("movements", [])
-        self.movement_stats = data.get("movement_stats", {})
-
-        # Özet kartları güncelle
-        self._update_card(self.total_items_card, str(data.get("total_items", 0)))
-        self._update_card(self.total_value_card, f"₺{data.get('total_value', 0):,.2f}")
-        self._update_card(self.low_stock_card, str(data.get("low_stock", 0)))
-        self._update_card(self.out_of_stock_card, str(data.get("out_of_stock", 0)))
-
-        # Tabloları yükle (Filtreleri uygula)
+        self.items = data.get("items", [])
+        self.wh_balances = data.get("warehouse_balances", [])
+        self.movements = data.get("movements", [])
+        self.mov_stats = data.get("movement_stats", {})
+        self.cards["total"].update_value(str(data.get("total_items", 0)))
+        self.cards["val"].update_value(f"₺{data.get('total_value', 0):,.2f}")
+        self.cards["low"].update_value(str(data.get("low_stock", 0)))
+        self.cards["none"].update_value(str(data.get("out_of_stock", 0)))
         self._filter_status_table()
-
-        # Kritik stok tablosu
-        self._load_critical_table(data.get("critical_items", []))
-
-        # Depo raporu
+        self._load_critical(data.get("critical_items", []))
         self._filter_warehouse_table()
-
-        # Hareket özeti
-        self._load_movement_table()
+        self._load_movements()
 
     def _filter_status_table(self):
-        """Stok durum tablosunu filtrele"""
-        category_id = self.status_category_combo.currentData()
-        warehouse_id = self.status_warehouse_combo.currentData()
-
-        filtered_items = []
-
-        # Depo bakiyeleri için lookup map hazırla: {(item_code, warehouse_id): quantity}
-        wh_balances = {}
-        if warehouse_id:
-            for b in self.all_warehouse_balances:
-                if b["warehouse_id"] == warehouse_id:
-                    wh_balances[b["item_code"]] = b
-
-        for item in self.all_items:
-            # Kategori filtresi
-            if category_id is not None and item.get("category_id") != category_id:
+        cid, wid = self.cat_combo.currentData(), self.wh_combo.currentData()
+        res = []
+        whm = {}
+        if wid:
+            for b in self.wh_balances:
+                if b["warehouse_id"] == wid:
+                    whm[b["item_code"]] = b
+        for itm in self.items:
+            if cid is not None and itm.get("category_id") != cid:
                 continue
+            di = itm.copy()
+            if wid:
+                bl = whm.get(itm["code"])
+                di["quantity"] = bl["quantity"] if bl else 0
+                di["total_value"] = bl["total_value"] if bl else 0
+            res.append(di)
+        self.status_table.setRowCount(len(res))
+        vc = self.status_table.get_visible_columns()
+        for r, itm in enumerate(res):
+            for c, k in enumerate(vc):
+                if k == "code":
+                    self.status_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("code", ""))
+                    )
+                elif k == "name":
+                    self.status_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("name", ""))
+                    )
+                elif k == "cat":
+                    self.status_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("category", "-"))
+                    )
+                elif k == "unit":
+                    self.status_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("unit", ""))
+                    )
+                elif k == "qty":
+                    v = itm.get("quantity", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.status_table.setItem(r, c, it)
+                elif k == "min":
+                    v = itm.get("min_stock", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.status_table.setItem(r, c, it)
+                elif k == "cost":
+                    v = itm.get("unit_cost", 0)
+                    it = QTableWidgetItem(f"₺{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.status_table.setItem(r, c, it)
+                elif k == "val":
+                    v = itm.get("total_value", 0)
+                    it = QTableWidgetItem(f"₺{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.status_table.setItem(r, c, it)
+                elif k == "status":
+                    st = itm.get("status", "normal")
+                    txts = {
+                        "normal": "Normal",
+                        "low": "Düşük",
+                        "critical": "Kritik",
+                        "out_of_stock": "Yok",
+                    }
+                    clrs = {
+                        "normal": "#10b981",
+                        "low": "#f59e0b",
+                        "critical": "#ef4444",
+                        "out_of_stock": "#ef4444",
+                    }
+                    it = QTableWidgetItem(txts.get(st, ""))
+                    it.setForeground(QColor(clrs.get(st, "#fff")))
+                    self.status_table.setItem(r, c, it)
 
-            # Depo filtresi
-            # Eğer depo seçiliyse, o depodaki miktarı göster.
-            # Eğer o depoda hiç kaydı yoksa (veya miktar 0 ise) listeye ekle ama miktar 0 görünsün?
-            # Genellikle depo seçilince sadece o depoda var olanlar listelenir.
+    def _load_critical(self, items: list):
+        self.critical_table.setRowCount(len(items))
+        vc = self.critical_table.get_visible_columns()
+        for r, itm in enumerate(items):
+            for c, k in enumerate(vc):
+                if k == "code":
+                    self.critical_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("code", ""))
+                    )
+                elif k == "name":
+                    self.critical_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("name", ""))
+                    )
+                elif k == "qty":
+                    v = itm.get("quantity", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.critical_table.setItem(r, c, it)
+                elif k == "min":
+                    v = itm.get("min_stock", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.critical_table.setItem(r, c, it)
+                elif k == "diff":
+                    v = max(0, itm.get("min_stock", 0) - itm.get("quantity", 0))
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    it.setForeground(QColor("#ef4444"))
+                    self.critical_table.setItem(r, c, it)
+                elif k == "ord":
+                    v = itm.get("reorder_qty", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.critical_table.setItem(r, c, it)
+                elif k == "lead":
+                    v = itm.get("lead_time", 0)
+                    it = QTableWidgetItem(f"{v} gün")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.critical_table.setItem(r, c, it)
+                elif k == "status":
+                    v = itm.get("quantity", 0)
+                    txt = "Stok Yok" if v <= 0 else "Kritik"
+                    it = QTableWidgetItem(txt)
+                    it.setForeground(QColor("#ef4444" if v <= 0 else "#f59e0b"))
+                    self.critical_table.setItem(r, c, it)
 
-            display_item = item.copy()
-
-            if warehouse_id:
-                balance = wh_balances.get(item["code"])
-                if balance:
-                    # Depodaki miktarı ve değeri kullan
-                    display_item["quantity"] = balance["quantity"]
-                    display_item["total_value"] = balance["total_value"]
-                    # Eğer miktar 0 ise ve stokta yoksa gösterme (opsiyonel, şimdilik gösterelim)
-                else:
-                    # Bu depoda kaydı yok
-                    display_item["quantity"] = 0
-                    display_item["total_value"] = 0
-
-            filtered_items.append(display_item)
-
-        self._load_status_table(filtered_items)
+    def _load_movements(self):
+        self.m_cards["in"].update_value(str(self.mov_stats.get("total_in", 0)))
+        self.m_cards["out"].update_value(str(self.mov_stats.get("total_out", 0)))
+        self.m_cards["tr"].update_value(str(self.mov_stats.get("total_transfer", 0)))
+        self.movements_table.setRowCount(len(self.movements))
+        vc = self.movements_table.get_visible_columns()
+        for r, itm in enumerate(self.movements):
+            mt, qty = itm.get("type", ""), itm.get("quantity", 0)
+            iq, oq, tq = ("-", "-", "-")
+            if "Giriş" in mt or "Alış" in mt:
+                iq = f"{qty:,.2f}"
+            elif "Çıkış" in mt or "Satış" in mt:
+                oq = f"{qty:,.2f}"
+            else:
+                tq = f"{qty:,.2f}"
+            for c, k in enumerate(vc):
+                if k == "code":
+                    self.movements_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("item_code", ""))
+                    )
+                elif k == "name":
+                    self.movements_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("item_name", ""))
+                    )
+                elif k == "in":
+                    self.movements_table.setItem(r, c, QTableWidgetItem(iq))
+                elif k == "out":
+                    self.movements_table.setItem(r, c, QTableWidgetItem(oq))
+                elif k == "tr":
+                    self.movements_table.setItem(r, c, QTableWidgetItem(tq))
+                elif k == "net":
+                    nc = (
+                        f"+{qty}"
+                        if iq != "-"
+                        else (f"-{qty}" if oq != "-" else str(qty))
+                    )
+                    self.movements_table.setItem(r, c, QTableWidgetItem(nc))
+                elif k == "last":
+                    self.movements_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("date", ""))
+                    )
 
     def _filter_warehouse_table(self):
-        """Depo tablosunu filtrele"""
-        warehouse_id = self.wh_report_combo.currentData()
-
-        if warehouse_id:
-            filtered = [
-                b
-                for b in self.all_warehouse_balances
-                if b["warehouse_id"] == warehouse_id
-            ]
-        else:
-            filtered = self.all_warehouse_balances
-
-        self._load_warehouse_table(filtered)
-
-    def _load_warehouse_table(self, items: list):
-        """Depo tablosunu doldur"""
-        self.warehouse_table.setRowCount(len(items))
-        for row, item in enumerate(items):
-            self.warehouse_table.setItem(
-                row, 0, QTableWidgetItem(item.get("warehouse_name", ""))
-            )
-            self.warehouse_table.setItem(
-                row, 1, QTableWidgetItem(item.get("item_code", ""))
-            )
-            self.warehouse_table.setItem(
-                row, 2, QTableWidgetItem(item.get("item_name", ""))
-            )
-
-            qty = item.get("quantity", 0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.warehouse_table.setItem(row, 3, qty_item)
-
-            self.warehouse_table.setItem(row, 4, QTableWidgetItem(item.get("unit", "")))
-
-            cost = item.get("unit_cost", 0)
-            cost_item = QTableWidgetItem(f"₺{cost:,.2f}")
-            cost_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.warehouse_table.setItem(row, 5, cost_item)
-
-            total = item.get("total_value", 0)
-            total_item = QTableWidgetItem(f"₺{total:,.2f}")
-            total_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.warehouse_table.setItem(row, 6, total_item)
-
-            self.warehouse_table.setItem(
-                row, 7, QTableWidgetItem(str(item.get("location", "-")))
-            )
-
-    def _load_movement_table(self):
-        """Hareket tablosunu doldur"""
-        # Kartları güncelle
-        stats = self.movement_stats
-        self._update_card(self.entry_card, str(stats.get("total_in", 0)))
-        self._update_card(self.exit_card, str(stats.get("total_out", 0)))
-        self._update_card(self.transfer_card, str(stats.get("total_transfer", 0)))
-
-        # Tabloyu doldur
-        items = self.all_movements
-        self.movement_table.setRowCount(len(items))
-
-        for row, item in enumerate(items):
-            self.movement_table.setItem(
-                row, 0, QTableWidgetItem(item.get("item_code", ""))
-            )
-            self.movement_table.setItem(
-                row, 1, QTableWidgetItem(item.get("item_name", ""))
-            )
-
-            m_type = item.get("type", "")
-            qty = item.get("quantity", 0)
-
-            # Giriş/Çıkış sütunlarına ayır
-            in_qty = "-"
-            out_qty = "-"
-            transfer_qty = "-"
-
-            if "Giriş" in m_type or "Alış" in m_type:
-                in_qty = f"{qty:,.2f}"
-            elif "Çıkış" in m_type or "Satış" in m_type:
-                out_qty = f"{qty:,.2f}"
-            else:
-                transfer_qty = f"{qty:,.2f}"
-
-            self.movement_table.setItem(row, 2, QTableWidgetItem(in_qty))
-            self.movement_table.setItem(row, 3, QTableWidgetItem(out_qty))
-            self.movement_table.setItem(row, 4, QTableWidgetItem(transfer_qty))
-
-            # Net değişim (basitçe miktar ve yön)
-            # Todo: Gerçek kümülatif değişim hesaplanabilir ama şimdilik miktar.
-            net_change = (
-                f"+{qty}"
-                if in_qty != "-"
-                else (f"-{qty}" if out_qty != "-" else str(qty))
-            )
-            self.movement_table.setItem(row, 5, QTableWidgetItem(net_change))
-
-            self.movement_table.setItem(row, 6, QTableWidgetItem(item.get("date", "")))
+        wid = self.wh_rep_combo.currentData()
+        res = (
+            [b for b in self.wh_balances if b["warehouse_id"] == wid]
+            if wid
+            else self.wh_balances
+        )
+        self.wh_table.setRowCount(len(res))
+        vc = self.wh_table.get_visible_columns()
+        for r, itm in enumerate(res):
+            for c, k in enumerate(vc):
+                if k == "wh":
+                    self.wh_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("warehouse_name", ""))
+                    )
+                elif k == "code":
+                    self.wh_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("item_code", ""))
+                    )
+                elif k == "name":
+                    self.wh_table.setItem(
+                        r, c, QTableWidgetItem(itm.get("item_name", ""))
+                    )
+                elif k == "qty":
+                    v = itm.get("quantity", 0)
+                    it = QTableWidgetItem(f"{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.wh_table.setItem(r, c, it)
+                elif k == "unit":
+                    self.wh_table.setItem(
+                        r,
+                        c,
+                        QTableWidgetItem(itm.get("unit", "")),
+                    )
+                elif k == "cost":
+                    v = itm.get("unit_cost", 0)
+                    it = QTableWidgetItem(f"₺{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.wh_table.setItem(r, c, it)
+                elif k == "val":
+                    v = itm.get("total_value", 0)
+                    it = QTableWidgetItem(f"₺{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.wh_table.setItem(r, c, it)
+                elif k == "loc":
+                    self.wh_table.setItem(
+                        r, c, QTableWidgetItem(str(itm.get("location", "-")))
+                    )
 
     def export_current_tab(self):
-        """Aktif sekmeyi dışa aktar"""
-        current_tab_idx = self.findChild(QTabWidget).currentIndex()
-
-        if current_tab_idx == 0:
-            table = self.status_table
-            filename = "stok_durumu"
-        elif current_tab_idx == 1:
-            table = self.critical_table
-            filename = "kritik_stoklar"
-        elif current_tab_idx == 2:
-            table = self.movement_table
-            filename = "hareket_ozeti"
-        elif current_tab_idx == 3:
-            table = self.warehouse_table
-            filename = "depo_raporu"
-        else:
-            return
-
-        path, _ = QFileDialog.getSaveFileName(
+        idx = self.tabs.currentIndex()
+        tbl = [
+            self.status_table,
+            self.critical_table,
+            self.movements_table,
+            self.wh_table,
+        ][idx]
+        name = ["stok_durumu", "kritik_stoklar", "hareket_ozeti", "depo_raporu"][idx]
+        p, _ = QFileDialog.getSaveFileName(
             self,
             "Dışa Aktar",
-            f"{filename}_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+            f"{name}_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
             "CSV Dosyası (*.csv)",
         )
-
-        if path:
+        if p:
             try:
-                with open(path, "w", newline="", encoding="utf-8-sig") as f:
-                    writer = csv.writer(f)
-
-                    # Başlıklar
-                    headers = []
-                    for col in range(table.columnCount()):
-                        headers.append(table.horizontalHeaderItem(col).text())
-                    writer.writerow(headers)
-
-                    # Veriler
-                    for row in range(table.rowCount()):
-                        row_data = []
-                        for col in range(table.columnCount()):
-                            item = table.item(row, col)
-                            row_data.append(item.text() if item else "")
-                        writer.writerow(row_data)
-
+                with open(p, "w", newline="", encoding="utf-8-sig") as f:
+                    w = csv.writer(f)
+                    w.writerow(
+                        [
+                            tbl.horizontalHeaderItem(c).text()
+                            for c in range(tbl.columnCount())
+                        ]
+                    )
+                    for r in range(tbl.rowCount()):
+                        w.writerow(
+                            [
+                                tbl.item(r, c).text() if tbl.item(r, c) else ""
+                                for c in range(tbl.columnCount())
+                            ]
+                        )
                 QMessageBox.information(self, "Başarılı", "Rapor dışa aktarıldı.")
             except Exception as e:
                 QMessageBox.critical(self, "Hata", f"Dosya kaydedilemedi:\n{str(e)}")
 
     def print_current_tab(self):
-        """Aktif sekmeyi yazdır"""
-        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-        preview = QPrintPreviewDialog(printer, self)
-        preview.paintRequested.connect(self._handle_print_request)
-        preview.exec()
+        pr = QPrinter(QPrinter.PrinterMode.HighResolution)
+        pre = QPrintPreviewDialog(pr, self)
+        pre.paintRequested.connect(self._handle_print_request)
+        pre.exec()
 
-    def _handle_print_request(self, printer):
-        """Yazdırma içeriğini oluştur"""
-        current_tab_idx = self.findChild(QTabWidget).currentIndex()
-        if current_tab_idx == 0:
-            title = "Stok Durum Raporu"
-            table = self.status_table
-        elif current_tab_idx == 1:
-            title = "Kritik Stok Raporu"
-            table = self.critical_table
-        elif current_tab_idx == 2:
-            title = "Hareket Özeti Raporu"
-            table = self.movement_table
-        elif current_tab_idx == 3:
-            title = "Depo Raporu"
-            table = self.warehouse_table
-        else:
-            return
-
-        # HTML oluştur
-        html = f"""
-        <h1>{title}</h1>
-        <p>Tarih: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}</p>
-        <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse: collapse;">
-            <thead>
-                <tr>
-        """
-
-        # Başlıklar
-        for col in range(table.columnCount()):
-            html += f'<th style="background-color: #f0f0f0;">{table.horizontalHeaderItem(col).text()}</th>'
-
-        html += """
-                </tr>
-            </thead>
-            <tbody>
-        """
-
-        # Veriler
-        for row in range(table.rowCount()):
+    def _handle_print_request(self, pr):
+        idx = self.tabs.currentIndex()
+        title = [
+            "Stok Durum Raporu",
+            "Kritik Stok Raporu",
+            "Hareket Özeti Raporu",
+            "Depo Raporu",
+        ][idx]
+        tbl = [
+            self.status_table,
+            self.critical_table,
+            self.movements_table,
+            self.wh_table,
+        ][idx]
+        html = f"<h1>{title}</h1><p>Tarih: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}</p><table border='1' cellspacing='0' cellpadding='4' style='width:100%; border-collapse: collapse;'><thead><tr>"
+        for c in range(tbl.columnCount()):
+            html += f"<th style='background-color: #f0f0f0;'>{tbl.horizontalHeaderItem(c).text()}</th>"
+        html += "</tr></thead><tbody>"
+        for r in range(tbl.rowCount()):
             html += "<tr>"
-            for col in range(table.columnCount()):
-                item = table.item(row, col)
-                text = item.text() if item else ""
-                html += f"<td>{text}</td>"
+            for c in range(tbl.columnCount()):
+                it = tbl.item(r, c)
+                html += f"<td>{it.text() if it else ''}</td>"
             html += "</tr>"
-
-        html += """
-            </tbody>
-        </table>
-        """
-
+        html += "</tbody></table>"
         doc = QTextDocument()
         doc.setHtml(html)
-        doc.print(printer)
+        doc.print(pr)
 
-    def _update_card(self, card, value: str):
-        """Kart değerini güncelle"""
-        if hasattr(card, "update_value"):
-            card.update_value(value)
-        else:
-            # Mini card (QFrame) durumu
-            lbl = card.findChild(QLabel, "value")
-            if lbl:
-                lbl.setText(str(value))
+    def load_categories(self, cats: list):
+        self.cat_combo.clear()
+        self.cat_combo.addItem("Tümü", None)
+        for c in cats:
+            self.cat_combo.addItem(c.name, c.id)
 
-    def _load_status_table(self, items: list):
-        """Stok durum tablosunu yükle"""
-        self.status_table.setRowCount(len(items))
-
-        for row, item in enumerate(items):
-            self.status_table.setItem(row, 0, QTableWidgetItem(item.get("code", "")))
-            self.status_table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-            self.status_table.setItem(
-                row, 2, QTableWidgetItem(item.get("category", "-"))
-            )
-            self.status_table.setItem(row, 3, QTableWidgetItem(item.get("unit", "")))
-
-            qty = item.get("quantity", 0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.status_table.setItem(row, 4, qty_item)
-
-            min_stock = item.get("min_stock", 0)
-            min_item = QTableWidgetItem(f"{min_stock:,.2f}")
-            min_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.status_table.setItem(row, 5, min_item)
-
-            cost = item.get("unit_cost", 0)
-            cost_item = QTableWidgetItem(f"₺{cost:,.2f}")
-            cost_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.status_table.setItem(row, 6, cost_item)
-
-            total = item.get("total_value", 0)
-            total_item = QTableWidgetItem(f"₺{total:,.2f}")
-            total_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.status_table.setItem(row, 7, total_item)
-
-            status = item.get("status", "normal")
-            status_text = {
-                "normal": "✅ Normal",
-                "low": "⚠️ Düşük",
-                "critical": "🔴 Kritik",
-                "out_of_stock": "❌ Yok",
-            }
-            status_colors = {
-                "normal": COLORS["success"],
-                "low": COLORS["warning"],
-                "critical": COLORS["error"],
-                "out_of_stock": COLORS["error"],
-            }
-            status_item = QTableWidgetItem(status_text.get(status, ""))
-            status_item.setForeground(QColor(status_colors.get(status, "#ffffff")))
-            self.status_table.setItem(row, 8, status_item)
-
-    def _load_critical_table(self, items: list):
-        """Kritik stok tablosunu yükle"""
-        self.critical_table.setRowCount(len(items))
-
-        for row, item in enumerate(items):
-            self.critical_table.setItem(row, 0, QTableWidgetItem(item.get("code", "")))
-            self.critical_table.setItem(row, 1, QTableWidgetItem(item.get("name", "")))
-
-            qty = item.get("quantity", 0)
-            qty_item = QTableWidgetItem(f"{qty:,.2f}")
-            qty_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.critical_table.setItem(row, 2, qty_item)
-
-            min_stock = item.get("min_stock", 0)
-            self.critical_table.setItem(row, 3, QTableWidgetItem(f"{min_stock:,.2f}"))
-
-            shortage = max(0, min_stock - qty)
-            shortage_item = QTableWidgetItem(f"{shortage:,.2f}")
-            shortage_item.setForeground(QColor(COLORS["error"]))
-            self.critical_table.setItem(row, 4, shortage_item)
-
-            self.critical_table.setItem(
-                row, 5, QTableWidgetItem(f"{item.get('reorder_qty', 0):,.2f}")
-            )
-            self.critical_table.setItem(
-                row, 6, QTableWidgetItem(f"{item.get('lead_time', 0)} gün")
-            )
-
-            status = "❌ Stok Yok" if qty <= 0 else "⚠️ Kritik"
-            status_item = QTableWidgetItem(status)
-            status_item.setForeground(
-                QColor(COLORS["error"] if qty <= 0 else COLORS["warning"])
-            )
-            self.critical_table.setItem(row, 7, status_item)
-
-    def load_categories(self, categories: list):
-        """Kategori combolarını yükle"""
-        self.status_category_combo.clear()
-        self.status_category_combo.addItem("Tümü", None)
-        for cat in categories:
-            self.status_category_combo.addItem(cat.name, cat.id)
-
-    def load_warehouses(self, warehouses: list):
-        """Depo combolarını yükle"""
-        self.status_warehouse_combo.clear()
-        self.status_warehouse_combo.addItem("Tümü", None)
-
-        self.wh_report_combo.clear()
-        self.wh_report_combo.addItem("Tüm Depolar", None)
-
-        for wh in warehouses:
-            self.status_warehouse_combo.addItem(wh.name, wh.id)
-            self.wh_report_combo.addItem(wh.name, wh.id)
+    def load_warehouses(self, whs: list):
+        self.wh_combo.clear()
+        self.wh_combo.addItem("Tümü", None)
+        self.wh_rep_combo.clear()
+        self.wh_rep_combo.addItem("Tüm Depolar", None)
+        for w in whs:
+            self.wh_combo.addItem(w.name, w.id)
+            self.wh_rep_combo.addItem(w.name, w.id)

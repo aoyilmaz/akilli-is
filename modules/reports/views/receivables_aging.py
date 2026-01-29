@@ -8,20 +8,15 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QFrame,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
-from ui.components.stat_cards import MiniStatCard
 
-from config.styles import (
-    SUCCESS,
-    WARNING,
-    ERROR,
-)
+from config.icons import ICONS
+from ui.components.stat_cards import MiniStatCard
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class ReceivablesAgingPage(QWidget):
@@ -37,21 +32,15 @@ class ReceivablesAgingPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Alacak Yaşlandırma",
-            icon="📉",
+            icon=ICONS.CHART,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self.refresh_requested.emit)
-
-        # Info mesajını header'a ekle
         h_layout = self.header.header_layout()
         h_layout.addSpacing(16)
         info = QLabel(
@@ -59,164 +48,107 @@ class ReceivablesAgingPage(QWidget):
         )
         info.setStyleSheet("color: #888; font-style: italic;")
         h_layout.addWidget(info)
-
         layout.addWidget(self.header)
 
-        # Yaşlandırma kartları
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        c_layout = QHBoxLayout()
+        c_layout.setSpacing(16)
+        self.cards = {
+            "0-30": MiniStatCard("0-30 Gün", "₺0", "success", icon=ICONS.TIME),
+            "31-60": MiniStatCard("31-60 Gün", "₺0", "warning", icon=ICONS.TIME),
+            "61-90": MiniStatCard("61-90 Gün", "₺0", "error", icon=ICONS.TIME),
+            "90+": MiniStatCard("90+ Gün", "₺0", "error", icon=ICONS.CLOSE),
+        }
+        for card in self.cards.values():
+            c_layout.addWidget(card)
+        layout.addLayout(c_layout)
 
-        self.card_0_30 = self._create_card("0-30 Gün", "₺0", SUCCESS, "Normal")
-        cards_layout.addWidget(self.card_0_30)
-
-        self.card_31_60 = self._create_card("31-60 Gün", "₺0", WARNING, "Takip")
-        cards_layout.addWidget(self.card_31_60)
-
-        self.card_61_90 = self._create_card("61-90 Gün", "₺0", "#f97316", "Riskli")
-        cards_layout.addWidget(self.card_61_90)
-
-        self.card_90_plus = self._create_card("90+ Gün", "₺0", ERROR, "Kritik")
-        cards_layout.addWidget(self.card_90_plus)
-
-        layout.addLayout(cards_layout)
-
-        # Toplam özet
-        summary_frame = QFrame()
-        summary_layout = QHBoxLayout(summary_frame)
-
+        sum_f = QFrame()
+        sl = QHBoxLayout(sum_f)
         self.total_label = QLabel("Toplam Alacak: ₺0")
-        summary_layout.addWidget(self.total_label)
-
-        summary_layout.addStretch()
-
+        sl.addWidget(self.total_label)
+        sl.addStretch()
         self.customer_count_label = QLabel("0 müşteri")
-        summary_layout.addWidget(self.customer_count_label)
+        sl.addWidget(self.customer_count_label)
+        layout.addWidget(sum_f)
 
-        layout.addWidget(summary_frame)
-
-        # Müşteri tablosu
-        self.table = QTableWidget()
-        self._setup_table(
-            self.table,
-            [
-                ("Risk", 60),
-                ("Müşteri Kodu", 100),
-                ("Müşteri Adı", 200),
-                ("Fatura Sayısı", 100),
-                ("Toplam Bakiye", 150),
-                ("En Eski Vade", 100),
-            ],
+        cols = [
+            ColumnConfig("risk", "Risk", width=60),
+            ColumnConfig("code", "Müşteri Kodu", width=120),
+            ColumnConfig("name", "Müşteri Adı", stretch=True),
+            ColumnConfig("count", "Fatura Sayısı", width=120),
+            ColumnConfig("bal", "Toplam Bakiye", width=150),
+            ColumnConfig("days", "En Eski Vade", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="report_receivables_aging", columns=cols, parent=self
         )
         layout.addWidget(self.table)
 
-    def _create_card(
-        self, title: str, value: str, color: str, subtitle: str
-    ) -> MiniStatCard:
-        """Dashboard tarzı istatistik kartı"""
-        return MiniStatCard(title, value, color)
-
-    def _setup_table(self, table: QTableWidget, columns: list):
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 2:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                table.setColumnWidth(i, width)
-
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
-
     def load_data(self, data: dict):
         groups = data.get("groups", {})
+        for k, card in self.cards.items():
+            g = groups.get(k, {})
+            card.update_value(f"₺{g.get('total', 0):,.2f}")
 
-        # Kartları güncelle
-        self._update_group_card(self.card_0_30, groups.get("0-30", {}))
-        self._update_group_card(self.card_31_60, groups.get("31-60", {}))
-        self._update_group_card(self.card_61_90, groups.get("61-90", {}))
-        self._update_group_card(self.card_90_plus, groups.get("90+", {}))
-
-        # Toplam
         total = data.get("total_receivables", 0)
         self.total_label.setText(f"Toplam Alacak: ₺{total:,.2f}")
+        cnt = data.get("total_customers", 0)
+        self.customer_count_label.setText(f"{cnt} müşteri")
 
-        total_customers = data.get("total_customers", 0)
-        self.customer_count_label.setText(f"{total_customers} müşteri")
-
-        # Tüm müşterileri tabloya ekle
-        all_customers = []
-        risk_config = {
-            "0-30": {"icon": "●", "color": SUCCESS},
-            "31-60": {"icon": "●", "color": WARNING},
-            "61-90": {"icon": "●", "color": "#f97316"},
-            "90+": {"icon": "●", "color": ERROR},
+        all_cus, clrs = [], {
+            "0-30": "#10b981",
+            "31-60": "#f59e0b",
+            "61-90": "#f97316",
+            "90+": "#ef4444",
         }
+        for gname, gdata in groups.items():
+            for c in gdata.get("customers", []):
+                c["risk_color"] = clrs.get(gname, "#ffffff")
+                c["risk_group"] = gname
+                all_cus.append(c)
+        all_cus.sort(key=lambda x: x.get("max_days", 0), reverse=True)
 
-        for group_name, group_data in groups.items():
-            config = risk_config.get(group_name, {})
-            for customer in group_data.get("customers", []):
-                customer["risk_icon"] = config.get("icon", "")
-                customer["risk_color"] = config.get("color", "#ffffff")
-                customer["risk_group"] = group_name
-                all_customers.append(customer)
-
-        # Günlere göre sırala (en kritik en üstte)
-        all_customers.sort(key=lambda x: x.get("max_days", 0), reverse=True)
-
-        self.table.setRowCount(len(all_customers))
-        for row, customer in enumerate(all_customers):
-            risk_item = QTableWidgetItem(customer.get("risk_icon", ""))
-            risk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            risk_item.setForeground(QColor(customer.get("risk_color", "#ffffff")))
-            self.table.setItem(row, 0, risk_item)
-
-            self.table.setItem(
-                row, 1, QTableWidgetItem(customer.get("customer_code", ""))
-            )
-            self.table.setItem(
-                row, 2, QTableWidgetItem(customer.get("customer_name", ""))
-            )
-
-            count = customer.get("invoice_count", 0)
-            count_item = QTableWidgetItem(str(count))
-            count_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            self.table.setItem(row, 3, count_item)
-
-            balance = customer.get("total_balance", 0)
-            balance_item = QTableWidgetItem(f"₺{balance:,.2f}")
-            balance_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            balance_item.setForeground(QColor(customer.get("risk_color", "#ffffff")))
-            self.table.setItem(row, 4, balance_item)
-
-            days = customer.get("max_days", 0)
-            days_item = QTableWidgetItem(f"{days} gün")
-            days_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
-            if days > 90:
-                days_item.setForeground(QColor(ERROR))
-            elif days > 60:
-                days_item.setForeground(QColor("#f97316"))
-            elif days > 30:
-                days_item.setForeground(QColor(WARNING))
-            self.table.setItem(row, 5, days_item)
-
-    def _update_group_card(self, card: QFrame, group_data: dict):
-        value = group_data.get("total", 0)
-        count = group_data.get("count", 0)
-
-        value_label = card.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(f"₺{value:,.2f}")
-
-        count_label = card.findChild(QLabel, "count")
-        if count_label:
-            count_label.setText(f"{count} müşteri")
+        self.table.setRowCount(len(all_cus))
+        vcols = self.table.get_visible_columns()
+        for row, cus in enumerate(all_cus):
+            for c, key in enumerate(vcols):
+                if key == "risk":
+                    it = QTableWidgetItem("●")
+                    it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    it.setForeground(QColor(cus.get("risk_color", "#fff")))
+                    self.table.setItem(row, c, it)
+                elif key == "code":
+                    self.table.setItem(
+                        row, c, QTableWidgetItem(cus.get("customer_code", ""))
+                    )
+                elif key == "name":
+                    self.table.setItem(
+                        row, c, QTableWidgetItem(cus.get("customer_name", ""))
+                    )
+                elif key == "count":
+                    it = QTableWidgetItem(str(cus.get("invoice_count", 0)))
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    self.table.setItem(row, c, it)
+                elif key == "bal":
+                    v = cus.get("total_balance", 0)
+                    it = QTableWidgetItem(f"₺{v:,.2f}")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    it.setForeground(QColor(cus.get("risk_color", "#fff")))
+                    self.table.setItem(row, c, it)
+                elif key == "days":
+                    d = cus.get("max_days", 0)
+                    it = QTableWidgetItem(f"{d} gün")
+                    it.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    if d > 90:
+                        it.setForeground(QColor("#ef4444"))
+                    elif d > 60:
+                        it.setForeground(QColor("#f97316"))
+                    elif d > 30:
+                        it.setForeground(QColor("#f59e0b"))
+                    self.table.setItem(row, c, it)

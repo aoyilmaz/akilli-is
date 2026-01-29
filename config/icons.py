@@ -11,12 +11,15 @@ class ICONS:
     REFRESH = "ph.arrows-clockwise"
     HOME = "ph.house"
     MENU = "ph.list"
+    LIST = "ph.list"
     CLOSE = "ph.x"
     TRUCK = "ph.truck"
     BUILDING = "ph.buildings"
     FOLDER_OPEN = "ph.folder-open"
+    FOLDER = "ph.folder"
     CHECK = "ph.check"
     PLUS = "ph.plus"
+    ADD = "ph.plus"
     MINUS = "ph.minus"
     EDIT = "ph.pencil-simple"
     DELETE = "ph.trash"
@@ -33,6 +36,12 @@ class ICONS:
     LOGOUT = "ph.sign-out"
     USER = "ph.user"
     USERS = "ph.users"
+    CART = "ph.shopping-cart"
+    CHART = "ph.trend-up"
+    REPORT = "ph.clipboard-text"
+    VIEW = "ph.eye"
+    ARROW_UP = "ph.arrow-up"
+    ARROW_DOWN = "ph.arrow-down"
 
     # --- STOK & ENVANTER ---
     INVENTORY = "ph.package"
@@ -43,6 +52,7 @@ class ICONS:
     TAG = "ph.tag"
     BARCODE = "ph.barcode"
     QR = "ph.qr-code"
+    GRID = "ph.squares-four"
 
     # Stok Tipleri
     TYPE_RAW = "ph.cube"  # Hammadde
@@ -55,7 +65,7 @@ class ICONS:
     TYPE_OTHER = "ph.clipboard-text"  # Diğer
 
     # --- FİNANS & MUHASEBE ---
-    FINANCE = "ph.currency-try"  # TL simgesi yoksa yerine
+    FINANCE = "ph.bank"
     MONEY = "ph.money"
     BANK = "ph.bank"
     INVOICE = "ph.receipt"
@@ -81,7 +91,7 @@ class ICONS:
 
     # --- BAKIM ---
     MAINTENANCE = "ph.wrench"
-    FIX = "ph.hammer"
+    FIX = "ph.wrench"
     DOWNTIME = "ph.stop-circle"
     TIME = "ph.clock"
 
@@ -89,6 +99,7 @@ class ICONS:
     HR = "ph.users-three"
     EMPLOYEE = "ph.identification-badge"
     CRM = "ph.handshake"
+    STAR = "ph.star"
     DEAL = "ph.star"
     CUSTOMER = "ph.user-focus"
     ROCKET = "ph.rocket"

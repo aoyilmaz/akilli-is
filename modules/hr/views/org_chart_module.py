@@ -12,8 +12,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtGui import QColor, QFont
+import qtawesome as qta
 
+from config.icons import ICONS
 from modules.hr.services import HRService
+from ui.components.page_header import PageHeader
 
 
 class OrgChartModule(QWidget):
@@ -30,33 +33,24 @@ class OrgChartModule(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Organizasyon Şeması",
-            icon="🏢",
+            icon=ICONS.BUILDING,
             show_search=False,
             show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self._load_data)
-
-        # Header Layout - View Combo
         h_layout = self.header.header_layout()
-
         self.view_combo = QComboBox()
         self.view_combo.addItem("Departmana Göre", "department")
         self.view_combo.addItem("Yöneticiye Göre", "manager")
         self.view_combo.setFixedHeight(36)
         self.view_combo.currentIndexChanged.connect(self._load_data)
         h_layout.addWidget(self.view_combo)
-
         layout.addWidget(self.header)
 
-        # Ağaç görünümü
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Ad", "Pozisyon", "Email", "Telefon"])
         self.tree.setAlternatingRowColors(True)
@@ -65,8 +59,6 @@ class OrgChartModule(QWidget):
         self.tree.setColumnWidth(2, 200)
         self.tree.setColumnWidth(3, 120)
         layout.addWidget(self.tree)
-
-        # Özet
         self.summary_label = QLabel()
         layout.addWidget(self.summary_label)
 
@@ -75,119 +67,96 @@ class OrgChartModule(QWidget):
         self._load_data()
 
     def _load_data(self):
-        """Organizasyon verilerini yükle"""
-        view_type = self.view_combo.currentData()
-
-        if view_type == "department":
+        v = self.view_combo.currentData()
+        if v == "department":
             self._load_by_department()
         else:
             self._load_by_manager()
 
     def _load_by_department(self):
-        """Departmana göre görünüm"""
         self.tree.clear()
-
         try:
-            departments = self.service.get_all_departments()
-            employees = self.service.get_all_employees(limit=1000)
-
+            depts = self.service.get_all_departments()
+            emps = self.service.get_all_employees(limit=1000)
             total = 0
-            for dept in departments:
-                dept_employees = [e for e in employees if e.department_id == dept.id]
-                if not dept_employees:
+            for d in depts:
+                ds = [e for e in emps if e.department_id == d.id]
+                if not ds:
                     continue
-
-                dept_item = QTreeWidgetItem(
-                    [f"📁 {dept.name}", "", f"{len(dept_employees)} kişi", ""]
-                )
-                dept_item.setFont(0, QFont("", 10, QFont.Weight.Bold))
-                dept_item.setForeground(0, QColor("#818cf8"))
-
-                # Pozisyonlara göre grupla
-                positions = {}
-                for emp in dept_employees:
-                    pos_name = emp.position.name if emp.position else "Belirsiz"
-                    if pos_name not in positions:
-                        positions[pos_name] = []
-                    positions[pos_name].append(emp)
+                di = QTreeWidgetItem([d.name, "", f"{len(ds)} kişi", ""])
+                di.setIcon(0, qta.icon(ICONS.FOLDER, color="#818cf8"))
+                di.setFont(0, QFont("", 10, QFont.Weight.Bold))
+                di.setForeground(0, QColor("#818cf8"))
+                poss = {}
+                for e in ds:
+                    pn = e.position.name if e.position else "Belirsiz"
+                    if pn not in poss:
+                        poss[pn] = []
+                    poss[pn].append(e)
                     total += 1
-
-                for pos_name, pos_employees in positions.items():
-                    pos_item = QTreeWidgetItem(
-                        [f"  📋 {pos_name}", "", f"{len(pos_employees)} kişi", ""]
-                    )
-                    pos_item.setForeground(0, QColor("#a78bfa"))
-
-                    for emp in pos_employees:
-                        gender_icon = "👨" if str(emp.gender) == "Gender.MALE" else "👩"
-                        emp_item = QTreeWidgetItem(
+                for pn, pes in poss.items():
+                    pi = QTreeWidgetItem([pn, "", f"{len(pes)} kişi", ""])
+                    pi.setIcon(0, qta.icon(ICONS.LIST, color="#a78bfa"))
+                    pi.setForeground(0, QColor("#a78bfa"))
+                    for e in pes:
+                        gi = ICONS.USER
+                        ei = QTreeWidgetItem(
                             [
-                                f"      {gender_icon} {emp.full_name}",
+                                e.full_name,
                                 "",
-                                emp.email or "-",
-                                emp.phone or emp.mobile or "-",
+                                e.email or "-",
+                                e.phone or e.mobile or "-",
                             ]
                         )
-                        pos_item.addChild(emp_item)
-
-                    dept_item.addChild(pos_item)
-
-                self.tree.addTopLevelItem(dept_item)
-                dept_item.setExpanded(True)
-
+                        ei.setIcon(0, qta.icon(gi, color="#9ca3af"))
+                        pi.addChild(ei)
+                    di.addChild(pi)
+                self.tree.addTopLevelItem(di)
+                di.setExpanded(True)
             self.summary_label.setText(f"Toplam: {total} çalışan")
-
         except Exception as e:
-            print(f"Organizasyon yükleme hatası: {e}")
+            print(f"Org chart error: {e}")
 
     def _load_by_manager(self):
-        """Yöneticiye göre görünüm"""
         self.tree.clear()
-
         try:
-            employees = self.service.get_all_employees(limit=1000)
+            emps = self.service.get_all_employees(limit=1000)
+            tops = [e for e in emps if not e.manager_id]
 
-            # Yöneticisi olmayanları bul (üst düzey)
-            top_level = [e for e in employees if not e.manager_id]
-
-            def add_subordinates(parent_item, manager_id):
-                subordinates = [e for e in employees if e.manager_id == manager_id]
-                for emp in subordinates:
-                    gender_icon = "👨" if str(emp.gender) == "Gender.MALE" else "👩"
-                    pos_name = emp.position.name if emp.position else ""
-                    emp_item = QTreeWidgetItem(
-                        [
-                            f"{gender_icon} {emp.full_name}",
-                            pos_name,
-                            emp.email or "-",
-                            emp.phone or emp.mobile or "-",
-                        ]
+            def add_subs(pi, mid):
+                subs = [e for e in emps if e.manager_id == mid]
+                for e in subs:
+                    gi = ICONS.USER
+                    pn = e.position.name if e.position else ""
+                    ei = QTreeWidgetItem(
+                        [e.full_name, pn, e.email or "-", e.phone or e.mobile or "-"]
                     )
-                    parent_item.addChild(emp_item)
-                    add_subordinates(emp_item, emp.id)
+                    ei.setIcon(0, qta.icon(gi, color="#9ca3af"))
+                    pi.addChild(ei)
+                    add_subs(ei, e.id)
 
-            for emp in top_level:
-                gender_icon = "👨" if str(emp.gender) == "Gender.MALE" else "👩"
-                pos_name = emp.position.name if emp.position else ""
-                dept_name = emp.department.name if emp.department else ""
-                emp_item = QTreeWidgetItem(
+            for e in tops:
+                gi = ICONS.USER
+                pn, dn = e.position.name if e.position else "", (
+                    e.department.name if e.department else ""
+                )
+                ei = QTreeWidgetItem(
                     [
-                        f"👑 {gender_icon} {emp.full_name}",
-                        f"{pos_name} - {dept_name}",
-                        emp.email or "-",
-                        emp.phone or emp.mobile or "-",
+                        e.full_name,
+                        f"{pn} - {dn}",
+                        e.email or "-",
+                        e.phone or e.mobile or "-",
                     ]
                 )
-                emp_item.setFont(0, QFont("", 10, QFont.Weight.Bold))
-                emp_item.setForeground(0, QColor("#f59e0b"))
-                self.tree.addTopLevelItem(emp_item)
-                add_subordinates(emp_item, emp.id)
-                emp_item.setExpanded(True)
-
-            self.summary_label.setText(f"Toplam: {len(employees)} çalışan")
-
+                ei.setIcon(0, qta.icon(ICONS.CHART, color="#f59e0b"))
+                ei.setFont(0, QFont("", 10, QFont.Weight.Bold))
+                ei.setForeground(0, QColor("#f59e0b"))
+                self.tree.addTopLevelItem(ei)
+                add_subs(ei, e.id)
+                ei.setExpanded(True)
+            self.summary_label.setText(f"Toplam: {len(emps)} çalışan")
         except Exception as e:
-            print(f"Organizasyon yükleme hatası: {e}")
+            print(f"Org chart error: {e}")
 
     def closeEvent(self, event):
         self.service.close()

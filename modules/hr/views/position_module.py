@@ -7,9 +7,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QLineEdit,
     QDialog,
     QFormLayout,
@@ -18,13 +16,12 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt
+import qtawesome as qta
 
-from config.styles import (
-    get_button_style,
-    BTN_HEIGHT_NORMAL,
-    ICONS,
-)
+from config.icons import ICONS
 from modules.hr.services import HRService
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
 class PositionFormDialog(QDialog):
@@ -32,68 +29,54 @@ class PositionFormDialog(QDialog):
 
     def __init__(self, pos_id: int = None, parent=None):
         super().__init__(parent)
-        self.pos_id = pos_id
-        self.service = HRService()
+        self.pos_id, self.service = pos_id, HRService()
+        self.setWindowTitle("Pozisyon Düzenle" if pos_id else "Yeni Pozisyon")
+        self.setMinimumSize(400, 350)
         self.setup_ui()
         self.load_combos()
         if pos_id:
             self.load_position()
 
     def setup_ui(self):
-        self.setWindowTitle("Pozisyon Düzenle" if self.pos_id else "Yeni Pozisyon")
-        self.setMinimumSize(400, 350)
-
         layout = QVBoxLayout(self)
         form = QFormLayout()
         form.setSpacing(12)
-
         self.code = QLineEdit()
         form.addRow("Kod:", self.code)
-
         self.name = QLineEdit()
         form.addRow("Ad:", self.name)
-
         self.department = QComboBox()
         form.addRow("Departman:", self.department)
-
         self.min_salary = QLineEdit()
         self.min_salary.setPlaceholderText("0.00")
         form.addRow("Min Maaş:", self.min_salary)
-
         self.max_salary = QLineEdit()
         self.max_salary.setPlaceholderText("0.00")
         form.addRow("Max Maaş:", self.max_salary)
-
         self.description = QTextEdit()
         self.description.setMaximumHeight(80)
         form.addRow("Açıklama:", self.description)
-
         layout.addLayout(form)
 
-        # Butonlar
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-
-        cancel_btn = QPushButton(f"{ICONS['cancel']} İptal")
-        cancel_btn.setStyleSheet(get_button_style("cancel"))
-        cancel_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        b_layout = QHBoxLayout()
+        b_layout.addStretch()
+        cancel_btn = QPushButton("İptal")
         cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-
-        save_btn = QPushButton(f"{ICONS['save']} Kaydet")
-        save_btn.setStyleSheet(get_button_style("save"))
-        save_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        b_layout.addWidget(cancel_btn)
+        save_btn = QPushButton("Kaydet")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="#ffffff"))
+        save_btn.setProperty("class", "btn-primary")
+        save_btn.setFixedHeight(36)
         save_btn.clicked.connect(self.save)
-        btn_layout.addWidget(save_btn)
-
-        layout.addLayout(btn_layout)
+        b_layout.addWidget(save_btn)
+        layout.addLayout(b_layout)
 
     def load_combos(self):
         self.department.addItem("Seçiniz...", None)
         try:
-            for dept in self.service.get_all_departments():
-                self.department.addItem(dept.name, dept.id)
-        except Exception:
+            for d in self.service.get_all_departments():
+                self.department.addItem(d.name, d.id)
+        except:
             pass
 
     def load_position(self):
@@ -112,46 +95,41 @@ class PositionFormDialog(QDialog):
                     if idx >= 0:
                         self.department.setCurrentIndex(idx)
         except Exception as e:
-            QMessageBox.warning(self, "Hata", f"Yükleme hatası: {str(e)}")
+            QMessageBox.warning(self, "Hata", str(e))
 
     def save(self):
-        if not self.code.text().strip():
-            QMessageBox.warning(self, "Uyarı", "Kod alanı zorunludur.")
-        if not self.name.text().strip():
-            QMessageBox.warning(self, "Uyarı", "Ad alanı zorunludur.")
-
+        c, n = self.code.text().strip(), self.name.text().strip()
+        if not c or not n:
+            QMessageBox.warning(self, "Uyarı", "Kod ve Ad zorunludur.")
+            return
         try:
             data = {
-                "code": self.code.text().strip(),
-                "name": self.name.text().strip(),
+                "code": c,
+                "name": n,
                 "description": self.description.toPlainText().strip() or None,
                 "department_id": self.department.currentData(),
             }
-
             if self.min_salary.text().strip():
                 try:
                     data["min_salary"] = float(self.min_salary.text())
-                except ValueError:
+                except:
                     pass
-
             if self.max_salary.text().strip():
                 try:
                     data["max_salary"] = float(self.max_salary.text())
-                except ValueError:
+                except:
                     pass
-
             if self.pos_id:
                 self.service.update_position(self.pos_id, data)
             else:
                 self.service.create_position(data)
-
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
 
-    def closeEvent(self, event):
+    def closeEvent(self, e):
         self.service.close()
-        super().closeEvent(event)
+        super().closeEvent(e)
 
 
 class PositionModule(QWidget):
@@ -169,37 +147,30 @@ class PositionModule(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
         self.header = PageHeader(
             title="Pozisyon Listesi",
-            icon="👔",
+            icon=ICONS.USER,
             show_search=False,
-            show_refresh=False,
+            show_refresh=True,
             show_add=True,
             add_text="Yeni Pozisyon",
             parent=self,
         )
         self.header.add_clicked.connect(self._new_position)
-        self.header.show_refresh = True
         self.header.refresh_clicked.connect(self.load_data)
-
         layout.addWidget(self.header)
 
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Kod", "Ad", "Departman", "Min Maaş", "Max Maaş"]
+        cols = [
+            ColumnConfig("code", "Kod", width=120),
+            ColumnConfig("name", "Ad", stretch=True),
+            ColumnConfig("dept", "Departman", width=200),
+            ColumnConfig("min", "Min Maaş", width=120),
+            ColumnConfig("max", "Max Maaş", width=120),
+        ]
+        self.table = EnhancedTableWidget(
+            table_id="hr_positions", columns=cols, parent=self
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.doubleClicked.connect(self._edit_position)
+        self.table.row_double_clicked.connect(self._edit_position)
         layout.addWidget(self.table)
 
     def _get_service(self):
@@ -214,48 +185,55 @@ class PositionModule(QWidget):
 
     def load_data(self):
         try:
-            service = self._get_service()
-            positions = service.get_all_positions()
-
+            positions = self._get_service().get_all_positions()
             self.table.setRowCount(len(positions))
-            for row, pos in enumerate(positions):
-                self.table.setItem(row, 0, QTableWidgetItem(pos.code))
-                self.table.setItem(row, 1, QTableWidgetItem(pos.name))
-                self.table.setItem(
-                    row,
-                    2,
-                    QTableWidgetItem(pos.department.name if pos.department else "-"),
-                )
-                self.table.setItem(
-                    row,
-                    3,
-                    QTableWidgetItem(
-                        f"₺{pos.min_salary:,.2f}" if pos.min_salary else "-"
-                    ),
-                )
-                self.table.setItem(
-                    row,
-                    4,
-                    QTableWidgetItem(
-                        f"₺{pos.max_salary:,.2f}" if pos.max_salary else "-"
-                    ),
-                )
-                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, pos.id)
+            vcols = self.table.get_visible_columns()
+            for r, pos in enumerate(positions):
+                for c, key in enumerate(vcols):
+                    if key == "code":
+                        it = QTableWidgetItem(pos.code)
+                        it.setData(Qt.ItemDataRole.UserRole, pos.id)
+                        self.table.setItem(r, c, it)
+                    elif key == "name":
+                        self.table.setItem(r, c, QTableWidgetItem(pos.name))
+                    elif key == "dept":
+                        self.table.setItem(
+                            r,
+                            c,
+                            QTableWidgetItem(
+                                pos.department.name if pos.department else "-"
+                            ),
+                        )
+                    elif key == "min":
+                        self.table.setItem(
+                            r,
+                            c,
+                            QTableWidgetItem(
+                                f"₺{pos.min_salary:,.2f}" if pos.min_salary else "-"
+                            ),
+                        )
+                    elif key == "max":
+                        self.table.setItem(
+                            r,
+                            c,
+                            QTableWidgetItem(
+                                f"₺{pos.max_salary:,.2f}" if pos.max_salary else "-"
+                            ),
+                        )
         except Exception as e:
-            QMessageBox.warning(self, "Uyarı", f"Hata: {str(e)}")
+            QMessageBox.warning(self, "Uyarı", str(e))
         finally:
             self._close_service()
 
     def _new_position(self):
-        dialog = PositionFormDialog(parent=self)
-        if dialog.exec():
+        if PositionFormDialog(parent=self).exec():
             self.load_data()
 
-    def _edit_position(self):
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        pos_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        dialog = PositionFormDialog(pos_id=pos_id, parent=self)
-        if dialog.exec():
+    def _edit_position(self, pos_id=None):
+        if pos_id is None:
+            r = self.table.currentRow()
+            if r < 0:
+                return
+            pos_id = self.table.item(r, 0).data(Qt.ItemDataRole.UserRole)
+        if PositionFormDialog(pos_id=pos_id, parent=self).exec():
             self.load_data()

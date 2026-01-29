@@ -16,12 +16,14 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QAction
 
 from config import COLORS
+from config.icons import ICONS
 from database.models import TransportUnitType, TransportUnitStatus
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
     ColumnConfig,
     MiniStatCard,
+    ScrollableCardContainer,
 )
 
 
@@ -49,7 +51,7 @@ class SSCCListPage(QWidget):
         # Header
         self.header = PageHeader(
             title="Taşıma Birimleri (SSCC)",
-            icon="📦",
+            icon=ICONS.INVENTORY,
             show_search=True,
             show_refresh=True,
             show_add=True,
@@ -86,20 +88,28 @@ class SSCCListPage(QWidget):
 
         layout.addWidget(self.header)
 
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
+        # İstatistik kartları (Scrollable)
+        stats_container = ScrollableCardContainer()
         self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard("📊 Toplam", "0", "#6366f1")
-        self.stat_cards["open"] = MiniStatCard("🔓 Açık", "0", "#10b981")
-        self.stat_cards["closed"] = MiniStatCard("🔒 Kapalı", "0", "#f59e0b")
-        self.stat_cards["shipped"] = MiniStatCard("🚚 Sevk Edildi", "0", "#ef4444")
+
+        self.stat_cards["total"] = MiniStatCard(
+            "Toplam", "0", "info", icon=ICONS.INVENTORY, icon_color="#6366f1"
+        )
+        self.stat_cards["open"] = MiniStatCard(
+            "Açık", "0", "success", icon=ICONS.UNLOCKED, icon_color="#10b981"
+        )
+        self.stat_cards["closed"] = MiniStatCard(
+            "Kapalı", "0", "warning", icon=ICONS.LOCKED, icon_color="#f59e0b"
+        )
+        self.stat_cards["shipped"] = MiniStatCard(
+            "Sevk Edildi", "0", "error", icon=ICONS.TRUCK, icon_color="#ef4444"
+        )
 
         for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
+            stats_container.add_card(card)
+        stats_container.add_stretch()
+
+        layout.addWidget(stats_container)
 
         # Tablo
         columns = [
