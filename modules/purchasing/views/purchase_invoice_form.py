@@ -322,7 +322,8 @@ class PurchaseInvoiceFormPage(QWidget):
                 qty_item = self.items_table.item(row, 2)
                 if qty_item:
                     try:
-                        qty = float(qty_item.text().replace(",", ""))
+                        qty_str = qty_item.text().replace(",", "")
+                        qty = float(qty_str) if qty_str else 0
                         total_item.setText(f"{self.currency_symbol}{qty * price:,.2f}")
                     except ValueError:
                         pass
@@ -485,14 +486,25 @@ class PurchaseInvoiceFormPage(QWidget):
             return
         items = []
         for r in range(self.items_table.rowCount()):
-            iid = self.items_table.item(r, 0).data(Qt.ItemDataRole.UserRole)
+            item0 = self.items_table.item(r, 0)
+            item2 = self.items_table.item(r, 2)
+            item3 = self.items_table.item(r, 3)
+            item4 = self.items_table.item(r, 4)
+            item5 = self.items_table.item(r, 5)
+
+            if not item0 or not item2:
+                continue
+
+            iid = item0.data(Qt.ItemDataRole.UserRole)
             try:
-                q = float(self.items_table.item(r, 2).text().replace(",", ""))
+                qty_str = item2.text().replace(",", "")
+                q = float(qty_str) if qty_str else 0
             except:
                 q = 0
-            uid = self.items_table.item(r, 3).data(Qt.ItemDataRole.UserRole)
-            p = self.items_table.item(r, 4).data(Qt.ItemDataRole.UserRole)
-            t = self.items_table.item(r, 5).data(Qt.ItemDataRole.UserRole)
+
+            uid = item3.data(Qt.ItemDataRole.UserRole) if item3 else None
+            p = item4.data(Qt.ItemDataRole.UserRole) if item4 else 0
+            t = item5.data(Qt.ItemDataRole.UserRole) if item5 else 0
             if iid and q > 0:
                 items.append(
                     {

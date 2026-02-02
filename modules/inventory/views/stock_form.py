@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QFormLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, pyqtSignal
 import qtawesome as qta
 from ui.components.toast import show_toast
 from ui.components import CurrencyInput
@@ -92,181 +92,120 @@ class StockFormPage(QWidget):
     def _create_general_tab(self) -> QWidget:
         """Genel bilgiler sekmesi"""
         tab = QWidget()
-        # Ana Düzen: Sol ve Sağ Kolon
-        main_layout = QHBoxLayout(tab)
-        main_layout.setSpacing(32)
-        main_layout.setContentsMargins(0, 10, 0, 0)
+        layout = QHBoxLayout(tab)
+        layout.setSpacing(24)
 
-        # === SOL KOLON ===
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setSpacing(20)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        # Sol: Temel Bilgiler
+        left_frame = QFrame()
+        left_layout = QVBoxLayout(left_frame)
 
-        # 1. Satır: Referans ve Stok Kodu (Yan Yana)
-        row1_widget = QWidget()
-        row1_layout = QHBoxLayout(row1_widget)
-        row1_layout.setContentsMargins(0, 0, 0, 0)
-        row1_layout.setSpacing(16)
+        left_title = QLabel("Temel Ürün Bilgileri")
+        left_layout.addWidget(left_title)
 
-        # Referans Alanı
-        ref_group = QWidget()
-        ref_layout = QVBoxLayout(ref_group)
-        ref_layout.setContentsMargins(0, 0, 0, 0)
-        ref_layout.setSpacing(6)
-        ref_layout.addWidget(QLabel("Referans"))
-
-        ref_input_group = QWidget()
-        ref_input_layout = QHBoxLayout(ref_input_group)
-        ref_input_layout.setContentsMargins(0, 0, 0, 0)
-        ref_input_layout.setSpacing(4)
-
-        self.ref_stock_info = QLineEdit()
-        self.ref_stock_info.setPlaceholderText("Referans stok seçin...")
-        self.ref_stock_info.setReadOnly(True)
-
-        ref_btn = QPushButton()
-        ref_btn.setIcon(qta.icon(ICONS.FOLDER_OPEN, color="#475569"))
-        ref_btn.setToolTip("Referans Stoktan Kopyala")
-        ref_btn.setFixedSize(36, 36)
-        ref_btn.clicked.connect(self._select_reference_stock)
-
-        ref_input_layout.addWidget(self.ref_stock_info)
-        ref_input_layout.addWidget(ref_btn)
-        ref_layout.addWidget(ref_input_group)
-
-        # Stok Kodu Alanı
-        code_group = QWidget()
-        code_layout = QVBoxLayout(code_group)
-        code_layout.setContentsMargins(0, 0, 0, 0)
-        code_layout.setSpacing(6)
-        code_layout.addWidget(QLabel("Stok Kodu *"))
-
-        code_input_group = QWidget()
-        code_input_layout = QHBoxLayout(code_input_group)
-        code_input_layout.setContentsMargins(0, 0, 0, 0)
-        code_input_layout.setSpacing(4)
-
-        self.code_input = QLineEdit()
-        self.code_input.setPlaceholderText("Otomatik...")
-        # self.code_input.setFixedWidth(140) # Esnek olsun
-
-        auto_btn = QPushButton()
-        auto_btn.setIcon(qta.icon(ICONS.REFRESH, color="#475569"))
-        auto_btn.setToolTip("Kod Üret")
-        auto_btn.setFixedSize(36, 36)
-        auto_btn.clicked.connect(self._generate_code)
-
-        code_input_layout.addWidget(self.code_input)
-        code_input_layout.addWidget(auto_btn)
-        code_layout.addWidget(code_input_group)
-
-        # Satıra ekle: Referans (Stretch 2), Kod (Stretch 1)
-        row1_layout.addWidget(ref_group, 2)
-        row1_layout.addWidget(code_group, 1)
-
-        left_layout.addWidget(row1_widget)
-
-        # 2. Satır: Stok Adı
-        name_group = QWidget()
-        name_layout = QVBoxLayout(name_group)
-        name_layout.setContentsMargins(0, 0, 0, 0)
-        name_layout.setSpacing(6)
-        name_layout.addWidget(QLabel("Stok Adı *"))
-
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Ürün adını girin")
-        name_layout.addWidget(self.name_input)
-
-        left_layout.addWidget(name_group)
-
-        # 3. Form Alanları (Kısa Ad, Tür, Kategori, Birim)
-        left_form = QFormLayout()
-        left_form.setSpacing(16)
-        left_form.setContentsMargins(0, 10, 0, 0)
-        left_form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-        )
-        left_form.setLabelAlignment(
+        form = QFormLayout()
+        form.setSpacing(12)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setLabelAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
 
+        # 1. Referans
+        ref_layout = QHBoxLayout()
+        self.ref_stock_info = QLineEdit()
+        self.ref_stock_info.setPlaceholderText("Referans seç...")
+        self.ref_stock_info.setReadOnly(True)
+        ref_btn = QPushButton()
+        ref_btn.setIcon(qta.icon(ICONS.FOLDER_OPEN, color="#475569"))
+        ref_btn.setFixedSize(30, 30)
+        ref_btn.clicked.connect(self._select_reference_stock)
+        ref_layout.addWidget(self.ref_stock_info)
+        ref_layout.addWidget(ref_btn)
+        form.addRow("Referans Kayıt", ref_layout)
+
+        # 2. Stok Kodu
+        code_layout = QHBoxLayout()
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("Otomatik...")
+        auto_btn = QPushButton()
+        auto_btn.setIcon(qta.icon(ICONS.REFRESH, color="#475569"))
+        auto_btn.setFixedSize(30, 30)
+        auto_btn.clicked.connect(self._generate_code)
+        code_layout.addWidget(self.code_input)
+        code_layout.addWidget(auto_btn)
+        form.addRow("Stok Kodu *", code_layout)
+
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Ürün tam adını giriniz")
+        form.addRow("Stok Adı *", self.name_input)
+
         self.short_name_input = QLineEdit()
-        left_form.addRow("Kısa Ad", self.short_name_input)
+        form.addRow("Kısa Ad / Teknik Ad", self.short_name_input)
 
         self.type_combo = QComboBox()
-        self.type_combo.addItem(qta.icon(ICONS.TYPE_RAW), "Hammadde", ItemType.HAMMADDE)
-        self.type_combo.addItem(qta.icon(ICONS.TYPE_PRODUCT), "Mamül", ItemType.MAMUL)
-        self.type_combo.addItem(
-            qta.icon(ICONS.TYPE_SEMI), "Yarı Mamül", ItemType.YARI_MAMUL
-        )
-        self.type_combo.addItem(
-            qta.icon(ICONS.TYPE_PACKAGE), "Ambalaj", ItemType.AMBALAJ
-        )
-        self.type_combo.addItem(
-            qta.icon(ICONS.TYPE_CONSUMABLE), "Sarf Malzeme", ItemType.SARF
-        )
-        self.type_combo.addItem(
-            qta.icon(ICONS.TYPE_COMMERCIAL), "Ticari Mal", ItemType.TICARI
-        )
-        self.type_combo.addItem(qta.icon(ICONS.TYPE_SERVICE), "Hizmet", ItemType.HIZMET)
-        self.type_combo.addItem(qta.icon(ICONS.TYPE_OTHER), "Diğer", ItemType.DIGER)
-        left_form.addRow("Tür *", self.type_combo)
+        # Türleri ekle
+        types = [
+            (ICONS.TYPE_RAW, "Hammadde", ItemType.HAMMADDE),
+            (ICONS.TYPE_PRODUCT, "Mamül", ItemType.MAMUL),
+            (ICONS.TYPE_SEMI, "Yarı Mamül", ItemType.YARI_MAMUL),
+            (ICONS.TYPE_PACKAGE, "Ambalaj", ItemType.AMBALAJ),
+            (ICONS.TYPE_CONSUMABLE, "Sarf Malzeme", ItemType.SARF),
+            (ICONS.TYPE_COMMERCIAL, "Ticari Mal", ItemType.TICARI),
+            (ICONS.TYPE_SERVICE, "Hizmet", ItemType.HIZMET),
+            (ICONS.TYPE_OTHER, "Diğer", ItemType.DIGER),
+        ]
+        for ico, lbl, val in types:
+            self.type_combo.addItem(qta.icon(ico), lbl, val)
+        form.addRow("Stok Türü *", self.type_combo)
 
         self.category_combo = QComboBox()
         self.category_combo.addItem("Seçiniz...", None)
-        left_form.addRow("Kategori", self.category_combo)
+        form.addRow("Kategori", self.category_combo)
 
         self.unit_combo = QComboBox()
-        left_form.addRow("Birim *", self.unit_combo)
+        form.addRow("Birim *", self.unit_combo)
 
-        left_layout.addLayout(left_form)
+        left_layout.addLayout(form)
         left_layout.addStretch()
+        layout.addWidget(left_frame)
 
-        main_layout.addWidget(left_container, 1)
+        # Sağ: Ek Bilgiler
+        right_frame = QFrame()
+        right_layout = QVBoxLayout(right_frame)
 
-        # === SAĞ KOLON ===
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setSpacing(16)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_title = QLabel("Tanımlayıcı Bilgiler ve Açıklama")
+        right_layout.addWidget(right_title)
 
-        # Başlık tarzı küçük bir boşluk veya çizgi eklenebilir ama gerek yok.
-
-        right_form = QFormLayout()
-        right_form.setSpacing(16)
-        right_form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-        )
-        right_form.setLabelAlignment(
+        form2 = QFormLayout()
+        form2.setSpacing(12)
+        form2.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form2.setLabelAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
 
         self.barcode_input = QLineEdit()
-        right_form.addRow("Barkod", self.barcode_input)
+        form2.addRow("Barkod / EAN", self.barcode_input)
 
         self.manufacturer_code_input = QLineEdit()
-        right_form.addRow("Üretici Kodu", self.manufacturer_code_input)
+        form2.addRow("Üretici / Tedarikçi Kodu", self.manufacturer_code_input)
 
         self.brand_input = QLineEdit()
-        right_form.addRow("Marka", self.brand_input)
+        form2.addRow("Marka", self.brand_input)
 
         self.model_input = QLineEdit()
-        right_form.addRow("Model", self.model_input)
+        form2.addRow("Model", self.model_input)
 
         self.origin_input = QLineEdit()
         self.origin_input.setPlaceholderText("Türkiye")
-        right_form.addRow("Menşei", self.origin_input)
+        form2.addRow("Menşei Ülke", self.origin_input)
 
         self.description_input = QTextEdit()
-        self.description_input.setPlaceholderText("Ürün açıklaması...")
-        self.description_input.setMaximumHeight(100)
-        right_form.addRow("Açıklama", self.description_input)
+        self.description_input.setPlaceholderText("Ürünle ilgili detaylı notlar...")
+        self.description_input.setMaximumHeight(80)
+        form2.addRow("Ağırlık / Notlar", self.description_input)
 
-        right_layout.addLayout(right_form)
+        right_layout.addLayout(form2)
         right_layout.addStretch()
-
-        main_layout.addWidget(right_container, 1)
+        layout.addWidget(right_frame)
 
         return tab
 

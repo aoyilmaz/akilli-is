@@ -51,7 +51,6 @@ class DriverListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Sürücü",
             search_placeholder="Ara... (kod, ad, telefon)",

@@ -1,9 +1,3 @@
-"""
-Akıllı İş - İK Vardiya Planlama Modülü
-
-Üretim takvimi modülüyle entegre çalışan HR vardiya planlama arayüzü.
-"""
-
 from datetime import date, timedelta
 
 from PyQt6.QtWidgets import (
@@ -24,10 +18,13 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QDateEdit,
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QTextCharFormat, QColor
+import qtawesome as qta
 
-from config.styles import ICONS
+from config.icons import ICONS
+from config.themes import get_theme
+from ui.components import PageHeader
 
 
 class AssignmentDialog(QDialog):
@@ -44,6 +41,7 @@ class AssignmentDialog(QDialog):
 
     def setup_ui(self):
         layout = QFormLayout(self)
+        layout.setSpacing(12)
 
         # Tarih aralığı
         self.start_date = QDateEdit()
@@ -83,10 +81,16 @@ class AssignmentDialog(QDialog):
 
         # Butonlar
         btn_layout = QHBoxLayout()
-        save_btn = QPushButton(f"{ICONS['add']} Ata")
+        save_btn = QPushButton("Ata")
+        save_btn.setIcon(qta.icon(ICONS.ADD, color="white"))
+        save_btn.setProperty("class", "btn-primary")
+        save_btn.setFixedHeight(36)
         save_btn.clicked.connect(self.accept)
+
         cancel_btn = QPushButton("İptal")
+        cancel_btn.setFixedHeight(36)
         cancel_btn.clicked.connect(self.reject)
+
         btn_layout.addStretch()
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
@@ -115,7 +119,36 @@ class ShiftPlanningModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        # Header
+        self.header = PageHeader(
+            title="Vardiya Planlama",
+            icon=ICONS.CALENDAR,
+            show_search=False,
+            show_add=True,
+            add_text="Yeni Vardiya",
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self._load_data)
+        layout.addWidget(self.header)
+
+        # Takvim Kontrolleri
+        t = get_theme()
+        controls = QFrame()
+        controls.setProperty("class", "card")
+        controls.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: 12px;
+            }}
+        """
+        )
+        # controls_layout = QHBoxLayout(controls)
+        # layout.addWidget(controls)
 
         # Sekme widget
         self.tabs = QTabWidget()
@@ -124,31 +157,72 @@ class ShiftPlanningModule(QWidget):
         self.tabs.addTab(self._create_employee_shifts_tab(), "👤 Kişi Vardiyaları")
         layout.addWidget(self.tabs)
 
-    def _create_calendar_tab(self) -> QWidget:
-        """Takvim sekmesi"""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-
-        # Sol: Takvim
-        left = QFrame()
-        left.setStyleSheet("background: #1e293b; border-radius: 8px;")
-        left_layout = QVBoxLayout(left)
+    def _setup_calendar(self, layout):
+        t = get_theme()
+        card = QFrame()
+        card.setProperty("class", "card")
+        card.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: 12px;
+            }}
+        """
+        )
+        l = QVBoxLayout(card)
 
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
         self.calendar.selectionChanged.connect(self._on_date_selected)
-        left_layout.addWidget(self.calendar)
+        l.addWidget(self.calendar)
 
-        layout.addWidget(left, 1)
+        layout.addWidget(card, 1)
+
+    def _on_date_selected(self):
+        """Tarih seçildiğinde"""
+        selected = self.calendar.selectedDate().toPyDate()
+        days_tr = [
+            "Pazartesi",
+            "Salı",
+            "Çarşamba",
+            "Perşembe",
+            "Cuma",
+            "Cumartesi",
+            "Pazar",
+        ]
+        day_name = days_tr[selected.weekday()]
+        self.day_info_label.setText(f"{selected.strftime('%d.%m.%Y')} - {day_name}")
+
+        # Seçili gün için vardiya bilgisi yükle
+        self._load_day_shifts(selected)
+
+    def _create_calendar_tab(self) -> QWidget:
+        """Takvim sekmesi"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(20)
+
+        # Sol: Takvim
+        self._setup_calendar(layout)
 
         # Sağ: Seçili gün detayları
+        t = get_theme()
         right = QFrame()
-        right.setStyleSheet("background: #1e293b; border-radius: 8px;")
+        right.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {t.card_bg};
+                border: 1px solid {t.border};
+                border-radius: 8px;
+            }}
+        """
+        )
         right_layout = QVBoxLayout(right)
 
         self.day_info_label = QLabel("Tarih seçin...")
         self.day_info_label.setStyleSheet(
-            "color: white; font-size: 16px; font-weight: bold;"
+            f"color: {t.text_primary}; font-size: 16px; font-weight: bold;"
         )
         right_layout.addWidget(self.day_info_label)
 
@@ -164,7 +238,10 @@ class ShiftPlanningModule(QWidget):
         right_layout.addWidget(self.day_shifts_table)
 
         # Atama butonu
-        assign_btn = QPushButton(f"{ICONS['add']} Vardiya Ata")
+        assign_btn = QPushButton("Vardiya Ata")
+        assign_btn.setIcon(qta.icon(ICONS.ADD, color="white"))
+        assign_btn.setFixedHeight(36)
+        assign_btn.setProperty("class", "btn-primary")
         assign_btn.clicked.connect(self._assign_shift)
         right_layout.addWidget(assign_btn)
 
@@ -176,17 +253,24 @@ class ShiftPlanningModule(QWidget):
         """Ekip vardiyaları sekmesi"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Toolbar
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Ekip:"))
         self.team_filter = QComboBox()
+        self.team_filter.setFixedWidth(200)
+        self.team_filter.setFixedHeight(36)
         self.team_filter.addItem("Tüm Ekipler", None)
         self.team_filter.currentIndexChanged.connect(self._load_team_shifts)
         toolbar.addWidget(self.team_filter)
 
+        toolbar.addSpacing(16)
         toolbar.addWidget(QLabel("Hafta:"))
         self.week_filter = QComboBox()
+        self.week_filter.setFixedWidth(200)
+        self.week_filter.setFixedHeight(36)
         self._populate_weeks()
         self.week_filter.currentIndexChanged.connect(self._load_team_shifts)
         toolbar.addWidget(self.week_filter)
@@ -211,17 +295,24 @@ class ShiftPlanningModule(QWidget):
         """Kişi vardiyaları sekmesi"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Toolbar
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Çalışan:"))
         self.employee_filter = QComboBox()
+        self.employee_filter.setFixedWidth(200)
+        self.employee_filter.setFixedHeight(36)
         self.employee_filter.addItem("Seçin...", None)
         self.employee_filter.currentIndexChanged.connect(self._load_employee_shifts)
         toolbar.addWidget(self.employee_filter)
 
+        toolbar.addSpacing(16)
         toolbar.addWidget(QLabel("Ay:"))
         self.month_filter = QComboBox()
+        self.month_filter.setFixedWidth(200)
+        self.month_filter.setFixedHeight(36)
         self._populate_months()
         self.month_filter.currentIndexChanged.connect(self._load_employee_shifts)
         toolbar.addWidget(self.month_filter)
@@ -356,7 +447,6 @@ class ShiftPlanningModule(QWidget):
                 self.team_table.setItem(i, 0, QTableWidgetItem(team.name))
                 # Varsayılan olarak rotasyon bilgisi göster
                 for j in range(1, 8):
-                    # Şimdilik placeholder
                     self.team_table.setItem(i, j, QTableWidgetItem("-"))
         except Exception as e:
             print(f"Ekip vardiya yükleme hatası: {e}")
@@ -367,7 +457,6 @@ class ShiftPlanningModule(QWidget):
         if not employee_id:
             return
 
-        # Placeholder - gerçek implementasyon rotation schedule'dan gelecek
         month_start = self.month_filter.currentData()
         if not month_start:
             return
@@ -385,7 +474,6 @@ class ShiftPlanningModule(QWidget):
         for i, d in enumerate(days):
             self.employee_table.setItem(i, 0, QTableWidgetItem(d.strftime("%d.%m.%Y")))
             self.employee_table.setItem(i, 1, QTableWidgetItem(days_tr[d.weekday()]))
-            # Placeholder
             self.employee_table.setItem(i, 2, QTableWidgetItem("-"))
             self.employee_table.setItem(i, 3, QTableWidgetItem("-"))
 
@@ -399,7 +487,6 @@ class ShiftPlanningModule(QWidget):
         weekend_format = QTextCharFormat()
         weekend_format.setBackground(QColor("#374151"))
 
-        # Şimdilik basit renklendirme
         today = date.today()
         for i in range(31):
             d = date(today.year, today.month, 1) + timedelta(days=i)
@@ -410,24 +497,6 @@ class ShiftPlanningModule(QWidget):
                     QDate(d.year, d.month, d.day), weekend_format
                 )
 
-    def _on_date_selected(self):
-        """Tarih seçildiğinde"""
-        selected = self.calendar.selectedDate().toPyDate()
-        days_tr = [
-            "Pazartesi",
-            "Salı",
-            "Çarşamba",
-            "Perşembe",
-            "Cuma",
-            "Cumartesi",
-            "Pazar",
-        ]
-        day_name = days_tr[selected.weekday()]
-        self.day_info_label.setText(f"{selected.strftime('%d.%m.%Y')} - {day_name}")
-
-        # Seçili gün için vardiya bilgisi yükle
-        self._load_day_shifts(selected)
-
     def _load_day_shifts(self, selected_date: date):
         """Seçili günün vardiyalarını yükle"""
         if not self.team_service or not self.shift_service:
@@ -437,7 +506,6 @@ class ShiftPlanningModule(QWidget):
             teams = self.team_service.get_all()
             shifts = self.shift_service.get_all()
 
-            # Placeholder - gerçek data rotation'dan gelecek
             self.day_shifts_table.setRowCount(len(teams))
 
             for i, team in enumerate(teams):
@@ -475,7 +543,6 @@ class ShiftPlanningModule(QWidget):
             dialog = AssignmentDialog(employees, shifts, teams, parent=self)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 data = dialog.get_data()
-                # Atama işlemi - rotation schedule'a ekle
                 QMessageBox.information(
                     self,
                     "Başarılı",

@@ -10,6 +10,7 @@ class ICONS:
     FORWARD = "ph.arrow-right"
     REFRESH = "ph.arrows-clockwise"
     HOME = "ph.house"
+    DASHBOARD = "ph.layout"
     MENU = "ph.list"
     LIST = "ph.list"
     CLOSE = "ph.x"
@@ -42,6 +43,8 @@ class ICONS:
     VIEW = "ph.eye"
     ARROW_UP = "ph.arrow-up"
     ARROW_DOWN = "ph.arrow-down"
+    SORT_UP = "ph.arrow-up"
+    SORT_DOWN = "ph.arrow-down"
 
     # --- STOK & ENVANTER ---
     INVENTORY = "ph.package"
@@ -98,6 +101,8 @@ class ICONS:
     # --- İK & CRM ---
     HR = "ph.users-three"
     EMPLOYEE = "ph.identification-badge"
+    DEPARTMENT = "ph.tree-structure"
+    POSITION = "ph.briefcase"
     CRM = "ph.handshake"
     STAR = "ph.star"
     DEAL = "ph.star"

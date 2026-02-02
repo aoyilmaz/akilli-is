@@ -6,7 +6,6 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 from datetime import date
 from PyQt6.QtWidgets import (
     QTableWidgetItem,
-    QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -41,13 +40,13 @@ class SalesOrderListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("order_no", "Sipariş No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("customer", "Müşteri", width=200, stretch=True),
-            ColumnConfig("total", "Toplam Tutar", width=120),
-            ColumnConfig("items", "Kalem", width=60),
-            ColumnConfig("delivery_date", "Teslim Tarihi", width=100),
-            ColumnConfig("status", "Durum", width=130),
-            ColumnConfig("currency", "Para Birimi", width=80),
+            ColumnConfig("total", "Toplam Tutar", width=120, filter_type="number"),
+            ColumnConfig("items", "Kalem", width=60, filter_type="number"),
+            ColumnConfig("delivery_date", "Teslim Tarihi", width=100, filter_type="date"),
+            ColumnConfig("status", "Durum", width=130, filter_type="enum"),
+            ColumnConfig("currency", "Para Birimi", width=80, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -55,6 +54,7 @@ class SalesOrderListPage(BaseListPage):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
@@ -65,7 +65,6 @@ class SalesOrderListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Sipariş",
             search_placeholder="Ara... (sipariş no, müşteri)",
@@ -73,7 +72,6 @@ class SalesOrderListPage(BaseListPage):
         )
 
         self.orders = []
-        self._setup_filters()
         self._setup_stat_cards()
 
     def _format_date(self, dt) -> str:
@@ -83,24 +81,6 @@ class SalesOrderListPage(BaseListPage):
                 return dt.strftime("%d.%m.%Y")
             return str(dt)
         return "-"
-
-    def _setup_filters(self):
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Onaylandı", "confirmed")
-        self.status_filter.addItem("Kısmi Teslim", "partial_delivered")
-        self.status_filter.addItem("Teslim Edildi", "delivered")
-        self.status_filter.addItem("Kapatıldı", "closed")
-        self.status_filter.addItem("İptal", "cancelled")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
 
     def _setup_stat_cards(self):
         """İstatistik kartlarını oluştur"""
@@ -115,15 +95,9 @@ class SalesOrderListPage(BaseListPage):
         super()._connect_signals()
 
     def load_data(self, orders: list):
+        """Sipariş verilerini yükle"""
         self.orders = orders
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.orders
-        if status_filter:
-            filtered = [o for o in self.orders if o.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(orders)
         self._update_stats()
 
     def _display_data(self, orders: list):
@@ -234,6 +208,7 @@ class SalesOrderListPage(BaseListPage):
         self.update_stat_card("delivered", str(delivered))
 
     def _on_search(self, text: str):
+        """Tabloda arama yap"""
         text = text.lower()
         for row in range(self.table.rowCount()):
             match = any(
@@ -242,9 +217,6 @@ class SalesOrderListPage(BaseListPage):
                 for col in range(self.table.columnCount() - 1)
             )
             self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
 
     def _confirm_delete(self, order_id: int):
         reply = QMessageBox.question(

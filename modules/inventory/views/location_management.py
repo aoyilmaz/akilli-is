@@ -254,11 +254,15 @@ class LocationManagementPage(QWidget):
 
     def filter_locations(self, text: str):
         """Lokasyonları filtrele"""
-        text = text.lower()
+        search_text = text.lower()
         for row in range(self.table.rowCount()):
-            code = self.table.item(row, 0).text().lower()
-            barcode = self.table.item(row, 1).text().lower()
-            match = text in code or text in barcode
+            item0 = self.table.item(row, 0)
+            item1 = self.table.item(row, 1)
+
+            code = item0.text().lower() if item0 else ""
+            barcode = item1.text().lower() if item1 else ""
+
+            match = search_text in code or search_text in barcode
             self.table.setRowHidden(row, not match)
 
     def show_context_menu(self, pos):

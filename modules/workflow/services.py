@@ -848,3 +848,151 @@ class WorkflowService:
             )
 
         return history
+
+    # ==================== WORKFLOW DEFINITION CRUD ====================
+
+    def list_workflow_definitions(self) -> List[WorkflowDefinition]:
+        """Tüm workflow tanımlarını listele"""
+        return (
+            self.session.query(WorkflowDefinition)
+            .options(joinedload(WorkflowDefinition.steps))
+            .order_by(WorkflowDefinition.target_table, WorkflowDefinition.priority.desc())
+            .all()
+        )
+
+    def get_workflow_definition(self, workflow_id: int) -> Optional[WorkflowDefinition]:
+        """Workflow tanımını getir"""
+        return (
+            self.session.query(WorkflowDefinition)
+            .options(joinedload(WorkflowDefinition.steps))
+            .filter(WorkflowDefinition.id == workflow_id)
+            .first()
+        )
+
+    def create_workflow_definition(
+        self, data: Dict[str, Any], steps_data: List[Dict[str, Any]] = None
+    ) -> WorkflowDefinition:
+        """Yeni workflow tanımı oluştur"""
+        workflow = WorkflowDefinition(
+            code=data.get("code"),
+            name=data.get("name"),
+            description=data.get("description"),
+            target_table=data.get("target_table"),
+            activation_condition=data.get("activation_condition"),
+            priority=data.get("priority", 0),
+            is_default=data.get("is_default", False),
+            is_active=data.get("is_active", True),
+        )
+        self.session.add(workflow)
+        self.session.flush()
+
+        # Adımları ekle
+        if steps_data:
+            for step_data in steps_data:
+                step = WorkflowStep(
+                    workflow_id=workflow.id,
+                    step_order=step_data.get("step_order", 1),
+                    name=step_data.get("name"),
+                    description=step_data.get("description"),
+                    required_role_id=step_data.get("required_role_id"),
+                    approver_user_id=step_data.get("approver_user_id"),
+                    dynamic_approver_field=step_data.get("dynamic_approver_field"),
+                    condition_script=step_data.get("condition_script"),
+                    timeout_hours=step_data.get("timeout_hours"),
+                    is_final_step=step_data.get("is_final_step", False),
+                )
+                self.session.add(step)
+
+        self.session.commit()
+        return workflow
+
+    def update_workflow_definition(
+        self, workflow_id: int, data: Dict[str, Any], steps_data: List[Dict[str, Any]] = None
+    ) -> Optional[WorkflowDefinition]:
+        """Workflow tanımını güncelle"""
+        workflow = self.get_workflow_definition(workflow_id)
+        if not workflow:
+            return None
+
+        # Ana bilgileri güncelle
+        workflow.code = data.get("code", workflow.code)
+        workflow.name = data.get("name", workflow.name)
+        workflow.description = data.get("description", workflow.description)
+        workflow.target_table = data.get("target_table", workflow.target_table)
+        workflow.activation_condition = data.get("activation_condition", workflow.activation_condition)
+        workflow.priority = data.get("priority", workflow.priority)
+        workflow.is_default = data.get("is_default", workflow.is_default)
+        workflow.is_active = data.get("is_active", workflow.is_active)
+
+        # Adımları güncelle
+        if steps_data is not None:
+            # Mevcut adım ID'leri
+            existing_ids = {s.id for s in workflow.steps}
+            new_ids = {s.get("id") for s in steps_data if s.get("id")}
+
+            # Silinecek adımlar
+            for step in list(workflow.steps):
+                if step.id not in new_ids:
+                    self.session.delete(step)
+
+            # Güncelle veya ekle
+            for step_data in steps_data:
+                step_id = step_data.get("id")
+                if step_id and step_id in existing_ids:
+                    # Güncelle
+                    step = next((s for s in workflow.steps if s.id == step_id), None)
+                    if step:
+                        step.step_order = step_data.get("step_order", step.step_order)
+                        step.name = step_data.get("name", step.name)
+                        step.description = step_data.get("description", step.description)
+                        step.required_role_id = step_data.get("required_role_id")
+                        step.approver_user_id = step_data.get("approver_user_id")
+                        step.dynamic_approver_field = step_data.get("dynamic_approver_field")
+                        step.condition_script = step_data.get("condition_script")
+                        step.timeout_hours = step_data.get("timeout_hours")
+                        step.is_final_step = step_data.get("is_final_step", False)
+                else:
+                    # Yeni ekle
+                    step = WorkflowStep(
+                        workflow_id=workflow.id,
+                        step_order=step_data.get("step_order", 1),
+                        name=step_data.get("name"),
+                        description=step_data.get("description"),
+                        required_role_id=step_data.get("required_role_id"),
+                        approver_user_id=step_data.get("approver_user_id"),
+                        dynamic_approver_field=step_data.get("dynamic_approver_field"),
+                        condition_script=step_data.get("condition_script"),
+                        timeout_hours=step_data.get("timeout_hours"),
+                        is_final_step=step_data.get("is_final_step", False),
+                    )
+                    self.session.add(step)
+
+        self.session.commit()
+        return workflow
+
+    def delete_workflow_definition(self, workflow_id: int) -> bool:
+        """Workflow tanımını sil"""
+        workflow = self.get_workflow_definition(workflow_id)
+        if not workflow:
+            return False
+
+        # İlişkili instance'lar varsa silme
+        instance_count = (
+            self.session.query(WorkflowInstance)
+            .filter(WorkflowInstance.workflow_id == workflow_id)
+            .count()
+        )
+        if instance_count > 0:
+            raise ValueError(
+                f"Bu iş akışına bağlı {instance_count} adet aktif süreç var. "
+                "Önce bu süreçleri tamamlayın veya iptal edin."
+            )
+
+        self.session.delete(workflow)
+        self.session.commit()
+        return True
+
+    def close(self):
+        """Session'ı kapat"""
+        if self.session:
+            self.session.close()

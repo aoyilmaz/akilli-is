@@ -302,7 +302,6 @@ class KPIDashboardWidget(MaintenanceBaseWidget):
             title="Bakım KPI Dashboard",
             icon=ICONS.CHART,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

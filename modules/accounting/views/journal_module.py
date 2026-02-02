@@ -40,7 +40,6 @@ class JournalModule(QWidget):
             title="Yevmiye Fişleri",
             icon=ICONS.INVOICE,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Yevmiye",
             parent=self,

@@ -7,38 +7,27 @@ from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
     QTableWidgetItem,
-    QComboBox,
-    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from config.icons import ICONS
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 
 
-class InvoiceListPage(QWidget):
+class InvoiceListPage(BaseListPage):
     """
     Faturalar listesi sayfası.
-    Filtre özelliği nedeniyle doğrudan BaseListPage yerine
-    özelleştirilmiş bir yapı kullanır.
+    BaseListPage kullanarak Excel tipi sütun filtreleme destekler.
     """
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
+    # Ek sinyaller
     issue_clicked = pyqtSignal(int)
     payment_clicked = pyqtSignal(int)
     cancel_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     # Durum etiketleri
     STATUS_LABELS = {
@@ -51,91 +40,15 @@ class InvoiceListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.invoices = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        """UI yapısını oluştur"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Page Header (arama ve butonlar için)
-        self.header = PageHeader(
-            title="Faturalar",
-            icon=ICONS.INVOICE,
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni Fatura",
-            search_placeholder="Ara... (fatura no, müşteri)",
-            parent=self,
-        )
-
-        # Filtreyi header'a ekle (search'ten önce)
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Kesildi", "issued")
-        self.status_filter.addItem("Kısmi Ödendi", "partial_paid")
-        self.status_filter.addItem("Ödendi", "paid")
-        self.status_filter.addItem("Vadesi Geçti", "overdue")
-        self.status_filter.addItem("İptal", "cancelled")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        # Header layout'unu özelleştir
-        # Search input'tan önce filter ekle
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.INVOICE
-        )
-        stats_layout.addWidget(self.stat_cards["total"])
-
-        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
-        stats_layout.addWidget(self.stat_cards["draft"])
-
-        self.stat_cards["issued"] = MiniStatCard(
-            "Kesildi", "0", "primary", icon=ICONS.EXPORT
-        )
-        stats_layout.addWidget(self.stat_cards["issued"])
-
-        self.stat_cards["paid"] = MiniStatCard(
-            "Ödendi", "0", "success", icon=ICONS.CHECK
-        )
-        stats_layout.addWidget(self.stat_cards["paid"])
-
-        self.stat_cards["overdue"] = MiniStatCard(
-            "Vadesi Geçti", "0", "error", icon=ICONS.DANGER
-        )
-        stats_layout.addWidget(self.stat_cards["overdue"])
-
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("invoice_no", "Fatura No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("customer", "Müşteri", width=200, stretch=True),
-            ColumnConfig("total", "Toplam Tutar", width=110),
-            ColumnConfig("paid", "Ödenen", width=100),
-            ColumnConfig("remaining", "Kalan", width=100),
-            ColumnConfig("due_date", "Vade", width=100),
-            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig("total", "Toplam Tutar", width=110, filter_type="number"),
+            ColumnConfig("paid", "Ödenen", width=100, filter_type="number"),
+            ColumnConfig("remaining", "Kalan", width=100, filter_type="number"),
+            ColumnConfig("due_date", "Vade", width=100, filter_type="date"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -143,38 +56,38 @@ class InvoiceListPage(QWidget):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Faturalar",
+            icon=ICONS.INVOICE,
             table_id="invoices",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_add=True,
+            add_text="Yeni Fatura",
+            search_placeholder="Ara... (fatura no, müşteri)",
+            parent=parent,
         )
-        self.table.set_standard_row_height(48)
-        layout.addWidget(self.table)
 
-    def _connect_signals(self):
-        """Sinyalleri bağla"""
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
+        self.invoices = []
+        self._setup_stat_cards()
+
+    def _setup_stat_cards(self):
+        """İstatistik kartlarını oluştur"""
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVOICE)
+        self.add_stat_card("draft", "Taslak", "0", "info", ICONS.TIME)
+        self.add_stat_card("issued", "Kesildi", "0", "primary", ICONS.EXPORT)
+        self.add_stat_card("paid", "Ödendi", "0", "success", ICONS.CHECK)
+        self.add_stat_card("overdue", "Vadesi Geçti", "0", "error", ICONS.DANGER)
 
     def load_data(self, invoices: list):
         """Verileri yükle"""
         self.invoices = invoices
-        self._apply_filter()
-
-    def _apply_filter(self):
-        """Filtreyi uygula"""
-        status_filter = self.status_filter.currentData()
-
-        filtered = self.invoices
-        if status_filter:
-            filtered = [i for i in self.invoices if i.get("status") == status_filter]
-
-        self._display_data(filtered)
+        self._display_data(invoices)
         self._update_stats()
 
     def _display_data(self, invoices: list):
@@ -292,7 +205,7 @@ class InvoiceListPage(QWidget):
         # İptal
         if status in ["draft", "issued"]:
             cancel_btn = create_cancel_button(btn_widget)
-            cancel_btn.setToolTip("İptal Et")  # Override tooltip if needed
+            cancel_btn.setToolTip("İptal Et")
             cancel_btn.clicked.connect(lambda: self.cancel_clicked.emit(inv_id))
             btn_layout.addWidget(cancel_btn)
 
@@ -313,35 +226,13 @@ class InvoiceListPage(QWidget):
         paid = sum(1 for i in self.invoices if i.get("status") == "paid")
         overdue = sum(1 for i in self.invoices if i.get("status") == "overdue")
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["issued"].update_value(str(issued))
-        self.stat_cards["paid"].update_value(str(paid))
-        self.stat_cards["overdue"].update_value(str(overdue))
-
-    def _on_search(self, text: str):
-        """Tabloda arama yap"""
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = False
-            for col in range(self.table.columnCount() - 1):
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
-            self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        """Filtre değiştiğinde"""
-        self._apply_filter()
+        self.update_stat_card("total", str(total))
+        self.update_stat_card("draft", str(draft))
+        self.update_stat_card("issued", str(issued))
+        self.update_stat_card("paid", str(paid))
+        self.update_stat_card("overdue", str(overdue))
 
     def _confirm_delete(self, inv_id: int):
         """Silme onayı"""
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu faturayı silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.confirm_delete("fatura"):
             self.delete_clicked.emit(inv_id)

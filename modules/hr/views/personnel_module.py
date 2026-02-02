@@ -141,17 +141,22 @@ class PersonnelModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        # === Header ===
         self.header = PageHeader(
             title="Özlük Dosyası",
             icon=ICONS.FOLDER,
-            show_search=False,
-            show_refresh=False,
+            show_search=True,
             show_add=True,
             add_text="Belge Ekle",
             parent=self,
         )
         self.header.add_clicked.connect(self._add_document)
+        self.header.refresh_clicked.connect(self._load_data)
+        self.header.search_changed.connect(self._load_data)
+
         h_layout = self.header.header_layout()
         h_layout.addWidget(QLabel("Tür:"))
         self.type_filter = QComboBox()
@@ -162,12 +167,13 @@ class PersonnelModule(QWidget):
             ("Sağlık Raporu", DocumentType.HEALTH_REPORT),
         ]:
             self.type_filter.addItem(lbl, val)
-        self.type_filter.setFixedWidth(140)
+        self.type_filter.setFixedWidth(160)
         self.type_filter.setFixedHeight(36)
         self.type_filter.currentIndexChanged.connect(self._load_documents)
         h_layout.addWidget(self.type_filter)
         layout.addWidget(self.header)
 
+        # === Tab Widget ===
         self.tabs = QTabWidget()
         self._setup_docs_tab()
         self._setup_exp_tab()

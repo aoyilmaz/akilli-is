@@ -256,7 +256,6 @@ class MPSCockpitPage(QWidget):
             icon=ICONS.CHART_BAR if hasattr(ICONS, "CHART_BAR") else "ph.chart-bar",
             show_search=False,
             show_add=False,
-            show_refresh=True,
             show_filter=False,  # Custom toolbar kullanacağız
             parent=self,
         )

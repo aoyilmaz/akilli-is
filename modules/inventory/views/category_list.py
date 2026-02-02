@@ -44,7 +44,6 @@ class CategoryListPage(QWidget):
             title="Stok Kategorileri",
             icon=ICONS.INVENTORY,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Kategori",
             search_placeholder="Kategori ara...",

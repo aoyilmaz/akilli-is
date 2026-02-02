@@ -103,8 +103,16 @@ class MovementModule(QWidget):
                 }
                 movement_type = type_map.get(type_filter)
 
-            start_dt = datetime.combine(filters.get("start_date"), datetime.min.time())
-            end_dt = datetime.combine(filters.get("end_date"), datetime.max.time())
+            start_date_val = filters.get("start_date")
+            end_date_val = filters.get("end_date")
+
+            start_dt = None
+            if start_date_val:
+                start_dt = datetime.combine(start_date_val, datetime.min.time())
+
+            end_dt = None
+            if end_date_val:
+                end_dt = datetime.combine(end_date_val, datetime.max.time())
 
             movements = self.movement_service.get_movements(
                 movement_type=movement_type,

@@ -1494,3 +1494,47 @@ QPushButton[class="btn-primary"]:hover {
     background-color: #1177bb;
 }
 
+/* ==================== TABLE FOOTER ==================== */
+
+QFrame[class="table-footer"] {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+QLabel[class="footer-count"] {
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+QLabel[class="refresh-indicator"] {
+    color: #6b7280;
+    font-size: 14px;
+    padding: 2px 6px;
+}
+
+/* Footer'daki horizontal stat kartları */
+QFrame[class="table-footer"] QFrame[class="stat-card"] {
+    background: transparent;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 4px 10px;
+    min-width: 80px;
+    max-height: 32px;
+}
+
+QFrame[class="table-footer"] QFrame[class="stat-card"]:hover {
+    border-color: #4b5563;
+}
+
+QFrame[class="table-footer"] QFrame[class="stat-card"] QLabel[class="card-title"] {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+QFrame[class="table-footer"] QFrame[class="stat-card"] QLabel {
+    font-size: 12px;
+    font-weight: 600;
+}
+

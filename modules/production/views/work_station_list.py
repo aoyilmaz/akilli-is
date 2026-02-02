@@ -4,39 +4,30 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QTableWidgetItem,
     QMenu,
-    QMessageBox,
-    QComboBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 import qtawesome as qta
+
 from config.icons import ICONS
 from config.themes import get_theme
-
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
-    ScrollableCardContainer,
 )
 
 
-class WorkStationListPage(QWidget):
-    """İş istasyonları listesi."""
+class WorkStationListPage(BaseListPage):
+    """
+    İş istasyonları listesi sayfası.
+    BaseListPage kullanarak Excel tipi sütun filtreleme destekler.
+    """
 
-    # Sinyaller
+    # Ek sinyaller
     new_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
     copy_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     TYPE_DISPLAY = {
         "machine": ("Makine", "#3b82f6"),
@@ -46,106 +37,56 @@ class WorkStationListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self._search_text = ""
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="İş İstasyonları",
-            icon=ICONS.PRODUCTION,
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni İstasyon",
-            search_placeholder="İstasyon ara...",
-            parent=self,
-        )
-        layout.addWidget(self.header)
-
-        # Filtre ve İstatistik Alanı
-        filter_stats_layout = QHBoxLayout()
-        filter_stats_layout.setSpacing(24)
-
-        # Durum Filtresi
-        filter_box = QHBoxLayout()
-        filter_box.setSpacing(8)
-
-        lbl_filter = QLabel("Durum:")
-        lbl_filter.setStyleSheet("font-weight: bold; color: #a1a1aa;")
-        filter_box.addWidget(lbl_filter)
-
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(["Tümü", "Aktif", "Pasif"])
-        self.status_filter.setCurrentText("Aktif")
-        self.status_filter.setFixedWidth(120)
-        filter_box.addWidget(self.status_filter)
-
-        filter_stats_layout.addLayout(filter_box)
-        filter_stats_layout.addStretch()
-
-        # İstatistik kartları
-        stats_container = ScrollableCardContainer()
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.PRODUCTION
-        )
-        self.stat_cards["machine"] = MiniStatCard(
-            "Makine", "0", "primary", icon=ICONS.TYPE_SEMI
-        )
-        self.stat_cards["workstation"] = MiniStatCard(
-            "İş İstasyonu", "0", "success", icon=ICONS.FIX
-        )
-        self.stat_cards["assembly"] = MiniStatCard(
-            "Montaj Hattı", "0", "warning", icon=ICONS.PRODUCTION
-        )
-
-        for card in self.stat_cards.values():
-            stats_container.add_card(card)
-        stats_container.add_stretch()
-
-        filter_stats_layout.addWidget(stats_container)
-        layout.addLayout(filter_stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("code", "Kod", width=100),
             ColumnConfig("name", "İstasyon Adı", width=200, stretch=True),
-            ColumnConfig("station_type", "Tür", width=120),
-            ColumnConfig("capacity_per_hour", "Kapasite/Saat", width=110),
-            ColumnConfig("efficiency_rate", "Verimlilik", width=100),
-            ColumnConfig("hourly_rate", "Saatlik Maliyet", width=120),
+            ColumnConfig("station_type", "Tür", width=120, filter_type="enum"),
+            ColumnConfig(
+                "capacity_per_hour", "Kapasite/Saat", width=110, filter_type="number"
+            ),
+            ColumnConfig(
+                "efficiency_rate", "Verimlilik", width=100, filter_type="number"
+            ),
+            ColumnConfig(
+                "hourly_rate", "Saatlik Maliyet", width=120, filter_type="number"
+            ),
             ColumnConfig("location", "Konum", width=150),
-            ColumnConfig("is_active", "Durum", width=100),
+            ColumnConfig("is_active", "Durum", width=100, filter_type="enum"),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="İş İstasyonları",
+            icon=ICONS.PRODUCTION,
             table_id="work_station_list",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_add=True,
+            add_text="Yeni İstasyon",
+            search_placeholder="İstasyon ara...",
+            parent=parent,
         )
+
+        self.stations = []
+        self._setup_stat_cards()
+
+        # Context menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
-        layout.addWidget(self.table)
 
-        # Alt bilgi
-        self.count_label = QLabel("Toplam: 0 istasyon")
-        layout.addWidget(self.count_label)
+        # new_clicked için add_clicked bağla
+        self.add_clicked.connect(self.new_clicked.emit)
 
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.new_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.status_filter.currentIndexChanged.connect(self._apply_filters)
-        self.table.row_double_clicked.connect(self.edit_clicked.emit)
+    def _setup_stat_cards(self):
+        """İstatistik kartlarını oluştur"""
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.PRODUCTION)
+        self.add_stat_card("machine", "Makine", "0", "primary", ICONS.TYPE_SEMI)
+        self.add_stat_card("workstation", "İş İstasyonu", "0", "success", ICONS.FIX)
+        self.add_stat_card("assembly", "Montaj Hattı", "0", "warning", ICONS.PRODUCTION)
 
     def load_data(self, stations: list):
+        """Verileri yükle"""
+        self.stations = stations
         self.table.setRowCount(len(stations))
         visible_cols = self.table.get_visible_columns()
 
@@ -163,17 +104,15 @@ class WorkStationListPage(QWidget):
                 assembly_count += 1
 
         # Kartları güncelle
-        self.stat_cards["total"].update_value(str(len(stations)))
-        self.stat_cards["machine"].update_value(str(machine_count))
-        self.stat_cards["workstation"].update_value(str(workstation_count))
-        self.stat_cards["assembly"].update_value(str(assembly_count))
+        self.update_stat_card("total", str(len(stations)))
+        self.update_stat_card("machine", str(machine_count))
+        self.update_stat_card("workstation", str(workstation_count))
+        self.update_stat_card("assembly", str(assembly_count))
 
-        self.count_label.setText(f"Toplam: {len(stations)} istasyon")
-
-        # filter uygula
-        self._apply_filters()
+        self.update_count(len(stations), "istasyon")
 
     def _populate_row(self, row: int, station: dict, visible_cols: list):
+        """Tek satırı doldur"""
         station_id = station.get("id")
 
         for col_idx, col_key in enumerate(visible_cols):
@@ -243,49 +182,8 @@ class WorkStationListPage(QWidget):
                     item.setForeground(QColor(t.text_muted))
                 self.table.setItem(row, col_idx, item)
 
-    def _on_search(self, text: str):
-        self._search_text = text.lower()
-        self._apply_filters()
-
-    def _apply_filters(self):
-        status_filter = self.status_filter.currentText()
-
-        # Durum kolonunun indexini bul
-        status_col_idx = -1
-        for col in range(self.table.columnCount()):
-            header_item = self.table.horizontalHeaderItem(col)
-            if header_item and header_item.text() == "Durum":
-                status_col_idx = col
-                break
-
-        for row in range(self.table.rowCount()):
-            # Search filter
-            search_match = True
-            if self._search_text:
-                search_match = False
-                for col in range(self.table.columnCount()):
-                    item = self.table.item(row, col)
-                    if item and self._search_text in item.text().lower():
-                        search_match = True
-                        break
-
-            # Status filter
-            status_match = True
-            if status_filter != "Tümü" and status_col_idx != -1:
-                item = self.table.item(row, status_col_idx)
-                if item:
-                    status_text = item.text()
-                    is_active = "Aktif" in status_text
-                    is_passive = "Pasif" in status_text
-
-                    if status_filter == "Aktif" and not is_active:
-                        status_match = False
-                    elif status_filter == "Pasif" and not is_passive:
-                        status_match = False
-
-            self.table.setRowHidden(row, not (search_match and status_match))
-
     def _show_context_menu(self, position):
+        """Context menu göster"""
         row = self.table.rowAt(position.y())
         if row < 0:
             return
@@ -317,11 +215,6 @@ class WorkStationListPage(QWidget):
         menu.exec(self.table.viewport().mapToGlobal(position))
 
     def _confirm_delete(self, station_id: int):
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu iş istasyonunu silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        """Silme onayı"""
+        if self.confirm_delete("iş istasyonu"):
             self.delete_clicked.emit(station_id)

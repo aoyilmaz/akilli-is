@@ -192,7 +192,6 @@ class MPSPlanListPage(QWidget):
             icon=ICONS.PRODUCTION,
             show_search=False,
             show_add=False,
-            show_refresh=True,
             parent=self,
         )
         self.header.refresh_clicked.connect(self.load_plans)

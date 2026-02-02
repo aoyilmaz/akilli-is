@@ -17,6 +17,9 @@ from ui.components.action_buttons import (
 )
 from ui.components.page_header import PageHeader
 from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
+from ui.components.filterable_header import FilterableHeaderView
+from ui.components.filter_popup import FilterPopup
+from ui.components.active_filters_bar import ActiveFiltersBar, FilterChip
 from ui.components.base_list_page import BaseListPage
 from ui.components.input_fields import CurrencyInput, NumericInput
 from ui.components.workflow_timeline import WorkflowTimelineWidget, ApprovalDialog
@@ -46,6 +49,10 @@ __all__ = [
     "PageHeader",
     "EnhancedTableWidget",
     "ColumnConfig",
+    "FilterableHeaderView",
+    "FilterPopup",
+    "ActiveFiltersBar",
+    "FilterChip",
     "BaseListPage",
     # Workflow
     "WorkflowTimelineWidget",

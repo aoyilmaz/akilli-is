@@ -258,6 +258,13 @@ class SalesOrderFormPage(QWidget):
 
         layout.addLayout(header_layout)
 
+        # Workflow Timeline Widget
+        from ui.components.workflow_timeline import WorkflowTimelineWidget
+
+        self.workflow_timeline = WorkflowTimelineWidget()
+        self.workflow_timeline.action_taken.connect(self._on_workflow_action)
+        layout.addWidget(self.workflow_timeline)
+
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -621,6 +628,25 @@ class SalesOrderFormPage(QWidget):
                     float(item_data.get("unit_price", 0) or 0),
                     float(item_data.get("discount_rate", 0) or 0),
                 )
+
+        # Workflow timeline yükle
+        order_id = self.order_data.get("id")
+        if order_id:
+            self.workflow_timeline.load_workflow(
+                table_name="sales_orders",
+                document_id=order_id,
+                current_user_id=1,  # TODO: Mevcut kullanıcı ID'si
+            )
+
+    def _on_workflow_action(self, instance_id: int, action: str, comment: str):
+        """Workflow aksiyonu alındığında"""
+        # Formu yenile
+        if self.order_data:
+            self.workflow_timeline.load_workflow(
+                table_name="sales_orders",
+                document_id=self.order_data.get("id"),
+                current_user_id=1,
+            )
 
     def _on_save(self):
         """Kaydet"""

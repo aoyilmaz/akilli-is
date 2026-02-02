@@ -438,13 +438,8 @@ class WorkOrderModule(QWidget):
             return
 
         try:
-            status_filter = self.list_page.get_status_filter()
-
-            from database.models.production import WorkOrderStatus
-
-            status = WorkOrderStatus(status_filter) if status_filter else None
-
-            work_orders = self.wo_service.get_all(status=status)
+            # Tüm verileri yükle - filtreleme tablo tarafından yapılıyor
+            work_orders = self.wo_service.get_all()
 
             wo_list = []
             for wo in work_orders:

@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QTableWidgetItem,
-    QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -37,12 +36,12 @@ class GoodsReceiptListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("receipt_no", "Fiş No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("supplier", "Tedarikçi", width=200, stretch=True),
             ColumnConfig("order_no", "Sipariş No", width=120),
-            ColumnConfig("warehouse", "Depo", width=120),
-            ColumnConfig("items", "Kalem", width=60),
-            ColumnConfig("status", "Durum", width=110),
+            ColumnConfig("warehouse", "Depo", width=120, filter_type="enum"),
+            ColumnConfig("items", "Kalem", width=60, filter_type="number"),
+            ColumnConfig("status", "Durum", width=110, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -50,6 +49,7 @@ class GoodsReceiptListPage(BaseListPage):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
@@ -60,7 +60,6 @@ class GoodsReceiptListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Manuel Giriş",
             search_placeholder="Ara... (fiş no, tedarikçi)",
@@ -68,33 +67,20 @@ class GoodsReceiptListPage(BaseListPage):
         )
 
         self.receipts = []
-        self._setup_filters()
+        self._setup_custom_buttons()
         self._setup_stat_cards()
 
-    def _setup_filters(self):
+    def _setup_custom_buttons(self):
         # Siparişten ekle butonu
         from_order_btn = QPushButton("Siparişten")
         from_order_btn.setIcon(qta.icon(ICONS.INVENTORY, color="#ffffff"))
         from_order_btn.setProperty("class", "btn-secondary")
         from_order_btn.clicked.connect(self.add_from_order_clicked.emit)
 
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Tamamlandı", "completed")
-        self.status_filter.addItem("İptal", "cancelled")
-        self.status_filter.setMinimumWidth(150)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
+        if self.header.add_btn:
             h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-            # Add butonu öncesine siparişten ekle butonunu ekle
-            if self.header.add_btn:
-                add_idx = h_layout.indexOf(self.header.add_btn)
-                h_layout.insertWidget(add_idx, from_order_btn)
+            add_idx = h_layout.indexOf(self.header.add_btn)
+            h_layout.insertWidget(add_idx, from_order_btn)
 
     def _setup_stat_cards(self):
         self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
@@ -110,14 +96,7 @@ class GoodsReceiptListPage(BaseListPage):
 
     def load_data(self, receipts: list):
         self.receipts = receipts
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.receipts
-        if status_filter:
-            filtered = [r for r in self.receipts if r.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(receipts)
         self._update_stats()
 
     def _display_data(self, receipts: list):
@@ -236,10 +215,15 @@ class GoodsReceiptListPage(BaseListPage):
         completed = sum(1 for r in self.receipts if r.get("status") == "completed")
         today = sum(1 for r in self.receipts if r.get("receipt_date") == date.today())
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["completed"].update_value(str(completed))
-        self.stat_cards["today"].update_value(str(today))
+        for key, val in [
+            ("total", total),
+            ("draft", draft),
+            ("completed", completed),
+            ("today", today),
+        ]:
+            self.update_stat_card(key, str(val))
+
+        self.update_count(total, "fiş")
 
     def _on_search(self, text: str):
         text = text.lower()
@@ -250,9 +234,6 @@ class GoodsReceiptListPage(BaseListPage):
                 for col in range(self.table.columnCount() - 1)
             )
             self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
 
     def _confirm_delete(self, rec_id: int):
         reply = QMessageBox.question(

@@ -264,6 +264,24 @@ class HRService:
 
         return [{"department": r[0], "count": r[1]} for r in result]
 
+    def get_employee_count_by_position(self) -> List[Dict]:
+        """Pozisyonlara göre çalışan sayısı"""
+        result = (
+            self.session.query(Position.name, func.count(Employee.id).label("count"))
+            .outerjoin(
+                Employee,
+                and_(
+                    Employee.position_id == Position.id,
+                    Employee.is_active == True,
+                    Employee.exit_date.is_(None),
+                ),
+            )
+            .filter(Position.is_active == True)
+            .group_by(Position.id, Position.name)
+            .all()
+        )
+        return [{"position": r[0], "count": r[1]} for r in result]
+
     # ========== İZİN İŞLEMLERİ ==========
 
     def get_leaves(
@@ -272,6 +290,7 @@ class HRService:
         status: LeaveStatus = None,
         start_date: date = None,
         end_date: date = None,
+        search: str = None,
         limit: int = 100,
     ) -> List[Leave]:
         """İzinleri getir"""
@@ -288,6 +307,16 @@ class HRService:
 
         if end_date:
             query = query.filter(Leave.end_date <= end_date)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.join(Employee).filter(
+                or_(
+                    Employee.employee_no.ilike(search_term),
+                    Employee.first_name.ilike(search_term),
+                    Employee.last_name.ilike(search_term),
+                )
+            )
 
         return query.order_by(desc(Leave.created_at)).limit(limit).all()
 
@@ -314,7 +343,9 @@ class HRService:
 
             # Çalışan bilgisi
             employee = leave.employee
-            department = employee.department.name if employee and employee.department else None
+            department = (
+                employee.department.name if employee and employee.department else None
+            )
 
             context = {
                 "days": float(leave.days),
@@ -325,7 +356,8 @@ class HRService:
             instance_id = start_workflow_for_document(
                 table_name="leaves",
                 document_id=leave.id,
-                initiated_by=user_id or 1,  # Varsayılan: admin user (employee_id users tablosunda yok)
+                initiated_by=user_id
+                or 1,  # Varsayılan: admin user (employee_id users tablosunda yok)
                 document_no=f"LEAVE-{leave.id}",
                 context=context,
             )
@@ -336,7 +368,9 @@ class HRService:
 
         return leave
 
-    def approve_leave(self, leave_id: int, approver_id: int, comment: str = None) -> Optional[Leave]:
+    def approve_leave(
+        self, leave_id: int, approver_id: int, comment: str = None
+    ) -> Optional[Leave]:
         """İzni onayla"""
         leave = self.get_leave_by_id(leave_id)
         if leave and leave.status == LeaveStatus.PENDING:
@@ -352,6 +386,7 @@ class HRService:
                     get_document_workflow_status,
                     process_workflow_action,
                 )
+
                 workflow_status = get_document_workflow_status("leaves", leave.id)
                 if workflow_status and workflow_status.get("instance_id"):
                     process_workflow_action(
@@ -384,6 +419,7 @@ class HRService:
                     get_document_workflow_status,
                     process_workflow_action,
                 )
+
                 workflow_status = get_document_workflow_status("leaves", leave.id)
                 if workflow_status and workflow_status.get("instance_id"):
                     process_workflow_action(

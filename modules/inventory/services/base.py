@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Optional, List
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_session
 from database.models import (
@@ -24,6 +24,12 @@ from database.models import (
     StockMovementType,
     StockBalance,
     Currency,
+    SalesOrder,
+    DeliveryNote,
+    PurchaseOrder,
+    GoodsReceipt,
+    WorkOrder,
+    WorkStation,
 )
 
 # Alias for backward compatibility
@@ -202,6 +208,7 @@ class ItemService(ServiceBase):
         stock_status: str = None,
         limit: int = 50,
         offset: int = 0,
+        table_filters: dict = None,
     ) -> List[Item]:
         """Stok kartı ara - keyword, query veya item_type parametresi ile"""
         search_term = keyword or query or ""
@@ -227,6 +234,9 @@ class ItemService(ServiceBase):
         if stock_status:
             q = self._apply_stock_status_filter(q, stock_status)
 
+        if table_filters:
+            q = self._apply_table_filters(q, table_filters)
+
         return q.order_by(Item.code.asc()).offset(offset).limit(limit).all()
 
     def count_search(
@@ -236,15 +246,19 @@ class ItemService(ServiceBase):
         item_type: str = None,
         is_active: bool = True,
         stock_status: str = None,
+        table_filters: dict = None,
     ) -> int:
         """Arama kriterlerine uyan toplam kayıt sayısını döner"""
         search_term = keyword or query or ""
 
-        # Eğer stok durumu filtresi varsa, COUNT(*) yerine subquery kullanmalıyız
-        if stock_status:
-            q = self.session.query(Item.id)
-        else:
-            q = self.session.query(func.count(Item.id))
+        # Subquery veya join ihtimaline karşı her zaman Item query başlatıyoruz
+        q = self.session.query(Item)
+
+        if table_filters:
+            if "category" in table_filters:
+                q = q.outerjoin(Item.category)
+            if "unit" in table_filters:
+                q = q.outerjoin(Item.unit)
 
         # Aktiflik filtresi
         if is_active is not None:
@@ -264,9 +278,11 @@ class ItemService(ServiceBase):
 
         if stock_status:
             q = self._apply_stock_status_filter(q, stock_status)
-            return q.count()
 
-        return q.scalar()
+        if table_filters:
+            q = self._apply_table_filters(q, table_filters)
+
+        return q.count()
 
     def get_stats(
         self,
@@ -275,11 +291,18 @@ class ItemService(ServiceBase):
         item_type: str = None,
         is_active: bool = True,
         stock_status: str = None,
+        table_filters: dict = None,
     ) -> dict:
         """Stok istatistiklerini hesapla"""
         search_term = keyword or query or ""
 
         q = self.session.query(Item)
+
+        if table_filters:
+            if "category" in table_filters:
+                q = q.outerjoin(Item.category)
+            if "unit" in table_filters:
+                q = q.outerjoin(Item.unit)
 
         if is_active is not None:
             q = q.filter(Item.is_active == is_active)
@@ -295,6 +318,12 @@ class ItemService(ServiceBase):
 
         if item_type:
             q = q.filter(Item.item_type == item_type)
+
+        if stock_status:
+            q = self._apply_stock_status_filter(q, stock_status)
+
+        if table_filters:
+            q = self._apply_table_filters(q, table_filters)
 
         # Performans için sadece gerekli kolonları ve ilişkileri çekmek gerekebilir
         # Şimdilik tutarlılık için model üzerinden gidiyoruz
@@ -401,6 +430,81 @@ class ItemService(ServiceBase):
             except ValueError:
                 pass
         return f"{prefix}000001"
+
+    def _apply_table_filters(self, query, filters):
+        """Tablo içi filtreleri query'e uygula"""
+        column_map = {
+            "code": Item.code,
+            "name": Item.name,
+            "type": Item.item_type,
+            "barcode": Item.barcode,
+            "item_type": Item.item_type,
+            "description": Item.description,
+            "category": ItemCategory.name,
+            "unit": Unit.name,
+            "purchase_price": Item.purchase_price,
+            "sale_price": Item.sale_price,
+            "stock_status": None,
+            "is_active": Item.is_active,
+        }
+
+        for col_key, filter_data in filters.items():
+            if col_key not in column_map:
+                continue
+
+            if col_key == "stock_status":
+                continue
+
+            column = column_map[col_key]
+
+            # Seçili değerler
+            selected_values = filter_data.get("selected_values")
+            if selected_values:
+                # Boolean çevrimi ve özel durumlar
+                if col_key == "is_active":
+                    bool_values = []
+                    if "Aktif" in selected_values:
+                        bool_values.append(True)
+                    if "Pasif" in selected_values:
+                        bool_values.append(False)
+                    if bool_values:
+                        query = query.filter(column.in_(bool_values))
+                elif col_key == "type" or col_key == "item_type":
+                    # Enum mapping
+                    type_mapping = {
+                        "Hammadde": "HAMMADDE",
+                        "Mamul": "MAMUL",
+                        "Yarı Mamul": "YARI_MAMUL",
+                        "Ambalaj": "AMBALAJ",
+                        "Sarf Malzemesi": "SARF",
+                        "Ticari Mal": "TICARI",
+                        "Hizmet": "HIZMET",
+                        "Diğer": "DIGER",
+                    }
+                    mapped_values = []
+                    for v in selected_values:
+                        mapped_values.append(type_mapping.get(v, v))
+                    if mapped_values:
+                        query = query.filter(column.in_(mapped_values))
+                else:
+                    query = query.filter(column.in_(selected_values))
+
+            # Text filter
+            text_match = filter_data.get("text_match")
+            if text_match:
+                mode = text_match.get("mode", "contains")
+                text = text_match.get("text", "")
+
+                if mode == "contains":
+                    query = query.filter(column.ilike(f"%{text}%"))
+                elif mode == "startswith":
+                    query = query.filter(column.ilike(f"{text}%"))
+                elif mode == "endswith":
+                    query = query.filter(column.ilike(f"%{text}"))
+                elif mode == "equals":
+                    query = query.filter(column == text)
+
+        return query
 
 
 class UnitService(ServiceBase):
@@ -579,11 +683,95 @@ class WarehouseService(ServiceBase):
 
     def delete(self, warehouse_id: int) -> bool:
         warehouse = self.get_by_id(warehouse_id)
-        if warehouse:
+        if not warehouse:
+            return False
+
+        # 1. Stok Hareket Kontrolü
+        movement_count = (
+            self.session.query(StockMovement)
+            .filter(
+                (StockMovement.from_warehouse_id == warehouse_id)
+                | (StockMovement.to_warehouse_id == warehouse_id)
+            )
+            .count()
+        )
+        if movement_count > 0:
+            raise ValueError(
+                "Bu depoya ait stok hareketleri bulunduğu için silinemez.\n"
+                "Güvenliğiniz için depoyu pasife alabilirsiniz."
+            )
+
+        # 2. Satış ve Teslimat Kontrolü
+        dn_count = (
+            self.session.query(DeliveryNote)
+            .filter(DeliveryNote.source_warehouse_id == warehouse_id)
+            .count()
+        )
+        if dn_count > 0:
+            raise ValueError(
+                "Bu depoya ait teslimat irsaliyeleri bulunduğu için silinemez."
+            )
+
+        so_count = (
+            self.session.query(SalesOrder)
+            .filter(SalesOrder.source_warehouse_id == warehouse_id)
+            .count()
+        )
+        if so_count > 0:
+            raise ValueError(
+                "Bu depoya bağlı satış siparişleri bulunduğu için silinemez."
+            )
+
+        # 3. Satınalma ve Mal Kabul Kontrolü
+        gr_count = (
+            self.session.query(GoodsReceipt)
+            .filter(GoodsReceipt.warehouse_id == warehouse_id)
+            .count()
+        )
+        if gr_count > 0:
+            raise ValueError(
+                "Bu depoya ait mal kabul kayıtları bulunduğu için silinemez."
+            )
+
+        po_count = (
+            self.session.query(PurchaseOrder)
+            .filter(PurchaseOrder.delivery_warehouse_id == warehouse_id)
+            .count()
+        )
+        if po_count > 0:
+            raise ValueError(
+                "Bu depoya bağlı satınalma siparişleri bulunduğu için silinemez."
+            )
+
+        # 4. Üretim Kontrolü
+        wo_count = (
+            self.session.query(WorkOrder)
+            .filter(
+                (WorkOrder.source_warehouse_id == warehouse_id)
+                | (WorkOrder.target_warehouse_id == warehouse_id)
+            )
+            .count()
+        )
+        if wo_count > 0:
+            raise ValueError("Bu depoya bağlı iş emirleri bulunduğu için silinemez.")
+
+        ws_count = (
+            self.session.query(WorkStation)
+            .filter(WorkStation.warehouse_id == warehouse_id)
+            .count()
+        )
+        if ws_count > 0:
+            raise ValueError(
+                "Bu depo bir iş istasyonu tarafından kullanıldığı için silinemez."
+            )
+
+        try:
             self.session.delete(warehouse)
             self.session.commit()
             return True
-        return False
+        except IntegrityError:
+            self.session.rollback()
+            raise ValueError("Bu depo başka kayıtlarda kullanıldığı için silinemez.")
 
 
 class StockMovementService(ServiceBase):

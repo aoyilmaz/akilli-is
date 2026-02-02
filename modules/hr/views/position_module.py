@@ -145,30 +145,36 @@ class PositionModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
+
+        # === Header ===
         self.header = PageHeader(
             title="Pozisyon Listesi",
-            icon=ICONS.USER,
-            show_search=False,
-            show_refresh=True,
+            icon=ICONS.POSITION,
+            show_search=True,
             show_add=True,
             add_text="Yeni Pozisyon",
             parent=self,
         )
-        self.header.add_clicked.connect(self._new_position)
+        self.header.add_clicked.connect(self._add_position)
         self.header.refresh_clicked.connect(self.load_data)
+        self.header.search_changed.connect(self.load_data)
         layout.addWidget(self.header)
 
-        cols = [
-            ColumnConfig("code", "Kod", width=120),
-            ColumnConfig("name", "Ad", stretch=True),
-            ColumnConfig("dept", "Departman", width=200),
-            ColumnConfig("min", "Min Maaş", width=120),
-            ColumnConfig("max", "Max Maaş", width=120),
+        # === Tablo ===
+        columns = [
+            ColumnConfig("name", "Pozisyon Adı", width=250, stretch=True),
+            ColumnConfig("department", "Departman", width=200),
+            ColumnConfig("level", "Kademe/Seviye", width=120),
+            ColumnConfig("employee_count", "Çalışan Sayısı", width=120),
+            ColumnConfig("status", "Durum", width=100),
         ]
+
         self.table = EnhancedTableWidget(
-            table_id="hr_positions", columns=cols, parent=self
+            table_id="hr_positions",
+            columns=columns,
+            parent=self,
         )
         self.table.row_double_clicked.connect(self._edit_position)
         layout.addWidget(self.table)
@@ -185,47 +191,45 @@ class PositionModule(QWidget):
 
     def load_data(self):
         try:
+            emp_counts = {
+                p["position"]: p["count"]
+                for p in self._get_service().get_employee_count_by_position()
+            }
+
             positions = self._get_service().get_all_positions()
             self.table.setRowCount(len(positions))
             vcols = self.table.get_visible_columns()
             for r, pos in enumerate(positions):
                 for c, key in enumerate(vcols):
-                    if key == "code":
-                        it = QTableWidgetItem(pos.code)
+                    if key == "name":
+                        it = QTableWidgetItem(pos.name)
                         it.setData(Qt.ItemDataRole.UserRole, pos.id)
                         self.table.setItem(r, c, it)
-                    elif key == "name":
-                        self.table.setItem(r, c, QTableWidgetItem(pos.name))
-                    elif key == "dept":
+                    elif key == "department":
+                        d_text = pos.department.name if pos.department else "-"
+                        self.table.setItem(r, c, QTableWidgetItem(d_text))
+                    elif key == "level":
                         self.table.setItem(
-                            r,
-                            c,
-                            QTableWidgetItem(
-                                pos.department.name if pos.department else "-"
-                            ),
+                            r, c, QTableWidgetItem("-")
+                        )  # Henüz modelde yok
+                    elif key == "employee_count":
+                        count = emp_counts.get(pos.name, 0)
+                        self.table.setItem(r, c, QTableWidgetItem(str(count)))
+                    elif key == "status":
+                        status = "Aktif" if pos.is_active else "Pasif"
+                        item = QTableWidgetItem(status)
+                        item.setForeground(
+                            Qt.GlobalColor.green
+                            if pos.is_active
+                            else Qt.GlobalColor.red
                         )
-                    elif key == "min":
-                        self.table.setItem(
-                            r,
-                            c,
-                            QTableWidgetItem(
-                                f"₺{pos.min_salary:,.2f}" if pos.min_salary else "-"
-                            ),
-                        )
-                    elif key == "max":
-                        self.table.setItem(
-                            r,
-                            c,
-                            QTableWidgetItem(
-                                f"₺{pos.max_salary:,.2f}" if pos.max_salary else "-"
-                            ),
-                        )
+                        self.table.setItem(r, c, item)
         except Exception as e:
             QMessageBox.warning(self, "Uyarı", str(e))
         finally:
             self._close_service()
 
-    def _new_position(self):
+    def _add_position(self):
         if PositionFormDialog(parent=self).exec():
             self.load_data()
 

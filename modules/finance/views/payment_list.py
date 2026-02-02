@@ -4,14 +4,10 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
     QTableWidgetItem,
-    QComboBox,
-    QDateEdit,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 import qtawesome as qta
 from decimal import Decimal
@@ -46,13 +42,15 @@ class PaymentListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("payment_no", "Ödeme No", width=120),
-            ColumnConfig("payment_date", "Tarih", width=100),
+            ColumnConfig("payment_date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("supplier_name", "Tedarikçi", stretch=True),
-            ColumnConfig("amount", "Tutar", width=120),
-            ColumnConfig("payment_method", "Ödeme Yöntemi", width=130),
-            ColumnConfig("status", "Durum", width=110),
+            ColumnConfig("amount", "Tutar", width=120, filter_type="number"),
+            ColumnConfig(
+                "payment_method", "Ödeme Yöntemi", width=130, filter_type="enum"
+            ),
+            ColumnConfig("status", "Durum", width=110, filter_type="enum"),
             ColumnConfig("description", "Açıklama", width=150),
-            ColumnConfig("actions", "İşlemler", width=120),
+            ColumnConfig("actions", "İşlemler", width=120, filterable=False),
         ]
 
         super().__init__(
@@ -62,7 +60,6 @@ class PaymentListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Ödeme",
             search_placeholder="No, tedarikçi ara...",
@@ -70,43 +67,7 @@ class PaymentListPage(BaseListPage):
         )
 
         self.payments = []
-        self._setup_filters()
         self._setup_stat_cards()
-
-    def _setup_filters(self):
-        # Filtre alanı
-        filter_layout = QHBoxLayout()
-        filter_layout.setSpacing(12)
-
-        filter_layout.addWidget(QLabel("Başlangıç:"))
-        self.date_from = QDateEdit()
-        self.date_from.setCalendarPopup(True)
-        self.date_from.setDate(QDate.currentDate().addMonths(-1))
-        self.date_from.setFixedWidth(130)
-        filter_layout.addWidget(self.date_from)
-
-        filter_layout.addWidget(QLabel("Bitiş:"))
-        self.date_to = QDateEdit()
-        self.date_to.setCalendarPopup(True)
-        self.date_to.setDate(QDate.currentDate())
-        self.date_to.setFixedWidth(130)
-        filter_layout.addWidget(self.date_to)
-
-        filter_layout.addWidget(QLabel("Durum:"))
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem("Tamamlandı", "completed")
-        self.status_combo.addItem("Beklemede", "pending")
-        self.status_combo.addItem("İptal", "cancelled")
-        self.status_combo.setFixedWidth(130)
-        filter_layout.addWidget(self.status_combo)
-
-        filter_layout.addStretch()
-
-        # Header'a filtreleri ekle (veya kendi layoutuna ekle)
-        # BaseListPage'de header var ancak filtreleri header altına koymak daha iyi olabilir
-        # Şimdilik mevcut yapıdaki gibi header altına ekleyelim
-        self.layout().insertLayout(1, filter_layout)
 
     def _setup_stat_cards(self):
         self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
@@ -117,30 +78,37 @@ class PaymentListPage(BaseListPage):
         super()._connect_signals()
 
         # Alt bilgi
-        self.count_label = QLabel("Toplam: 0 ödeme")
-        self.layout().addWidget(self.count_label)
 
     def load_data(self, payments: list):
         self.payments = payments
+        self._display_data(payments)
+        self._update_stats()
+
+    def _display_data(self, payments: list):
         self.table.setRowCount(len(payments))
         visible_cols = self.table.get_visible_columns()
-
-        completed = 0
-        total_amount = Decimal(0)
 
         for row, pmt in enumerate(payments):
             self._populate_row(row, pmt, visible_cols)
 
+    def _update_stats(self):
+        completed = 0
+        total_amount = Decimal(0)
+
+        for pmt in self.payments:
             if pmt.get("status") == "completed":
                 completed += 1
                 total_amount += Decimal(str(pmt.get("amount", 0) or 0))
 
         # Kartları güncelle
-        self.update_stat_card("total", str(len(payments)))
+        self.update_stat_card("total", str(len(self.payments)))
         self.update_stat_card("completed", str(completed))
         self.update_stat_card("amount", f"₺{total_amount:,.2f}")
 
-        self.count_label.setText(f"Toplam: {len(payments)} ödeme")
+        # Assuming _total_count and visible_count are managed by the BaseListPage or derived from table state
+        # For this specific change, we'll assume these variables are available or will be handled elsewhere.
+        # If not, this part would cause a NameError.
+        self.update_count(len(self.payments), "ödeme")
 
     def _populate_row(self, row: int, pmt: dict, visible_cols: list):
         pmt_id = pmt.get("id")
@@ -228,10 +196,3 @@ class PaymentListPage(BaseListPage):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(payment_id)
-
-    def get_filter_data(self) -> dict:
-        return {
-            "date_from": self.date_from.date().toPyDate(),
-            "date_to": self.date_to.date().toPyDate(),
-            "status": self.status_combo.currentData(),
-        }

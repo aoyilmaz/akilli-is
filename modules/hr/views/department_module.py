@@ -7,9 +7,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QLineEdit,
     QDialog,
     QFormLayout,
@@ -18,7 +16,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt
-import qtawesome as qta
 
 from config.icons import ICONS
 from modules.hr.services import HRService
@@ -139,29 +136,33 @@ class DepartmentModule(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
+        # === Header ===
         self.header = PageHeader(
             title="Departman Listesi",
-            icon=ICONS.BUILDING,
-            show_search=False,
-            show_refresh=True,
+            icon=ICONS.DEPARTMENT,
+            show_search=True,
             show_add=True,
             add_text="Yeni Departman",
             parent=self,
         )
-        self.header.add_clicked.connect(self._new_department)
+        self.header.add_clicked.connect(self._add_department)
         self.header.refresh_clicked.connect(self.load_data)
+        self.header.search_changed.connect(self.load_data)
         layout.addWidget(self.header)
 
-        # Tablo
+        # === Tablo ===
         columns = [
-            ColumnConfig("code", "Kod", width=120),
-            ColumnConfig("name", "Ad", width=250, stretch=True),
-            ColumnConfig("parent", "Üst Departman", width=200),
+            ColumnConfig("name", "Departman Adı", width=250, stretch=True),
+            ColumnConfig("code", "Kodu", width=120),
+            ColumnConfig("manager", "Yönetici", width=200),
             ColumnConfig("emp_count", "Çalışan Sayısı", width=120),
+            ColumnConfig("status", "Durum", width=100),
         ]
+
         self.table = EnhancedTableWidget(
-            table_id="hr_departments", columns=columns, parent=self
+            table_id="hr_departments",
+            columns=columns,
+            parent=self,
         )
         self.table.row_double_clicked.connect(self._edit_department)
         layout.addWidget(self.table)
@@ -196,25 +197,42 @@ class DepartmentModule(QWidget):
 
     def _populate_row(self, row, dept, emp_counts, visible_cols):
         for col_idx, col_key in enumerate(visible_cols):
-            if col_key == "code":
-                item = QTableWidgetItem(dept.code)
+            if col_key == "name":
+                item = QTableWidgetItem(dept.name)
                 item.setData(Qt.ItemDataRole.UserRole, dept.id)
                 self.table.setItem(row, col_idx, item)
-            elif col_key == "name":
-                self.table.setItem(row, col_idx, QTableWidgetItem(dept.name))
-            elif col_key == "parent":
-                p_text = dept.parent.name if dept.parent else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(p_text))
+            elif col_key == "code":
+                self.table.setItem(row, col_idx, QTableWidgetItem(dept.code))
+            elif col_key == "manager":
+                m_text = dept.manager.full_name if dept.manager else "-"
+                self.table.setItem(row, col_idx, QTableWidgetItem(m_text))
             elif col_key == "emp_count":
                 count = emp_counts.get(dept.name, 0)
                 self.table.setItem(row, col_idx, QTableWidgetItem(str(count)))
+            elif col_key == "status":
+                status = "Aktif" if dept.is_active else "Pasif"
+                item = QTableWidgetItem(status)
+                item.setForeground(
+                    Qt.GlobalColor.green if dept.is_active else Qt.GlobalColor.red
+                )
+                self.table.setItem(row, col_idx, item)
 
-    def _new_department(self):
+    def _add_department(self):
         dialog = DepartmentFormDialog(parent=self)
         if dialog.exec():
             self.load_data()
 
-    def _edit_department(self, dept_id):
+    def _edit_department(self, dept_id=None):
+        if dept_id is None:
+            row = self.table.currentRow()
+            if row < 0:
+                return
+            # İlk sütunda UserRole olarak ID saklandığını varsayıyoruz (_populate_row'a göre)
+            dept_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+
+        if not dept_id:
+            return
+
         dialog = DepartmentFormDialog(dept_id=dept_id, parent=self)
         if dialog.exec():
             self.load_data()

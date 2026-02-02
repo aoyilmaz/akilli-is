@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QTableWidgetItem,
-    QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -40,13 +39,13 @@ class PurchaseInvoiceListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("invoice_no", "Fatura No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
-            ColumnConfig("due_date", "Vade", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
+            ColumnConfig("due_date", "Vade", width=100, filter_type="date"),
             ColumnConfig("supplier", "Tedarikçi", width=200, stretch=True),
-            ColumnConfig("total", "Toplam", width=110),
-            ColumnConfig("paid", "Ödenen", width=110),
-            ColumnConfig("balance", "Bakiye", width=110),
-            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig("total", "Toplam", width=110, filter_type="number"),
+            ColumnConfig("paid", "Ödenen", width=110, filter_type="number"),
+            ColumnConfig("balance", "Bakiye", width=110, filter_type="number"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -54,6 +53,7 @@ class PurchaseInvoiceListPage(BaseListPage):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
@@ -64,7 +64,6 @@ class PurchaseInvoiceListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Fatura",
             search_placeholder="Ara... (fatura no, tedarikçi)",
@@ -72,35 +71,19 @@ class PurchaseInvoiceListPage(BaseListPage):
         )
 
         self.invoices = []
-        self._setup_filters()
+        self._setup_custom_buttons()
         self._setup_stat_cards()
 
-    def _setup_filters(self):
+    def _setup_custom_buttons(self):
         # Mal Kabulden ekle butonu
         from_receipt_btn = QPushButton("📦 Mal Kabulden")
         from_receipt_btn.setProperty("class", "btn-secondary")
         from_receipt_btn.clicked.connect(self.add_from_receipt_clicked.emit)
 
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("🔵 Taslak", "draft")
-        self.status_filter.addItem("📥 Alındı", "received")
-        self.status_filter.addItem("🟡 Kısmi Ödendi", "partial")
-        self.status_filter.addItem("🟢 Ödendi", "paid")
-        self.status_filter.addItem("🔴 Vadesi Geçti", "overdue")
-        self.status_filter.addItem("⚫ İptal", "cancelled")
-        self.status_filter.setMinimumWidth(150)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
+        if self.header.add_btn:
             h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-            # Add butonu öncesine Mal Kabulden butonunu ekle
-            if self.header.add_btn:
-                add_idx = h_layout.indexOf(self.header.add_btn)
-                h_layout.insertWidget(add_idx, from_receipt_btn)
+            add_idx = h_layout.indexOf(self.header.add_btn)
+            h_layout.insertWidget(add_idx, from_receipt_btn)
 
     def _setup_stat_cards(self):
         self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
@@ -117,14 +100,7 @@ class PurchaseInvoiceListPage(BaseListPage):
 
     def load_data(self, invoices: list):
         self.invoices = invoices
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.invoices
-        if status_filter:
-            filtered = [i for i in self.invoices if i.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(invoices)
         self._update_stats()
 
     def _display_data(self, invoices: list):
@@ -271,11 +247,14 @@ class PurchaseInvoiceListPage(BaseListPage):
         overdue = sum(1 for i in self.invoices if i.get("status") == "overdue")
         total_balance = sum(float(i.get("balance", 0) or 0) for i in self.invoices)
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["open"].update_value(str(open_count))
-        self.stat_cards["paid"].update_value(str(paid))
-        self.stat_cards["overdue"].update_value(str(overdue))
-        self.stat_cards["balance"].update_value(f"₺{total_balance:,.0f}")
+        for key, val in [
+            ("total", str(total)),
+            ("open", str(open_count)),
+            ("paid", str(paid)),
+            ("overdue", str(overdue)),
+            ("balance", f"₺{total_balance:,.0f}"),
+        ]:
+            self.update_stat_card(key, val)
 
     def _on_search(self, text: str):
         text = text.lower()
@@ -286,9 +265,6 @@ class PurchaseInvoiceListPage(BaseListPage):
                 for col in range(self.table.columnCount() - 1)
             )
             self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
 
     def _confirm_delete(self, inv_id: int):
         reply = QMessageBox.question(

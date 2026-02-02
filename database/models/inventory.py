@@ -135,7 +135,10 @@ class UnitConversion(BaseModel):
     )
 
     def __repr__(self):
-        return f"<UnitConversion(from={self.from_unit_id}, to={self.to_unit_id}, multiplier={self.multiplier})>"
+        return (
+            f"<UnitConversion(from={self.from_unit_id}, "
+            f"to={self.to_unit_id}, multiplier={self.multiplier})>"
+        )
 
 
 class ItemCategory(BaseModel):
@@ -356,7 +359,9 @@ class Warehouse(BaseModel):
     allow_negative = Column(Boolean, default=False)
 
     # İlişkiler
-    stock_balances = relationship("StockBalance", back_populates="warehouse")
+    stock_balances = relationship(
+        "StockBalance", back_populates="warehouse", cascade="all, delete-orphan"
+    )
     locations = relationship(
         "WarehouseLocation", back_populates="warehouse", cascade="all, delete-orphan"
     )
@@ -476,7 +481,10 @@ class StockBalance(BaseModel):
         return (self.quantity or Decimal(0)) - (self.reserved_quantity or Decimal(0))
 
     def __repr__(self):
-        return f"<StockBalance(item_id={self.item_id}, warehouse_id={self.warehouse_id}, qty={self.quantity})>"
+        return (
+            f"<StockBalance(item_id={self.item_id}, "
+            f"warehouse_id={self.warehouse_id}, qty={self.quantity})>"
+        )
 
 
 class StockMovement(BaseModel):
@@ -567,7 +575,10 @@ class StockMovement(BaseModel):
     )
 
     def __repr__(self):
-        return f"<StockMovement(type={self.movement_type.value}, item={self.item_code}, qty={self.quantity})>"
+        return (
+            f"<StockMovement(type={self.movement_type.value}, "
+            f"item={self.item_code}, qty={self.quantity})>"
+        )
 
 
 class StockRequest(BaseModel):

@@ -44,7 +44,6 @@ class JournalListWidget(QWidget):
             title="Yevmiye Defteri",
             icon=ICONS.INVOICE,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

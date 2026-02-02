@@ -224,7 +224,6 @@ class UnitManagementPage(QWidget):
             title="Birim Yönetimi",
             icon="ph.ruler",  # Explicit icon
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Birim",
             parent=self,

@@ -10,10 +10,11 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QTableWidgetItem,
 )
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
-import qtawesome as qta
 
 from config.icons import ICONS
+from config.themes import get_theme
 from modules.hr.services import HRService
 from ui.components.page_header import PageHeader
 from ui.components.stat_cards import MiniStatCard
@@ -62,9 +63,9 @@ class TeamTab(QWidget):
         p_layout.addStretch()
         layout.addLayout(p_layout)
 
-        l = QLabel("Ekip Üyeleri")
-        l.setFont(QFont("", 12, QFont.Weight.Bold))
-        layout.addWidget(l)
+        title_label = QLabel("Ekip Üyeleri")
+        title_label.setFont(QFont("", 12, QFont.Weight.Bold))
+        layout.addWidget(title_label)
         tab_cols = [
             ColumnConfig("name", "Ad Soyad", stretch=True),
             ColumnConfig("pos", "Pozisyon", width=150),
@@ -130,21 +131,30 @@ class ShiftTeamOverview(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
+
+        # === Header ===
         self.header = PageHeader(
             title="Vardiya Ekipleri",
-            icon=ICONS.USER,
+            icon=ICONS.EMPLOYEE,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self._load_data)
         layout.addWidget(self.header)
+
+        # === Tabs ===
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
+
         self.summary_label = QLabel()
+        t = get_theme()
+        self.summary_label.setStyleSheet(
+            f"color: {t.text_secondary}; font-weight: bold;"
+        )
+
         h_layout = self.header.header_layout()
         h_layout.addStretch()
         h_layout.addWidget(self.summary_label)

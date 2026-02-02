@@ -5,40 +5,28 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
     QTableWidgetItem,
-    QComboBox,
-    QMessageBox,
-    QLabel,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-import qtawesome as qta
 
 from config.icons import ICONS
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 
 
-class SalesQuoteListPage(QWidget):
-    """Satış teklifleri listesi sayfası."""
+class SalesQuoteListPage(BaseListPage):
+    """
+    Satış teklifleri listesi sayfası.
+    BaseListPage kullanarak Excel tipi sütun filtreleme destekler.
+    """
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
+    # Ek sinyaller
     send_clicked = pyqtSignal(int)
     accept_clicked = pyqtSignal(int)
     reject_clicked = pyqtSignal(int)
     convert_to_order_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
         "draft": ("Taslak", "#64748b"),
@@ -51,82 +39,15 @@ class SalesQuoteListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.quotes = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Satış Teklifleri",
-            icon=ICONS.INVOICE,
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni Teklif",
-            search_placeholder="Ara... (teklif no, müşteri)",
-            parent=self,
-        )
-
-        # Filtre
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Gönderildi", "sent")
-        self.status_filter.addItem("Kabul Edildi", "accepted")
-        self.status_filter.addItem("Reddedildi", "rejected")
-        self.status_filter.addItem("Siparişe Dönüştü", "ordered")
-        self.status_filter.addItem("Süresi Doldu", "expired")
-        self.status_filter.addItem("İptal", "cancelled")
-        self.status_filter.setMinimumWidth(180)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.INVOICE
-        )
-        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
-        self.stat_cards["sent"] = MiniStatCard(
-            "Gönderildi", "0", "primary", icon=ICONS.EXPORT
-        )
-        self.stat_cards["accepted"] = MiniStatCard(
-            "Kabul", "0", "success", icon=ICONS.CHECK
-        )
-        self.stat_cards["rejected"] = MiniStatCard(
-            "Red", "0", "error", icon=ICONS.CLOSE
-        )
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("quote_no", "Teklif No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("customer", "Müşteri", width=200, stretch=True),
-            ColumnConfig("total", "Toplam Tutar", width=120),
-            ColumnConfig("items", "Kalem", width=60),
-            ColumnConfig("valid_until", "Geçerlilik", width=100),
-            ColumnConfig("status", "Durum", width=130),
-            ColumnConfig("currency", "Para Birimi", width=80),
+            ColumnConfig("total", "Toplam Tutar", width=120, filter_type="number"),
+            ColumnConfig("items", "Kalem", width=60, filter_type="number"),
+            ColumnConfig("valid_until", "Geçerlilik", width=100, filter_type="date"),
+            ColumnConfig("status", "Durum", width=130, filter_type="enum"),
+            ColumnConfig("currency", "Para Birimi", width=80, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -134,35 +55,42 @@ class SalesQuoteListPage(QWidget):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Satış Teklifleri",
+            icon=ICONS.INVOICE,
             table_id="sales_quotes",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_add=True,
+            add_text="Yeni Teklif",
+            search_placeholder="Ara... (teklif no, müşteri)",
+            parent=parent,
         )
-        layout.addWidget(self.table)
 
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
+        self.quotes = []
+        self._setup_stat_cards()
+
+    def _setup_stat_cards(self):
+        """İstatistik kartlarını oluştur"""
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVOICE)
+        self.add_stat_card("draft", "Taslak", "0", "info", ICONS.TIME)
+        self.add_stat_card("sent", "Gönderildi", "0", "primary", ICONS.EXPORT)
+        self.add_stat_card("accepted", "Kabul", "0", "success", ICONS.CHECK)
+        self.add_stat_card("rejected", "Red", "0", "error", ICONS.CLOSE)
 
     def load_data(self, quotes: list):
+        """Verileri yükle"""
         self.quotes = quotes
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.quotes
-        if status_filter:
-            filtered = [q for q in self.quotes if q.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(quotes)
         self._update_stats()
 
     def _display_data(self, quotes: list):
+        """Tabloya verileri yükle"""
         self.table.setRowCount(len(quotes))
         visible_cols = self.table.get_visible_columns()
 
@@ -170,6 +98,7 @@ class SalesQuoteListPage(QWidget):
             self._populate_row(row, quote, visible_cols)
 
     def _populate_row(self, row: int, quote: dict, visible_cols: list):
+        """Tek satırı doldur"""
         quote_id = quote.get("id")
 
         for col_idx, col_key in enumerate(visible_cols):
@@ -211,6 +140,7 @@ class SalesQuoteListPage(QWidget):
                 self._add_action_buttons(row, col_idx, quote)
 
     def _format_date(self, dt) -> str:
+        """Tarihi formatla"""
         if dt:
             if isinstance(dt, date):
                 return dt.strftime("%d.%m.%Y")
@@ -218,6 +148,7 @@ class SalesQuoteListPage(QWidget):
         return "-"
 
     def _add_action_buttons(self, row: int, col: int, quote: dict):
+        """İşlem butonlarını ekle"""
         qid = quote.get("id")
         status = quote.get("status", "draft")
 
@@ -266,38 +197,20 @@ class SalesQuoteListPage(QWidget):
         self.table.setCellWidget(row, col, widget)
 
     def _update_stats(self):
+        """İstatistikleri güncelle"""
         total = len(self.quotes)
         draft = sum(1 for q in self.quotes if q.get("status") == "draft")
         sent = sum(1 for q in self.quotes if q.get("status") == "sent")
         accepted = sum(1 for q in self.quotes if q.get("status") == "accepted")
         rejected = sum(1 for q in self.quotes if q.get("status") == "rejected")
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["sent"].update_value(str(sent))
-        self.stat_cards["accepted"].update_value(str(accepted))
-        self.stat_cards["rejected"].update_value(str(rejected))
-
-    def _on_search(self, text: str):
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = False
-            for col in range(self.table.columnCount() - 1):
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
-            self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
+        self.update_stat_card("total", str(total))
+        self.update_stat_card("draft", str(draft))
+        self.update_stat_card("sent", str(sent))
+        self.update_stat_card("accepted", str(accepted))
+        self.update_stat_card("rejected", str(rejected))
 
     def _confirm_delete(self, quote_id: int):
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu teklifi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        """Silme onayı"""
+        if self.confirm_delete("teklif"):
             self.delete_clicked.emit(quote_id)

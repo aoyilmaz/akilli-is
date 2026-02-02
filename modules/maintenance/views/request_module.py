@@ -47,7 +47,6 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
             title="Arıza/Bakım Talepleri",
             icon=ICONS.MAINTENANCE,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Arıza Bildirimi",
             parent=self,

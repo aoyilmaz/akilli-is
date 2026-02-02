@@ -47,7 +47,6 @@ class AccountStatementListPage(QWidget):
             title="Cari Hesap Ekstresi",
             icon=ICONS.FINANCE,
             show_search=False,
-            show_refresh=True,
             show_export=True,
             parent=self,
         )

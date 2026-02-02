@@ -42,7 +42,6 @@ class AccountModule(QWidget):
             title="Hesap Planı",
             icon=ICONS.FINANCE,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Hesap",
             parent=self,

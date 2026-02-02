@@ -3,12 +3,10 @@ Akıllı İş - Satın Alma Talepleri Liste Sayfası
 Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
-import qtawesome as qta
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QTableWidgetItem,
-    QComboBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -47,13 +45,13 @@ class PurchaseRequestListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("request_no", "Talep No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("requested_by", "Talep Eden", width=120),
             ColumnConfig("department", "Departman", width=150, stretch=True),
-            ColumnConfig("items", "Kalem", width=60),
-            ColumnConfig("priority", "Öncelik", width=80),
-            ColumnConfig("status", "Durum", width=120),
-            ColumnConfig("required_date", "Termin", width=100),
+            ColumnConfig("items", "Kalem", width=60, filter_type="number"),
+            ColumnConfig("priority", "Öncelik", width=80, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
+            ColumnConfig("required_date", "Termin", width=100, filter_type="date"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -61,6 +59,7 @@ class PurchaseRequestListPage(BaseListPage):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
@@ -71,7 +70,6 @@ class PurchaseRequestListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Talep",
             search_placeholder="Ara... (talep no, departman)",
@@ -79,25 +77,7 @@ class PurchaseRequestListPage(BaseListPage):
         )
 
         self.requests = []
-        self._setup_filters()
         self._setup_stat_cards()
-
-    def _setup_filters(self):
-        # Filtre ekle
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Onay Bekliyor", "pending")
-        self.status_filter.addItem("Onaylandı", "approved")
-        self.status_filter.addItem("Reddedildi", "rejected")
-        self.status_filter.addItem("Sipariş Verildi", "ordered")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
 
     def _setup_stat_cards(self):
         self.add_stat_card("total", "Toplam", "0", "info", ICONS.CRM)
@@ -114,14 +94,7 @@ class PurchaseRequestListPage(BaseListPage):
 
     def load_data(self, requests: list):
         self.requests = requests
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.requests
-        if status_filter:
-            filtered = [r for r in self.requests if r.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(requests)
         self._update_stats()
 
     def _display_data(self, requests: list):
@@ -266,11 +239,16 @@ class PurchaseRequestListPage(BaseListPage):
         approved = sum(1 for r in self.requests if r.get("status") == "approved")
         rejected = sum(1 for r in self.requests if r.get("status") == "rejected")
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["pending"].update_value(str(pending))
-        self.stat_cards["approved"].update_value(str(approved))
-        self.stat_cards["rejected"].update_value(str(rejected))
+        for key, val in [
+            ("total", total),
+            ("draft", draft),
+            ("pending", pending),
+            ("approved", approved),
+            ("rejected", rejected),
+        ]:
+            self.update_stat_card(key, str(val))
+
+        self.update_count(total, "talep")
 
     def _on_search(self, text: str):
         text = text.lower()
@@ -281,9 +259,6 @@ class PurchaseRequestListPage(BaseListPage):
                 for col in range(self.table.columnCount() - 1)
             )
             self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
 
     def _confirm_delete(self, req_id: int):
         reply = QMessageBox.question(

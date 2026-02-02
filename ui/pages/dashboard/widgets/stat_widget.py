@@ -50,7 +50,12 @@ class StatWidget(BaseWidget):
         self._value_formatter = value_formatter or str
         self._trend_getter = trend_getter
         self._current_value = None
+        self._previous_value = None  # Animasyon için
         self._current_trend = None
+
+        # Animasyon nesneleri
+        self._value_animator = None
+        self._glow_animator = None
 
         super().__init__(config, edit_mode, parent)
 
@@ -122,16 +127,95 @@ class StatWidget(BaseWidget):
             self.trend_label.setText("→ %0")
             self.trend_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
 
-    def set_value(self, value: Any, trend: Optional[float] = None):
-        """Değeri manuel olarak ayarlar"""
+    def set_value(
+        self,
+        value: Any,
+        trend: Optional[float] = None,
+        animate: bool = True
+    ):
+        """
+        Değeri manuel olarak ayarlar.
+
+        Args:
+            value: Gösterilecek değer
+            trend: Trend yüzdesi (opsiyonel)
+            animate: Değer değişiminde animasyon uygulansın mı
+        """
+        old_value = self._previous_value
+        self._previous_value = self._current_value
         self._current_value = value
         self._current_trend = trend
 
-        formatted_value = self._value_formatter(value)
-        self.value_label.setText(formatted_value)
+        # Değer animasyonu
+        if (animate and self.enable_animations and
+                old_value is not None and
+                self._is_numeric(old_value) and
+                self._is_numeric(value)):
+            self._animate_value_change(
+                float(old_value),
+                float(value)
+            )
+        else:
+            formatted_value = self._value_formatter(value)
+            self.value_label.setText(formatted_value)
 
         if trend is not None:
             self._update_trend()
+
+        # Kritik değer kontrolü
+        if self._is_critical_value(value):
+            self._show_critical_glow()
+
+    def _is_numeric(self, value: Any) -> bool:
+        """Değerin sayısal olup olmadığını kontrol eder"""
+        if value is None:
+            return False
+        if isinstance(value, (int, float, Decimal)):
+            return True
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    def _animate_value_change(self, old_val: float, new_val: float):
+        """Değer değişimini animasyonlu gösterir"""
+        from .animations import ValueAnimator
+
+        if self._value_animator:
+            self._value_animator.stop()
+
+        self._value_animator = ValueAnimator(
+            self.value_label,
+            self._value_formatter,
+            self
+        )
+        self._value_animator.animate(old_val, new_val, duration=400)
+
+    def _is_critical_value(self, value: Any) -> bool:
+        """Değerin kritik eşiği aşıp aşmadığını kontrol eder"""
+        threshold = self._config.config.get("critical_threshold")
+        if threshold is None:
+            return False
+
+        try:
+            return float(value) >= float(threshold)
+        except (ValueError, TypeError):
+            return False
+
+    def _show_critical_glow(self):
+        """Kritik değer için pulsating glow efekti gösterir"""
+        from .animations import PulseGlowAnimator
+
+        if self._glow_animator:
+            self._glow_animator.stop()
+
+        self._glow_animator = PulseGlowAnimator(
+            self,
+            COLORS['danger'],
+            self
+        )
+        self._glow_animator.start(pulse_count=3)
 
 
 # Özelleştirilmiş StatWidget'lar
@@ -142,6 +226,7 @@ class SalesTodayWidget(StatWidget):
 
     widget_code = "stat_sales_today"
     widget_name = "Bugünkü Satışlar"
+    widget_category = "sales"  # Accent bar rengi için
     widget_description = "Günlük satış toplamı"
     widget_icon = "shopping-cart"
     required_permission = "sales.view"
@@ -172,7 +257,8 @@ class SalesTodayWidget(StatWidget):
                 self.set_value(float(total))
                 self.description_label.setText("Bugünkü toplam satış")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"SalesTodayWidget hatası: {e}")
             self.value_label.setText("--")
@@ -185,6 +271,7 @@ class PendingOrdersWidget(StatWidget):
 
     widget_code = "stat_pending_orders"
     widget_name = "Bekleyen Siparişler"
+    widget_category = "sales"
     widget_description = "Onay bekleyen sipariş sayısı"
     widget_icon = "clock"
     required_permission = "sales.view"
@@ -218,7 +305,8 @@ class PendingOrdersWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Taslak sipariş")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"PendingOrdersWidget hatası: {e}")
             self.value_label.setText("--")
@@ -231,6 +319,7 @@ class LowStockWidget(StatWidget):
 
     widget_code = "stat_low_stock"
     widget_name = "Stok Uyarıları"
+    widget_category = "inventory"
     widget_description = "Kritik seviyedeki stok sayısı"
     widget_icon = "exclamation-triangle"
     required_permission = "inventory.view"
@@ -275,7 +364,8 @@ class LowStockWidget(StatWidget):
                 else:
                     self.value_label.setStyleSheet(f"color: {COLORS['success']};")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"LowStockWidget hatası: {e}")
             self.value_label.setText("--")
@@ -288,6 +378,7 @@ class OpenWorkOrdersWidget(StatWidget):
 
     widget_code = "stat_open_work_orders"
     widget_name = "Açık İş Emirleri"
+    widget_category = "production"
     widget_description = "Devam eden iş emri sayısı"
     widget_icon = "cogs"
     required_permission = "production.view"
@@ -327,7 +418,8 @@ class OpenWorkOrdersWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Devam eden iş emri")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"OpenWorkOrdersWidget hatası: {e}")
             self.value_label.setText("--")
@@ -340,6 +432,7 @@ class TodayWarehouseEntryWidget(StatWidget):
 
     widget_code = "stat_warehouse_entry"
     widget_name = "Depoya Giriş"
+    widget_category = "inventory"
     widget_description = "Bugün depoya giren malzeme sayısı"
     widget_icon = "arrow-down"
     required_permission = "inventory.view"
@@ -357,7 +450,7 @@ class TodayWarehouseEntryWidget(StatWidget):
         self.set_loading(True)
         try:
             from database.base import get_session
-            from database.models.inventory import StockMovement, MovementType
+            from database.models.inventory import StockMovement, StockMovementType
             from sqlalchemy import func
             from datetime import date
 
@@ -367,8 +460,8 @@ class TodayWarehouseEntryWidget(StatWidget):
                     session.query(StockMovement)
                     .filter(
                         func.date(StockMovement.created_at) == date.today(),
-                        StockMovement.movement_type == MovementType.IN,
-                        StockMovement.is_active,
+                        StockMovement.movement_type == StockMovementType.GIRIS,
+                        StockMovement.is_active == True,
                     )
                     .count()
                 )
@@ -376,7 +469,8 @@ class TodayWarehouseEntryWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Bugün giren hareket")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TodayWarehouseEntryWidget hatası: {e}")
             self.value_label.setText("--")
@@ -389,6 +483,7 @@ class TodayWarehouseExitWidget(StatWidget):
 
     widget_code = "stat_warehouse_exit"
     widget_name = "Depodan Çıkış"
+    widget_category = "inventory"
     widget_description = "Bugün depodan çıkan malzeme sayısı"
     widget_icon = "arrow-up"
     required_permission = "inventory.view"
@@ -406,7 +501,7 @@ class TodayWarehouseExitWidget(StatWidget):
         self.set_loading(True)
         try:
             from database.base import get_session
-            from database.models.inventory import StockMovement, MovementType
+            from database.models.inventory import StockMovement, StockMovementType
             from sqlalchemy import func
             from datetime import date
 
@@ -416,8 +511,8 @@ class TodayWarehouseExitWidget(StatWidget):
                     session.query(StockMovement)
                     .filter(
                         func.date(StockMovement.created_at) == date.today(),
-                        StockMovement.movement_type == MovementType.OUT,
-                        StockMovement.is_active,
+                        StockMovement.movement_type == StockMovementType.CIKIS,
+                        StockMovement.is_active == True,
                     )
                     .count()
                 )
@@ -425,7 +520,8 @@ class TodayWarehouseExitWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Bugün çıkan hareket")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TodayWarehouseExitWidget hatası: {e}")
             self.value_label.setText("--")
@@ -438,6 +534,7 @@ class TodayPurchasesWidget(StatWidget):
 
     widget_code = "stat_today_purchases"
     widget_name = "Bugünkü Satınalmalar"
+    widget_category = "purchasing"
     widget_description = "Bugün yapılan satınalma tutarı"
     widget_icon = "shopping-bag"
     required_permission = "purchasing.view"
@@ -469,7 +566,8 @@ class TodayPurchasesWidget(StatWidget):
                 self.set_value(float(total))
                 self.description_label.setText("Bugünkü satınalma tutarı")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TodayPurchasesWidget hatası: {e}")
             self.value_label.setText("--")
@@ -482,6 +580,7 @@ class PendingPurchaseOrdersWidget(StatWidget):
 
     widget_code = "stat_pending_purchases"
     widget_name = "Bekleyen Satınalmalar"
+    widget_category = "purchasing"
     widget_description = "Onay bekleyen satınalma sipariş sayısı"
     widget_icon = "hourglass"
     required_permission = "purchasing.view"
@@ -506,8 +605,8 @@ class PendingPurchaseOrdersWidget(StatWidget):
                 count = (
                     session.query(PurchaseOrder)
                     .filter(
-                        PurchaseOrder.status == PurchaseOrderStatus.PENDING,
-                        PurchaseOrder.is_active,
+                        PurchaseOrder.status == PurchaseOrderStatus.SENT,
+                        PurchaseOrder.is_active == True,
                     )
                     .count()
                 )
@@ -515,7 +614,8 @@ class PendingPurchaseOrdersWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Onay bekleyen sipariş")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"PendingPurchaseOrdersWidget hatası: {e}")
             self.value_label.setText("--")
@@ -528,6 +628,7 @@ class TodayShipmentsWidget(StatWidget):
 
     widget_code = "stat_today_shipments"
     widget_name = "Bugünkü Sevkiyatlar"
+    widget_category = "shipping"
     widget_description = "Bugün yapılan sevkiyat sayısı"
     widget_icon = "truck"
     required_permission = "sales.view"
@@ -545,7 +646,7 @@ class TodayShipmentsWidget(StatWidget):
         self.set_loading(True)
         try:
             from database.base import get_session
-            from database.models.sales import Shipment
+            from database.models.shipping import Shipment
             from sqlalchemy import func
             from datetime import date
 
@@ -554,7 +655,7 @@ class TodayShipmentsWidget(StatWidget):
                 count = (
                     session.query(Shipment)
                     .filter(
-                        func.date(Shipment.ship_date) == date.today(),
+                        Shipment.shipment_date == date.today(),
                         Shipment.is_active,
                     )
                     .count()
@@ -563,7 +664,8 @@ class TodayShipmentsWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Bugün yapılan sevkiyat")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TodayShipmentsWidget hatası: {e}")
             self.value_label.setText("--")
@@ -576,6 +678,7 @@ class PendingShipmentsWidget(StatWidget):
 
     widget_code = "stat_pending_shipments"
     widget_name = "Bekleyen Sevkiyatlar"
+    widget_category = "shipping"
     widget_description = "Sevk edilmemiş sipariş sayısı"
     widget_icon = "box"
     required_permission = "sales.view"
@@ -601,7 +704,7 @@ class PendingShipmentsWidget(StatWidget):
                 count = (
                     session.query(SalesOrder)
                     .filter(
-                        SalesOrder.status == SalesOrderStatus.APPROVED,
+                        SalesOrder.status == SalesOrderStatus.CONFIRMED,
                         SalesOrder.is_active,
                     )
                     .count()
@@ -615,7 +718,8 @@ class PendingShipmentsWidget(StatWidget):
                 else:
                     self.value_label.setStyleSheet(f"color: {COLORS['text_primary']};")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"PendingShipmentsWidget hatası: {e}")
             self.value_label.setText("--")
@@ -628,6 +732,7 @@ class TodayProductionWidget(StatWidget):
 
     widget_code = "stat_today_production"
     widget_name = "Bugünkü Üretim"
+    widget_category = "production"
     widget_description = "Bugün tamamlanan iş emri sayısı"
     widget_icon = "industry"
     required_permission = "production.view"
@@ -654,9 +759,9 @@ class TodayProductionWidget(StatWidget):
                 count = (
                     session.query(WorkOrder)
                     .filter(
-                        func.date(WorkOrder.actual_end_date) == date.today(),
+                        func.date(WorkOrder.actual_end) == date.today(),
                         WorkOrder.status == WorkOrderStatus.COMPLETED,
-                        WorkOrder.is_active,
+                        WorkOrder.is_active == True,
                     )
                     .count()
                 )
@@ -664,7 +769,8 @@ class TodayProductionWidget(StatWidget):
                 self.set_value(count)
                 self.description_label.setText("Bugün tamamlanan iş emri")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TodayProductionWidget hatası: {e}")
             self.value_label.setText("--")
@@ -677,6 +783,7 @@ class ActiveCustomersWidget(StatWidget):
 
     widget_code = "stat_active_customers"
     widget_name = "Aktif Müşteriler"
+    widget_category = "sales"
     widget_description = "Sistemdeki aktif müşteri sayısı"
     widget_icon = "users"
     required_permission = "sales.view"
@@ -694,23 +801,21 @@ class ActiveCustomersWidget(StatWidget):
         self.set_loading(True)
         try:
             from database.base import get_session
-            from database.models.common import Contact, ContactType
+            from database.models.sales import Customer
 
             session = get_session()
             try:
                 count = (
-                    session.query(Contact)
-                    .filter(
-                        Contact.contact_type == ContactType.CUSTOMER,
-                        Contact.is_active,
-                    )
+                    session.query(Customer)
+                    .filter(Customer.is_active == True)
                     .count()
                 )
 
                 self.set_value(count)
                 self.description_label.setText("Toplam aktif müşteri")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"ActiveCustomersWidget hatası: {e}")
             self.value_label.setText("--")
@@ -723,6 +828,7 @@ class ActiveSuppliersWidget(StatWidget):
 
     widget_code = "stat_active_suppliers"
     widget_name = "Aktif Tedarikçiler"
+    widget_category = "purchasing"
     widget_description = "Sistemdeki aktif tedarikçi sayısı"
     widget_icon = "building"
     required_permission = "purchasing.view"
@@ -740,23 +846,21 @@ class ActiveSuppliersWidget(StatWidget):
         self.set_loading(True)
         try:
             from database.base import get_session
-            from database.models.common import Contact, ContactType
+            from database.models.purchasing import Supplier
 
             session = get_session()
             try:
                 count = (
-                    session.query(Contact)
-                    .filter(
-                        Contact.contact_type == ContactType.SUPPLIER,
-                        Contact.is_active,
-                    )
+                    session.query(Supplier)
+                    .filter(Supplier.is_active == True)
                     .count()
                 )
 
                 self.set_value(count)
                 self.description_label.setText("Toplam aktif tedarikçi")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"ActiveSuppliersWidget hatası: {e}")
             self.value_label.setText("--")
@@ -769,6 +873,7 @@ class TotalStockValueWidget(StatWidget):
 
     widget_code = "stat_total_stock_value"
     widget_name = "Stok Değeri"
+    widget_category = "inventory"
     widget_description = "Toplam stok değeri"
     widget_icon = "coins"
     required_permission = "inventory.view"
@@ -802,7 +907,8 @@ class TotalStockValueWidget(StatWidget):
                 self.set_value(float(total))
                 self.description_label.setText("Envanter değeri")
             finally:
-                session.close()
+                pass
+
         except Exception as e:
             print(f"TotalStockValueWidget hatası: {e}")
             self.value_label.setText("--")

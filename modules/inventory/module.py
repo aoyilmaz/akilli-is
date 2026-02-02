@@ -52,8 +52,12 @@ class InventoryModule(QWidget):
         self.list_page.duplicate_clicked.connect(self.duplicate_item)
         self.list_page.delete_clicked.connect(self.delete_item)
         self.list_page.refresh_requested.connect(self.load_data)
+        self.list_page.table_filters_changed.connect(
+            lambda f: self.load_data(table_filters=f)
+        )
         self.list_page.next_page_clicked.connect(self.next_page)
         self.list_page.prev_page_clicked.connect(self.prev_page)
+        self.list_page.page_size_changed.connect(self._on_page_size_changed)
         self.stack.addWidget(self.list_page)
 
         # Talep listesi sayfası
@@ -93,13 +97,20 @@ class InventoryModule(QWidget):
             self.request_service.close()
             self.request_service = None
 
-    def load_data(self):
+    def load_data(self, table_filters=None):
         """Verileri yükle"""
         try:
             self._get_services()
 
-            # Filtreleri al
+            # Tabloyu server-side moduna al (Client-side gizlemeyi kapat)
+            self.list_page.table.set_server_side_mode(True)
+
+            # Header filtrelerini al
             filters = self.list_page.get_filters()
+
+            # Eğer table_filters parametresi None ise (örn. ilk yükleme), tablodan mevcut filtreleri al
+            if table_filters is None:
+                table_filters = self.list_page.table.get_backend_filters()
 
             # Sayfalama için offset hesapla
             offset = (self.current_page - 1) * self.page_size
@@ -110,6 +121,7 @@ class InventoryModule(QWidget):
                 item_type=filters.get("item_type"),
                 is_active=filters.get("is_active"),
                 stock_status=filters.get("stock_status"),
+                table_filters=table_filters,  # Tablo içi filtreler
             )
 
             # Toplam sayfa sayısını hesapla
@@ -127,6 +139,7 @@ class InventoryModule(QWidget):
                 limit=self.page_size,
                 offset=offset,
                 stock_status=filters.get("stock_status"),
+                table_filters=table_filters,  # Tablo içi filtreler
             )
 
             # İstatistikleri getir ve güncelle
@@ -135,6 +148,7 @@ class InventoryModule(QWidget):
                 item_type=filters.get("item_type"),
                 is_active=filters.get("is_active"),
                 stock_status=filters.get("stock_status"),
+                table_filters=table_filters,  # Tablo içi filtreler
             )
             self.list_page.update_stats(stats)
 
@@ -211,6 +225,12 @@ class InventoryModule(QWidget):
         if self.current_page > 1:
             self.current_page -= 1
             self.load_data()
+
+    def _on_page_size_changed(self, new_size: int):
+        """Sayfa boyutu değiştiğinde"""
+        self.page_size = new_size
+        self.current_page = 1  # İlk sayfaya dön
+        self.load_data()
 
     def show_add_form(self):
         """Yeni stok kartı veya talep formu göster"""

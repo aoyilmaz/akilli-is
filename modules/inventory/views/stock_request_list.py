@@ -44,7 +44,6 @@ class StockRequestListPage(QWidget):
             icon=ICONS.INVENTORY,
             show_back=True,
             show_search=True,
-            show_refresh=True,
             show_add=False,
             search_placeholder="Talep arayın...",
             parent=self,
@@ -67,9 +66,37 @@ class StockRequestListPage(QWidget):
         self.table.doubleClicked.connect(self._on_row_double_clicked)
         layout.addWidget(self.table)
 
+        # Footer ekle
+        from ui.components.table_footer import TableFooter
+
+        self.footer = TableFooter(self)
+        self.footer.add_stat("total", "Toplam", ICONS.INVENTORY, "#3498db")
+        self.footer.add_stat("pending", "Bekleyen", ICONS.TIME, "#f59e0b")
+        self.footer.add_stat("approved", "Onaylanan", ICONS.CHECK, "#10b981")
+        self.footer.add_stat("rejected", "Reddedilen", ICONS.CLOSE, "#ef4444")
+
+        self.footer.page_size_changed.connect(
+            lambda s: self.table.setRowCount(0)
+        )  # Şimdilik dummy
+        layout.addWidget(self.footer)
+
     def load_data(self, requests: list):
         self.requests = requests
         self.table.setRowCount(len(requests))
+
+        # İstatistikleri güncelle
+        total = len(requests)
+        pending = sum(1 for r in requests if r.status == StockRequestStatus.PENDING)
+        approved = sum(1 for r in requests if r.status == StockRequestStatus.APPROVED)
+        rejected = sum(1 for r in requests if r.status == StockRequestStatus.REJECTED)
+
+        if hasattr(self, "footer"):
+            self.footer.update_stat("total", str(total))
+            self.footer.update_stat("pending", str(pending))
+            self.footer.update_stat("approved", str(approved))
+            self.footer.update_stat("rejected", str(rejected))
+            self.footer.update_pagination(1, 1, total)
+
         vcols = self.table.get_visible_columns()
         for r, req in enumerate(requests):
             self._populate_row(r, req, vcols)

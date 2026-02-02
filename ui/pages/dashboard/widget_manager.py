@@ -160,7 +160,7 @@ class WidgetManager:
                 .all()
             )
         finally:
-            session.close()
+            pass
 
     @classmethod
     def get_user_layout(cls, user_id: int) -> Optional[Dict[str, Any]]:
@@ -189,7 +189,7 @@ class WidgetManager:
 
             return None
         finally:
-            session.close()
+            pass
 
     @classmethod
     def get_role_default_layout(cls, role_id: int) -> Optional[Dict[str, Any]]:
@@ -218,7 +218,7 @@ class WidgetManager:
 
             return None
         finally:
-            session.close()
+            pass
 
     @classmethod
     def get_effective_layout(cls, user_context: UserContext) -> Dict[str, Any]:
@@ -258,7 +258,7 @@ class WidgetManager:
                     if role_layout:
                         return role_layout
             finally:
-                session.close()
+                pass
 
         # 3. Sistem varsayılanı
         return cls.get_default_layout(user_context)
@@ -366,7 +366,7 @@ class WidgetManager:
             print(f"Düzen kaydetme hatası: {e}")
             return False
         finally:
-            session.close()
+            pass
 
     @classmethod
     def reset_user_layout(cls, user_id: int) -> bool:
@@ -391,7 +391,7 @@ class WidgetManager:
             print(f"Düzen sıfırlama hatası: {e}")
             return False
         finally:
-            session.close()
+            pass
 
     @classmethod
     def save_role_default_layout(cls, role_id: int, layout: Dict[str, Any]) -> bool:
@@ -426,4 +426,4 @@ class WidgetManager:
             print(f"Rol düzeni kaydetme hatası: {e}")
             return False
         finally:
-            session.close()
+            pass

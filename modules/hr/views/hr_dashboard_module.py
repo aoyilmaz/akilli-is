@@ -4,80 +4,28 @@ Akıllı İş - İK Dashboard Modülü
 İnsan Kaynakları ana dashboard UI.
 """
 
-from datetime import date
-
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QFrame,
-    QGridLayout,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QScrollArea,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont
 import qtawesome as qta
 from config.icons import ICONS
+from config.themes import get_theme
 
-from config.styles import COLORS
+from ui.components import (
+    PageHeader,
+    MiniStatCard,
+    ScrollableCardContainer,
+)
 from modules.hr.services import HRDashboardService
-
-
-class StatCard(QFrame):
-    """İstatistik kartı widget'ı"""
-
-    def __init__(
-        self, title: str, value: str, icon: str = "", color: str = None, parent=None
-    ):
-        super().__init__(parent)
-        self.setFrameStyle(QFrame.Shape.StyledPanel)
-        self.setStyleSheet(
-            f"""
-            StatCard {{
-                background: {color or '#1e293b'};
-                border-radius: 12px;
-                padding: 16px;
-            }}
-        """
-        )
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-
-        # Üst satır (icon + title)
-        title_layout = QHBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 0)
-
-        if icon.startswith("ph."):
-            icon_lbl = QLabel()
-            icon_lbl.setPixmap(qta.icon(icon, color="#94a3b8").pixmap(16, 16))
-            title_layout.addWidget(icon_lbl)
-
-            txt_lbl = QLabel(title)
-            txt_lbl.setStyleSheet("color: #94a3b8; font-size: 13px;")
-            title_layout.addWidget(txt_lbl)
-        else:
-            title_lbl = QLabel(f"{icon} {title}")
-            title_lbl.setStyleSheet("color: #94a3b8; font-size: 13px;")
-            title_layout.addWidget(title_lbl)
-
-        title_layout.addStretch()
-        layout.addLayout(title_layout)
-
-        # Değer
-        value_lbl = QLabel(value)
-        value_lbl.setStyleSheet("color: white; font-size: 28px; font-weight: bold;")
-        layout.addWidget(value_lbl)
-
-        self.value_label = value_lbl
-
-    def set_value(self, value: str):
-        self.value_label.setText(value)
 
 
 class HRDashboardModule(QWidget):
@@ -91,123 +39,100 @@ class HRDashboardModule(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(20)
+
+        # Header
+        self.header = PageHeader(
+            title="İK Dashboard",
+            icon=ICONS.DASHBOARD,
+            show_search=False,
+            parent=self,
+        )
+        self.header.refresh_clicked.connect(self._load_data)
+        layout.addWidget(self.header)
+
+        # Scroll Area for content
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("background: transparent;")
 
         content = QWidget()
-        layout = QVBoxLayout(content)
-        layout.setSpacing(20)
+        content.setStyleSheet("background: transparent;")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(24)
 
-        # Üst kart satırı
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        # Üst kart satırı (ScrollableCardContainer)
+        stats_container = ScrollableCardContainer()
 
-        self.total_card = StatCard("Toplam Çalışan", "0", ICONS.USERS, "#3b82f6")
-        cards_layout.addWidget(self.total_card)
+        self.total_card = MiniStatCard(
+            "Toplam Çalışan", "0", "info", icon=ICONS.USERS, icon_color="#3b82f6"
+        )
+        self.present_card = MiniStatCard(
+            "Bugün Katılım", "0%", "success", icon=ICONS.CHECK, icon_color="#10b981"
+        )
+        self.leave_card = MiniStatCard(
+            "İzinli", "0", "warning", icon=ICONS.CALENDAR, icon_color="#f59e0b"
+        )
+        self.pending_card = MiniStatCard(
+            "Bekleyen İzin", "0", "error", icon=ICONS.TIME, icon_color="#ef4444"
+        )
 
-        self.present_card = StatCard("Bugün Katılım", "0%", ICONS.CHECK, "#10b981")
-        cards_layout.addWidget(self.present_card)
-
-        self.leave_card = StatCard("İzinli", "0", ICONS.CALENDAR, "#f59e0b")
-        cards_layout.addWidget(self.leave_card)
-
-        self.pending_card = StatCard("Bekleyen İzin", "0", ICONS.TIME, "#8b5cf6")
-        cards_layout.addWidget(self.pending_card)
-
-        layout.addLayout(cards_layout)
+        stats_container.add_card(self.total_card)
+        stats_container.add_card(self.present_card)
+        stats_container.add_card(self.leave_card)
+        stats_container.add_card(self.pending_card)
+        stats_container.add_stretch()
+        content_layout.addWidget(stats_container)
 
         # Orta bölüm: İki sütun
         middle_layout = QHBoxLayout()
-        middle_layout.setSpacing(20)
+        middle_layout.setSpacing(24)
 
         # Sol: Yaklaşan doğum günleri
-        left_group = QFrame()
-        left_group.setStyleSheet(
-            """
-            QFrame {
-                background: #1e293b;
-                border-radius: 12px;
-                padding: 16px;
-            }
-        """
-        )
-        left_layout = QVBoxLayout(left_group)
+        self._setup_birthdays_section(middle_layout)
 
-        left_title = QLabel("🎂 Yaklaşan Doğum Günleri")
-        left_title.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
-        left_layout.addWidget(left_title)
+        # Sağ: Son işe alımlar ve izinler
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(24)
+        self._setup_recent_hires_section(right_panel)
+        middle_layout.addLayout(right_panel, 1)
 
-        self.birthdays_table = QTableWidget()
-        self.birthdays_table.setColumnCount(3)
-        self.birthdays_table.setHorizontalHeaderLabels(["İsim", "Tarih", "Gün"])
-        self.birthdays_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        self.birthdays_table.setMaximumHeight(200)
-        left_layout.addWidget(self.birthdays_table)
-
-        middle_layout.addWidget(left_group)
-
-        # Sağ: Son işe alımlar
-        right_group = QFrame()
-        right_group.setStyleSheet(
-            """
-            QFrame {
-                background: #1e293b;
-                border-radius: 12px;
-                padding: 16px;
-            }
-        """
-        )
-        right_layout = QVBoxLayout(right_group)
-
-        right_title = QLabel("🆕 Son İşe Alımlar")
-        right_title.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
-        right_layout.addWidget(right_title)
-
-        self.hires_table = QTableWidget()
-        self.hires_table.setColumnCount(3)
-        self.hires_table.setHorizontalHeaderLabels(["İsim", "Departman", "Tarih"])
-        self.hires_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        self.hires_table.setMaximumHeight(200)
-        right_layout.addWidget(self.hires_table)
-
-        middle_layout.addWidget(right_group)
-
-        layout.addLayout(middle_layout)
+        content_layout.addLayout(middle_layout)
 
         # Alt bölüm: Kıdem dağılımı
+        t = get_theme()
         tenure_group = QFrame()
         tenure_group.setStyleSheet(
-            """
-            QFrame {
-                background: #1e293b;
+            f"""
+            QFrame {{
+                background: {t.card_bg};
+                border: 1px solid {t.border};
                 border-radius: 12px;
                 padding: 16px;
-            }
+            }}
         """
         )
         tenure_layout = QVBoxLayout(tenure_group)
 
         tenure_title = QLabel("📊 Kıdem Dağılımı")
-        tenure_title.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+        tenure_title.setStyleSheet(
+            f"color: {t.text_primary}; font-size: 16px; font-weight: bold;"
+        )
         tenure_layout.addWidget(tenure_title)
 
         self.tenure_layout = QHBoxLayout()
+        self.tenure_layout.setSpacing(12)
         tenure_layout.addLayout(self.tenure_layout)
 
-        layout.addWidget(tenure_group)
-
-        layout.addStretch()
+        content_layout.addWidget(tenure_group)
+        content_layout.addStretch()
 
         scroll.setWidget(content)
-
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(scroll)
+        layout.addWidget(scroll)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -220,21 +145,20 @@ class HRDashboardModule(QWidget):
 
     def _load_data(self):
         self._ensure_service()
-
         try:
             data = self.service.get_dashboard_data()
 
             # Kartları güncelle
             emp_counts = data.get("employee_counts", {})
-            self.total_card.set_value(str(emp_counts.get("total", 0)))
+            self.total_card.update_value(str(emp_counts.get("total", 0)))
 
             att_summary = data.get("attendance_summary", {})
             rate = att_summary.get("attendance_rate", 0)
-            self.present_card.set_value(f"{rate}%")
-            self.leave_card.set_value(str(att_summary.get("on_leave", 0)))
+            self.present_card.update_value(f"{rate}%")
+            self.leave_card.update_value(str(att_summary.get("on_leave", 0)))
 
             leave_summary = data.get("leave_summary", {})
-            self.pending_card.set_value(str(leave_summary.get("pending", 0)))
+            self.pending_card.update_value(str(leave_summary.get("pending", 0)))
 
             # Doğum günleri
             birthdays = data.get("upcoming_birthdays", [])
@@ -266,13 +190,13 @@ class HRDashboardModule(QWidget):
             print(f"Dashboard yükleme hatası: {e}")
 
     def _update_tenure_chart(self, tenure: dict):
-        # Mevcut widget'ları temizle
+        """Kıdem dağılımı görselini güncelle"""
         while self.tenure_layout.count():
             item = self.tenure_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
+        chart_colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
         labels = ["0-1 Yıl", "1-3 Yıl", "3-5 Yıl", "5-10 Yıl", "10+ Yıl"]
         keys = ["0-1", "1-3", "3-5", "5-10", "10+"]
 
@@ -286,13 +210,7 @@ class HRDashboardModule(QWidget):
 
             item = QFrame()
             item.setStyleSheet(
-                f"""
-                QFrame {{
-                    background: {colors[i]};
-                    border-radius: 8px;
-                    padding: 12px;
-                }}
-            """
+                f"background: {chart_colors[i]}; border-radius: 8px; padding: 12px;"
             )
             item_layout = QVBoxLayout(item)
             item_layout.setContentsMargins(8, 8, 8, 8)
@@ -306,3 +224,60 @@ class HRDashboardModule(QWidget):
             item_layout.addWidget(val_lbl)
 
             self.tenure_layout.addWidget(item)
+
+    def _setup_birthdays_section(self, layout):
+        t = get_theme()
+        section = QFrame()
+        section.setStyleSheet(
+            f"background: {t.card_bg}; border: 1px solid {t.border}; border-radius: 12px; padding: 16px;"
+        )
+        s_layout = QVBoxLayout(section)
+
+        title = QLabel("🎂 Yaklaşan Doğum Günleri")
+        title.setStyleSheet(
+            f"color: {t.text_primary}; font-size: 16px; font-weight: bold;"
+        )
+        s_layout.addWidget(title)
+
+        self.birthdays_table = QTableWidget()
+        self.birthdays_table.setColumnCount(3)
+        self.birthdays_table.setHorizontalHeaderLabels(["Çalışan", "Tarih", "Kalan"])
+        self.birthdays_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        self.birthdays_table.verticalHeader().hide()
+        self.birthdays_table.setStyleSheet("border: none; background: transparent;")
+        s_layout.addWidget(self.birthdays_table)
+
+        layout.addWidget(section, 1)
+
+    def _setup_recent_hires_section(self, layout):
+        t = get_theme()
+        section = QFrame()
+        section.setStyleSheet(
+            f"background: {t.card_bg}; border: 1px solid {t.border}; border-radius: 12px; padding: 16px;"
+        )
+        s_layout = QVBoxLayout(section)
+
+        title = QLabel("🆕 Son İşe Alımlar")
+        title.setStyleSheet(
+            f"color: {t.text_primary}; font-size: 16px; font-weight: bold;"
+        )
+        s_layout.addWidget(title)
+
+        self.hires_table = QTableWidget()
+        self.hires_table.setColumnCount(3)
+        self.hires_table.setHorizontalHeaderLabels(["Çalışan", "Departman", "Tarih"])
+        self.hires_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
+        self.hires_table.verticalHeader().hide()
+        self.hires_table.setStyleSheet("border: none; background: transparent;")
+        s_layout.addWidget(self.hires_table)
+
+        layout.addWidget(section)
+
+    def closeEvent(self, event):
+        if self.service:
+            self.service.close()
+        super().closeEvent(event)

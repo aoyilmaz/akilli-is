@@ -99,6 +99,11 @@ class Department(BaseModel):
         backref="children",
         foreign_keys=[parent_id],
     )
+    manager = relationship(
+        "Employee",
+        foreign_keys=[manager_id],
+        post_update=True,
+    )
     positions = relationship("Position", back_populates="department")
     employees = relationship(
         "Employee", back_populates="department", foreign_keys="Employee.department_id"

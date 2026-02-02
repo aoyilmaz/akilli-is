@@ -672,6 +672,28 @@ class SalesOrderService:
 
         order.status = SalesOrderStatus.CONFIRMED
         self.session.commit()
+
+        # Workflow başlat (Bridge pattern ile circular import önlenir)
+        try:
+            from modules.workflow.bridge import start_workflow_for_document
+
+            context = {
+                "total_amount": float(order.total or 0),
+                "customer_name": order.customer.name if order.customer else None,
+                "order_date": order.order_date.isoformat() if order.order_date else None,
+            }
+            instance_id = start_workflow_for_document(
+                table_name="sales_orders",
+                document_id=order.id,
+                initiated_by=1,  # TODO: user_id parametresi eklenebilir
+                document_no=order.order_no,
+                context=context,
+            )
+            if instance_id:
+                print(f"[SalesOrder] Workflow başlatıldı: instance_id={instance_id}")
+        except Exception as e:
+            print(f"[SalesOrder] Workflow başlatma hatası: {e}")
+
         return order
 
     def _get_customer_open_balance(self, customer_id: int) -> float:
@@ -1207,6 +1229,28 @@ class InvoiceService:
             except Exception as e:
                 # Finans modülü yüklü değilse veya hata olursa sessizce devam et
                 print(f"Cari hesap hareketi oluşturulamadı: {e}")
+
+            # Workflow başlat (Bridge pattern ile circular import önlenir)
+            try:
+                from modules.workflow.bridge import start_workflow_for_document
+
+                context = {
+                    "total_amount": float(invoice.total or 0),
+                    "customer_name": invoice.customer.name if invoice.customer else None,
+                    "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
+                    "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
+                }
+                instance_id = start_workflow_for_document(
+                    table_name="invoices",
+                    document_id=invoice.id,
+                    initiated_by=1,  # TODO: user_id parametresi eklenebilir
+                    document_no=invoice.invoice_no,
+                    context=context,
+                )
+                if instance_id:
+                    print(f"[Invoice] Workflow başlatıldı: instance_id={instance_id}")
+            except Exception as e:
+                print(f"[Invoice] Workflow başlatma hatası: {e}")
 
         return invoice
 

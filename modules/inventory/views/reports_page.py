@@ -23,6 +23,7 @@ from PyQt6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 import qtawesome as qta
 
 from config.icons import ICONS
+from config.themes import get_theme
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
@@ -54,7 +55,6 @@ class StockReportsPage(QWidget):
             title="Stok Raporları",
             icon=ICONS.CHART,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             show_export=True,
             parent=self,
@@ -221,6 +221,7 @@ class StockReportsPage(QWidget):
         self._load_movements()
 
     def _filter_status_table(self):
+        self.status_table.setSortingEnabled(False)
         cid, wid = self.cat_combo.currentData(), self.wh_combo.currentData()
         res = []
         whm = {}
@@ -238,31 +239,36 @@ class StockReportsPage(QWidget):
                 di["total_value"] = bl["total_value"] if bl else 0
             res.append(di)
         self.status_table.setRowCount(len(res))
+
+        t = get_theme()
+        default_color = QColor(t.text_primary)
         vc = self.status_table.get_visible_columns()
+
         for r, itm in enumerate(res):
             for c, k in enumerate(vc):
                 if k == "code":
-                    self.status_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("code", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("code", ""))
+                    it.setForeground(default_color)
+                    self.status_table.setItem(r, c, it)
                 elif k == "name":
-                    self.status_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("name", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("name", ""))
+                    it.setForeground(default_color)
+                    self.status_table.setItem(r, c, it)
                 elif k == "cat":
-                    self.status_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("category", "-"))
-                    )
+                    it = QTableWidgetItem(itm.get("category", "-"))
+                    it.setForeground(default_color)
+                    self.status_table.setItem(r, c, it)
                 elif k == "unit":
-                    self.status_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("unit", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("unit", ""))
+                    it.setForeground(default_color)
+                    self.status_table.setItem(r, c, it)
                 elif k == "qty":
                     v = itm.get("quantity", 0)
                     it = QTableWidgetItem(f"{v:,.2f}")
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.status_table.setItem(r, c, it)
                 elif k == "min":
                     v = itm.get("min_stock", 0)
@@ -270,6 +276,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.status_table.setItem(r, c, it)
                 elif k == "cost":
                     v = itm.get("unit_cost", 0)
@@ -277,6 +284,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.status_table.setItem(r, c, it)
                 elif k == "val":
                     v = itm.get("total_value", 0)
@@ -284,6 +292,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.status_table.setItem(r, c, it)
                 elif k == "status":
                     st = itm.get("status", "normal")
@@ -302,26 +311,33 @@ class StockReportsPage(QWidget):
                     it = QTableWidgetItem(txts.get(st, ""))
                     it.setForeground(QColor(clrs.get(st, "#fff")))
                     self.status_table.setItem(r, c, it)
+        self.status_table.setSortingEnabled(True)
 
     def _load_critical(self, items: list):
+        self.critical_table.setSortingEnabled(False)
         self.critical_table.setRowCount(len(items))
+
+        t = get_theme()
+        default_color = QColor(t.text_primary)
         vc = self.critical_table.get_visible_columns()
+
         for r, itm in enumerate(items):
             for c, k in enumerate(vc):
                 if k == "code":
-                    self.critical_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("code", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("code", ""))
+                    it.setForeground(default_color)
+                    self.critical_table.setItem(r, c, it)
                 elif k == "name":
-                    self.critical_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("name", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("name", ""))
+                    it.setForeground(default_color)
+                    self.critical_table.setItem(r, c, it)
                 elif k == "qty":
                     v = itm.get("quantity", 0)
                     it = QTableWidgetItem(f"{v:,.2f}")
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.critical_table.setItem(r, c, it)
                 elif k == "min":
                     v = itm.get("min_stock", 0)
@@ -329,6 +345,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.critical_table.setItem(r, c, it)
                 elif k == "diff":
                     v = max(0, itm.get("min_stock", 0) - itm.get("quantity", 0))
@@ -344,6 +361,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.critical_table.setItem(r, c, it)
                 elif k == "lead":
                     v = itm.get("lead_time", 0)
@@ -351,6 +369,7 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.critical_table.setItem(r, c, it)
                 elif k == "status":
                     v = itm.get("quantity", 0)
@@ -358,13 +377,19 @@ class StockReportsPage(QWidget):
                     it = QTableWidgetItem(txt)
                     it.setForeground(QColor("#ef4444" if v <= 0 else "#f59e0b"))
                     self.critical_table.setItem(r, c, it)
+        self.critical_table.setSortingEnabled(True)
 
     def _load_movements(self):
+        self.movements_table.setSortingEnabled(False)
         self.m_cards["in"].update_value(str(self.mov_stats.get("total_in", 0)))
         self.m_cards["out"].update_value(str(self.mov_stats.get("total_out", 0)))
         self.m_cards["tr"].update_value(str(self.mov_stats.get("total_transfer", 0)))
         self.movements_table.setRowCount(len(self.movements))
+
+        t = get_theme()
+        default_color = QColor(t.text_primary)
         vc = self.movements_table.get_visible_columns()
+
         for r, itm in enumerate(self.movements):
             mt, qty = itm.get("type", ""), itm.get("quantity", 0)
             iq, oq, tq = ("-", "-", "-")
@@ -376,32 +401,42 @@ class StockReportsPage(QWidget):
                 tq = f"{qty:,.2f}"
             for c, k in enumerate(vc):
                 if k == "code":
-                    self.movements_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("item_code", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("item_code", ""))
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "name":
-                    self.movements_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("item_name", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("item_name", ""))
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "in":
-                    self.movements_table.setItem(r, c, QTableWidgetItem(iq))
+                    it = QTableWidgetItem(iq)
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "out":
-                    self.movements_table.setItem(r, c, QTableWidgetItem(oq))
+                    it = QTableWidgetItem(oq)
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "tr":
-                    self.movements_table.setItem(r, c, QTableWidgetItem(tq))
+                    it = QTableWidgetItem(tq)
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "net":
                     nc = (
                         f"+{qty}"
                         if iq != "-"
                         else (f"-{qty}" if oq != "-" else str(qty))
                     )
-                    self.movements_table.setItem(r, c, QTableWidgetItem(nc))
+                    it = QTableWidgetItem(nc)
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
                 elif k == "last":
-                    self.movements_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("date", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("date", ""))
+                    it.setForeground(default_color)
+                    self.movements_table.setItem(r, c, it)
+        self.movements_table.setSortingEnabled(True)
 
     def _filter_warehouse_table(self):
+        self.wh_table.setSortingEnabled(False)
         wid = self.wh_rep_combo.currentData()
         res = (
             [b for b in self.wh_balances if b["warehouse_id"] == wid]
@@ -409,40 +444,44 @@ class StockReportsPage(QWidget):
             else self.wh_balances
         )
         self.wh_table.setRowCount(len(res))
+
+        t = get_theme()
+        default_color = QColor(t.text_primary)
         vc = self.wh_table.get_visible_columns()
+
         for r, itm in enumerate(res):
             for c, k in enumerate(vc):
                 if k == "wh":
-                    self.wh_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("warehouse_name", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("warehouse_name", ""))
+                    it.setForeground(default_color)
+                    self.wh_table.setItem(r, c, it)
                 elif k == "code":
-                    self.wh_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("item_code", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("item_code", ""))
+                    it.setForeground(default_color)
+                    self.wh_table.setItem(r, c, it)
                 elif k == "name":
-                    self.wh_table.setItem(
-                        r, c, QTableWidgetItem(itm.get("item_name", ""))
-                    )
+                    it = QTableWidgetItem(itm.get("item_name", ""))
+                    it.setForeground(default_color)
+                    self.wh_table.setItem(r, c, it)
                 elif k == "qty":
                     v = itm.get("quantity", 0)
                     it = QTableWidgetItem(f"{v:,.2f}")
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.wh_table.setItem(r, c, it)
                 elif k == "unit":
-                    self.wh_table.setItem(
-                        r,
-                        c,
-                        QTableWidgetItem(itm.get("unit", "")),
-                    )
+                    it = QTableWidgetItem(itm.get("unit", ""))
+                    it.setForeground(default_color)
+                    self.wh_table.setItem(r, c, it)
                 elif k == "cost":
                     v = itm.get("unit_cost", 0)
                     it = QTableWidgetItem(f"₺{v:,.2f}")
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.wh_table.setItem(r, c, it)
                 elif k == "val":
                     v = itm.get("total_value", 0)
@@ -450,11 +489,13 @@ class StockReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+                    it.setForeground(default_color)
                     self.wh_table.setItem(r, c, it)
                 elif k == "loc":
-                    self.wh_table.setItem(
-                        r, c, QTableWidgetItem(str(itm.get("location", "-")))
-                    )
+                    it = QTableWidgetItem(str(itm.get("location", "-")))
+                    it.setForeground(default_color)
+                    self.wh_table.setItem(r, c, it)
+        self.wh_table.setSortingEnabled(True)
 
     def export_current_tab(self):
         idx = self.tabs.currentIndex()

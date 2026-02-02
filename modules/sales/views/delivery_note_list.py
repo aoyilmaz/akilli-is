@@ -5,40 +5,28 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 
 from datetime import date
 from PyQt6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
     QTableWidgetItem,
-    QComboBox,
-    QMessageBox,
-    QLabel,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-import qtawesome as qta
 
 from config.icons import ICONS
 from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
+    BaseListPage,
     ColumnConfig,
-    MiniStatCard,
 )
 
 
-class DeliveryNoteListPage(QWidget):
-    """Teslimat irsaliyeleri listesi sayfası."""
+class DeliveryNoteListPage(BaseListPage):
+    """
+    Teslimat irsaliyeleri listesi sayfası.
+    BaseListPage kullanarak Excel tipi sütun filtreleme destekler.
+    """
 
-    # Sinyaller
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
+    # Ek sinyaller
     ship_clicked = pyqtSignal(int)
     complete_clicked = pyqtSignal(int)
     cancel_clicked = pyqtSignal(int)
     create_invoice_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
 
     STATUS_LABELS = {
         "draft": ("Taslak", "#64748b"),
@@ -48,75 +36,14 @@ class DeliveryNoteListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.notes = []
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="Teslimat İrsaliyeleri",
-            icon=ICONS.TRUCK,
-            show_search=True,
-            show_refresh=True,
-            show_add=True,
-            add_text="Yeni İrsaliye",
-            search_placeholder="Ara... (irsaliye no, müşteri)",
-            parent=self,
-        )
-
-        # Filtre
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        self.status_filter.addItem("Taslak", "draft")
-        self.status_filter.addItem("Sevk Edildi", "shipped")
-        self.status_filter.addItem("Teslim Edildi", "delivered")
-        self.status_filter.addItem("İptal", "cancelled")
-        self.status_filter.setMinimumWidth(160)
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_filter)
-
-        layout.addWidget(self.header)
-
-        # İstatistik kartları
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(12)
-
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.INVOICE
-        )
-        self.stat_cards["draft"] = MiniStatCard("Taslak", "0", "info", icon=ICONS.TIME)
-        self.stat_cards["shipped"] = MiniStatCard(
-            "Sevk", "0", "warning", icon=ICONS.TRUCK
-        )
-        self.stat_cards["delivered"] = MiniStatCard(
-            "Teslim", "0", "success", icon=ICONS.CHECK
-        )
-
-        for card in self.stat_cards.values():
-            stats_layout.addWidget(card)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
-
-        # Tablo
         columns = [
             ColumnConfig("note_no", "İrsaliye No", width=120),
-            ColumnConfig("date", "Tarih", width=100),
+            ColumnConfig("date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("customer", "Müşteri", width=200, stretch=True),
             ColumnConfig("order_no", "Sipariş No", width=120),
-            ColumnConfig("items", "Kalem", width=60),
-            ColumnConfig("ship_date", "Sevk Tarihi", width=100),
-            ColumnConfig("status", "Durum", width=130),
+            ColumnConfig("items", "Kalem", width=60, filter_type="number"),
+            ColumnConfig("ship_date", "Sevk Tarihi", width=100, filter_type="date"),
+            ColumnConfig("status", "Durum", width=130, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -124,35 +51,41 @@ class DeliveryNoteListPage(QWidget):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="Teslimat İrsaliyeleri",
+            icon=ICONS.TRUCK,
             table_id="delivery_notes",
             columns=columns,
-            parent=self,
+            show_stats=True,
+            show_search=True,
+            show_add=True,
+            add_text="Yeni İrsaliye",
+            search_placeholder="Ara... (irsaliye no, müşteri)",
+            parent=parent,
         )
-        layout.addWidget(self.table)
 
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
+        self.notes = []
+        self._setup_stat_cards()
+
+    def _setup_stat_cards(self):
+        """İstatistik kartlarını oluştur"""
+        self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVOICE)
+        self.add_stat_card("draft", "Taslak", "0", "info", ICONS.TIME)
+        self.add_stat_card("shipped", "Sevk", "0", "warning", ICONS.TRUCK)
+        self.add_stat_card("delivered", "Teslim", "0", "success", ICONS.CHECK)
 
     def load_data(self, notes: list):
+        """Verileri yükle"""
         self.notes = notes
-        self._apply_filter()
-
-    def _apply_filter(self):
-        status_filter = self.status_filter.currentData()
-        filtered = self.notes
-        if status_filter:
-            filtered = [n for n in self.notes if n.get("status") == status_filter]
-        self._display_data(filtered)
+        self._display_data(notes)
         self._update_stats()
 
     def _display_data(self, notes: list):
+        """Tabloya verileri yükle"""
         self.table.setRowCount(len(notes))
         visible_cols = self.table.get_visible_columns()
 
@@ -160,6 +93,7 @@ class DeliveryNoteListPage(QWidget):
             self._populate_row(row, note, visible_cols)
 
     def _populate_row(self, row: int, note: dict, visible_cols: list):
+        """Tek satırı doldur"""
         note_id = note.get("id")
 
         for col_idx, col_key in enumerate(visible_cols):
@@ -197,6 +131,7 @@ class DeliveryNoteListPage(QWidget):
                 self._add_action_buttons(row, col_idx, note)
 
     def _format_date(self, dt) -> str:
+        """Tarihi formatla"""
         if dt:
             if isinstance(dt, date):
                 return dt.strftime("%d.%m.%Y")
@@ -204,6 +139,7 @@ class DeliveryNoteListPage(QWidget):
         return "-"
 
     def _add_action_buttons(self, row: int, col: int, note: dict):
+        """İşlem butonlarını ekle"""
         note_id = note.get("id")
         status = note.get("status", "draft")
 
@@ -257,36 +193,18 @@ class DeliveryNoteListPage(QWidget):
         self.table.setCellWidget(row, col, widget)
 
     def _update_stats(self):
+        """İstatistikleri güncelle"""
         total = len(self.notes)
         draft = sum(1 for n in self.notes if n.get("status") == "draft")
         shipped = sum(1 for n in self.notes if n.get("status") == "shipped")
         delivered = sum(1 for n in self.notes if n.get("status") == "delivered")
 
-        self.stat_cards["total"].update_value(str(total))
-        self.stat_cards["draft"].update_value(str(draft))
-        self.stat_cards["shipped"].update_value(str(shipped))
-        self.stat_cards["delivered"].update_value(str(delivered))
-
-    def _on_search(self, text: str):
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = False
-            for col in range(self.table.columnCount() - 1):
-                item = self.table.item(row, col)
-                if item and text in item.text().lower():
-                    match = True
-                    break
-            self.table.setRowHidden(row, not match)
-
-    def _on_filter_changed(self):
-        self._apply_filter()
+        self.update_stat_card("total", str(total))
+        self.update_stat_card("draft", str(draft))
+        self.update_stat_card("shipped", str(shipped))
+        self.update_stat_card("delivered", str(delivered))
 
     def _confirm_delete(self, note_id: int):
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu irsaliyeyi silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        """Silme onayı"""
+        if self.confirm_delete("irsaliye"):
             self.delete_clicked.emit(note_id)

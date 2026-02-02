@@ -50,7 +50,6 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
             title="Periyodik Bakım Planları",
             icon=ICONS.CALENDAR,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Plan Oluştur",
             parent=self,
@@ -350,7 +349,6 @@ class MaintenanceCalendarWidget(MaintenanceBaseWidget):
             title="Bakım Takvimi",
             icon=ICONS.CALENDAR,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

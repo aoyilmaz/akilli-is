@@ -163,17 +163,18 @@ class PurchaseRequestFormPage(QWidget):
         h_layout = self.header.header_layout()
 
         # Onaya Gönder (Edit modunda ve taslak ise)
+        self.submit_btn = None
         if self.is_edit_mode and self.request_data.get("status") == "draft":
-            submit_btn = QPushButton("📤 Onaya Gönder")
-            submit_btn.clicked.connect(self._on_submit_for_approval)
-            h_layout.addWidget(submit_btn)
+            self.submit_btn = QPushButton("📤 Onaya Gönder")
+            self.submit_btn.clicked.connect(self._on_submit_for_approval)
+            h_layout.addWidget(self.submit_btn)
 
         # Kaydet
-        save_btn = QPushButton("💾 Kaydet")
-        save_btn.setProperty("class", "btn-primary")
-        save_btn.setFixedHeight(36)
-        save_btn.clicked.connect(self._on_save)
-        h_layout.addWidget(save_btn)
+        self.save_btn = QPushButton("💾 Kaydet")
+        self.save_btn.setProperty("class", "btn-primary")
+        self.save_btn.setFixedHeight(36)
+        self.save_btn.clicked.connect(self._on_save)
+        h_layout.addWidget(self.save_btn)
 
         layout.addWidget(self.header)
 
@@ -513,10 +514,16 @@ class PurchaseRequestFormPage(QWidget):
             reply = QMessageBox.question(
                 self,
                 "Onaya Gönder",
-                "Bu talebi onaya göndermek istediğinize emin misiniz?\n\nOnaya gönderdikten sonra düzenleme yapılamaz.",
+                "Bu talebi onaya göndermek istediğinize emin misiniz?\n\n"
+                "Onaya gönderdikten sonra düzenleme yapılamaz.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
+                # Butonları devre dışı bırak (çift tıklama önleme)
+                if self.submit_btn:
+                    self.submit_btn.setEnabled(False)
+                if self.save_btn:
+                    self.save_btn.setEnabled(False)
                 self.submit_for_approval.emit(self.request_data.get("id"))
 
     def _on_workflow_action(self, instance_id: int, action: str, comment: str):

@@ -45,7 +45,6 @@ class ReconciliationPage(QWidget):
             title="Mutabakat",
             icon=ICONS.FINANCE,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

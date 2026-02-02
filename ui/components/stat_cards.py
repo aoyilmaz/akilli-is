@@ -268,16 +268,16 @@ class ScrollableCardContainer(QScrollArea):
         self.setFixedHeight(85)  # Yeterli yükseklik
 
         self.container = QWidget()
-        self.layout = QHBoxLayout(self.container)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(12)
+        self.content_layout = QHBoxLayout(self.container)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(12)
         # Sola hizala
-        self.layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.setWidget(self.container)
 
     def add_card(self, card):
-        self.layout.addWidget(card)
+        self.content_layout.addWidget(card)
 
     def add_stretch(self):
-        self.layout.addStretch()
+        self.content_layout.addStretch()

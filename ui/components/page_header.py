@@ -45,7 +45,7 @@ class PageHeader(QWidget):
         icon: str = "",
         show_back: bool = False,
         show_search: bool = True,
-        show_refresh: bool = True,
+        show_refresh: bool = False,  # Varsayılan False - otomatik yenileme tercih edilir
         show_add: bool = True,
         add_text: str = "Yeni Ekle",
         show_export: bool = False,
@@ -126,7 +126,7 @@ class PageHeader(QWidget):
 
         # Eğer yeterince iyi bir eşleşme bulunduysa kullan
         # Eşik değer: 50
-        resolved_icon = best_match_icon if max_score > 50 else icon
+        self.resolved_icon = best_match_icon if max_score > 50 else icon
 
         # Eğer özel bir icon bulunamadıysa ve parametre boşsa, varsayılan bir şeyler yapılabilir
         # Ancak şimdilik bulunan iconu veya parametreyi kullanıyoruz.
@@ -173,14 +173,14 @@ class PageHeader(QWidget):
             title_layout.setSpacing(0)
             title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-            if resolved_icon and resolved_icon.startswith("ph."):
+            if self.resolved_icon and self.resolved_icon.startswith("ph."):
                 h_title = QHBoxLayout()
                 h_title.setContentsMargins(0, 0, 0, 0)
                 h_title.setSpacing(8)
 
                 icon_lbl = QLabel()
                 icon_lbl.setPixmap(
-                    qta.icon(resolved_icon, color="#475569").pixmap(24, 24)
+                    qta.icon(self.resolved_icon, color="#475569").pixmap(24, 24)
                 )
                 h_title.addWidget(icon_lbl)
                 h_title.addWidget(self.title_label)
@@ -198,10 +198,10 @@ class PageHeader(QWidget):
 
             header_layout.addWidget(title_container)
         else:
-            if resolved_icon and resolved_icon.startswith("ph."):
+            if self.resolved_icon and self.resolved_icon.startswith("ph."):
                 icon_lbl = QLabel()
                 icon_lbl.setPixmap(
-                    qta.icon(resolved_icon, color="#475569").pixmap(24, 24)
+                    qta.icon(self.resolved_icon, color="#475569").pixmap(24, 24)
                 )
                 header_layout.addWidget(icon_lbl)
 

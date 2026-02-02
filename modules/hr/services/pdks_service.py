@@ -22,6 +22,7 @@ try:
 except ImportError:
     EXCEL_AVAILABLE = False
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from database.base import get_session
 from database.models.hr import Employee, Attendance, AttendanceStatus
@@ -608,8 +609,59 @@ class PDKSService:
 
     # ========== Yardımcı Metodlar ==========
 
+    def calculate_monthly_attendance(self, year: int, month: int):
+        """
+        Belirtilen ay için puantaj hesapla.
+        Hiç kaydı olmayan günler (hafta sonu hariç) devamsız işaretlenir.
+        """
+        import calendar
+
+        start_date = date(year, month, 1)
+        _, last_day = calendar.monthrange(year, month)
+        end_date = date(year, month, last_day)
+
+        # Tüm aktif çalışanları al
+        employees = (
+            self.session.query(Employee)
+            .filter(Employee.is_active == True, Employee.exit_date.is_(None))
+            .all()
+        )
+
+        for emp in employees:
+            # Ayın her günü için kontrol et
+            for day_num in range(1, last_day + 1):
+                curr_date = date(year, month, day_num)
+                if curr_date > date.today():
+                    break
+
+                # Hafta sonu kontrolü (Pazar = 6)
+                if curr_date.weekday() == 6:
+                    continue
+
+                # Mevcut kaydı kontrol et
+                existing = (
+                    self.session.query(Attendance)
+                    .filter(
+                        Attendance.employee_id == emp.id, Attendance.date == curr_date
+                    )
+                    .first()
+                )
+
+                if not existing:
+                    # Kayıt yoksa devamsız olarak ekle
+                    att = Attendance(
+                        employee_id=emp.id,
+                        date=curr_date,
+                        status=AttendanceStatus.ABSENT,
+                        notes="Sistem tarafından otomatik oluşturuldu (kayıt yok)",
+                    )
+                    self.session.add(att)
+
+        self.session.commit()
+        return True
+
     def get_monthly_summary(
-        self, year: int, month: int, department_id: int = None
+        self, year: int, month: int, department_id: int = None, search: str = None
     ) -> List[Dict]:
         """
         Aylık puantaj özeti
@@ -632,6 +684,16 @@ class PDKSService:
 
         if department_id:
             query = query.filter(Employee.department_id == department_id)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Employee.employee_no.ilike(search_term),
+                    Employee.first_name.ilike(search_term),
+                    Employee.last_name.ilike(search_term),
+                )
+            )
 
         employees = query.all()
 

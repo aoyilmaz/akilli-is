@@ -211,7 +211,11 @@ class CapacityBottleneckDashboardWidget(BaseWidget):
             self._update_display()
 
         def on_error(error):
-            self.summary_label.setText(f"Hata: {str(error)[:20]}...")
+            try:
+                if hasattr(self, 'summary_label') and self.summary_label:
+                    self.summary_label.setText(f"Hata: {str(error)[:20]}...")
+            except RuntimeError:
+                pass  # Widget silindi, hata yoksay
 
         WorkerManager().run_task(fetch, on_result=on_result, on_error=on_error)
 

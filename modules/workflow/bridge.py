@@ -179,7 +179,22 @@ def get_pending_approvals_for_user(user_id: int) -> List[Dict[str, Any]]:
 
     try:
         service = WorkflowService()
-        return service.get_pending_approvals(user_id)
+        instances = service.get_pending_approvals(user_id)
+
+        # WorkflowInstance nesnelerini dict'e çevir
+        result = []
+        for inst in instances:
+            result.append({
+                "instance_id": inst.id,
+                "document_table": inst.document_table,
+                "document_id": inst.document_id,
+                "document_no": inst.document_no,
+                "workflow_name": inst.workflow.name if inst.workflow else "",
+                "step_name": inst.current_step.name if inst.current_step else "",
+                "initiated_by": inst.initiator.full_name if inst.initiator else "?",
+                "initiated_at": inst.initiated_at,
+            })
+        return result
     except Exception as e:
         print(f"[Workflow Bridge] Bekleyen onayları alma hatası: {e}")
         return []

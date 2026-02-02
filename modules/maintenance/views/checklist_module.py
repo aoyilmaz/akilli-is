@@ -42,7 +42,6 @@ class ChecklistEditorWidget(MaintenanceBaseWidget):
             title="Kontrol Listesi Şablonları",
             icon=ICONS.LIST,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Şablon",
             parent=self,

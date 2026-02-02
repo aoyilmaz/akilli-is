@@ -44,7 +44,6 @@ class ShipmentListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Sevkiyat",
             search_placeholder="Ara... (sevkiyat no, plaka, sürücü)",

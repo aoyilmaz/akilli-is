@@ -4,7 +4,6 @@ Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
 """
 
 from PyQt6.QtWidgets import (
-    QComboBox,
     QTableWidgetItem,
     QMessageBox,
 )
@@ -24,13 +23,13 @@ class ReceiptListPage(BaseListPage):
     def __init__(self, parent=None):
         columns = [
             ColumnConfig("receipt_no", "Tahsilat No", width=120),
-            ColumnConfig("receipt_date", "Tarih", width=100),
+            ColumnConfig("receipt_date", "Tarih", width=100, filter_type="date"),
             ColumnConfig("customer_name", "Müşteri", stretch=True),
-            ColumnConfig("amount", "Tutar", width=120),
-            ColumnConfig("payment_method", "Ödeme Yöntemi", width=130),
-            ColumnConfig("status", "Durum", width=100),
+            ColumnConfig("amount", "Tutar", width=120, filter_type="number"),
+            ColumnConfig("payment_method", "Ödeme Yöntemi", width=130, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=100, filter_type="enum"),
             ColumnConfig("description", "Açıklama", stretch=True),
-            ColumnConfig("actions", "İşlemler", width=120),
+            ColumnConfig("actions", "İşlemler", width=120, filterable=False),
         ]
 
         super().__init__(
@@ -40,7 +39,6 @@ class ReceiptListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Tahsilat",
             search_placeholder="No, müşteri ara...",
@@ -48,25 +46,7 @@ class ReceiptListPage(BaseListPage):
         )
 
         self.receipts = []
-        self._setup_filters()
         self._setup_stat_cards()
-
-    def _setup_filters(self):
-        # Durum filtresi
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem("Tamamlandı", "completed")
-        self.status_combo.addItem("Beklemede", "pending")
-        self.status_combo.addItem("İptal", "cancelled")
-        self.status_combo.setFixedWidth(130)
-        self.status_combo.currentIndexChanged.connect(
-            lambda: self.refresh_requested.emit()
-        )
-
-        if self.header.search_input:
-            h_layout = self.header.header_layout()
-            idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, self.status_combo)
 
     def _setup_stat_cards(self):
         self.add_stat_card("total", "Toplam", "0", "info", ICONS.INVENTORY)
@@ -88,14 +68,16 @@ class ReceiptListPage(BaseListPage):
 
     def load_data(self, receipts: list):
         self.receipts = receipts
+        self._display_data(receipts)
+        self._update_stats()
+
+    def _display_data(self, receipts: list):
         self.clear_table()
         self.table.setRowCount(len(receipts))
         visible_cols = self.table.get_visible_columns()
 
         for row, rec in enumerate(receipts):
             self._populate_row(row, rec, visible_cols)
-
-        self._update_stats()
 
     def _populate_row(self, row: int, rec: dict, visible_cols: list):
         rec_id = rec.get("id")
@@ -178,8 +160,3 @@ class ReceiptListPage(BaseListPage):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(receipt_id)
-
-    def get_filter_data(self) -> dict:
-        return {
-            "status": self.status_combo.currentData(),
-        }

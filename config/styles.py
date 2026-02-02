@@ -111,6 +111,11 @@ ICONS = {
 }
 
 
+def get_theme():
+    """Mevcut tema renklerini döndürür"""
+    return COLORS
+
+
 def get_input_style():
     """Standart input stili"""
     return f"""
@@ -705,6 +710,33 @@ def get_back_button_style():
     """
 
 
+# === GLOW EFFECTS (Dashboard widget'ları için) ===
+GLOW_PRIMARY = "0 0 10px rgba(0, 122, 204, 0.5)"
+GLOW_SUCCESS = "0 0 10px rgba(78, 201, 176, 0.5)"
+GLOW_WARNING = "0 0 10px rgba(220, 220, 170, 0.5)"
+GLOW_DANGER = "0 0 10px rgba(241, 76, 76, 0.5)"
+
+# === WIDGET ACCENT BAR COLORS (Kategori göstergesi) ===
+ACCENT_BARS = {
+    "sales": "#3b82f6",  # Mavi - Satış
+    "inventory": "#10b981",  # Yeşil - Envanter
+    "production": "#f59e0b",  # Turuncu - Üretim
+    "purchasing": "#8b5cf6",  # Mor - Satınalma
+    "shipping": "#06b6d4",  # Cyan - Sevkiyat
+    "workflow": "#ec4899",  # Pembe - İş akışı
+    "finance": "#eab308",  # Sarı - Finans
+    "hr": "#14b8a6",  # Teal - İK
+}
+
+# === SKELETON LOADING COLORS ===
+SKELETON_BASE = "#2d2d2d"
+SKELETON_HIGHLIGHT = "#3e3e42"
+SKELETON_ANIMATION_DURATION = 1500  # ms
+
+# === WIDGET CARD GRADIENTS ===
+CARD_GRADIENT_START = "#2d2d2d"
+CARD_GRADIENT_END = "#282828"
+
 # === COLORS DICTIONARY (Dashboard uyumu için) ===
 COLORS = {
     # Background
@@ -730,6 +762,20 @@ COLORS = {
     "danger": ERROR,
     "error": ERROR,
     "info": INFO,
+    # Glow effects
+    "glow_primary": GLOW_PRIMARY,
+    "glow_success": GLOW_SUCCESS,
+    "glow_warning": GLOW_WARNING,
+    "glow_danger": GLOW_DANGER,
+    # Skeleton
+    "skeleton_base": SKELETON_BASE,
+    "skeleton_highlight": SKELETON_HIGHLIGHT,
+    # Gradients
+    "card_gradient_start": CARD_GRADIENT_START,
+    "card_gradient_end": CARD_GRADIENT_END,
+    "bg_active": BG_SELECTED,
+    "header_bg": TABLE_HEADER_BG,
+    "header_text": TEXT_MUTED,
 }
 
 

@@ -140,6 +140,7 @@ MENU_DATA = {
         "items": [
             ("Firma Kartı", "ph.buildings", "company-card"),
             ("Kullanıcı Yönetimi", "ph.users-three", "users"),
+            ("İş Akışları", "ph.flow-arrow", "workflow-admin"),
             ("Tema Ayarları", "ph.palette", "theme-settings"),
             ("İşlem Geçmişi", "ph.clock-counter-clockwise", "audit-logs"),
             ("Genel Ayarlar", "ph.sliders", "settings"),

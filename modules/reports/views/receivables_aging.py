@@ -36,7 +36,6 @@ class ReceivablesAgingPage(QWidget):
             title="Alacak Yaşlandırma",
             icon=ICONS.CHART,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

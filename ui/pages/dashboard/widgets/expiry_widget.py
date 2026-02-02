@@ -138,7 +138,6 @@ class ExpiryAlertWidget(BaseWidget):
                     }
                 )
 
-            session.close()
             return result
 
         except Exception as e:

@@ -36,7 +36,6 @@ class StockAgingPage(QWidget):
             title="Stok Yaşlandırma",
             icon=ICONS.TIME,
             show_search=False,
-            show_refresh=True,
             show_add=False,
             parent=self,
         )

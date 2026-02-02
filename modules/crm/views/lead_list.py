@@ -53,7 +53,6 @@ class LeadListPage(BaseListPage):
             columns=columns,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Aday",
             search_placeholder="Ad, şirket ara...",
@@ -93,7 +92,7 @@ class LeadListPage(BaseListPage):
         self.update_stat_card("contacted", str(contacted_count))
         self.update_stat_card("qualified", str(qualified_count))
 
-        self.count_label.setText(f"Toplam: {len(leads)} aday")
+        self.update_count(len(leads), "aday")
 
     def _populate_row(self, row: int, lead: dict, visible_cols: list):
         lead_id = lead.get("id")

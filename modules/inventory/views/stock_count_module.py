@@ -74,14 +74,8 @@ class StockCountModule(QWidget):
             
     def load_data(self):
         """Sayım listesini yükle"""
-        status_filter = self.list_page.get_status_filter()
-        
-        # Filtrelenmiş sayımlar
-        filtered = self.counts
-        if status_filter:
-            filtered = [c for c in self.counts if c.get("status") == status_filter]
-        
-        self.list_page.load_data(filtered)
+        # Tüm verileri yükle - filtreleme tablo tarafından yapılıyor
+        self.list_page.load_data(self.counts)
         
     def show_new_form(self):
         """Yeni sayım formu"""

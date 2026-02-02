@@ -1,100 +1,97 @@
 """
-Akıllı İş - Stok Kartları Liste Sayfası
-Yeni bileşen mimarisi kullanılarak yeniden yapılandırıldı.
+Akıllı İş ERP - Stok Listesi Sayfası
+Stok kartlarını listeler, arama ve filtreleme sağlar.
 """
 
 from decimal import Decimal
+from typing import List
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QTableWidgetItem,
-    QComboBox,
     QMenu,
-    QMessageBox,
-    QPushButton,
-    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor, QAction, QIcon
+from PyQt6.QtGui import QColor, QAction
 import qtawesome as qta
 
-from config import COLORS
-from database.models import ItemType
-from core.export_manager import ExportManager
-from core.label_manager import LabelManager
-from ui.components import (
-    PageHeader,
+from config.icons import ICONS
+from config.styles import COLORS
+from ui.components.page_header import PageHeader
+from ui.components.enhanced_table import (
     EnhancedTableWidget,
     ColumnConfig,
-    MiniStatCard,
-    ScrollableCardContainer,
+    NumericTableWidgetItem,
 )
-from config.icons import ICONS
-from config.themes import get_theme
+from ui.components.table_footer import TableFooter
+from core.export_manager import ExportManager
 
 
 class StockListPage(QWidget):
-    """Stok kartları liste sayfası."""
+    """
+    Stok kartlarını listeleyen sayfa.
+    """
 
-    # Sinyaller
-    item_selected = pyqtSignal(int)
+    # Sinyaller (InventoryModule tarafından beklenenler)
     add_clicked = pyqtSignal()
-    duplicate_clicked = pyqtSignal(int)
     edit_clicked = pyqtSignal(int)
+    duplicate_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
     refresh_requested = pyqtSignal()
     next_page_clicked = pyqtSignal()
     prev_page_clicked = pyqtSignal()
+    page_size_changed = pyqtSignal(int)  # Sayfa boyutu değişti
+    row_double_clicked = pyqtSignal(int)
+    table_filters_changed = pyqtSignal(
+        dict
+    )  # Tablo içi filtreler değişti ve filtreleri taşıyor
 
+    # Stok türleri (Sabitler)
     TYPE_NAMES = {
-        ItemType.HAMMADDE: "Hammadde",
-        ItemType.MAMUL: "Mamül",
-        ItemType.YARI_MAMUL: "Yarı Mamül",
-        ItemType.AMBALAJ: "Ambalaj",
-        ItemType.SARF: "Sarf",
-        ItemType.TICARI: "Ticari",
-        ItemType.HIZMET: "Hizmet",
-        ItemType.DIGER: "Diğer",
-    }
-
-    TYPE_ICONS = {
-        ItemType.HAMMADDE: ICONS.TYPE_RAW,
-        ItemType.MAMUL: ICONS.TYPE_PRODUCT,
-        ItemType.YARI_MAMUL: ICONS.TYPE_SEMI,
-        ItemType.AMBALAJ: ICONS.TYPE_PACKAGE,
-        ItemType.SARF: ICONS.TYPE_CONSUMABLE,
-        ItemType.TICARI: ICONS.TYPE_COMMERCIAL,
-        ItemType.HIZMET: ICONS.TYPE_SERVICE,
-        ItemType.DIGER: ICONS.TYPE_OTHER,
+        "hammadde": "Hammadde",
+        "mamul": "Mamul",
+        "yari_mamul": "Yarı Mamul",
+        "ambalaj": "Ambalaj",
+        "sarf": "Sarf Malzemesi",
+        "ticari": "Ticari Mal",
+        "hizmet": "Hizmet",
+        "diger": "Diğer",
     }
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.items_data = []
-        self._setup_ui()
-        self._connect_signals()
+        self._updating_from_backend = False  # Sonsuz döngüyü önlemek için
+        self.setup_ui()
 
-    def _setup_ui(self):
+        # Arama için timer
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.setInterval(500)
+        self.search_timer.timeout.connect(lambda: self.refresh_requested.emit())
+
+        # Otomatik yenileme timer
+        self._auto_refresh_timer = QTimer(self)
+        self._auto_refresh_timer.timeout.connect(lambda: self.refresh_requested.emit())
+        self._auto_refresh_timer.start(30000)  # 30 saniye
+
+    def setup_ui(self):
+        """UI bileşenlerini oluştur"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        # Header
+        # Sayfa Başlığı
         self.header = PageHeader(
             title="Stok Kartları",
             icon=ICONS.INVENTORY,
-            show_search=False,  # Header aramasını kapattık
-            show_refresh=True,
             show_add=True,
             show_export=True,
             add_text="Yeni Stok Kartı",
-            search_placeholder="",
+            search_placeholder="Stok kodu, adı veya barkod ile ara...",
             parent=self,
         )
 
-        # Export menüsüne etiket ekleme
+        # Export menüsü
         if self.header.export_btn:
             export_menu = ExportManager.create_export_menu(self, self._get_export_data)
             export_menu.addSeparator()
@@ -104,394 +101,304 @@ class StockListPage(QWidget):
             export_menu.addAction(label_action)
             self.header.export_btn.setMenu(export_menu)
 
-        # Filtreleri header'a ekle
-        self.active_combo = QComboBox()
-        self.active_combo.addItem("Aktif Kayıtlar", True)
-        self.active_combo.addItem("Pasif Kayıtlar", False)
-        self.active_combo.addItem("Tümü", None)
-        self.active_combo.setMinimumWidth(120)
-        self.active_combo.setFixedHeight(36)
-        self.active_combo.currentIndexChanged.connect(self._do_search)
-
-        self.type_combo = QComboBox()
-        self.type_combo.addItem("Tümü", None)
-        for item_type, label in self.TYPE_NAMES.items():
-            icon_name = self.TYPE_ICONS.get(item_type, "")
-            icon = qta.icon(icon_name) if icon_name else QIcon()
-            self.type_combo.addItem(icon, label, item_type)
-
-        self.type_combo.setMinimumWidth(130)
-        self.type_combo.setFixedHeight(36)
-        self.type_combo.currentIndexChanged.connect(self._do_search)
-
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("Tümü", None)
-        self.status_combo.addItem(
-            qta.icon(ICONS.STATUS_ICONS["success"], color="#22c55e"), "Normal", "normal"
-        )
-        self.status_combo.addItem(
-            qta.icon(ICONS.STATUS_ICONS["low"], color="#eab308"), "Düşük Stok", "low"
-        )
-        self.status_combo.addItem(
-            qta.icon(ICONS.STATUS_ICONS["critical"], color="#f97316"),
-            "Kritik",
-            "critical",
-        )
-        self.status_combo.addItem(
-            qta.icon(ICONS.STATUS_ICONS["out_of_stock"], color="#ef4444"),
-            "Stok Yok",
-            "out_of_stock",
-        )
-        self.status_combo.setMinimumWidth(120)
-        self.status_combo.setFixedHeight(36)
-        self.status_combo.currentIndexChanged.connect(self._do_search)
-
-        # Filtreleri ekle
-        h_layout = self.header.header_layout()
-        # Butonlardan önce ekle
-        target_widget = (
-            self.header.export_btn or self.header.refresh_btn or self.header.add_btn
-        )
-
-        if target_widget:
-            idx = h_layout.indexOf(target_widget)
-            h_layout.insertWidget(idx, QLabel("Durum:"))
-            h_layout.insertWidget(idx + 1, self.active_combo)
-            h_layout.insertWidget(idx + 2, QLabel("Tür:"))
-            h_layout.insertWidget(idx + 3, self.type_combo)
-            h_layout.insertWidget(idx + 4, QLabel("Stok:"))
-            h_layout.insertWidget(idx + 5, self.status_combo)
-        else:
-            h_layout.addWidget(QLabel("Durum:"))
-            h_layout.addWidget(self.active_combo)
-            h_layout.addWidget(QLabel("Tür:"))
-            h_layout.addWidget(self.type_combo)
-            h_layout.addWidget(QLabel("Stok:"))
-            h_layout.addWidget(self.status_combo)
-
         layout.addWidget(self.header)
-
-        # Search input (Headerdan buraya taşıdık)
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Stok kodu, adı veya barkod ile ara...")
-        self.search_input.addAction(
-            qta.icon(ICONS.SEARCH, color="#94a3b8"),
-            QLineEdit.ActionPosition.LeadingPosition,
-        )
-        self.search_input.setFixedHeight(30)
-        self.search_input.setFixedWidth(280)
-        self.search_input.textChanged.connect(self._on_search_changed)
-
-        # İstatistik kartları (Scrollable)
-        stats_container = ScrollableCardContainer()
-        self.stat_cards = {}
-        # Toplam: Kahverengi
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", icon=ICONS.INVENTORY, icon_color="#8d6e63"
-        )
-        # Normal: Yeşil
-        self.stat_cards["normal"] = MiniStatCard(
-            "Normal", "0", "success", icon=ICONS.SUCCESS, icon_color="#22c55e"
-        )
-        # Düşük: Sarı
-        self.stat_cards["low"] = MiniStatCard(
-            "Düşük", "0", "warning", icon=ICONS.WARNING, icon_color="#eab308"
-        )
-        # Kritik: Turuncu
-        self.stat_cards["critical"] = MiniStatCard(
-            "Kritik", "0", "error", icon=ICONS.ERROR, icon_color="#f97316"
-        )
-        # Stok Yok: Kırmızı
-        self.stat_cards["out_of_stock"] = MiniStatCard(
-            "Stok Yok", "0", "error", icon=ICONS.DANGER, icon_color="#ef4444"
-        )
-
-        for card in self.stat_cards.values():
-            stats_container.add_card(card)
-        stats_container.add_stretch()
-
-        # Stats ve Arama kutusu için container layout
-        top_bar_layout = QHBoxLayout()
-        top_bar_layout.setContentsMargins(0, 0, 0, 0)
-        top_bar_layout.setSpacing(12)
-
-        # Stats container esnek olsun
-        top_bar_layout.addWidget(stats_container, 1)
-
-        # Arama kutusu sabit kalsın sağda
-        top_bar_layout.addWidget(self.search_input, 0)
-
-        layout.addLayout(top_bar_layout)
 
         # Tablo
         columns = [
-            ColumnConfig("code", "Kod", width=100),
-            ColumnConfig("name", "Stok Adı", width=280, stretch=True),
-            ColumnConfig("type", "Tür", width=100),
-            ColumnConfig("category", "Kategori", width=120),
-            ColumnConfig("unit", "Birim", width=70),
-            ColumnConfig("quantity", "Miktar", width=100),
-            ColumnConfig("min_stock", "Min. Stok", width=90),
-            ColumnConfig("purchase_price", "Alış Fiyatı", width=110),
-            ColumnConfig("sale_price", "Satış Fiyatı", width=110),
-            ColumnConfig("status", "Durum", width=100),
+            ColumnConfig("code", "Kod", width=120, filterable=True),
+            ColumnConfig("name", "Stok Adı", width=250, stretch=True, filterable=True),
+            ColumnConfig("type", "Tür", width=120, filter_type="enum"),
+            ColumnConfig("category", "Kategori", width=150, filterable=True),
+            ColumnConfig("unit", "Birim", width=80, filterable=True),
+            ColumnConfig("quantity", "Miktar", width=100, filterable=True),
+            ColumnConfig("min_stock", "Min. Stok", width=90, filterable=True),
+            ColumnConfig("purchase_price", "Alış Fiyatı", width=110, filterable=True),
+            ColumnConfig("sale_price", "Satış Fiyatı", width=110, filterable=True),
+            ColumnConfig("stock_status", "Stok Durumu", width=120, filter_type="enum"),
+            ColumnConfig("is_active", "Aktif", width=80, filter_type="enum"),
         ]
 
         self.table = EnhancedTableWidget(
-            table_id="stock_items",
-            columns=columns,
-            parent=self,
+            table_id="inventory_item_list", columns=columns, parent=self
         )
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self._show_context_menu)
+        self.table.set_standard_row_height(48)
         layout.addWidget(self.table)
 
-        # Alt bilgi ve Sayfalama
-        footer_layout = QHBoxLayout()
+        # Footer - sayfalama ve istatistikler
+        self._setup_footer(layout)
 
-        self.count_label = QLabel("Toplam: 0 kayıt")
-        footer_layout.addWidget(self.count_label)
-
-        footer_layout.addStretch()
-
-        # Sayfalama kontrolleri
-        self.btn_prev = QPushButton("Önceki")
-        self.btn_prev.clicked.connect(self.prev_page_clicked.emit)
-        self.btn_prev.setIcon(qta.icon(ICONS.BACK))
-        self.btn_prev.setEnabled(False)
-        footer_layout.addWidget(self.btn_prev)
-
-        self.page_label = QLabel("Sayfa 1 / 1")
-        self.page_label.setStyleSheet("font-weight: bold; margin: 0 10px;")
-        footer_layout.addWidget(self.page_label)
-
-        self.btn_next = QPushButton("Sonraki")
-        self.btn_next.clicked.connect(self.next_page_clicked.emit)
-        self.btn_next.setIcon(qta.icon(ICONS.FORWARD))
-        self.btn_next.setEnabled(False)
-        footer_layout.addWidget(self.btn_next)
-
-        footer_layout.addStretch()
-
-        self.value_label = QLabel("Toplam Değer: ₺0,00")
-        footer_layout.addWidget(self.value_label)
-
-        layout.addLayout(footer_layout)
-
-        # Arama debounce timer
-        self.search_timer = QTimer()
-        self.search_timer.setSingleShot(True)
-        self.search_timer.timeout.connect(self._do_search)
-
-    def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
-        self.header.add_clicked.connect(self.add_clicked.emit)
+        # Sinyal bağlantıları
+        self.header.add_btn.clicked.connect(self.add_clicked.emit)
         self.header.search_changed.connect(self._on_search_changed)
-        self.table.row_double_clicked.connect(self.edit_clicked.emit)
+        # Çift tıklama ile düzenleme devre dışı - kullanıcı sağ tık menüsünü kullanmalı
+        # self.table.row_double_clicked.connect(self.row_double_clicked_handler)
+        self.table.rows_filtered.connect(self.update_filtered_stats)
 
-    def load_data(self, items: list):
-        """Tabloyu verilerle doldur"""
-        self.items_data = items
-        self.table.setRowCount(len(items))
-        visible_cols = self.table.get_visible_columns()
+        # Context menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        for row, item in enumerate(items):
-            self._populate_row(row, item, visible_cols)
+        # Filtre seçeneklerini tanımla
+        self.table.set_filter_options("type", sorted(list(self.TYPE_NAMES.values())))
+        self.table.set_filter_options("is_active", ["Aktif", "Pasif"])
+
+    def _setup_footer(self, layout: QVBoxLayout):
+        """Footer - sayfalama ve istatistikler"""
+        self.footer = TableFooter(self)
+
+        # İstatistik kartlarını ekle
+        self.footer.add_stat("total", "Toplam", ICONS.INVENTORY, COLORS["info"])
+        self.footer.add_stat("normal", "Normal", ICONS.SUCCESS, COLORS["success"])
+        self.footer.add_stat("low", "Düşük", ICONS.WARNING, COLORS["warning"])
+        self.footer.add_stat("critical", "Kritik", ICONS.ERROR, COLORS["error"])
+        self.footer.add_stat("out_of_stock", "Stok Yok", ICONS.DANGER, COLORS["error"])
+
+        # Sinyalleri bağla
+        self.footer.next_page_clicked.connect(self.next_page_clicked.emit)
+        self.footer.prev_page_clicked.connect(self.prev_page_clicked.emit)
+        self.footer.page_size_changed.connect(self.page_size_changed.emit)
+
+        layout.addWidget(self.footer)
+
+    def update_filtered_stats(self, visible, total):
+        """Filtreleme sonrası backend'den güncel istatistikleri al"""
+        # Backend'den veri yüklenirken tetikleniyorsa, sonsuz döngüye girme
+        if self._updating_from_backend:
+            return
+
+        # Filtreleri al ve backend'den yeni veri iste
+        filters = self.table.get_backend_filters()
+        self.table_filters_changed.emit(filters)
+
+    def row_double_clicked_handler(self, row):
+        """Satıra çift tıklandığında item_id ile sinyal gönder"""
+        item = self.table.item(row, 0)
+        if item:
+            item_id = item.data(Qt.ItemDataRole.UserRole)
+            if item_id:
+                self.edit_clicked.emit(item_id)
+                self.row_double_clicked.emit(item_id)
 
     def update_stats(self, stats: dict):
-        """İstatistik kartlarını güncelle"""
-        self.stat_cards["total"].update_value(str(stats["total"]))
-        self.stat_cards["normal"].update_value(str(stats["normal"]))
-        self.stat_cards["low"].update_value(str(stats["low"]))
-        self.stat_cards["critical"].update_value(str(stats["critical"]))
-        self.stat_cards["out_of_stock"].update_value(str(stats.get("out_of_stock", 0)))
+        """İstatistikleri güncelle"""
+        if not stats:
+            return
+        self.footer.update_stats(stats)
 
-        self.value_label.setText(f"Toplam Değer: ₺{stats['total_value']:,.2f}")
-
-    def update_pagination(
-        self, current_page: int, total_pages: int, total_records: int
-    ):
+    def update_pagination(self, current: int, total_pages: int, total_records: int):
         """Sayfalama bilgilerini güncelle"""
-        self.btn_prev.setEnabled(current_page > 1)
-        self.btn_next.setEnabled(current_page < total_pages)
-        self.page_label.setText(f"Sayfa {current_page} / {total_pages}")
-        self.count_label.setText(f"Toplam: {total_records} kayıt")
+        self.footer.update_pagination(current, total_pages, total_records)
 
-    def _populate_row(self, row: int, item, visible_cols: list):
-        for col_idx, col_key in enumerate(visible_cols):
+    def get_page_size(self) -> int:
+        """Mevcut sayfa boyutunu döndür"""
+        return self.footer.get_page_size()
+
+    def load_data(self, items: List):
+        """Tabloya veri yükle"""
+        self._updating_from_backend = True  # Flag'ı aç
+        self.table.setSortingEnabled(False)
+        self.table.setRowCount(len(items))
+
+        # Tüm sütunları doldur (gizli olanlar dahil, böylece açıldığında dolu gelir)
+        for row, item in enumerate(items):
+            self._populate_row(row, item)
+
+        self.table.setSortingEnabled(True)
+
+        # Kaydedilmiş filtreleri uygula
+        self.table.apply_saved_filters()
+        self._updating_from_backend = False  # Flag'ı kapat
+
+    def _populate_row(self, row, item):
+        """Tek bir satırı doldur"""
+        for col_idx, col_key in enumerate(self.table.column_order):
             if col_key == "code":
                 cell = QTableWidgetItem(item.code)
                 cell.setData(Qt.ItemDataRole.UserRole, item.id)
-                cell.setForeground(QColor("#818cf8"))
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
                 self.table.setItem(row, col_idx, cell)
-
             elif col_key == "name":
-                self.table.setItem(row, col_idx, QTableWidgetItem(item.name))
-
-            elif col_key == "type":
-                type_name = self.TYPE_NAMES.get(item.item_type, "Diğer")
-                cell = QTableWidgetItem(type_name)
-
-                # İkon ekle
-                icon_name = self.TYPE_ICONS.get(item.item_type, ICONS.TYPE_OTHER)
-                cell.setIcon(qta.icon(icon_name, color="#475569"))
-
+                cell = QTableWidgetItem(item.name)
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
                 self.table.setItem(row, col_idx, cell)
-
+            elif col_key == "type":
+                item_type = (
+                    item.item_type.value
+                    if hasattr(item.item_type, "value")
+                    else item.item_type
+                )
+                type_name = self.TYPE_NAMES.get(item_type, "Diğer")
+                cell = QTableWidgetItem(type_name)
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
             elif col_key == "category":
                 cat_text = item.category.name if item.category else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(cat_text))
-
+                cell = QTableWidgetItem(cat_text)
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
             elif col_key == "unit":
                 unit_text = item.unit.code if item.unit else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(unit_text))
-
-            elif col_key == "quantity":
-                total_stock = item.total_stock or Decimal(0)
-                cell = QTableWidgetItem(f"{total_stock:,.2f}")
-                cell.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "min_stock":
-                min_stock = item.min_stock or Decimal(0)
-                cell = QTableWidgetItem(f"{min_stock:,.2f}")
-                cell.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "purchase_price":
-                price = item.purchase_price or Decimal(0)
-                cell = QTableWidgetItem(f"₺{price:,.2f}")
-                cell.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "sale_price":
-                price = item.sale_price or Decimal(0)
-                cell = QTableWidgetItem(f"₺{price:,.2f}")
-                cell.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "status":
-                cell = QTableWidgetItem()
-                t = get_theme()
-
+                cell = QTableWidgetItem(unit_text)
                 if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "quantity":
+                qty = item.total_stock or Decimal(0)
+                cell = NumericTableWidgetItem(qty, f"{qty:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "min_stock":
+                ms = item.min_stock or Decimal(0)
+                cell = NumericTableWidgetItem(ms, f"{ms:,.2f}")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "purchase_price":
+                p = item.purchase_price or Decimal(0)
+                cell = NumericTableWidgetItem(p, f"{p:,.2f} TL")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "sale_price":
+                p = item.sale_price or Decimal(0)
+                cell = NumericTableWidgetItem(p, f"{p:,.2f} TL")
+                cell.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "stock_status":
+                cell = QTableWidgetItem()
+                status = item.stock_status
+                if status == "out_of_stock":
+                    color = "#ef4444"
+                    cell.setText("Stok Yok")
+                    cell.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["out_of_stock"], color=color)
+                    )
+                elif status == "critical":
+                    color = "#f97316"
+                    cell.setText("Kritik Seviye")
+                    cell.setIcon(qta.icon(ICONS.STATUS_ICONS["critical"], color=color))
+                elif status == "low":
+                    color = "#eab308"
+                    cell.setText("Düşük Stok")
+                    cell.setIcon(qta.icon(ICONS.STATUS_ICONS["low"], color=color))
+                else:
+                    color = "#22c55e"
+                    cell.setText("Normal")
+                    cell.setIcon(qta.icon(ICONS.STATUS_ICONS["success"], color=color))
+                cell.setForeground(QColor(color))
+                if not item.is_active:
+                    cell.setForeground(QColor(COLORS["text_muted"]))
+                self.table.setItem(row, col_idx, cell)
+            elif col_key == "is_active":
+                cell = QTableWidgetItem()
+                if item.is_active:
+                    cell.setText("Aktif")
+                    cell.setIcon(
+                        qta.icon(ICONS.STATUS_ICONS["success"], color="#22c55e")
+                    )
+                    cell.setForeground(QColor("#22c55e"))
+                else:
                     cell.setText("Pasif")
                     cell.setIcon(
-                        qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
+                        qta.icon(
+                            ICONS.STATUS_ICONS["passive"], color=COLORS["text_muted"]
+                        )
                     )
-                    cell.setForeground(QColor(t.text_muted))
-                else:
-                    status = item.stock_status
-                    if status == "out_of_stock":
-                        # Kırmızı
-                        color = "#ef4444"
-                        cell.setText("Stok Yok")
-                        cell.setIcon(
-                            qta.icon(ICONS.STATUS_ICONS["out_of_stock"], color=color)
-                        )
-                        cell.setForeground(QColor(color))
-                    elif status == "critical":
-                        # Turuncu
-                        color = "#f97316"
-                        cell.setText("Kritik")
-                        cell.setIcon(
-                            qta.icon(ICONS.STATUS_ICONS["critical"], color=color)
-                        )
-                        cell.setForeground(QColor(color))
-                    elif status == "low":
-                        # Sarı
-                        color = "#eab308"
-                        cell.setText("Düşük")
-                        cell.setIcon(qta.icon(ICONS.STATUS_ICONS["low"], color=color))
-                        cell.setForeground(QColor(color))
-                    else:
-                        # Yeşil
-                        color = "#22c55e"
-                        cell.setText("Normal")
-                        cell.setIcon(
-                            qta.icon(ICONS.STATUS_ICONS["normal"], color=color)
-                        )
-                        cell.setForeground(QColor(color))
+                    cell.setForeground(QColor(COLORS["text_muted"]))
                 self.table.setItem(row, col_idx, cell)
 
     def _on_search_changed(self, text: str):
+        """Arama metni değiştiğinde timer başlat"""
         self.search_timer.stop()
-        self.search_timer.start(300)
-
-    def _do_search(self):
-        self.refresh_requested.emit()
+        self.search_timer.start()
 
     def get_filters(self) -> dict:
-        return {
-            "keyword": (self.search_input.text().strip() if self.search_input else ""),
-            "is_active": self.active_combo.currentData(),
-            "item_type": self.type_combo.currentData(),
-            "stock_status": self.status_combo.currentData(),
-        }
+        """Mevcut filtreleri döndür"""
+        return {"keyword": self.header.get_search_text(), "is_active": None}
+
+    def get_search_text(self) -> str:
+        """Arama metnini döndür"""
+        return self.header.get_search_text()
 
     def _get_export_data(self):
-        return ExportManager.extract_data_from_table(self.table)
+        """Export için tabloyu döndür"""
+        return self.table
 
     def _print_labels(self):
-        data = self._get_export_data()
-        LabelManager.print_product_labels(self, data)
+        """Barkod etiketi yazdır"""
+        pass
 
-    def _show_context_menu(self, position):
-        row = self.table.rowAt(position.y())
+    def showEvent(self, event):
+        """Sayfa görünür olduğunda otomatik yenilemeyi başlat"""
+        super().showEvent(event)
+        self._auto_refresh_timer.start(30000)
+
+    def hideEvent(self, event):
+        """Sayfa gizlendiğinde otomatik yenilemeyi durdur"""
+        super().hideEvent(event)
+
+    def _show_context_menu(self, pos):
+        """Sağ tık context menüsü göster"""
+        row = self.table.rowAt(pos.y())
         if row < 0:
             return
 
         item_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        if not item_id:
+            return
 
         menu = QMenu(self)
-        view_action = QAction("Görüntüle", self)
-        view_action.setIcon(qta.icon(ICONS.EYE, color="#475569"))
-        view_action.triggered.connect(lambda: self.item_selected.emit(item_id))
-        menu.addAction(view_action)
 
+        # Düzenle
         edit_action = QAction("Düzenle", self)
         edit_action.setIcon(qta.icon(ICONS.EDIT, color="#3498db"))
         edit_action.triggered.connect(lambda: self.edit_clicked.emit(item_id))
         menu.addAction(edit_action)
 
-        duplicate_action = QAction("Kopyala ve Oluştur", self)
+        # Çoğalt
+        duplicate_action = QAction("Çoğalt", self)
         duplicate_action.setIcon(qta.icon(ICONS.COPY, color="#8b5cf6"))
         duplicate_action.triggered.connect(lambda: self.duplicate_clicked.emit(item_id))
         menu.addAction(duplicate_action)
 
         menu.addSeparator()
 
-        movement_action = QAction("Stok Hareketi", self)
-        movement_action.setIcon(qta.icon(ICONS.MOVEMENT, color="#64748b"))
-        menu.addAction(movement_action)
-
-        history_action = QAction("Hareket Geçmişi", self)
-        history_action.setIcon(qta.icon(ICONS.REFRESH, color="#64748b"))
-        menu.addAction(history_action)
-
-        menu.addSeparator()
-
+        # Sil
         delete_action = QAction("Sil", self)
         delete_action.setIcon(qta.icon(ICONS.DELETE, color="#ef4444"))
         delete_action.triggered.connect(lambda: self._confirm_delete(item_id))
         menu.addAction(delete_action)
 
-        menu.exec(self.table.viewport().mapToGlobal(position))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _confirm_delete(self, item_id: int):
+        """Silme onayı"""
+        from PyQt6.QtWidgets import QMessageBox
+
         reply = QMessageBox.question(
             self,
-            "Silme Onayı",
-            "Bu stok kartını silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.",
+            "Stok Kartı Sil",
+            "Bu stok kartını silmek istediğinizden emin misiniz?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.delete_clicked.emit(item_id)

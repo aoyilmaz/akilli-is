@@ -32,19 +32,15 @@ from PyQt6.QtWidgets import (
     QFrame,
     QLineEdit,
     QAbstractItemView,
-    QSplitter,
     QStackedWidget,
 )
 
 from PyQt6.QtCore import (
     Qt,
     pyqtSignal,
-    QPoint,
     QPointF,
     QSize,
     QTimer,
-    QPropertyAnimation,
-    QEasingCurve,
 )
 
 from PyQt6.QtGui import (
@@ -861,27 +857,29 @@ class SideBar(QFrame):
             else:
                 parent.setHidden(True)
 
-    def get_breadcrumb(self, page_id):
-        """Page ID'ye göre ekmek kırıntısı ve modül ikonunu döndür"""
-        # Ağaçta ara
+    def get_breadcrumb_data(self, page_id):
+        """Page ID'ye göre (parent_text, parent_icon, item_text, item_icon) döndür"""
         iterator = QTreeWidgetItemIterator(self.tree)
         while iterator.value():
             item = iterator.value()
             if item.data(0, Qt.ItemDataRole.UserRole) == page_id:
-                # Bulundu, yukarı doğru çık
-                parts = []
-                curr = item
-                root_icon = None
-                while curr:
-                    parts.insert(0, curr.text(0))
-                    # En üst ebeveynin ikonunu al
-                    if curr.parent() is None:
-                        root_icon = curr.icon(0)
-                    curr = curr.parent()
-
-                return " > ".join(parts), root_icon
+                parent = item.parent()
+                if parent:
+                    return {
+                        "group_title": parent.text(0),
+                        "group_icon": parent.icon(0),
+                        "item_title": item.text(0),
+                        "item_icon": item.icon(0),
+                    }
+                else:
+                    return {
+                        "group_title": item.text(0),
+                        "group_icon": item.icon(0),
+                        "item_title": "",
+                        "item_icon": None,
+                    }
             iterator += 1
-        return "", None
+        return None
 
     def on_item_clicked(self, item, col):
         # Sadece yaprakların (alt eleman) tıklanması sayfa açar
@@ -1017,7 +1015,11 @@ class MainWindow(QMainWindow):
         self.pages["audit-logs"] = AuditLogViewer()
         self.pages["company-card"] = CompanyCard()
 
-        # Bakım ve Onarım Modülü
+        # Workflow Admin Modülü
+        from modules.workflow.views import WorkflowAdminModule
+
+        self.pages["workflow-admin"] = WorkflowAdminModule()
+
         # Bakım ve Onarım Modülü
         self.pages["equipments"] = EquipmentListWidget()
         self.pages["maintenance-requests"] = MaintenanceRequestWidget()
@@ -1103,9 +1105,6 @@ class MainWindow(QMainWindow):
         # === STATUSBAR ===
         self.status_bar = QStatusBar()
         self.status_bar.setFixedHeight(28)
-        self.status_bar.setStyleSheet(
-            "background: #1e1e1e; border-top: 1px solid #3e3e42; color: #888888;"
-        )
         self.setStatusBar(self.status_bar)
 
         # Logo
@@ -1126,28 +1125,33 @@ class MainWindow(QMainWindow):
             )
             self.status_bar.addWidget(self.status_logo_label)
 
-        # Modül İkonu
-        self.status_module_icon_label = QLabel()
-        self.status_module_icon_label.setStyleSheet(
-            "padding: 0 2px; border: none; background: transparent;"
+        # Breadcrumb Container (İkonlar ve Yazılar için)
+        self.breadcrumb_container = QWidget()
+        self.breadcrumb_container.setStyleSheet(
+            "background: transparent; border: none;"
         )
-        self.status_bar.addWidget(self.status_module_icon_label)
+        self.breadcrumb_layout = QHBoxLayout(self.breadcrumb_container)
+        self.breadcrumb_layout.setContentsMargins(10, 0, 0, 0)
+        self.breadcrumb_layout.setSpacing(4)
+        self.status_bar.addWidget(self.breadcrumb_container)
 
-        # Sol taraf: Breadcrumb (Artık solda)
-        self.status_breadcrumb_label = QLabel("")
-        self.status_breadcrumb_label.setStyleSheet(
-            "padding: 0 5px; color: #aaaaaa; font-weight: 500;"
+        # Sağ taraf: Kullanıcı
+        self.status_user_container = QWidget()
+        self.status_user_container.setStyleSheet(
+            "background: transparent; border: none;"
         )
-        self.status_bar.addWidget(self.status_breadcrumb_label)
+        self.status_user_layout = QHBoxLayout(self.status_user_container)
+        self.status_user_layout.setContentsMargins(0, 0, 10, 0)
+        self.status_user_layout.setSpacing(4)
 
-        # Sağ taraf: Kullanıcı (Artık sağda)
-        self.status_user_label = QLabel(
-            "Kullanıcı: Admin"
-        )  # TODO: Dinamik hale getirilecek
-        self.status_user_label.setStyleSheet(
-            "padding: 0 10px; font-weight: bold; color: #cccccc;"
-        )
-        self.status_bar.addPermanentWidget(self.status_user_label)
+        self.status_user_icon_label = QLabel()
+        self.status_user_label = QLabel("Admin")
+        self.status_user_label.setStyleSheet("font-weight: 500; color: #cccccc;")
+
+        self.status_user_layout.addWidget(self.status_user_icon_label)
+        self.status_user_layout.addWidget(self.status_user_label)
+
+        self.status_bar.addPermanentWidget(self.status_user_container)
 
         QSizeGrip(self.status_bar)
 
@@ -1257,14 +1261,20 @@ class MainWindow(QMainWindow):
         QTabBar::close-button:selected {{ width: 16px; height: 16px; margin-left: 5px; }}
 
         QStatusBar {{
-            background-color: {t.accent_primary};
-            color: white;
+            background-color: {t.bg_primary};
+            color: {t.text_secondary};
             border-top: 1px solid {t.border};
             min-height: 22px;
+        }}
+        QStatusBar::item {{
+            border: none;
+            background: transparent;
         }}
         QStatusBar QLabel {{
             background: transparent;
             font-size: {small_font}px;
+            color: {t.text_secondary};
+            border: none;
         }}
 
         /* Genel widget stilleri */
@@ -1386,37 +1396,151 @@ class MainWindow(QMainWindow):
 
     def update_status_bar(self, index=None):
         """Update status bar based on current context"""
-        # Kullanıcı (TODO: Auth servisinden al)
-        current_user = "Ahmet Yılmaz"
-        self.status_user_label.setText(f"👤 {current_user}")
+        from config.themes import get_theme
+        from PyQt6.QtWidgets import QTabWidget, QStackedWidget, QLabel
+        from PyQt6.QtGui import QIcon
 
-        # Breadcrumb
-        current_widget = self.tabs.currentWidget()
-        if current_widget:
-            page_id = current_widget.property("page_id")
-            if page_id:
-                breadcrumb, root_icon = self.sidebar.get_breadcrumb(page_id)
+        t = get_theme()
 
-                # Modül ikonunu ayarla
-                if root_icon:
-                    self.status_module_icon_label.setPixmap(root_icon.pixmap(16, 16))
-                    self.status_module_icon_label.setVisible(True)
-                else:
-                    self.status_module_icon_label.setVisible(False)
+        # Kullanıcı Adı (AuthService'den al)
+        try:
+            from core.auth_service import AuthService
 
-                # İç sekmeleri kontrol et (Nested Tab)
-                # Sayfa içindeki ilk görünür QTabWidget'ı bul
-                inner_tabs = current_widget.findChildren(QTabWidget)
-                for tab in inner_tabs:
-                    if tab.isVisible() and tab.count() > 0:
-                        breadcrumb += f" > {tab.tabText(tab.currentIndex())}"
-                        break
+            user = AuthService.get_current_user()
+            display_name = (
+                user.full_name
+                if user and user.full_name
+                else (user.username if user else "Admin")
+            )
+        except Exception:
+            display_name = "Admin"
 
-                self.status_breadcrumb_label.setText(breadcrumb)
-            else:
-                self.status_breadcrumb_label.setText("")
+        if "qta" in globals():
+            user_icon = qta.icon("ph.user-circle", color=t.accent_primary)
+            self.status_user_icon_label.setPixmap(user_icon.pixmap(18, 18))
+            self.status_user_label.setText(display_name)
         else:
-            self.status_breadcrumb_label.setText("")
+            self.status_user_label.setText(f"👤 {display_name}")
+
+        current_widget = self.tabs.currentWidget()
+        if not current_widget:
+            # Breadcrumb Temizle
+            while self.breadcrumb_layout.count():
+                item = self.breadcrumb_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            return
+
+        # Dinamik içerik takibi (Yeni eklenen tab/stackleri yakala)
+        # Her değişimi dinlemek için çocukları geziyoruz
+        for child in current_widget.findChildren((QTabWidget, QStackedWidget)):
+            try:
+                child.currentChanged.disconnect(self.update_status_bar)
+            except (TypeError, RuntimeError):
+                pass
+            child.currentChanged.connect(self.update_status_bar)
+
+        # Breadcrumb Temizle
+        while self.breadcrumb_layout.count():
+            item = self.breadcrumb_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        page_id = current_widget.property("page_id")
+        if not page_id:
+            return
+
+        b_data = self.sidebar.get_breadcrumb_data(page_id)
+        if not b_data:
+            return
+
+        # Navigasyon Parçalarını Oluştur
+        nav_items = []
+        # 1. Modül
+        nav_items.append((b_data["group_title"], b_data["group_icon"]))
+        # 2. Sayfa
+        if b_data["item_title"]:
+            nav_items.append((b_data["item_title"], b_data["item_icon"]))
+
+        # 3. Form / Sub-Page (StackedWidget kontrolü)
+        stacks = current_widget.findChildren(QStackedWidget)
+        for stack in stacks:
+            if stack.isVisible() and stack.currentIndex() >= 0:
+                current_stack_widget = stack.currentWidget()
+                if current_stack_widget:
+                    from ui.components.page_header import PageHeader
+
+                    headers = current_stack_widget.findChildren(PageHeader)
+                    if headers:
+                        header = headers[0]
+                        h_title = header.title_label.text()
+                        h_icon = None
+
+                        # PageHeader'dan ikonu al (Gelişmiş Mantık)
+                        h_icon = None
+                        if hasattr(header, "resolved_icon") and header.resolved_icon:
+                            try:
+                                h_icon = qta.icon(
+                                    header.resolved_icon, color=t.accent_primary
+                                )
+                            except Exception:
+                                pass
+
+                        if not h_icon or h_icon.isNull():
+                            # Header içindeki ikon label'ını bulmaya çalış (fallback)
+                            for child in header.findChildren(QLabel):
+                                pix = child.pixmap()
+                                if pix and not pix.isNull():
+                                    h_icon = QIcon(pix)
+                                    break
+
+                        # Fallback: Eğer hala ikon yoksa sayfa ikonunu kullan
+                        if not h_icon or h_icon.isNull():
+                            h_icon = b_data["item_icon"]
+
+                        # Eğer modül başlığı ile aynıysa (liste görünümü), ekleme
+                        # Başlıkları normalize ederek karşılaştır
+                        if (
+                            h_title.strip().lower()
+                            != b_data["item_title"].strip().lower()
+                        ):
+                            nav_items.append((h_title, h_icon))
+
+        # 4. Sekme (TabWidget kontrolü)
+        inner_tabs = current_widget.findChildren(QTabWidget)
+        for tab in inner_tabs:
+            if tab.isVisible() and tab.count() > 0:
+                text = tab.tabText(tab.currentIndex())
+                icon = tab.tabIcon(tab.currentIndex())
+                if not icon or icon.isNull():
+                    # Sekme ikonu yoksa sayfa ikonunu kullan
+                    icon = b_data["item_icon"]
+                nav_items.append((text, icon))
+                break
+
+        # UI'a Ekle
+        for i, (text, icon) in enumerate(nav_items):
+            if i > 0:
+                sep = QLabel(">")
+                sep.setStyleSheet(
+                    "color: #ffffff; margin: 0 4px; "
+                    "background: transparent; font-weight: bold;"
+                )
+                self.breadcrumb_layout.addWidget(sep)
+
+            if icon:
+                ico_lbl = QLabel()
+                ico_lbl.setPixmap(icon.pixmap(16, 16))
+                ico_lbl.setStyleSheet("margin-right: 0px; background: transparent;")
+                self.breadcrumb_layout.addWidget(ico_lbl)
+
+            txt_lbl = QLabel(text)
+            txt_lbl.setStyleSheet(
+                "color: white; font-weight: 500; background: transparent;"
+            )
+            self.breadcrumb_layout.addWidget(txt_lbl)
+
+        self.breadcrumb_layout.addStretch()
 
     def open_tab(self, page_id):
         # İzin kontrolü
@@ -1438,17 +1562,6 @@ class MainWindow(QMainWindow):
 
         # Set property for breadcrumb lookup
         page_widget.setProperty("page_id", page_id)
-
-        # İç sekmelerin değişimini dinle (Nested Tab Signals)
-        # Sayfa içindeki QTabWidget'ları bul ve sinyallerini bağla
-        inner_tabs = page_widget.findChildren(QTabWidget)
-        for tab in inner_tabs:
-            try:
-                # Önceki bağlantıyı kaldırmayı dene (Duplicate önlemek için)
-                tab.currentChanged.disconnect(self.update_status_bar)
-            except TypeError:
-                pass  # Bağlı değilse sorun yok
-            tab.currentChanged.connect(self.update_status_bar)
 
         for i in range(self.tabs.count()):
             if self.tabs.widget(i) == page_widget:

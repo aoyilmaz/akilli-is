@@ -11,22 +11,21 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QTableWidgetItem,
-    QComboBox,
-    QDateEdit,
     QMenu,
+    QFrame,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor, QAction
 import qtawesome as qta
 
 from config.icons import ICONS
+from config.themes import get_theme
 from database.models import StockMovementType
 from ui.components import (
     PageHeader,
     EnhancedTableWidget,
     ColumnConfig,
     MiniStatCard,
-    ScrollableCardContainer,
 )
 
 
@@ -54,18 +53,25 @@ class MovementListPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._total_count = 0
         self._setup_ui()
         self._connect_signals()
+
+        # Otomatik yenileme
+        self._auto_refresh_timer = QTimer(self)
+        self._auto_refresh_timer.timeout.connect(lambda: self.refresh_requested.emit())
+        self._auto_refresh_timer.start(30000)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
+
+        # Header
         self.header = PageHeader(
             title="Stok Hareketleri",
             icon=ICONS.INVENTORY,
             show_search=True,
-            show_refresh=True,
             search_placeholder="Stok kodu, belge no ile ara...",
             parent=self,
         )
@@ -83,49 +89,11 @@ class MovementListPage(QWidget):
             h.addWidget(btn)
         layout.addWidget(self.header)
 
-        fl = QHBoxLayout()
-        fl.setSpacing(12)
-        fl.addWidget(QLabel("Tür:"))
-        self.type_combo = QComboBox()
-        self.type_combo.addItem("Tümü", None)
-        for t in ["Giriş", "Çıkış", "Transfer", "Satın Alma", "Satış"]:
-            self.type_combo.addItem(t, t.lower().replace(" ", "_"))
-        self.type_combo.setMinimumWidth(130)
-        self.type_combo.setFixedHeight(36)
-        fl.addWidget(self.type_combo)
-        fl.addWidget(QLabel("Tarih:"))
-        self.start_date = QDateEdit()
-        self.start_date.setDate(QDate.currentDate().addDays(-30))
-        self.start_date.setCalendarPopup(True)
-        fl.addWidget(self.start_date)
-        fl.addWidget(QLabel("-"))
-        self.end_date = QDateEdit()
-        self.end_date.setDate(QDate.currentDate())
-        self.end_date.setCalendarPopup(True)
-        fl.addWidget(self.end_date)
-        fb = QPushButton("Filtrele")
-        fb.setIcon(qta.icon(ICONS.FILTER, color="#ffffff"))
-        fb.setProperty("class", "btn-filter")
-        fb.clicked.connect(self.refresh_requested.emit)
-        fl.addWidget(fb)
-        fl.addStretch()
-        layout.addLayout(fl)
-
-        stats_container = ScrollableCardContainer()
-        self.stat_cards = {
-            "total": MiniStatCard("Toplam", "0", "info", icon=ICONS.INVENTORY),
-            "in": MiniStatCard("Giriş", "₺0", "success", icon=ICONS.ARROW_DOWN),
-            "out": MiniStatCard("Çıkış", "₺0", "error", icon=ICONS.ARROW_UP),
-        }
-        for card in self.stat_cards.values():
-            stats_container.add_card(card)
-        stats_container.add_stretch()
-        layout.addWidget(stats_container)
-
+        # Tablo
         cols = [
             ColumnConfig("date", "Tarih", width=140),
             ColumnConfig("document_no", "Belge No", width=120),
-            ColumnConfig("type", "Tür", width=100),
+            ColumnConfig("type", "Tür", width=100, filter_type="enum"),
             ColumnConfig("item_code", "Stok Kodu", width=100),
             ColumnConfig("item_name", "Stok Adı", width=200, stretch=True),
             ColumnConfig("quantity", "Miktar", width=90),
@@ -138,24 +106,60 @@ class MovementListPage(QWidget):
         self.table = EnhancedTableWidget(
             table_id="stock_movements", columns=cols, parent=self
         )
+        self.table.set_standard_row_height(48)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
+
         layout.addWidget(self.table)
 
-        st = QHBoxLayout()
+        # Footer
+        self._setup_footer(layout)
+
+    def _setup_footer(self, layout: QVBoxLayout):
+        """Footer - kayıt sayısı ve istatistikler"""
+        footer = QFrame()
+        footer.setProperty("class", "table-footer")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 8, 0, 0)
+        footer_layout.setSpacing(16)
+
+        # Sol: Kayıt sayısı
         self.count_label = QLabel("Toplam: 0 hareket")
-        st.addWidget(self.count_label)
-        st.addStretch()
-        self.total_label = QLabel("Giriş: ₺0 | Çıkış: ₺0")
-        st.addWidget(self.total_label)
-        layout.addLayout(st)
+        self.count_label.setProperty("class", "footer-count")
+        footer_layout.addWidget(self.count_label)
+
+        # İstatistik kartları (horizontal)
+        self.stat_cards = {
+            "total": MiniStatCard(
+                "Toplam", "0", "info", orientation="horizontal", icon=ICONS.INVENTORY
+            ),
+            "in": MiniStatCard(
+                "Giriş", "₺0", "success", orientation="horizontal", icon=ICONS.ARROW_DOWN
+            ),
+            "out": MiniStatCard(
+                "Çıkış", "₺0", "error", orientation="horizontal", icon=ICONS.ARROW_UP
+            ),
+        }
+        for card in self.stat_cards.values():
+            footer_layout.addWidget(card)
+
+        footer_layout.addStretch()
+
+        # Sağ: Otomatik yenileme göstergesi
+        refresh_indicator = QLabel("⟳")
+        refresh_indicator.setProperty("class", "refresh-indicator")
+        refresh_indicator.setToolTip("Otomatik yenileme: 30s")
+        footer_layout.addWidget(refresh_indicator)
+
+        layout.addWidget(footer)
 
     def _connect_signals(self):
-        self.header.refresh_clicked.connect(self.refresh_requested.emit)
         self.header.search_changed.connect(lambda: self.refresh_requested.emit())
         self.table.row_double_clicked.connect(self.view_clicked.emit)
+        self.table.filter_changed.connect(self._update_visible_count)
 
     def load_data(self, movements: list):
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(movements))
         vcols = self.table.get_visible_columns()
         tin, tout = Decimal(0), Decimal(0)
@@ -174,13 +178,30 @@ class MovementListPage(QWidget):
                 tin += ttl
             else:
                 tout += ttl
+        self.table.setSortingEnabled(True)
         self.stat_cards["total"].update_value(str(len(movements)))
         self.stat_cards["in"].update_value(f"₺{tin:,.2f}")
         self.stat_cards["out"].update_value(f"₺{tout:,.2f}")
-        self.count_label.setText(f"Toplam: {len(movements)} hareket")
-        self.total_label.setText(f"Giriş: ₺{tin:,.2f} | Çıkış: ₺{tout:,.2f}")
+        self._total_count = len(movements)
+        self.count_label.setText(f"Toplam: {self._total_count} hareket")
+
+    def _update_visible_count(self, filters: dict = None):
+        """Görünen satır sayısını güncelle"""
+        visible_count = sum(
+            1 for row in range(self.table.rowCount())
+            if not self.table.isRowHidden(row)
+        )
+        if visible_count == self._total_count:
+            self.count_label.setText(f"Toplam: {self._total_count} hareket")
+        else:
+            self.count_label.setText(
+                f"Gösterilen: {visible_count} / {self._total_count} hareket"
+            )
 
     def _populate_row(self, r, mov, vcols):
+        t = get_theme()
+        default_color = QColor(t.text_primary)
+
         for ci, key in enumerate(vcols):
             if key == "date":
                 ds = (
@@ -190,9 +211,12 @@ class MovementListPage(QWidget):
                 )
                 it = QTableWidgetItem(ds)
                 it.setData(Qt.ItemDataRole.UserRole, mov.id)
+                it.setForeground(default_color)
                 self.table.setItem(r, ci, it)
             elif key == "document_no":
-                self.table.setItem(r, ci, QTableWidgetItem(mov.document_no or "-"))
+                it = QTableWidgetItem(mov.document_no or "-")
+                it.setForeground(default_color)
+                self.table.setItem(r, ci, it)
             elif key == "type":
                 txt, color = self.TYPE_NAMES.get(mov.movement_type, ("?", "#ffffff"))
                 it = QTableWidgetItem(txt)
@@ -204,23 +228,21 @@ class MovementListPage(QWidget):
                 it.setForeground(QColor("#818cf8"))
                 self.table.setItem(r, ci, it)
             elif key == "item_name":
-                self.table.setItem(
-                    r,
-                    ci,
-                    QTableWidgetItem(
-                        mov.item.name if mov.item else (mov.item_name or "-")
-                    ),
-                )
+                nm = mov.item.name if mov.item else (mov.item_name or "-")
+                it = QTableWidgetItem(nm)
+                it.setForeground(default_color)
+                self.table.setItem(r, ci, it)
             elif key == "quantity":
                 it = QTableWidgetItem(f"{mov.quantity or 0:,.2f}")
                 it.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
+                it.setForeground(default_color)
                 self.table.setItem(r, ci, it)
             elif key == "unit":
-                self.table.setItem(
-                    r, ci, QTableWidgetItem(mov.unit.code if mov.unit else "-")
-                )
+                it = QTableWidgetItem(mov.unit.code if mov.unit else "-")
+                it.setForeground(default_color)
+                self.table.setItem(r, ci, it)
             elif key in ["unit_price", "total"]:
                 v = mov.unit_price if key == "unit_price" else mov.total_price
                 sym = mov.currency.symbol if mov.currency else "₺"
@@ -228,33 +250,20 @@ class MovementListPage(QWidget):
                 it.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                 )
+                it.setForeground(default_color)
                 self.table.setItem(r, ci, it)
             elif key in ["from_wh", "to_wh"]:
-                self.table.setItem(
-                    r,
-                    ci,
-                    QTableWidgetItem(
-                        (
-                            mov.from_warehouse if key == "from_wh" else mov.to_warehouse
-                        ).code
-                        if (
-                            mov.from_warehouse if key == "from_wh" else mov.to_warehouse
-                        )
-                        else "-"
-                    ),
-                )
+                wh = mov.from_warehouse if key == "from_wh" else mov.to_warehouse
+                txt = wh.code if wh else "-"
+                it = QTableWidgetItem(txt)
+                it.setForeground(default_color)
+                self.table.setItem(r, ci, it)
 
     def get_filters(self) -> dict:
-        return {
-            "keyword": (
-                self.header.search_input.text().strip()
-                if self.header.search_input
-                else ""
-            ),
-            "movement_type": self.type_combo.currentData(),
-            "start_date": self.start_date.date().toPyDate(),
-            "end_date": self.end_date.date().toPyDate(),
-        }
+        return {"keyword": self.header.get_search_text()}
+
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
     def _show_context_menu(self, pos):
         row = self.table.rowAt(pos.y())
@@ -270,3 +279,11 @@ class MovementListPage(QWidget):
         vi.triggered.connect(lambda: self.view_clicked.emit(mid))
         menu.addAction(vi)
         menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._auto_refresh_timer.start(30000)
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._auto_refresh_timer.stop()

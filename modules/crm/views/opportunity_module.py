@@ -28,7 +28,6 @@ class OpportunityModule(QWidget):
             title="Fırsat Yönetimi",
             icon=ICONS.MONEY,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Fırsat",
             parent=self,

@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QTableWidgetItem,
-    QComboBox,
     QMenu,
     QMessageBox,
 )
@@ -37,13 +36,13 @@ class StockCountListPage(BaseListPage):
     def __init__(self, parent=None):
         cols = [
             ColumnConfig("count_no", "Sayım No", width=120),
-            ColumnConfig("date", "Tarih", width=140),
-            ColumnConfig("warehouse", "Depo", width=150),
+            ColumnConfig("date", "Tarih", width=140, filter_type="date"),
+            ColumnConfig("warehouse", "Depo", width=150, filter_type="enum"),
             ColumnConfig("description", "Açıklama", width=200, stretch=True),
-            ColumnConfig("item_count", "Ürün Sayısı", width=100),
-            ColumnConfig("counted", "Sayılan", width=100),
-            ColumnConfig("diff_amount", "Fark Tutarı", width=120),
-            ColumnConfig("status", "Durum", width=120),
+            ColumnConfig("item_count", "Ürün Sayısı", width=100, filter_type="number"),
+            ColumnConfig("counted", "Sayılan", width=100, filter_type="number"),
+            ColumnConfig("diff_amount", "Fark Tutarı", width=120, filter_type="number"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
             ColumnConfig(
                 "actions",
                 "İşlemler",
@@ -51,6 +50,7 @@ class StockCountListPage(BaseListPage):
                 resizable=False,
                 movable=False,
                 hideable=False,
+                filterable=False,
             ),
         ]
         super().__init__(
@@ -60,35 +60,14 @@ class StockCountListPage(BaseListPage):
             columns=cols,
             show_stats=True,
             show_search=True,
-            show_refresh=True,
             show_add=True,
             add_text="Yeni Sayım",
+            count_label_text="sayım",
             parent=parent,
         )
-        self._setup_filters()
         self._setup_stat_cards()
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
-
-    def _setup_filters(self):
-        self.status_combo = QComboBox()
-        self.status_combo.addItem("Tüm Durumlar", None)
-        for t, v in [
-            ("Taslak", "draft"),
-            ("Devam Ediyor", "in_progress"),
-            ("Tamamlandı", "completed"),
-            ("Uygulandı", "applied"),
-            ("İptal", "cancelled"),
-        ]:
-            self.status_combo.addItem(t, v)
-        self.status_combo.setMinimumWidth(150)
-        self.status_combo.currentIndexChanged.connect(
-            lambda: self.refresh_requested.emit()
-        )
-        if self.header.search_input:
-            hl = self.header.header_layout()
-            idx = hl.indexOf(self.header.search_input)
-            hl.insertWidget(idx, self.status_combo)
 
     def _setup_stat_cards(self):
         self.add_stat_card("draft", "Taslak", "0", "warning", ICONS.TIME)
@@ -102,11 +81,19 @@ class StockCountListPage(BaseListPage):
         self.table.row_double_clicked.connect(self.view_clicked.emit)
 
     def load_data(self, counts: list):
+        self.counts = counts
+        self._display_data(counts)
+        self._update_stats()
+
+    def _display_data(self, counts: list):
         self.table.setRowCount(len(counts))
         vcols = self.table.get_visible_columns()
-        dc = pc = cc = td = 0
         for r, c in enumerate(counts):
             self._populate_row(r, c, vcols)
+
+    def _update_stats(self):
+        dc = pc = cc = td = 0
+        for c in self.counts:
             s = c.get("status", "draft")
             if s == "draft":
                 dc += 1
@@ -207,15 +194,16 @@ class StockCountListPage(BaseListPage):
             else str(dt or "-")
         )
 
-    def get_status_filter(self) -> str:
-        return self.status_combo.currentData()
-
     def _show_context_menu(self, pos):
         row = self.table.rowAt(pos.y())
         if row < 0:
             return
-        cid = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        st = self.table.item(row, 7).text() if self.table.item(row, 7) else ""
+        item0 = self.table.item(row, 0)
+        item7 = self.table.item(row, 7)
+        if not item0:
+            return
+        cid = item0.data(Qt.ItemDataRole.UserRole)
+        st = item7.text() if item7 else ""
         menu = QMenu(self)
         vi = QAction("Görüntüle", self)
         vi.setIcon(qta.icon(ICONS.VIEW, color="#cccccc"))

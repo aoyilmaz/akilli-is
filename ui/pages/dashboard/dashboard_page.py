@@ -353,6 +353,14 @@ class DashboardPage(QWidget):
         except ImportError as e:
             print(f"Notification widget import hatası: {e}")
 
+        # Workflow widget'ları
+        try:
+            from .widgets.pending_approvals_widget import PendingApprovalsWidget
+
+            WidgetManager.register(PendingApprovalsWidget)
+        except ImportError as e:
+            print(f"PendingApprovals widget import hatası: {e}")
+
         # Aksiyon widget'ları
         try:
             from .widgets.quick_action_widget import QuickActionWidget
@@ -369,6 +377,18 @@ class DashboardPage(QWidget):
         except ImportError as e:
             print(f"Bottleneck widget import hatası: {e}")
 
+        # Gauge widget'ları
+        try:
+            from .widgets.gauge_widget import (
+                CapacityGaugeWidget,
+                EfficiencyGaugeWidget,
+            )
+
+            WidgetManager.register(CapacityGaugeWidget)
+            WidgetManager.register(EfficiencyGaugeWidget)
+        except ImportError as e:
+            print(f"Gauge widget import hatası: {e}")
+
     def _load_layout(self):
         """Kullanıcı düzenini yükle"""
         self._user_context = get_current_user()
@@ -382,10 +402,11 @@ class DashboardPage(QWidget):
         self._apply_layout(layout_data)
 
     def _apply_layout(self, layout_data: Dict[str, Any]):
-        """Düzeni uygular"""
+        """Düzeni uygular - staggered fade-in animasyonu ile"""
         self.grid_layout.clear_all()
 
         widgets_data = layout_data.get("widgets", [])
+        widget_index = 0  # Animasyon gecikme indeksi
 
         for widget_data in widgets_data:
             widget_code = widget_data.get("widget_code")
@@ -405,6 +426,9 @@ class DashboardPage(QWidget):
             if widget:
                 # Erişim kontrolü
                 if widget.can_user_access(self._user_context):
+                    # Widget'ı başlangıçta gizle
+                    widget.content_widget.setVisible(False)
+
                     self.grid_layout.add_widget(
                         widget,
                         row=position["row"],
@@ -413,8 +437,21 @@ class DashboardPage(QWidget):
                         height=size["height"],
                     )
 
-                    # İlk veri yüklemesi
-                    QTimer.singleShot(100, widget.refresh_data)
+                    # Staggered animasyon - her widget 50ms aralıkla
+                    delay = widget_index * 50
+                    QTimer.singleShot(
+                        delay + 100,
+                        lambda w=widget: self._animate_widget_in(w)
+                    )
+                    widget_index += 1
+
+    def _animate_widget_in(self, widget: BaseWidget):
+        """Widget'ı fade-in animasyonu ile göster ve veri yükle"""
+        widget.content_widget.setVisible(True)
+        if widget.enable_animations:
+            widget.fade_in(duration=300)
+        # Veri yüklemesi
+        QTimer.singleShot(50, widget.refresh_data)
 
     def _toggle_edit_mode(self):
         """Düzenleme modunu aç/kapat"""

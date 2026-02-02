@@ -46,7 +46,6 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
             title="Duruş Takibi",
             icon=ICONS.TIME,
             show_search=False,
-            show_refresh=True,
             show_add=True,
             add_text="Duruş Başlat",
             parent=self,

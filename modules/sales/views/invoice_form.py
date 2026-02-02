@@ -262,6 +262,13 @@ class InvoiceFormPage(QWidget):
 
         layout.addLayout(header_layout)
 
+        # Workflow Timeline Widget
+        from ui.components.workflow_timeline import WorkflowTimelineWidget
+
+        self.workflow_timeline = WorkflowTimelineWidget()
+        self.workflow_timeline.action_taken.connect(self._on_workflow_action)
+        layout.addWidget(self.workflow_timeline)
+
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -607,6 +614,25 @@ class InvoiceFormPage(QWidget):
                     float(item_data.get("unit_price", 0) or 0),
                     float(item_data.get("discount_rate", 0) or 0),
                 )
+
+        # Workflow timeline yükle
+        invoice_id = self.invoice_data.get("id")
+        if invoice_id:
+            self.workflow_timeline.load_workflow(
+                table_name="invoices",
+                document_id=invoice_id,
+                current_user_id=1,  # TODO: Mevcut kullanıcı ID'si
+            )
+
+    def _on_workflow_action(self, instance_id: int, action: str, comment: str):
+        """Workflow aksiyonu alındığında"""
+        # Formu yenile
+        if self.invoice_data:
+            self.workflow_timeline.load_workflow(
+                table_name="invoices",
+                document_id=self.invoice_data.get("id"),
+                current_user_id=1,
+            )
 
     def _on_save(self):
         if not self.selected_customer:
