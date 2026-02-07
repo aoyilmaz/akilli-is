@@ -670,6 +670,7 @@ class PDKSService:
             Çalışan bazlı özet listesi
         """
         from sqlalchemy import func, and_
+        from sqlalchemy.orm import joinedload
 
         start_date = date(year, month, 1)
         if month == 12:
@@ -677,9 +678,11 @@ class PDKSService:
         else:
             end_date = date(year, month + 1, 1)
 
-        # Temel sorgu
-        query = self.session.query(Employee).filter(
-            Employee.is_active == True, Employee.exit_date.is_(None)
+        # Temel sorgu - Department'ı eager load yap
+        query = (
+            self.session.query(Employee)
+            .options(joinedload(Employee.department))
+            .filter(Employee.is_active == True, Employee.exit_date.is_(None))
         )
 
         if department_id:
@@ -697,17 +700,30 @@ class PDKSService:
 
         employees = query.all()
 
+        if not employees:
+            return []
+
+        employee_ids = [e.id for e in employees]
+
+        # Tüm puantajları tek seferde çek
+        all_attendances = (
+            self.session.query(Attendance)
+            .filter(
+                Attendance.employee_id.in_(employee_ids),
+                Attendance.date >= start_date,
+                Attendance.date < end_date,
+            )
+            .all()
+        )
+
+        # Puantajları çalışan bazında grupla
+        attendance_map = {e_id: [] for e_id in employee_ids}
+        for att in all_attendances:
+            attendance_map[att.employee_id].append(att)
+
         results = []
         for emp in employees:
-            attendances = (
-                self.session.query(Attendance)
-                .filter(
-                    Attendance.employee_id == emp.id,
-                    Attendance.date >= start_date,
-                    Attendance.date < end_date,
-                )
-                .all()
-            )
+            attendances = attendance_map.get(emp.id, [])
 
             present = sum(
                 1 for a in attendances if a.status == AttendanceStatus.PRESENT

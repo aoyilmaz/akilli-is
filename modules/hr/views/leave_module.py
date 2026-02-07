@@ -72,32 +72,7 @@ class LeaveModule(QWidget):
         self.header.search_changed.connect(self.load_data)
         layout.addWidget(self.header)
 
-        # === Filtreler ===
-        t = get_theme()
-        filter_card = QFrame()
-        filter_card.setStyleSheet(
-            f"""
-            QFrame {{
-                background: {t.card_bg};
-                border: 1px solid {t.border};
-                border-radius: 8px;
-                padding: 12px;
-            }}
-        """
-        )
-        filter_layout = QHBoxLayout(filter_card)
-
-        filter_layout.addWidget(QLabel("Durum:"))
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Tüm Durumlar", None)
-        for s, lbl in LEAVE_STATUS_LABELS.items():
-            self.status_filter.addItem(lbl, s)
-        self.status_filter.setFixedHeight(36)
-        self.status_filter.currentIndexChanged.connect(self.load_data)
-        filter_layout.addWidget(self.status_filter)
-
-        filter_layout.addStretch()
-        layout.addWidget(filter_card)
+        # === Filtreler Card Kaldırıldı (Tablodan yapılabilir) ===
 
         # === Tablo ===
         columns = [
@@ -131,10 +106,11 @@ class LeaveModule(QWidget):
         """Verileri yükle"""
         try:
             service = self._get_service()
-            status = self.status_filter.currentData()
+            # Durum filtresi kaldırıldı, sadece arama metni ile filtreleme yapılabilir
+            # veya tablo kendi içinde filtreleyebilir. Service tarafında default None gidecek.
             search = self.header.search_input.text().strip() or None
 
-            leaves = service.get_leaves(status=status, search=search, limit=500)
+            leaves = service.get_leaves(search=search, limit=500)
             self.table.setRowCount(len(leaves))
 
             visible_cols = self.table.get_visible_columns()

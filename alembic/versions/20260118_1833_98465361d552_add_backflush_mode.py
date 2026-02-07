@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -21,20 +22,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # BackflushMode enum oluştur
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    # BackflushMode enum oluştur (safe)
+    # Using raw SQL for safety in enum creation check usually, but sqlalchemy Enum.create(checkfirst=True) is good.
     backflush_enum = sa.Enum("ON_START", "ON_COMPLETE", "MANUAL", name="backflushmode")
     backflush_enum.create(op.get_bind(), checkfirst=True)
 
     # work_orders tablosuna backflush_mode ekle
-    with op.batch_alter_table("work_orders", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column(
-                "backflush_mode",
-                sa.Enum("ON_START", "ON_COMPLETE", "MANUAL", name="backflushmode"),
-                nullable=True,
-                server_default="ON_START",
+    columns = [c["name"] for c in insp.get_columns("work_orders")]
+
+    if "backflush_mode" not in columns:
+        with op.batch_alter_table("work_orders", schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column(
+                    "backflush_mode",
+                    sa.Enum("ON_START", "ON_COMPLETE", "MANUAL", name="backflushmode"),
+                    nullable=True,
+                    server_default="ON_START",
+                )
             )
-        )
 
 
 def downgrade() -> None:

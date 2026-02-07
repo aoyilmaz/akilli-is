@@ -19,7 +19,8 @@ class OpportunityModule(QWidget):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         # === Header - PageHeader kullanarak ===
         from ui.components.page_header import PageHeader

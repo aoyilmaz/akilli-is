@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Akıllı İş - Dashboard Grid Layout
 
@@ -24,6 +26,7 @@ from .widgets.base import BaseWidget, WidgetConfig
 @dataclass
 class GridCell:
     """Grid hücre bilgisi"""
+
     row: int
     col: int
     occupied: bool = False
@@ -49,7 +52,8 @@ class WidgetPlaceholder(QFrame):
         self._setup_style()
 
     def _setup_style(self):
-        self.setStyleSheet(f"""
+        self.setStyleSheet(
+            f"""
             WidgetPlaceholder {{
                 background: {COLORS['bg_secondary']};
                 border: 2px dashed {COLORS['border']};
@@ -59,7 +63,8 @@ class WidgetPlaceholder(QFrame):
                 border-color: {COLORS['primary']};
                 background: {COLORS['bg_hover']};
             }}
-        """)
+        """
+        )
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -94,7 +99,9 @@ class DashboardGridLayout(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._widgets: Dict[str, Tuple[BaseWidget, int, int, int, int]] = {}  # code -> (widget, row, col, width, height)
+        self._widgets: Dict[str, Tuple[BaseWidget, int, int, int, int]] = (
+            {}
+        )  # code -> (widget, row, col, width, height)
         self._edit_mode = False
         self._grid: List[List[GridCell]] = []
 
@@ -171,12 +178,7 @@ class DashboardGridLayout(QWidget):
         self.cell_clicked.emit(row, col)
 
     def add_widget(
-        self,
-        widget: BaseWidget,
-        row: int,
-        col: int,
-        width: int = 1,
-        height: int = 1
+        self, widget: BaseWidget, row: int, col: int, width: int = 1, height: int = 1
     ) -> bool:
         """
         Widget ekler
@@ -192,12 +194,21 @@ class DashboardGridLayout(QWidget):
             Başarılı ise True
         """
         # Sınır kontrolü
-        if row < 0 or col < 0 or row + height > self.MAX_ROWS or col + width > self.COLUMNS:
-            print(f"Widget sınır dışı: row={row}, col={col}, width={width}, height={height}")
+        if (
+            row < 0
+            or col < 0
+            or row + height > self.MAX_ROWS
+            or col + width > self.COLUMNS
+        ):
+            print(
+                f"Widget sınır dışı: row={row}, col={col}, width={width}, height={height}"
+            )
             return False
 
         # Çakışma kontrolü
-        if not self._can_place_widget(row, col, width, height, exclude_code=widget.widget_code):
+        if not self._can_place_widget(
+            row, col, width, height, exclude_code=widget.widget_code
+        ):
             print(f"Widget çakışması: {widget.widget_code} at ({row}, {col})")
             return False
 
@@ -266,7 +277,7 @@ class DashboardGridLayout(QWidget):
         col: int,
         width: int,
         height: int,
-        exclude_code: Optional[str] = None
+        exclude_code: Optional[str] = None,
     ) -> bool:
         """Widget yerleştirilebilir mi kontrol eder"""
         for r in range(row, row + height):
@@ -278,7 +289,9 @@ class DashboardGridLayout(QWidget):
                     return False
         return True
 
-    def _mark_cells(self, row: int, col: int, width: int, height: int, widget_code: str):
+    def _mark_cells(
+        self, row: int, col: int, width: int, height: int, widget_code: str
+    ):
         """Hücreleri işaretle"""
         for r in range(row, row + height):
             for c in range(col, col + width):
@@ -292,7 +305,7 @@ class DashboardGridLayout(QWidget):
                 self._grid[r][c].occupied = False
                 self._grid[r][c].widget_code = None
 
-    def get_widget(self, widget_code: str) -> Optional[BaseWidget]:
+    def get_widget(self, widget_code: str) -> Optional["BaseWidget"]:
         """Widget'ı döner"""
         if widget_code in self._widgets:
             return self._widgets[widget_code][0]
@@ -312,18 +325,16 @@ class DashboardGridLayout(QWidget):
         widgets_data = []
 
         for code, (widget, row, col, width, height) in self._widgets.items():
-            widgets_data.append({
-                "widget_code": code,
-                "position": {"row": row, "col": col},
-                "size": {"width": width, "height": height},
-                "config": widget.get_config().config
-            })
+            widgets_data.append(
+                {
+                    "widget_code": code,
+                    "position": {"row": row, "col": col},
+                    "size": {"width": width, "height": height},
+                    "config": widget.get_config().config,
+                }
+            )
 
-        return {
-            "version": "1.0",
-            "grid_columns": self.COLUMNS,
-            "widgets": widgets_data
-        }
+        return {"version": "1.0", "grid_columns": self.COLUMNS, "widgets": widgets_data}
 
     def clear_all(self):
         """Tüm widget'ları kaldırır"""
@@ -341,7 +352,9 @@ class DashboardGridLayout(QWidget):
             except Exception as e:
                 print(f"Widget yenileme hatası ({code}): {e}")
 
-    def find_empty_position(self, width: int = 1, height: int = 1) -> Optional[Tuple[int, int]]:
+    def find_empty_position(
+        self, width: int = 1, height: int = 1
+    ) -> Optional[Tuple[int, int]]:
         """
         Boş pozisyon bulur
 

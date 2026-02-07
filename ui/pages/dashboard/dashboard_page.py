@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Akıllı İş - Modüler Dashboard Sayfası
 
@@ -440,8 +442,7 @@ class DashboardPage(QWidget):
                     # Staggered animasyon - her widget 50ms aralıkla
                     delay = widget_index * 50
                     QTimer.singleShot(
-                        delay + 100,
-                        lambda w=widget: self._animate_widget_in(w)
+                        delay + 100, lambda w=widget: self._animate_widget_in(w)
                     )
                     widget_index += 1
 

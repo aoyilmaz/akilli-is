@@ -149,15 +149,8 @@ class ShiftTeamOverview(QWidget):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
-        self.summary_label = QLabel()
-        t = get_theme()
-        self.summary_label.setStyleSheet(
-            f"color: {t.text_secondary}; font-weight: bold;"
-        )
-
         h_layout = self.header.header_layout()
         h_layout.addStretch()
-        h_layout.addWidget(self.summary_label)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -189,9 +182,6 @@ class ShiftTeamOverview(QWidget):
             un = [e for e in emps if not e.shift_team_id]
             if un:
                 self.tabs.addTab(TeamTab(None, un), f"Atanmamış ({len(un)})")
-            self.summary_label.setText(
-                f"Toplam: {len(emps)} çalışan, {total_a} ekip atanmış, {len(un)} atanmamış"
-            )
         except Exception as e:
             print(f"Vardiya ekibi yükleme hatası: {e}")
 

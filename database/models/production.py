@@ -46,12 +46,24 @@ class WorkOrderStatus(enum.Enum):
     """İş emri durumları"""
 
     DRAFT = "draft"
+    PENDING = "pending"
     PLANNED = "planned"
     RELEASED = "released"
     IN_PROGRESS = "in_progress"
     QUALITY_CHECK = "quality_check"  # Yeni: Kalite kontrol aşaması
     COMPLETED = "completed"
     CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
+class WorkOrderOperationStatus(enum.Enum):
+    """İş emri operasyon durumları"""
+
+    WAITING = "waiting"
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    PAUSED = "paused"
     CANCELLED = "cancelled"
 
 
@@ -272,18 +284,7 @@ class WorkStation(BaseModel):
         return int(hours * 60 * efficiency)
 
     def get_remaining_capacity(self, target_date, session) -> int:
-        """
-        Belirli bir tarih için kalan kapasiteyi hesapla (dakika).
-
-        Args:
-            target_date: Hedef tarih (date objesi)
-            session: SQLAlchemy session
-
-        Returns:
-            Kalan kapasite (dakika)
-        """
-        from datetime import date as date_type
-
+        """Belirli bir tarih için kalan kapasiteyi hesapla (dakika)."""
         total_capacity = self.daily_capacity_minutes
 
         # O gün için planlanmış operasyonların toplam süresi
@@ -518,11 +519,12 @@ class WorkOrder(BaseModel):
         if total_planned == 0:
             # Eğer planned_quantity operasyonlarda yoksa operasyon sayısı üzerinden git
             completed_count = sum(
-                1 for op in self.operations if op.status == "completed"
+                1
+                for op in self.operations
+                if op.status == WorkOrderOperationStatus.COMPLETED
             )
             return Decimal(completed_count) / Decimal(len(self.operations)) * 100
 
-        total_completed = sum(op.completed_quantity or 0 for op in self.operations)
         # Ortalama yüzde (basit versiyon)
         total_percent = sum(
             (op.completed_quantity or 0) / (op.planned_quantity or 1)
@@ -535,6 +537,47 @@ class WorkOrder(BaseModel):
         return (self.planned_quantity or Decimal(0)) - (
             self.completed_quantity or Decimal(0)
         )
+
+    @property
+    def delay_risk(self) -> str:
+        """
+        Gecikme riskini hesaplar:
+        - 'none': Risk yok (veya tamamlandı)
+        - 'low': Hafif gecikme riski
+        - 'high': Yüksek gecikmeyi riski veya zaten gecikmiş
+        """
+        if self.status in [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED]:
+            return "none"
+
+        now = datetime.now()
+        if not self.planned_end:
+            return "none"
+
+        # Zaten gecikmişse
+        if now > self.planned_end:
+            return "high"
+
+        # Bitime 24 saatten az kalmış ve ilerleme %50 altındaysa
+        planned_duration = (self.planned_end - self.planned_start).total_seconds()
+        if planned_duration > 0:
+            remaining_time = (self.planned_end - now).total_seconds()
+            if remaining_time < 86400 and float(self.progress_rate) < 50:
+                return "high"
+            if remaining_time < 172800 and float(self.progress_rate) < 30:
+                return "low"
+
+        return "none"
+
+    @property
+    def total_oee(self) -> float:
+        """İş emri genelindeki operasyonların ortalama OEE yüzdesi"""
+        if not self.operations:
+            return 0.0
+
+        oee_list = [op.oee_score for op in self.operations if op.oee_score > 0]
+        if not oee_list:
+            return 0.0
+        return sum(oee_list) / len(oee_list)
 
 
 class WorkOrderLine(BaseModel):
@@ -595,7 +638,9 @@ class WorkOrderOperation(BaseModel):
 
     work_station_id = Column(Integer, ForeignKey("work_stations.id"), nullable=True)
 
-    status = Column(String(20), default="pending")
+    status = Column(
+        Enum(WorkOrderOperationStatus), default=WorkOrderOperationStatus.WAITING
+    )
 
     planned_setup_time = Column(Integer, default=0)
     planned_run_time = Column(Integer, default=0)
@@ -643,6 +688,55 @@ class WorkOrderOperation(BaseModel):
     # Fason Üretim - Hizmet Alımı Siparişi
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
     purchase_order = relationship("PurchaseOrder", foreign_keys=[purchase_order_id])
+
+    downtimes = relationship(
+        "ProductionDowntime",
+        back_populates="operation",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def availability(self) -> float:
+        """Kullanılabilirlik = Çalışma Süresi / (Çalışma Süresi + Duruş Süresi)"""
+        run_time_sec = (self.actual_run_time or 0) * 60
+        setup_time_sec = (self.actual_setup_time or 0) * 60
+        total_run_sec = run_time_sec + setup_time_sec
+
+        if total_run_sec == 0:
+            return 0.0
+
+        downtime_sec = sum((d.duration_minutes or 0) for d in self.downtimes) * 60
+        return total_run_sec / (total_run_sec + downtime_sec)
+
+    @property
+    def performance(self) -> float:
+        """Performans = (Toplam Üretilen * İdeal Çevrim Süresi) / Gerçek Çalışma Süresi"""
+        actual_run_min = self.actual_run_time or 0
+        if actual_run_min == 0:
+            return 0.0
+
+        # İdeal çevrim süresi = Planlanan süre / Planlanan miktar
+        planned_qty = float(self.work_order.planned_quantity or 1)
+        if planned_qty == 0:
+            planned_qty = 1
+        ideal_cycle_min = (self.planned_run_time or 0) / planned_qty
+
+        expected_time_min = float(self.completed_quantity or 0) * ideal_cycle_min
+        return min(expected_time_min / actual_run_min, 1.2)  # Max %120
+
+    @property
+    def quality(self) -> float:
+        """Kalite = Sağlam Ürün / Toplam Üretilen"""
+        total = float(self.completed_quantity or 0)
+        if total == 0:
+            return 0.0
+        scrapped = float(self.scrapped_quantity or 0)
+        return max(0.0, (total - scrapped) / total)
+
+    @property
+    def oee_score(self) -> float:
+        """OEE = Availability * Performance * Quality (Percentage 0-100)"""
+        return self.availability * self.performance * self.quality * 100
 
     __table_args__ = (Index("idx_woop_wo", "work_order_id"),)
 
@@ -740,7 +834,7 @@ class ProductionDowntime(BaseModel):
 
     # İlişkiler
     work_order = relationship("WorkOrder")
-    operation = relationship("WorkOrderOperation")
+    operation = relationship("WorkOrderOperation", back_populates="downtimes")
     work_station = relationship("WorkStation")
     operator = relationship("User")
 

@@ -19,7 +19,11 @@ from database.models.purchasing import (
     GoodsReceiptItem,
     PurchaseOrder,
 )
-from database.models.production import WorkOrder, WorkOrderStatus
+from database.models.production import (
+    WorkOrder,
+    WorkOrderStatus,
+    WorkOrderOperationStatus,
+)
 
 
 class ReportsService:
@@ -297,16 +301,14 @@ class ReportsService:
         on_time_count = 0
 
         details = []
+        total_oee = 0.0
         details = []
         for wo in work_orders:
+            oee = wo.total_oee
+            total_oee += oee
+
             planned = wo.planned_quantity or Decimal(0)
             actual = wo.completed_quantity or Decimal(0)
-            # Kabul edilen = tamamlanan (kalite kontrolü varsa ayarlanabilir)
-            good = actual
-
-            total_planned_qty += planned
-            total_actual_qty += actual
-            total_good_qty += good
 
             # Zamanında tamamlandı mı?
             if wo.planned_end and wo.actual_end:
@@ -319,42 +321,61 @@ class ReportsService:
                     "item_name": wo.item.name if wo.item else "",
                     "planned_qty": float(planned),
                     "actual_qty": float(actual),
+                    "oee_score": float(oee),
                     "performance": float(actual / planned * 100) if planned > 0 else 0,
                 }
             )
 
-        # OEE Hesaplama
-        # Kullanılabilirlik = Zamanında tamamlanan / Toplam
-        availability = (on_time_count / len(work_orders) * 100) if work_orders else 0
-
-        # Performans = Gerçek Üretim / Planlanan Üretim
-        performance = (
-            float(total_actual_qty / total_planned_qty * 100)
-            if total_planned_qty > 0
-            else 0
-        )
-
-        # Kalite = Kabul Edilen / Toplam Üretim
-        quality = (
-            float(total_good_qty / total_actual_qty * 100)
-            if total_actual_qty > 0
-            else 100
-        )
-
-        # OEE = Kullanılabilirlik x Performans x Kalite / 10000
-        oee = (availability * performance * quality) / 10000
+        # Ortalama OEE
+        oee_avg = total_oee / len(work_orders) if work_orders else 0
 
         return {
-            "availability": round(availability, 1),
-            "performance": round(performance, 1),
-            "quality": round(quality, 1),
-            "oee": round(oee, 1),
+            "oee": round(oee_avg, 1),
             "total_orders": len(work_orders),
             "on_time_count": on_time_count,
-            "total_planned": float(total_planned_qty),
-            "total_actual": float(total_actual_qty),
+            "on_time_rate": (
+                round(on_time_count / len(work_orders) * 100, 1) if work_orders else 0
+            ),
             "details": details,
         }
+
+    def get_realtime_oee(self) -> List[Dict]:
+        """Anlık üretim performans izleme verisi (Canlı)"""
+        # Aktif iş emirlerini getir (IN_PROGRESS)
+        current_work_orders = (
+            self.session.query(WorkOrder)
+            .filter(WorkOrder.status == WorkOrderStatus.IN_PROGRESS)
+            .all()
+        )
+
+        results = []
+        for wo in current_work_orders:
+            # İş emrinin aktif operasyonlarını bul
+            for op in wo.operations:
+                if op.status == WorkOrderOperationStatus.IN_PROGRESS:
+                    results.append(
+                        {
+                            "id": op.id,
+                            "work_order_no": wo.order_no,
+                            "item_name": wo.item.name if wo.item else "Bilinmiyor",
+                            "work_station": (
+                                op.work_station.name
+                                if op.work_station
+                                else "Bilinmiyor"
+                            ),
+                            "work_station_code": (
+                                op.work_station.code if op.work_station else None
+                            ),
+                            "oee": round(op.oee_score, 1),
+                            "availability": round(op.availability * 100, 1),
+                            "performance": round(op.performance * 100, 1),
+                            "quality": round(op.quality * 100, 1),
+                            "completed": float(op.completed_quantity or 0),
+                            "planned": float(wo.planned_quantity or 0),
+                        }
+                    )
+
+        return results
 
     # =====================
     # TEDARİKÇİ PERFORMANS

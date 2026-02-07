@@ -24,36 +24,72 @@ from PyQt6.QtCore import Qt, QDateTime, QTimer
 import qtawesome as qta
 
 from config.icons import ICONS
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
 from ui.components.page_header import PageHeader
 from ui.components.stat_cards import MiniStatCard
-from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
+from ui.components.enhanced_table import ColumnConfig
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
 
 
-class DowntimeTrackerWidget(MaintenanceBaseWidget):
+class DowntimeTrackerWidget(BaseListPage):
     """Duruş Takibi Widget'ı"""
 
     def __init__(self, parent=None):
-        super().__init__("Duruş Takibi", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
+
+        columns = [
+            ColumnConfig(
+                "equipment", "Ekipman", width=200, filterable=True, stretch=True
+            ),
+            ColumnConfig("start", "Başlangıç", width=150),
+            ColumnConfig("end", "Bitiş", width=150),
+            ColumnConfig("duration", "Süre", width=100),
+            ColumnConfig("reason", "Sebep", width=150, filterable=True),
+            ColumnConfig("wo", "İş Emri", width=120, filterable=True),
+            ColumnConfig("status", "Durum", width=120, filterable=True),
+        ]
+
+        super().__init__(
+            title="Duruş Takibi",
+            icon=ICONS.TIME,
+            table_id="maintenance_downtime",
+            columns=columns,
+            show_add=True,
+            add_text="Duruş Başlat",
+            parent=parent,
+        )
+
+        self._setup_extra_ui()
+        self.add_clicked.connect(self.start_downtime)
+        self.refresh_requested.connect(self.refresh_data)
+
+        # Override auto-refresh timer to update active downtimes if filter is set
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_active_downtimes)
         self.timer.start(60000)
 
-    def setup_ui(self):
-        # Header
-        self.header = PageHeader(
-            title="Duruş Takibi",
-            icon=ICONS.TIME,
-            show_search=False,
-            show_add=True,
-            add_text="Duruş Başlat",
-            parent=self,
-        )
-        self.header.add_clicked.connect(self.start_downtime)
-        self.header.refresh_clicked.connect(self.refresh_data)
+    def closeEvent(self, e):
+        self.timer.stop()
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(e)
+
+    def _setup_extra_ui(self):
+        # Inject custom stats summary into header layout or above table
+        # BaseListPage adds header then table. We can insert a layout between them or adding to layout.
+        # But layout is not directly accessible easily if we want to INSERT.
+        # Luckily BaseListPage uses a QVBoxLayout (self.layout()).
+
+        # We'll add the stats layout right after the header (index 1)
+        self.summary_widget = QWidget()
+        self.summary_layout = QHBoxLayout(self.summary_widget)
+        self.summary_layout.setContentsMargins(0, 0, 0, 0)
+        self.layout().insertWidget(1, self.summary_widget)
 
         h_layout = self.header.header_layout()
+        h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Göster:"))
         self.cmb_filter = QComboBox()
         self.cmb_filter.addItems(["Aktif Duruşlar", "Bugün", "Bu Hafta", "Tümü"])
@@ -61,7 +97,7 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
         self.cmb_filter.setItemData(1, "today")
         self.cmb_filter.setItemData(2, "week")
         self.cmb_filter.setItemData(3, "all")
-        self.cmb_filter.setFixedHeight(36)
+        self.cmb_filter.setFixedHeight(32)
         self.cmb_filter.currentIndexChanged.connect(self.refresh_data)
         h_layout.addWidget(self.cmb_filter)
         h_layout.addStretch()
@@ -69,31 +105,24 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
         self.btn_end = QPushButton("Duruşu Bitir")
         self.btn_end.setIcon(qta.icon(ICONS.CHECK, color="#ffffff"))
         self.btn_end.setProperty("class", "btn-success")
-        self.btn_end.setFixedHeight(36)
+        self.btn_end.setFixedHeight(32)
         self.btn_end.clicked.connect(self.end_downtime)
         h_layout.addWidget(self.btn_end)
 
-        self.layout.addWidget(self.header)
-
-        # Active Summary
-        self.summary_layout = QHBoxLayout()
-        self.layout.addLayout(self.summary_layout)
-
-        # Table
-        cols = [
-            ColumnConfig("equipment", "Ekipman", width=200, stretch=True),
-            ColumnConfig("start", "Başlangıç", width=150),
-            ColumnConfig("end", "Bitiş", width=150),
-            ColumnConfig("duration", "Süre", width=100),
-            ColumnConfig("reason", "Sebep", width=150),
-            ColumnConfig("wo", "İş Emri", width=120),
-            ColumnConfig("status", "Durum", width=120),
-        ]
-        self.table = EnhancedTableWidget(
-            table_id="maint_downtime", columns=cols, parent=self
+        # Filters options for table
+        self.table.set_filter_options("status", ["Devam Ediyor", "Tamamlandı"])
+        self.table.set_filter_options(
+            "reason",
+            [
+                "Arıza",
+                "Bakım",
+                "Ayar",
+                "Eksik Malzeme",
+                "Operatör Yok",
+                "Kalite",
+                "Diğer",
+            ],
         )
-        self.layout.addWidget(self.table)
-        self.refresh_data()
 
     def refresh_data(self):
         f = self.cmb_filter.currentData()
@@ -105,19 +134,20 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
             d = self.service.get_week_downtimes()
         else:
             d = self.service.get_all_downtimes()
+
         self._refresh_summary()
-        self._populate_table(d)
+        self.load_data(d)
 
     def _refresh_summary(self):
         while self.summary_layout.count():
             w = self.summary_layout.takeAt(0).widget()
             if w:
                 w.deleteLater()
+
         actives = self.service.get_active_downtimes()
         if not actives:
-            lbl = QLabel("Aktif duruş yok")
-            lbl.setStyleSheet("color: #10b981; font-weight: bold; padding: 10px;")
-            self.summary_layout.addWidget(lbl)
+            # Optional: Hide widget if empty or show "No Active Downtime"
+            pass
         else:
             for dt in actives[:4]:
                 dur = datetime.now() - dt.start_time
@@ -130,81 +160,80 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
                 )
                 self.summary_layout.addWidget(card)
             if len(actives) > 4:
-                self.summary_layout.addWidget(QLabel(f"+{len(actives)-4} daha"))
+                lbl = QLabel(f"+{len(actives)-4} daha")
+                lbl.setStyleSheet("font-weight: bold; color: #6b7280;")
+                self.summary_layout.addWidget(lbl)
         self.summary_layout.addStretch()
 
-    def _populate_table(self, items):
+    def load_data(self, items):
         self.table.setRowCount(len(items))
-        vcols = self.table.get_visible_columns()
+
         for i, dt in enumerate(items):
-            for c, key in enumerate(vcols):
-                if key == "equipment":
-                    it = QTableWidgetItem(dt.equipment.name if dt.equipment else "-")
-                    it.setData(Qt.ItemDataRole.UserRole, dt.id)
-                    self.table.setItem(i, c, it)
-                elif key == "start":
-                    self.table.setItem(
-                        i, c, QTableWidgetItem(dt.start_time.strftime("%d.%m.%Y %H:%M"))
-                    )
-                elif key == "end":
-                    self.table.setItem(
-                        i,
-                        c,
-                        QTableWidgetItem(
-                            dt.end_time.strftime("%d.%m.%Y %H:%M")
-                            if dt.end_time
-                            else "-"
-                        ),
-                    )
-                elif key == "duration":
-                    dur = (dt.end_time or datetime.now()) - dt.start_time
-                    val = f"{int(dur.total_seconds()//3600)}s {int((dur.total_seconds()%3600)//60)}dk"
-                    it = QTableWidgetItem(val)
-                    if not dt.end_time:
-                        it.setForeground(Qt.GlobalColor.red)
-                    self.table.setItem(i, c, it)
-                elif key == "reason":
-                    r_map = {
-                        "breakdown": "Arıza",
-                        "maintenance": "Bakım",
-                        "setup": "Ayar",
-                        "no_material": "Eksik Malzeme",
-                        "no_operator": "Operatör Yok",
-                        "quality_issue": "Kalite",
-                        "other": "Diğer",
-                    }
-                    self.table.setItem(
-                        i, c, QTableWidgetItem(r_map.get(dt.reason, dt.reason or "-"))
-                    )
-                elif key == "wo":
-                    self.table.setItem(
-                        i,
-                        c,
-                        QTableWidgetItem(
-                            dt.work_order.order_no if dt.work_order else "-"
-                        ),
-                    )
-                elif key == "status":
-                    it = QTableWidgetItem(
-                        "Devam Ediyor" if not dt.end_time else "Tamamlandı"
-                    )
-                    it.setForeground(
-                        Qt.GlobalColor.red
-                        if not dt.end_time
-                        else Qt.GlobalColor.darkGreen
-                    )
-                    self.table.setItem(i, c, it)
+            # Equipment
+            it = QTableWidgetItem(dt.equipment.name if dt.equipment else "-")
+            it.setData(Qt.ItemDataRole.UserRole, dt.id)
+            self.table.setItem(i, 0, it)
+
+            # Start
+            self.table.setItem(
+                i, 1, QTableWidgetItem(dt.start_time.strftime("%d.%m.%Y %H:%M"))
+            )
+
+            # End
+            self.table.setItem(
+                i,
+                2,
+                QTableWidgetItem(
+                    dt.end_time.strftime("%d.%m.%Y %H:%M") if dt.end_time else "-"
+                ),
+            )
+
+            # Duration
+            dur = (dt.end_time or datetime.now()) - dt.start_time
+            val = f"{int(dur.total_seconds()//3600)}s {int((dur.total_seconds()%3600)//60)}dk"
+            it = QTableWidgetItem(val)
+            if not dt.end_time:
+                it.setForeground(Qt.GlobalColor.red)
+            self.table.setItem(i, 3, it)
+
+            # Reason
+            r_map = {
+                "breakdown": "Arıza",
+                "maintenance": "Bakım",
+                "setup": "Ayar",
+                "no_material": "Eksik Malzeme",
+                "no_operator": "Operatör Yok",
+                "quality_issue": "Kalite",
+                "other": "Diğer",
+            }
+            self.table.setItem(
+                i, 4, QTableWidgetItem(r_map.get(dt.reason, dt.reason or "-"))
+            )
+
+            # Work Order
+            self.table.setItem(
+                i,
+                5,
+                QTableWidgetItem(dt.work_order.order_no if dt.work_order else "-"),
+            )
+
+            # Status
+            it = QTableWidgetItem("Devam Ediyor" if not dt.end_time else "Tamamlandı")
+            it.setForeground(
+                Qt.GlobalColor.red if not dt.end_time else Qt.GlobalColor.darkGreen
+            )
+            self.table.setItem(i, 6, it)
+
+        self.update_count(len(items))
 
     def update_active_downtimes(self):
         if self.cmb_filter.currentData() == "active":
-            self._refresh_summary()
             self.refresh_data()
+        else:
+            self._refresh_summary()
 
     def get_selected_downtime_id(self) -> Optional[int]:
-        row = self.table.currentRow()
-        return (
-            self.table.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 else None
-        )
+        return self.table.get_selected_id()
 
     def start_downtime(self):
         if DowntimeStartDialog(self.service, self).exec():
@@ -213,9 +242,11 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
     def end_downtime(self):
         did = self.get_selected_downtime_id()
         if not did:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir duruş seçin.")
             return
         dt = self.service.get_downtime_by_id(did)
         if dt.end_time:
+            QMessageBox.information(self, "Bilgi", "Bu duruş zaten sonlandırılmış.")
             return
         if (
             QMessageBox.question(
@@ -232,9 +263,9 @@ class DowntimeTrackerWidget(MaintenanceBaseWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Hata", str(e))
 
-    def closeEvent(self, e):
-        self.timer.stop()
-        super().closeEvent(e)
+    # Interface Implementation
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
 
 class DowntimeStartDialog(QDialog):
@@ -298,6 +329,7 @@ class DowntimeStartDialog(QDialog):
     def accept(self):
         eid = self.cmb_eq.currentData()
         if not eid:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir ekipman seçin.")
             return
         try:
             self.service.start_downtime(

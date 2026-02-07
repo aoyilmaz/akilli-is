@@ -805,7 +805,7 @@ class WorkOrderModule(QWidget):
                     work_station_id=op_data.get("work_station_id"),
                     planned_setup_time=int(op_data.get("setup_time", 0)),
                     planned_run_time=int(float(op_data.get("run_time", 0))),
-                    status="pending",
+                    status=WorkOrderOperationStatus.WAITING,
                 )
                 self.wo_service.session.add(new_op)
 
@@ -825,7 +825,10 @@ class WorkOrderModule(QWidget):
     def _change_status(self, wo_id: int, new_status: str):
         """İş emri durumunu değiştir"""
         try:
-            from database.models.production import WorkOrderStatus
+            from database.models.production import (
+                WorkOrderStatus,
+                WorkOrderOperationStatus,
+            )
 
             # "in_progress" için özel dialog
             if new_status == "in_progress":

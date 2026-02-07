@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+         xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+         xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
+    <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
+    <cbc:ProfileID>{{ profile }}</cbc:ProfileID>
+    <cbc:ID>{{ invoice_number }}</cbc:ID>
+    <cbc:CopyIndicator>false</cbc:CopyIndicator>
+    <cbc:UUID>{{ uuid }}</cbc:UUID>
+    <cbc:IssueDate>{{ issue_date.strftime('%Y-%m-%d') }}</cbc:IssueDate>
+    <cbc:IssueTime>{{ issue_date.strftime('%H:%M:%S') }}</cbc:IssueTime>
+    <cbc:InvoiceTypeCode>{{ invoice_type }}</cbc:InvoiceTypeCode>
+    <cbc:DocumentCurrencyCode>{{ currency_code }}</cbc:DocumentCurrencyCode>
+
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="VKN">{{ sender_vkn }}</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>{{ sender_name }}</cbc:Name>
+            </cac:PartyName>
+            <!-- Add address and contact details here -->
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="VKN">{{ receiver_vkn }}</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>{{ receiver_name }}</cbc:Name>
+            </cac:PartyName>
+             <!-- Add address and contact details here -->
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+    
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="{{ currency_code }}">{{ tax_amount }}</cbc:TaxAmount>
+        <!-- Add tax subtotals here -->
+    </cac:TaxTotal>
+    
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="{{ currency_code }}">{{ line_extension_amount }}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="{{ currency_code }}">{{ tax_exclusive_amount }}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="{{ currency_code }}">{{ tax_inclusive_amount }}</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="{{ currency_code }}">{{ payable_amount }}</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    
+    {% for line in lines %}
+    <cac:InvoiceLine>
+        <cbc:ID>{{ loop.index }}</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="{{ line.unit_code }}">{{ line.quantity }}</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="{{ currency_code }}">{{ line.line_total }}</cbc:LineExtensionAmount>
+        <cac:TaxTotal>
+             <cbc:TaxAmount currencyID="{{ currency_code }}">{{ line.tax_amount }}</cbc:TaxAmount>
+             <!-- Add tax subtotal for line here -->
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>{{ line.item_name }}</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="{{ currency_code }}">{{ line.price }}</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    {% endfor %}
+</Invoice>

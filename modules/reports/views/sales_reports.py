@@ -189,19 +189,19 @@ class SalesReportsPage(QWidget):
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
-                    self.table.setItem(r, c, it)
+                    self.product_table.setItem(r, c, it)
                 elif key == "val":
                     it = QTableWidgetItem(f"₺{itm.get('total_amount', 0):,.2f}")
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
-                    self.table.setItem(r, c, it)
+                    self.product_table.setItem(r, c, it)
                 elif key == "cnt":
                     it = QTableWidgetItem(str(itm.get("sale_count", 0)))
                     it.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
-                    self.table.setItem(r, c, it)
+                    self.product_table.setItem(r, c, it)
 
     def load_period_data(self, data: list):
         self.period_table.setRowCount(len(data))

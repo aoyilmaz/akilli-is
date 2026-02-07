@@ -4,15 +4,29 @@ Hata Kayıtları ve Loglama
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QComboBox, QCheckBox, QMessageBox,
-    QHeaderView, QAbstractItemView, QGroupBox, QTextEdit, QDialog
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QPushButton,
+    QLabel,
+    QComboBox,
+    QCheckBox,
+    QMessageBox,
+    QHeaderView,
+    QAbstractItemView,
+    QGroupBox,
+    QTextEdit,
+    QDialog,
+    QTabWidget,
 )
 from PyQt6.QtCore import Qt
 from datetime import datetime, timedelta
 
 from modules.development.services import ErrorLogService
 from database.models.development import ErrorSeverity
+
 
 class ErrorDetailDialog(QDialog):
     """Hata detayı göster dialog"""
@@ -33,17 +47,35 @@ class ErrorDetailDialog(QDialog):
         # Sol taraf
         left_info = QVBoxLayout()
         left_info.addWidget(QLabel(f"<b>Hata Türü:</b> {self.error_log.error_type}"))
-        left_info.addWidget(QLabel(f"<b>Modül:</b> {self.error_log.module_name or 'N/A'}"))
-        left_info.addWidget(QLabel(f"<b>Ekran:</b> {self.error_log.screen_name or 'N/A'}"))
-        left_info.addWidget(QLabel(f"<b>Fonksiyon:</b> {self.error_log.function_name or 'N/A'}"))
+        left_info.addWidget(
+            QLabel(f"<b>Modül:</b> {self.error_log.module_name or 'N/A'}")
+        )
+        left_info.addWidget(
+            QLabel(f"<b>Ekran:</b> {self.error_log.screen_name or 'N/A'}")
+        )
+        left_info.addWidget(
+            QLabel(f"<b>Fonksiyon:</b> {self.error_log.function_name or 'N/A'}")
+        )
         info_layout.addLayout(left_info)
 
         # Sağ taraf
         right_info = QVBoxLayout()
-        right_info.addWidget(QLabel(f"<b>Kullanıcı:</b> {self.error_log.username or 'N/A'}"))
-        right_info.addWidget(QLabel(f"<b>Tarih:</b> {self.error_log.created_at.strftime('%Y-%m-%d %H:%M:%S')}"))
-        right_info.addWidget(QLabel(f"<b>Severity:</b> {self.error_log.severity.value}"))
-        right_info.addWidget(QLabel(f"<b>Çözüldü:</b> {'Evet' if self.error_log.is_resolved else 'Hayır'}"))
+        right_info.addWidget(
+            QLabel(f"<b>Kullanıcı:</b> {self.error_log.username or 'N/A'}")
+        )
+        right_info.addWidget(
+            QLabel(
+                f"<b>Tarih:</b> {self.error_log.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        )
+        right_info.addWidget(
+            QLabel(f"<b>Severity:</b> {self.error_log.severity.value}")
+        )
+        right_info.addWidget(
+            QLabel(
+                f"<b>Çözüldü:</b> {'Evet' if self.error_log.is_resolved else 'Hayır'}"
+            )
+        )
         info_layout.addLayout(right_info)
 
         layout.addLayout(info_layout)
@@ -75,10 +107,9 @@ class ErrorDetailDialog(QDialog):
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
 
-class DevelopmentModule(QWidget):
-    """Geliştirme modülü - Hata kayıtları"""
 
-    page_title = "⚙️ Geliştirme"
+class ErrorLogsWidget(QWidget):
+    """Hata kayıtları listesi widget'ı"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -90,8 +121,8 @@ class DevelopmentModule(QWidget):
         layout = QVBoxLayout(self)
 
         # Başlık
-        header = QLabel("<h2>⚙️ Hata Kayıtları</h2>")
-        layout.addWidget(header)
+        # header = QLabel("<h2>⚙️ Hata Kayıtları</h2>")
+        # layout.addWidget(header)
 
         # Filtreler
         filter_group = QGroupBox("Filtreler")
@@ -141,10 +172,12 @@ class DevelopmentModule(QWidget):
         # Tablo
         self.table = QTableWidget()
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Tarih", "Modül", "Ekran", "Hata Türü", "Severity", "Çözüldü"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Tarih", "Modül", "Ekran", "Hata Türü", "Severity", "Çözüldü"]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -189,19 +222,16 @@ class DevelopmentModule(QWidget):
             severity = None
             if severity_str:
                 severity_map = {
-                    'critical': ErrorSeverity.CRITICAL,
-                    'error': ErrorSeverity.ERROR,
-                    'warning': ErrorSeverity.WARNING,
-                    'info': ErrorSeverity.INFO,
+                    "critical": ErrorSeverity.CRITICAL,
+                    "error": ErrorSeverity.ERROR,
+                    "warning": ErrorSeverity.WARNING,
+                    "info": ErrorSeverity.INFO,
                 }
                 severity = severity_map.get(severity_str)
 
             # Verileri çek
             errors = self.service.get_all(
-                module=module,
-                severity=severity,
-                is_resolved=is_resolved,
-                limit=200
+                module=module, severity=severity, is_resolved=is_resolved, limit=200
             )
 
             # Tabloyu doldur
@@ -211,7 +241,7 @@ class DevelopmentModule(QWidget):
                 self.table.setItem(row, 0, QTableWidgetItem(str(error.id)))
 
                 # Tarih
-                date_str = error.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                date_str = error.created_at.strftime("%Y-%m-%d %H:%M:%S")
                 self.table.setItem(row, 1, QTableWidgetItem(date_str))
 
                 # Modül
@@ -230,7 +260,9 @@ class DevelopmentModule(QWidget):
                     ErrorSeverity.WARNING: "🟡",
                     ErrorSeverity.INFO: "🔵",
                 }
-                severity_text = f"{severity_emoji.get(error.severity, '⚪')} {error.severity.value}"
+                severity_text = (
+                    f"{severity_emoji.get(error.severity, '⚪')} {error.severity.value}"
+                )
                 self.table.setItem(row, 5, QTableWidgetItem(severity_text))
 
                 # Çözüldü
@@ -251,6 +283,7 @@ class DevelopmentModule(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Hata", f"Veriler yüklenirken hata:\n{str(e)}")
             import traceback
+
             traceback.print_exc()
         finally:
             self._close_service()
@@ -290,7 +323,9 @@ class DevelopmentModule(QWidget):
             error_id = int(self.table.item(selected, 0).text())
 
             # TODO: Kullanıcı ID'sini al (şu an için 1 kullan)
-            self.service.resolve(error_id, "Manuel olarak çözüme işaretlendi", user_id=1)
+            self.service.resolve(
+                error_id, "Manuel olarak çözüme işaretlendi", user_id=1
+            )
 
             QMessageBox.information(self, "Başarılı", "Hata çözüme işaretlendi!")
             self.load_data()
@@ -299,3 +334,25 @@ class DevelopmentModule(QWidget):
             QMessageBox.critical(self, "Hata", f"İşlem sırasında hata:\n{str(e)}")
         finally:
             self._close_service()
+
+
+class DevelopmentModule(QWidget):
+    """
+    Geliştirme Modülü Ana Wrapper
+    Tab: Hata Kayıtları
+    Tab: Trace İnceleme
+    """
+
+    page_title = "⚙️ Geliştirme"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        # Tab 1: Hata Kayıtları
+        self.error_logs = ErrorLogsWidget()
+        layout.addWidget(self.error_logs)

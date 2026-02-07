@@ -16,6 +16,9 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QHeaderView,
     QMessageBox,
+    QFrame,
+    QTableWidget,
+    QTableWidgetItem,
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont
@@ -66,6 +69,8 @@ class MPSGridModel(QAbstractTableModel):
         # Veri Matrisi (4 satır x N sütun)
         self.data_matrix = [[0] * self.num_periods for _ in range(4)]
         self.initial_stock = 0
+        self.risks = ["none"] * self.num_periods
+        self.safety_stock = 0.0
 
     def set_data(self, data: dict):
         """Servisten gelen veriyi modele yükle"""
@@ -84,10 +89,12 @@ class MPSGridModel(QAbstractTableModel):
         self.data_matrix[1] = data.get("incoming", [0] * self.num_periods)
         self.data_matrix[3] = data.get("mps", [0] * self.num_periods)
 
-        # Projeksiyon stok (initial stock servisten gelmeli veya hesaplanmalı)
-        # Servis zaten projected_stock dönüyor ama client-side reactivity için tekrar hesaplayabiliriz
-        # Şimdilik servisten geleni alalım
+        # Projeksiyon stok
         self.data_matrix[2] = data.get("projected_stock", [0] * self.num_periods)
+
+        # Risk ve Emniyet Stoğu
+        self.risks = data.get("risks", ["none"] * self.num_periods)
+        self.safety_stock = data.get("safety_stock", 0.0)
 
         self.endResetModel()
 
@@ -209,17 +216,104 @@ class MPSDelegate(QStyledItemDelegate):
                 option.backgroundBrush = QBrush(QColor(60, 60, 65))
 
             if row == 2:  # Projeksiyon
-                try:
-                    val_str = index.data()
-                    if val_str and "!!" in str(val_str):
+                model = index.model()
+                if hasattr(model, "risks") and (col - 1) < len(model.risks):
+                    risk = model.risks[col - 1]
+                    if risk == "critical":
                         option.backgroundBrush = QBrush(QColor("#4d0000"))
                         option.palette.setColor(
                             option.palette.ColorGroup.Normal,
                             option.palette.ColorRole.Text,
                             QColor("white"),
                         )
-                except:
-                    pass
+                    elif risk == "warning":
+                        option.backgroundBrush = QBrush(QColor("#4d4d00"))
+                        option.palette.setColor(
+                            option.palette.ColorGroup.Normal,
+                            option.palette.ColorRole.Text,
+                            QColor("white"),
+                        )
+
+
+# -----------------------------------------------------------------------------
+# Capacity Widgets
+# -----------------------------------------------------------------------------
+
+
+class CapacityHeatmapWidget(QFrame):
+    """
+    İş istasyonu bazlı periyodik doluluk ısı haritası.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background-color: transparent;")
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(2)
+
+        self.table = QTableWidget()
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.table.setStyleSheet(
+            """
+            QTableWidget {
+                border: none;
+                gridline-color: #f0f0f0;
+            }
+        """
+        )
+        self.layout.addWidget(self.table)
+
+    def set_data(self, data: dict):
+        """Service'den gelen veriyi yükle"""
+        if not data or not data.get("periods"):
+            return
+
+        periods = data["periods"]
+        stations = data["stations"]
+
+        self.table.setColumnCount(len(periods) + 1)
+        self.table.setRowCount(len(stations))
+
+        # Headers
+        headers = ["İş Merkezi"] + periods
+        self.table.setHorizontalHeaderLabels(headers)
+
+        for r, station in enumerate(stations):
+            # İstasyon Adı
+            name_item = QTableWidgetItem(station["name"])
+            name_item.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+            self.table.setItem(r, 0, name_item)
+
+            # Doluluklar
+            for c, util in enumerate(station["utilizations"]):
+                util_item = QTableWidgetItem(f"%{int(util)}")
+                util_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                # Renklendirme
+                if util >= 100:
+                    bg_color = QColor("#4d0000")  # Koyu Kırmızı
+                    text_color = QColor("white")
+                elif util >= 85:
+                    bg_color = QColor(
+                        "#4d4d00"
+                    )  # Koyu Sarı/Turuncu (Kendi temamıza uygun)
+                    text_color = QColor("white")
+                elif util > 0:
+                    bg_color = QColor("#223322")  # Koyu Yeşil (Dark theme uyumlu ise)
+                    text_color = QColor("#ffffff")
+                else:
+                    bg_color = QColor("transparent")
+                    text_color = QColor("#808080")
+
+                util_item.setBackground(QBrush(bg_color))
+                util_item.setForeground(QBrush(text_color))
+                self.table.setItem(r, c + 1, util_item)
 
 
 # -----------------------------------------------------------------------------
@@ -326,8 +420,26 @@ class MPSCockpitPage(QWidget):
         )
         btn_approve.clicked.connect(self._approve_plan)
 
+        btn_variance = QPushButton("SAPMA RAPORU")
+        btn_variance.setIcon(qta.icon("ph.chart-line-up", color="white"))
+        btn_variance.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #6e5494; 
+                color: white; 
+                font-weight: bold; 
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #5a447a; }
+        """
+        )
+        btn_variance.clicked.connect(self._show_variance_report)
+
         toolbar_layout.addWidget(btn_mrp)
         toolbar_layout.addWidget(btn_approve)
+        toolbar_layout.addWidget(btn_variance)
 
         main_layout.addWidget(toolbar_container)
 
@@ -365,14 +477,13 @@ class MPSCockpitPage(QWidget):
 
         main_layout.addWidget(splitter)
 
-        # 4. Kapasite ve Darboğaz Analizi
         capacity_group = QGroupBox("KAPASİTE VE DARBOĞAZ ANALİZİ")
-        capacity_group.setMaximumHeight(150)
+        capacity_group.setMinimumHeight(250)
         self.cap_layout = QVBoxLayout()
         self.cap_layout.setSpacing(8)
 
-        # Initial dummy data or empty
-        # self.load_capacity_data() # Will be called later
+        self.cap_heatmap = CapacityHeatmapWidget()
+        self.cap_layout.addWidget(self.cap_heatmap)
 
         capacity_group.setLayout(self.cap_layout)
         main_layout.addWidget(capacity_group)
@@ -504,32 +615,12 @@ class MPSCockpitPage(QWidget):
             return
 
         try:
-            # Layout temizle
-            while self.cap_layout.count():
-                child = self.cap_layout.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-                elif child.layout():
-                    # Layout içindeki widgetları da temizle (Helper function gerekebilir ama basitçe recursive silim yapmazsak memory leak olabilir.
-                    # Ancak şimdilik layout item siliyoruz.)
-                    # Layout item'ı silmek için loop gerekir.
-                    # Basit yöntem: Widget'ları silmek yeterli.
-                    # clear_layout helper kullanmak en iyisi.
-                    pass
-
-            # Helper: Layout temizleme
-            def clear_layout(layout):
-                while layout.count():
-                    child = layout.takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
-                    elif child.layout():
-                        clear_layout(child.layout())
-
-            clear_layout(self.cap_layout)
-
-            # Verileri çek
-            data = self.mps_service.get_aggregated_capacity(self.current_plan_id)
+            # Periyot bazlı veriyi çek
+            data = self.mps_service.get_period_capacity_analysis(self.current_plan_id)
+            if hasattr(self, "cap_heatmap"):
+                self.cap_heatmap.set_data(data)
+        except Exception as e:
+            print(f"Kapasite yükleme hatası: {e}")
 
             if not data:
                 lbl = QLabel("Kapasite verisi yok veya plan boş.")
@@ -588,11 +679,16 @@ class MPSCockpitPage(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                # User ID lazım, şimdilik 1 (Admin) varsayalım veya context'ten alalım
-                # self.mps_service.approve_plan(self.current_plan_id, 1)
-                QMessageBox.information(self, "Başarılı", "Plan onaylandı! (Demo)")
+                from core.user_context import get_current_user_id
+
+                user_id = get_current_user_id() or 1
+                self.mps_service.approve_plan(self.current_plan_id, user_id)
+                QMessageBox.information(
+                    self, "Başarılı", "Plan onaylandı ve hammadde rezervasyonu yapıldı!"
+                )
+                self.refresh_data()
             except Exception as e:
-                QMessageBox.critical(self, "Hata", str(e))
+                QMessageBox.critical(self, "Hata", f"Plan onaylanamadı: {str(e)}")
 
     def create_capacity_row(self, name, percentage):
         layout = QHBoxLayout()
@@ -632,6 +728,20 @@ class MPSCockpitPage(QWidget):
         layout.addWidget(lbl_name)
         layout.addWidget(progress)
         return layout
+
+    def _show_variance_report(self):
+        """Sapma raporu ekranını aç"""
+        try:
+            from modules.reports.views.planning_variance_report import (
+                PlanningVarianceDialog,
+            )
+
+            dialog = PlanningVarianceDialog(self)
+            dialog.exec()
+        except ImportError as e:
+            QMessageBox.warning(self, "Hata", f"Rapor modülü bulunamadı: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"Rapor açılırken hata oluştu: {e}")
 
     def _run_mrp(self):
         """MRP ve Çizelgeleme Mantığını Çalıştır"""

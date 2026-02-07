@@ -481,6 +481,8 @@ class MachineRow(QFrame):
             "completed": "#10b981",
             "closed": "#475569",
             "pending": "#64748b",
+            "waiting": "#64748b",
+            "paused": "#ef4444",
         }
 
         status_names = {
@@ -491,6 +493,8 @@ class MachineRow(QFrame):
             "completed": "Tamamlandı",
             "closed": "Kapatıldı",
             "pending": "Bekliyor",
+            "waiting": "Bekliyor",
+            "paused": "Duraklatıldı",
         }
 
         for op in self.operations:

@@ -11,8 +11,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QLineEdit,
     QComboBox,
-    QFrame,
-    QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QMessageBox,
@@ -20,46 +18,60 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QSpinBox,
     QCheckBox,
-    QAbstractItemView,
     QMenu,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QColor
 
 from database.models.inventory import LocationType
 from config.icons import ICONS
+from config.styles import COLORS
 import qtawesome as qta
 
+# BaseListPage ve ColumnConfig importları
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
 
-class LocationManagementPage(QWidget):
+
+class LocationManagementPage(BaseListPage):
     """Depo lokasyon yönetim sayfası"""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.current_warehouse_id = None
-        self.warehouses = []
-        self.locations = []
-        self.setup_ui()
-        self.load_warehouses()
+        columns = [
+            ColumnConfig("code", "Kod", width=100, filterable=True, sortable=True),
+            ColumnConfig("barcode", "Barkod", width=120, filterable=True),
+            ColumnConfig("name", "Ad", width=200, stretch=True, filterable=True),
+            ColumnConfig("aisle", "Koridor", width=70, filterable=True),
+            ColumnConfig("rack", "Raf", width=60, filterable=True),
+            ColumnConfig("shelf", "Kat", width=60, filterable=True),
+            ColumnConfig("type", "Tip", width=100, filter_type="enum"),
+            ColumnConfig("zone", "Bölge", width=80, filterable=True),
+            ColumnConfig("priority", "Öncelik", width=70, filter_type="number"),
+            ColumnConfig("status", "Durum", width=80, filter_type="enum"),
+        ]
 
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
-        self.header = PageHeader(
+        super().__init__(
             title="Lokasyon Yönetimi",
-            icon="ph.map-pin",  # Explicit icon
-            show_search=True,
-            show_refresh=False,
+            icon=ICONS.LOCATION,  # "ph.map-pin" yerine ICONS.LOCATION kullanıyoruz
+            table_id="location_management",
+            columns=columns,
             show_add=True,
             add_text="Yeni Lokasyon",
             search_placeholder="Kod veya barkod...",
-            parent=self,
+            parent=parent,
         )
+
+        self.current_warehouse_id = None
+        self.warehouses = []
+        self.locations = []
+
+        # Ekstra UI bileşenlerini ekle
+        self._setup_extra_ui()
+
+        self.load_warehouses()
+
+    def _setup_extra_ui(self):
+        """Header'a depo seçimi ve toplu oluştur butonu ekle"""
 
         # Depo seçimi combobox
         self.warehouse_combo = QComboBox()
@@ -74,66 +86,41 @@ class LocationManagementPage(QWidget):
         self.bulk_btn.setIcon(qta.icon(ICONS.GRID, color="#475569"))
         self.bulk_btn.clicked.connect(self.bulk_create)
 
-        # Header'a widget'ları ekle
+        # Header layout'una ekle
         h_layout = self.header.header_layout()
+
+        # Arama kutusunun olduğu yere ekle (genellikle index 1 veya 2)
+        # Search input widget'ını bul
+        idx = -1
         if self.header.search_input:
             idx = h_layout.indexOf(self.header.search_input)
+
+        if idx != -1:
             h_layout.insertWidget(idx, QLabel("Depo:"))
             h_layout.insertWidget(idx + 1, self.warehouse_combo)
+        else:
+            # Bulamazsa başa ekle
+            h_layout.insertWidget(0, QLabel("Depo:"))
+            h_layout.insertWidget(1, self.warehouse_combo)
 
-        # Toplu oluştur butonunu ekle (add butonundan önce)
+        # Toplu oluştur butonunu Ekle butonunun yanına (varsa) veya sona ekle
         if self.header.add_btn:
             idx = h_layout.indexOf(self.header.add_btn)
             h_layout.insertWidget(idx, self.bulk_btn)
+        else:
+            h_layout.addWidget(self.bulk_btn)
 
-        # Sinyalleri bağla
-        self.header.add_clicked.connect(self.add_location)
-        self.header.search_changed.connect(self.filter_locations)
+        # BaseListPage sinyallerini bağla
+        self.add_clicked.connect(self.add_location)
+        self.refresh_requested.connect(self.load_locations)
 
-        # Arama kutusunu referans olarak sakla
-        self.search_input = self.header.search_input
-        self.add_btn = self.header.add_btn
-
-        layout.addWidget(self.header)
-
-        # Tablo
-        self.table = QTableWidget()
-        self.setup_table()
-        layout.addWidget(self.table)
-
-        # Alt bilgi
-        self.status_label = QLabel("Toplam: 0 lokasyon")
-        layout.addWidget(self.status_label)
-
-    def setup_table(self):
-        columns = [
-            ("Kod", 100),
-            ("Barkod", 120),
-            ("Ad", 200),
-            ("Koridor", 70),
-            ("Raf", 60),
-            ("Kat", 60),
-            ("Tip", 100),
-            ("Bölge", 80),
-            ("Öncelik", 70),
-            ("Durum", 70),
-            ("", 80),
-        ]
-
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels([c[0] for c in columns])
-
-        header = self.table.horizontalHeader()
-        for i, (_, width) in enumerate(columns):
-            if i == 2:
-                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
-            else:
-                self.table.setColumnWidth(i, width)
-
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.verticalHeader().setVisible(False)
+        # Context Menü
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
+
+        # Filtre seçeneklerini tanımla
+        self.table.set_filter_options("type", [t.value for t in LocationType])
+        self.table.set_filter_options("status", ["Aktif", "Pasif"])
 
     def load_warehouses(self):
         """Depoları yükle"""
@@ -146,14 +133,16 @@ class LocationManagementPage(QWidget):
                 session.query(Warehouse).filter(Warehouse.is_active == True).all()
             )
 
+            self.warehouse_combo.blockSignals(True)
             self.warehouse_combo.clear()
             self.warehouse_combo.addItem("- Depo Seçin -", None)
             for wh in self.warehouses:
                 self.warehouse_combo.addItem(f"{wh.code} - {wh.name}", wh.id)
+            self.warehouse_combo.blockSignals(False)
 
             session.close()
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Depolar yüklenemedi: {e}")
+            self.show_error("Hata", f"Depolar yüklenemedi: {e}")
 
     def on_warehouse_changed(self, index: int):
         """Depo değiştiğinde lokasyonları yükle"""
@@ -162,7 +151,7 @@ class LocationManagementPage(QWidget):
             self.load_locations()
         else:
             self.table.setRowCount(0)
-            self.status_label.setText("Toplam: 0 lokasyon")
+            self.update_count(0)
 
     def load_locations(self):
         """Lokasyonları yükle"""
@@ -172,21 +161,28 @@ class LocationManagementPage(QWidget):
         try:
             from modules.inventory.services.location_service import LocationService
 
+            # BaseListPage search entegrasyonu (BaseListPage _on_search içinde yapıyor ama
+            # data load sırasında da filtreleyebiliriz veya tümünü çekip client-side filtreleriz)
+            # Şimdilik hepsini çekiyoruz, BaseListPage client-side filtreliyor.
+
             self.locations = LocationService.get_all(
                 warehouse_id=self.current_warehouse_id,
                 is_active=None,  # Hepsini getir
             )
             self.refresh_table()
         except Exception as e:
-            QMessageBox.critical(self, "Hata", f"Lokasyonlar yüklenemedi: {e}")
+            self.show_error("Hata", f"Lokasyonlar yüklenemedi: {e}")
 
     def refresh_table(self):
         """Tabloyu yenile"""
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self.locations))
 
         for row, loc in enumerate(self.locations):
             # Kod
-            self.table.setItem(row, 0, QTableWidgetItem(loc.code or ""))
+            item = QTableWidgetItem(loc.code or "")
+            item.setData(Qt.ItemDataRole.UserRole, loc.id)
+            self.table.setItem(row, 0, item)
 
             # Barkod
             self.table.setItem(row, 1, QTableWidgetItem(loc.barcode or ""))
@@ -211,83 +207,66 @@ class LocationManagementPage(QWidget):
             self.table.setItem(row, 7, QTableWidgetItem(loc.zone or ""))
 
             # Öncelik
-            self.table.setItem(row, 8, QTableWidgetItem(str(loc.priority or 0)))
+            from ui.components.enhanced_table import NumericTableWidgetItem
+
+            self.table.setItem(row, 8, NumericTableWidgetItem(loc.priority or 0))
 
             # Durum
-            status = "✅ Aktif" if loc.is_active else "❌ Pasif"
-            self.table.setItem(row, 9, QTableWidgetItem(status))
+            status_item = QTableWidgetItem("Aktif" if loc.is_active else "Pasif")
+            if loc.is_active:
+                status_item.setForeground(QColor(COLORS.get("success", "#10b981")))
+                status_item.setIcon(
+                    qta.icon(ICONS.CHECK, color=COLORS.get("success", "#10b981"))
+                )
+            else:
+                status_item.setForeground(QColor(COLORS.get("text_muted", "#64748b")))
+                status_item.setIcon(
+                    qta.icon(ICONS.CANCEL, color=COLORS.get("text_muted", "#64748b"))
+                )
+            self.table.setItem(row, 9, status_item)
 
-            # İşlem butonları
-            btn_widget = QWidget()
-            btn_widget.setProperty("class", "action-button-group")
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(4, 4, 4, 4)
-            btn_layout.setSpacing(4)
+        self.table.setSortingEnabled(True)
+        self.update_count(len(self.locations))
 
-            edit_btn = QPushButton("✏")
-            edit_btn.setFixedSize(28, 26)
-            edit_btn.setProperty("class", "action-edit")
-            edit_btn.setToolTip("Düzenle")
-            edit_btn.setStyleSheet(
-                f"background-color: transparent; border: none; font-size: 16px; color: {TEXT_SECONDARY};"
-            )
-            edit_btn.clicked.connect(
-                lambda checked, lid=loc.id: self.edit_location(lid)
-            )
-            btn_layout.addWidget(edit_btn)
-
-            del_btn = QPushButton("🗑")
-            del_btn.setFixedSize(28, 26)
-            del_btn.setProperty("class", "action-delete")
-            del_btn.setToolTip("Sil")
-            del_btn.setStyleSheet(
-                f"background-color: transparent; border: none; font-size: 16px; color: {ERROR};"
-            )
-            del_btn.clicked.connect(
-                lambda checked, lid=loc.id: self.delete_location(lid)
-            )
-            btn_layout.addWidget(del_btn)
-
-            self.table.setCellWidget(row, 10, btn_widget)
-
-        self.status_label.setText(f"Toplam: {len(self.locations)} lokasyon")
-
-    def filter_locations(self, text: str):
-        """Lokasyonları filtrele"""
-        search_text = text.lower()
-        for row in range(self.table.rowCount()):
-            item0 = self.table.item(row, 0)
-            item1 = self.table.item(row, 1)
-
-            code = item0.text().lower() if item0 else ""
-            barcode = item1.text().lower() if item1 else ""
-
-            match = search_text in code or search_text in barcode
-            self.table.setRowHidden(row, not match)
+        # Filtreleri uygula (BaseListPage özelliği)
+        # self.table.apply_saved_filters() # BaseListPage load sonrası otomatik yapmıyor olabilir, kontrol edelim
+        # BaseListPage otomatik yapmıyor,manuel çağıralım:
+        self.table.apply_saved_filters()
 
     def show_context_menu(self, pos):
         """Sağ tık menüsü"""
-        menu = QMenu(self)
-        edit_action = menu.addAction("✏️ Düzenle")
-        delete_action = menu.addAction("🗑 Sil")
-        menu.addSeparator()
-        print_action = menu.addAction("🖨 Barkod Yazdır")
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
 
-        action = menu.exec(self.table.viewport().mapToGlobal(pos))
-        row = self.table.currentRow()
-        if row >= 0 and row < len(self.locations):
-            loc = self.locations[row]
-            if action == edit_action:
-                self.edit_location(loc.id)
-            elif action == delete_action:
-                self.delete_location(loc.id)
-            elif action == print_action:
-                self.print_barcode(loc)
+        item = self.table.item(row, 0)
+        if not item:
+            return
+
+        loc_id = item.data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu(self)
+
+        edit_action = menu.addAction("✏️ Düzenle")
+        edit_action.triggered.connect(lambda: self.edit_location(loc_id))
+
+        delete_action = menu.addAction("🗑 Sil")
+        delete_action.triggered.connect(lambda: self.delete_location(loc_id))
+
+        menu.addSeparator()
+
+        print_action = menu.addAction("🖨 Barkod Yazdır")
+        # loc nesnesini bulmamız lazım
+        loc = next((l for l in self.locations if l.id == loc_id), None)
+        if loc:
+            print_action.triggered.connect(lambda: self.print_barcode(loc))
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def add_location(self):
         """Yeni lokasyon ekle"""
         if not self.current_warehouse_id:
-            QMessageBox.warning(self, "Uyarı", "Lütfen önce bir depo seçin!")
+            self.show_info("Uyarı", "Lütfen önce bir depo seçin!")
             return
 
         dialog = LocationDialog(warehouse_id=self.current_warehouse_id, parent=self)
@@ -296,6 +275,7 @@ class LocationManagementPage(QWidget):
 
     def edit_location(self, location_id: int):
         """Lokasyon düzenle"""
+        # loc_id int olarak geliyor
         loc = next((l for l in self.locations if l.id == location_id), None)
         if not loc:
             return
@@ -308,29 +288,22 @@ class LocationManagementPage(QWidget):
 
     def delete_location(self, location_id: int):
         """Lokasyon sil"""
-        reply = QMessageBox.question(
-            self,
-            "Onay",
-            "Bu lokasyonu silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.confirm_delete("lokasyonu"):
             try:
                 from modules.inventory.services.location_service import LocationService
 
                 LocationService.delete(location_id)
                 self.load_locations()
-                QMessageBox.information(self, "Başarılı", "Lokasyon silindi.")
+                self.show_info("Başarılı", "Lokasyon silindi.")
             except ValueError as e:
-                QMessageBox.warning(self, "Uyarı", str(e))
+                self.show_info("Uyarı", str(e))
             except Exception as e:
-                QMessageBox.critical(self, "Hata", f"Silinemedi: {e}")
+                self.show_error("Hata", f"Silinemedi: {e}")
 
     def bulk_create(self):
         """Toplu lokasyon oluşturma"""
         if not self.current_warehouse_id:
-            QMessageBox.warning(self, "Uyarı", "Lütfen önce bir depo seçin!")
+            self.show_info("Uyarı", "Lütfen önce bir depo seçin!")
             return
 
         dialog = BulkLocationDialog(warehouse_id=self.current_warehouse_id, parent=self)
@@ -339,8 +312,7 @@ class LocationManagementPage(QWidget):
 
     def print_barcode(self, location):
         """Lokasyon barkodunu yazdır"""
-        QMessageBox.information(
-            self,
+        self.show_info(
             "Barkod Yazdırma",
             f"Lokasyon: {location.code}\n"
             f"Barkod: {location.barcode}\n\n"

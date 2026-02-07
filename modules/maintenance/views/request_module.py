@@ -7,9 +7,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QFormLayout,
     QTextEdit,
     QComboBox,
@@ -21,10 +19,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from PyQt6.QtGui import QColor
-from config.styles import get_button_style, SUCCESS, INFO, WARNING, ERROR
+from PyQt6.QtGui import QColor, QAction
+from config.styles import SUCCESS, INFO, WARNING, ERROR
 from config.icons import ICONS
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
 from database.models.maintenance import (
     MaintenancePriority,
     MaintenanceType,
@@ -32,82 +33,83 @@ from database.models.maintenance import (
 )
 
 
-class MaintenanceRequestWidget(MaintenanceBaseWidget):
+class MaintenanceRequestWidget(BaseListPage):
     """Bakım Talepleri Widget'ı"""
 
     def __init__(self, parent=None):
-        super().__init__("Arıza/Bakım Talepleri", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
 
-    def setup_ui(self):
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
+        columns = [
+            ColumnConfig("request_no", "Talep No", width=100, filterable=True),
+            ColumnConfig(
+                "equipment", "Ekipman", width=150, filterable=True, stretch=True
+            ),
+            ColumnConfig("date", "Tarih", width=120),
+            ColumnConfig("priority", "Öncelik", width=100, filter_type="enum"),
+            ColumnConfig("type", "Tür", width=120, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
+            ColumnConfig("reporter", "Bildiren", width=120),
+        ]
 
-        self.header = PageHeader(
+        super().__init__(
             title="Arıza/Bakım Talepleri",
             icon=ICONS.MAINTENANCE,
-            show_search=False,
+            table_id="maintenance_requests",
+            columns=columns,
             show_add=True,
             add_text="Yeni Arıza Bildirimi",
-            parent=self,
+            parent=parent,
         )
-        self.header.add_clicked.connect(self.show_request_dialog)
-        self.header.refresh_clicked.connect(self.refresh_data)
 
-        # Header Layout - Butonlar ve Filtreler
+        self._setup_extra_ui()
+        self.add_clicked.connect(self.show_request_dialog)
+        self.refresh_requested.connect(self.refresh_data)
+
+    def closeEvent(self, event):
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(event)
+
+    def _setup_extra_ui(self):
         h_layout = self.header.header_layout()
 
         # Filtreler
+        h_layout.addSpacing(16)
         h_layout.addWidget(QLabel("Durum:"))
         self.cmb_status = QComboBox()
         self.cmb_status.addItem("Bekleyenler", "pending")
         self.cmb_status.addItem("Tümü", "all")
         self.cmb_status.addItem("Çözülenler", "resolved")
-        self.cmb_status.setFixedHeight(36)
+        self.cmb_status.setFixedHeight(32)
         self.cmb_status.currentIndexChanged.connect(self.refresh_data)
         h_layout.addWidget(self.cmb_status)
 
-        h_layout.addSpacing(16)
+        h_layout.addSpacing(10)
         h_layout.addWidget(QLabel("Öncelik:"))
         self.cmb_priority = QComboBox()
-        self.cmb_priority.addItem("Tüm Öncelikler", None)
+        self.cmb_priority.addItem("Tümü", None)
         for p in MaintenancePriority:
             self.cmb_priority.addItem(p.value.capitalize(), p)
-        self.cmb_priority.setFixedHeight(36)
+        self.cmb_priority.setFixedHeight(32)
         self.cmb_priority.currentIndexChanged.connect(self.refresh_data)
         h_layout.addWidget(self.cmb_priority)
 
-        h_layout.addStretch()
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        # Custom Butonlar
-        self.btn_new_wo = QPushButton("Seçiliden İş Emri Oluştur")
-        self.btn_new_wo.setStyleSheet(get_button_style("primary"))
-        self.btn_new_wo.setFixedHeight(36)
-        self.btn_new_wo.clicked.connect(self.create_work_order_from_request)
-        h_layout.addWidget(self.btn_new_wo)
-
-        self.btn_close = QPushButton("Talebi Kapat")
-        self.btn_close.setStyleSheet(get_button_style("success"))
-        self.btn_close.setFixedHeight(36)
-        self.btn_close.clicked.connect(self.close_request)
-        h_layout.addWidget(self.btn_close)
-
-        self.layout.addWidget(self.header)
-
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels(
-            ["Talep No", "Ekipman", "Tarih", "Öncelik", "Tür", "Durum", "Bildiren"]
+        # Filtre Seçenekleri
+        self.table.set_filter_options(
+            "priority", [p.value.capitalize() for p in MaintenancePriority]
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.table.set_filter_options(
+            "type", [t.value.capitalize() for t in MaintenanceType]
         )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.layout.addWidget(self.table)
-
-        self.refresh_data()
+        self.table.set_filter_options(
+            "status",
+            [s.value.replace("_", " ").capitalize() for s in MaintenanceStatus],
+        )
 
     def refresh_data(self):
         status_filter = self.cmb_status.currentData()
@@ -120,19 +122,27 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
         else:
             requests = self.service.get_all_requests(priority=priority_filter)
 
+        self.load_data(requests)
+
+    def load_data(self, requests):
         self.table.setRowCount(len(requests))
         for i, req in enumerate(requests):
-            self.table.setItem(i, 0, QTableWidgetItem(req.request_no))
-            self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, req.id)
+            # Request No
+            item = QTableWidgetItem(req.request_no)
+            item.setData(Qt.ItemDataRole.UserRole, req.id)
+            self.table.setItem(i, 0, item)
 
+            # Equipment
             self.table.setItem(
                 i, 1, QTableWidgetItem(req.equipment.name if req.equipment else "-")
             )
+
+            # Date
             self.table.setItem(
                 i, 2, QTableWidgetItem(req.request_date.strftime("%d.%m.%Y %H:%M"))
             )
 
-            # Öncelik - renkli
+            # Priority
             priority_item = QTableWidgetItem(req.priority.value.capitalize())
             priority_colors = {
                 MaintenancePriority.LOW: QColor(SUCCESS),
@@ -143,11 +153,12 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
             priority_item.setForeground(priority_colors.get(req.priority, QColor(INFO)))
             self.table.setItem(i, 3, priority_item)
 
+            # Type
             self.table.setItem(
                 i, 4, QTableWidgetItem(req.maintenance_type.value.capitalize())
             )
 
-            # Durum - renkli
+            # Status
             status_item = QTableWidgetItem(
                 req.status.value.replace("_", " ").capitalize()
             )
@@ -159,17 +170,35 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
                 status_item.setForeground(QColor(WARNING))
             self.table.setItem(i, 5, status_item)
 
+            # Reporter
             self.table.setItem(
                 i,
                 6,
                 QTableWidgetItem(req.reported_by.full_name if req.reported_by else "-"),
             )
 
+        self.update_count(len(requests))
+
     def get_selected_request_id(self) -> Optional[int]:
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            return None
-        return self.table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        return self.table.get_selected_id()
+
+    def _show_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+
+        menu = self.table.create_standard_context_menu(pos)
+        menu.addSeparator()
+
+        wo_action = QAction("İş Emri Oluştur", self)
+        wo_action.triggered.connect(self.create_work_order_from_request)
+        menu.addAction(wo_action)
+
+        close_action = QAction("Talebi Kapat", self)
+        close_action.triggered.connect(self.close_request)
+        menu.addAction(close_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def show_request_dialog(self):
         dialog = RequestDialog(self.service, self)
@@ -211,6 +240,16 @@ class MaintenanceRequestWidget(MaintenanceBaseWidget):
                 QMessageBox.information(self, "Bilgi", "Talep kapatıldı.")
             except Exception as e:
                 QMessageBox.critical(self, "Hata", str(e))
+
+    # Interface Implementation
+    def get_filters(self) -> dict:
+        return {
+            "status": self.cmb_status.currentData(),
+            "priority": self.cmb_priority.currentData(),
+        }
+
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
 
 class RequestDialog(QDialog):

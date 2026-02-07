@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QTableWidgetItem,
-    QHeaderView,
     QFormLayout,
     QLineEdit,
     QTextEdit,
@@ -26,155 +25,173 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QListWidget,
     QListWidgetItem,
+    QMenu,
 )
 from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QTextCharFormat, QColor
+from PyQt6.QtGui import QTextCharFormat, QColor, QAction
 import qtawesome as qta
 
 from config.icons import ICONS
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
 from ui.components.page_header import PageHeader
-from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
+from ui.components.enhanced_table import ColumnConfig
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
+from modules.maintenance.views.base import MaintenanceBaseWidget
 
 
-class MaintenancePlanWidget(MaintenanceBaseWidget):
+class MaintenancePlanWidget(BaseListPage):
     """Periyodik Bakım Planları Widget'ı"""
 
     def __init__(self, parent=None):
-        super().__init__("Periyodik Bakım Planları", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
 
-    def setup_ui(self):
-        # Header
-        self.header = PageHeader(
+        columns = [
+            ColumnConfig(
+                "equipment", "Ekipman", width=200, filterable=True, stretch=True
+            ),
+            ColumnConfig("name", "Plan Adı", width=200, filterable=True),
+            ColumnConfig("frequency", "Sıklık", width=120),
+            ColumnConfig("last", "Son Bakım", width=120),
+            ColumnConfig("next", "Sonraki Bakım", width=120),
+            ColumnConfig("auto", "Otomatik", width=100, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=100, filter_type="enum"),
+            ColumnConfig("remaining", "Kalan Gün", width=120),
+        ]
+
+        super().__init__(
             title="Periyodik Bakım Planları",
             icon=ICONS.CALENDAR,
-            show_search=False,
+            table_id="maintenance_plans",
+            columns=columns,
             show_add=True,
             add_text="Yeni Plan Oluştur",
-            parent=self,
+            parent=parent,
         )
-        self.header.add_clicked.connect(self.create_plan)
-        self.header.refresh_clicked.connect(self.refresh_data)
 
+        self._setup_extra_ui()
+        self.add_clicked.connect(self.create_plan)
+        self.refresh_requested.connect(self.refresh_data)
+
+    def closeEvent(self, event):
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(event)
+
+    def _setup_extra_ui(self):
         h_layout = self.header.header_layout()
+
         self.chk_active = QCheckBox("Sadece Aktifler")
         self.chk_active.setChecked(True)
         self.chk_active.stateChanged.connect(self.refresh_data)
-        self.chk_active.setFixedHeight(36)
+        self.chk_active.setFixedHeight(32)
         h_layout.addWidget(self.chk_active)
 
         h_layout.addStretch()
 
-        self.btn_edit = QPushButton("Düzenle")
-        self.btn_edit.setIcon(qta.icon(ICONS.EDIT, color="#ffffff"))
-        self.btn_edit.setProperty("class", "btn-secondary")
-        self.btn_edit.setFixedHeight(36)
-        self.btn_edit.clicked.connect(self.edit_plan)
-        h_layout.addWidget(self.btn_edit)
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        self.btn_generate = QPushButton("İş Emri Oluştur")
-        self.btn_generate.setIcon(qta.icon(ICONS.ADD, color="#ffffff"))
-        self.btn_generate.setProperty("class", "btn-success")
-        self.btn_generate.setFixedHeight(36)
-        self.btn_generate.clicked.connect(self.generate_work_order)
-        h_layout.addWidget(self.btn_generate)
-
-        self.layout.addWidget(self.header)
-
-        # Tablo
-        cols = [
-            ColumnConfig("equipment", "Ekipman", width=200, stretch=True),
-            ColumnConfig("name", "Plan Adı", width=200),
-            ColumnConfig("frequency", "Sıklık", width=120),
-            ColumnConfig("last", "Son Bakım", width=120),
-            ColumnConfig("next", "Sonraki Bakım", width=120),
-            ColumnConfig("auto", "Otomatik", width=100),
-            ColumnConfig("status", "Durum", width=100),
-            ColumnConfig("remaining", "Kalan Gün", width=120),
-        ]
-        self.table = EnhancedTableWidget(
-            table_id="maint_plans", columns=cols, parent=self
-        )
-        self.layout.addWidget(self.table)
-        self.refresh_data()
+        self.table.set_filter_options("status", ["Aktif", "Pasif"])
+        self.table.set_filter_options("auto", ["Evet", "Hayır"])
 
     def refresh_data(self):
         plans = self.service.get_maintenance_plans(
             active_only=self.chk_active.isChecked()
         )
+        self.load_data(plans)
+
+    def load_data(self, plans):
         self.table.setRowCount(len(plans))
         today = datetime.now().date()
-        vcols = self.table.get_visible_columns()
+
         for i, p in enumerate(plans):
-            for c, key in enumerate(vcols):
-                if key == "equipment":
-                    it = QTableWidgetItem(p.equipment.name if p.equipment else "-")
-                    it.setData(Qt.ItemDataRole.UserRole, p.id)
-                    self.table.setItem(i, c, it)
-                elif key == "name":
-                    self.table.setItem(i, c, QTableWidgetItem(p.name))
-                elif key == "frequency":
-                    self.table.setItem(
-                        i,
-                        c,
-                        QTableWidgetItem(f"Her {p.frequency_value} {p.frequency_type}"),
+            # Equipment
+            it = QTableWidgetItem(p.equipment.name if p.equipment else "-")
+            it.setData(Qt.ItemDataRole.UserRole, p.id)
+            self.table.setItem(i, 0, it)
+
+            # Name
+            self.table.setItem(i, 1, QTableWidgetItem(p.name))
+
+            # Frequency
+            self.table.setItem(
+                i, 2, QTableWidgetItem(f"Her {p.frequency_value} {p.frequency_type}")
+            )
+
+            # Last Maintenance
+            last_date = (
+                p.last_maintenance_date.strftime("%d.%m.%Y")
+                if p.last_maintenance_date
+                else "-"
+            )
+            self.table.setItem(i, 3, QTableWidgetItem(last_date))
+
+            # Next Maintenance
+            dt = p.next_maintenance_date
+            it = QTableWidgetItem(dt.strftime("%d.%m.%Y") if dt else "-")
+            if dt and dt.date() < today:
+                it.setForeground(Qt.GlobalColor.red)
+            elif dt and dt.date() <= today + timedelta(days=7):
+                it.setForeground(Qt.GlobalColor.darkYellow)
+            self.table.setItem(i, 4, it)
+
+            # Auto
+            self.table.setItem(
+                i,
+                5,
+                QTableWidgetItem("Evet" if p.auto_generate_work_order else "Hayır"),
+            )
+
+            # Status
+            it = QTableWidgetItem("Aktif" if p.is_active else "Pasif")
+            it.setForeground(QColor("#10b981" if p.is_active else "#6b7280"))
+            self.table.setItem(i, 6, it)
+
+            # Remaining
+            if dt:
+                days = (dt.date() - today).days
+                it = QTableWidgetItem(
+                    f"{days} gün" if days >= 0 else f"{abs(days)} gün gecikti!"
+                )
+                it.setForeground(
+                    Qt.GlobalColor.red
+                    if days < 0
+                    else (
+                        Qt.GlobalColor.darkYellow
+                        if days <= 7
+                        else Qt.GlobalColor.white  # Assuming dark theme or high contrast needed, using default enhanced table color logic would be better but this matches previous logic
                     )
-                elif key == "last":
-                    self.table.setItem(
-                        i,
-                        c,
-                        QTableWidgetItem(
-                            p.last_maintenance_date.strftime("%d.%m.%Y")
-                            if p.last_maintenance_date
-                            else "-"
-                        ),
-                    )
-                elif key == "next":
-                    dt = p.next_maintenance_date
-                    it = QTableWidgetItem(dt.strftime("%d.%m.%Y") if dt else "-")
-                    if dt and dt.date() < today:
-                        it.setForeground(Qt.GlobalColor.red)
-                    elif dt and dt.date() <= today + timedelta(days=7):
-                        it.setForeground(Qt.GlobalColor.darkYellow)
-                    self.table.setItem(i, c, it)
-                elif key == "auto":
-                    self.table.setItem(
-                        i,
-                        c,
-                        QTableWidgetItem(
-                            "Evet" if p.auto_generate_work_order else "Hayır"
-                        ),
-                    )
-                elif key == "status":
-                    it = QTableWidgetItem("Aktif" if p.is_active else "Pasif")
-                    it.setForeground(QColor("#10b981" if p.is_active else "#6b7280"))
-                    self.table.setItem(i, c, it)
-                elif key == "remaining":
-                    dt = p.next_maintenance_date
-                    if dt:
-                        days = (dt.date() - today).days
-                        it = QTableWidgetItem(
-                            f"{days} gün" if days >= 0 else f"{abs(days)} gün gecikti!"
-                        )
-                        it.setForeground(
-                            Qt.GlobalColor.red
-                            if days < 0
-                            else (
-                                Qt.GlobalColor.darkYellow
-                                if days <= 7
-                                else Qt.GlobalColor.white
-                            )
-                        )
-                        self.table.setItem(i, c, it)
-                    else:
-                        self.table.setItem(i, c, QTableWidgetItem("-"))
+                )
+                self.table.setItem(i, 7, it)
+            else:
+                self.table.setItem(i, 7, QTableWidgetItem("-"))
+
+        self.update_count(len(plans))
 
     def get_selected_plan_id(self) -> Optional[int]:
-        row = self.table.currentRow()
-        return (
-            self.table.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 else None
+        return self.table.get_selected_id()
+
+    def _show_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+
+        menu = QMenu(self)
+
+        edit_action = QAction(qta.icon(ICONS.EDIT, color="#f59e0b"), "Düzenle", self)
+        edit_action.triggered.connect(self.edit_plan)
+        menu.addAction(edit_action)
+
+        generate_action = QAction(
+            qta.icon(ICONS.ADD, color="#22c55e"), "İş Emri Oluştur", self
         )
+        generate_action.triggered.connect(self.generate_work_order)
+        menu.addAction(generate_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def create_plan(self):
         if PlanDialog(self.service, self).exec():
@@ -183,6 +200,7 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
     def edit_plan(self):
         pid = self.get_selected_plan_id()
         if not pid:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir plan seçin.")
             return
         p = self.service.get_maintenance_plan_by_id(pid)
         if PlanDialog(self.service, self, plan=p).exec():
@@ -191,6 +209,7 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
     def generate_work_order(self):
         pid = self.get_selected_plan_id()
         if not pid:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir plan seçin.")
             return
         try:
             wo = self.service.generate_work_order_from_plan(pid)
@@ -200,6 +219,17 @@ class MaintenancePlanWidget(MaintenanceBaseWidget):
             self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Hata", str(e))
+
+    # Interface Implementation
+    def get_filters(self) -> dict:
+        return {
+            "status": (
+                "active" if self.chk_active.isChecked() else "all"
+            ),  # Simplified representation
+        }
+
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
 
 class PlanDialog(QDialog):
@@ -312,6 +342,7 @@ class PlanDialog(QDialog):
     def accept(self):
         eid, name = self.cmb_eq.currentData(), self.inp_name.text().strip()
         if not eid or not name:
+            QMessageBox.warning(self, "Uyarı", "Ekipman ve Plan Adı zorunludur.")
             return
         try:
             data = {

@@ -121,7 +121,7 @@ class AccountTransactionService:
             transaction_type=TransactionType.INVOICE,
             customer_id=invoice.customer_id,
             invoice_id=invoice.id,
-            debit=invoice.total_amount,  # Müşteri borçlanır
+            debit=Decimal(str(invoice.total or 0)),  # Müşteri borçlanır
             credit=Decimal(0),
             description=f"Fatura: {invoice.invoice_no}",
         )
@@ -142,7 +142,7 @@ class AccountTransactionService:
             supplier_id=invoice.supplier_id,
             purchase_invoice_id=invoice.id,
             debit=Decimal(0),
-            credit=invoice.total_amount,  # Tedarikçiye borcumuz artar
+            credit=Decimal(str(invoice.total or 0)),  # Tedarikçiye borcumuz artar
             description=f"Satınalma Faturası: {invoice.invoice_no}",
         )
         self.session.add(transaction)
@@ -588,11 +588,11 @@ class ReceiptService:
 
         total_paid = Decimal(total_paid) if total_paid else Decimal(0)
 
-        if total_paid >= invoice.total_amount:
+        if total_paid >= Decimal(str(invoice.total or 0)):
             invoice.status = InvoiceStatus.PAID
         elif total_paid > 0:
-            invoice.status = InvoiceStatus.PARTIAL_PAID
-        elif invoice.status in [InvoiceStatus.PAID, InvoiceStatus.PARTIAL_PAID]:
+            invoice.status = InvoiceStatus.PARTIAL
+        elif invoice.status in [InvoiceStatus.PAID, InvoiceStatus.PARTIAL]:
             invoice.status = InvoiceStatus.ISSUED
 
         invoice.paid_amount = total_paid
@@ -607,7 +607,7 @@ class ReceiptService:
                 Invoice.status.in_(
                     [
                         InvoiceStatus.ISSUED,
-                        InvoiceStatus.PARTIAL_PAID,
+                        InvoiceStatus.PARTIAL,
                         InvoiceStatus.OVERDUE,
                     ]
                 ),
@@ -783,7 +783,7 @@ class ReconciliationService:
                 Invoice.status.in_(
                     [
                         InvoiceStatus.ISSUED,
-                        InvoiceStatus.PARTIAL_PAID,
+                        InvoiceStatus.PARTIAL,
                         InvoiceStatus.OVERDUE,
                     ]
                 ),
@@ -795,9 +795,7 @@ class ReconciliationService:
 
         invoices_data = []
         for inv in open_invoices:
-            remaining = (inv.total_amount or Decimal(0)) - (
-                inv.paid_amount or Decimal(0)
-            )
+            remaining = (Decimal(str(inv.total or 0))) - (inv.paid_amount or Decimal(0))
             invoices_data.append(
                 {
                     "invoice_id": inv.id,

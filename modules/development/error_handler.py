@@ -29,7 +29,7 @@ except ImportError:
     QMessageBox = None
 
 from modules.development.services import ErrorLogService
-from database.models.development import ErrorSeverity
+from database.models.development import ErrorSeverity, TraceStatus
 
 
 class ErrorHandler:
@@ -127,7 +127,82 @@ class ErrorHandler:
         if show_message and QMessageBox:
             cls._show_message_box(exception, severity, parent_widget)
 
+        # 5. Trace aktifse otomatik durdur ve admin'e bildir
+        cls._handle_trace_on_error(error_log, module, screen, tb_str, exception)
+
         return error_log
+
+    @classmethod
+    def _handle_trace_on_error(cls, error_log, module: str, screen: str,
+                               traceback_str: str = None, exception: Exception = None):
+        """
+        Hata alındığında trace'i otomatik durdur ve admin'e bildir
+
+        Args:
+            error_log: ErrorLog kaydı
+            module: Modül adı
+            screen: Ekran adı
+            traceback_str: Tam traceback string'i
+            exception: Yakalanan exception objesi
+        """
+        try:
+            from modules.development.trace_service import TraceService
+
+            if not TraceService.is_active():
+                return
+
+            # ÖNCELİKLE: Hata event'ini kaydet (stop_trace buffer'ı flush edecek)
+            if traceback_str or exception:
+                TraceService.record_event(
+                    event_type="error_occurred",
+                    widget_name="exception",
+                    widget_path=f"{module} > {screen}",
+                    event_data={
+                        "exception_type": type(exception).__name__ if exception else "Unknown",
+                        "error_message": str(exception) if exception else "",
+                        "traceback": traceback_str or "",
+                        "module": module,
+                        "screen": screen,
+                        "error_log_id": error_log.id if error_log else None
+                    }
+                )
+
+            # Trace'i hata durumu ile durdur
+            error_log_id = error_log.id if error_log else None
+            trace_session = TraceService.stop_trace(
+                error_log_id=error_log_id,
+                status=TraceStatus.ERROR
+            )
+
+            if trace_session:
+                # Admin'e notification gönder
+                cls._send_trace_notification(trace_session, module, screen)
+
+        except Exception as e:
+            # Trace işlemi başarısız olsa bile ana hata akışını bozma
+            print(f"[ErrorHandler] Trace handling failed: {e}")
+
+    @classmethod
+    def _send_trace_notification(cls, trace_session, module: str, screen: str):
+        """Trace raporu hazır bildirimi gönder"""
+        try:
+            from modules.system.services.notification_service import NotificationService
+
+            username = "Bilinmeyen"
+            if cls._current_user:
+                username = cls._current_user.username
+
+            NotificationService.create_admin_notification(
+                title="Trace Raporu Hazir",
+                message=f"{username} kullanicisi {screen} ekraninda hata aldi",
+                link=f"development/trace-viewer/{trace_session.id}",
+                notification_type="action_required"
+            )
+        except ImportError:
+            # NotificationService henüz mevcut değilse sessizce geç
+            print(f"[ErrorHandler] Trace session {trace_session.id} completed (notification service not available)")
+        except Exception as e:
+            print(f"[ErrorHandler] Notification failed: {e}")
 
     @classmethod
     def _log_to_console(cls, exception, module, screen, function, severity, tb_str):

@@ -32,6 +32,9 @@ from database.models.inventory import (
     LotSizingProcedure,
     StockRequest,
     StockRequestStatus,
+    MrpType,
+    LotSizePolicy,
+    ValuationMethod,
 )
 
 # Ortak tablolar
@@ -52,6 +55,12 @@ from database.models.dashboard import (
     DashboardWidget,
     RoleDefaultLayout,
     UserDashboardLayout,
+)
+
+# DMS
+from database.models.dms import (
+    Document,
+    DocumentRelation,
 )
 
 __all__ = [
@@ -93,6 +102,9 @@ __all__ = [
     "DashboardWidget",
     "RoleDefaultLayout",
     "UserDashboardLayout",
+    # DMS
+    "Document",
+    "DocumentRelation",
 ]
 
 from .production import (
@@ -129,13 +141,29 @@ from .purchasing import (
     PurchaseOrderStatus,
     GoodsReceiptStatus,
     PurchaseInvoiceStatus,
+    PurchaseInvoiceStatus,
     Currency,
+)
+
+# e-Fatura / e-Arşiv
+from database.models.einvoice import (
+    EInvoice,
+    EInvoiceSeries,
+    EInvoiceSettings,
+    EInvoiceType,
+    EInvoiceStatus,
+    EInvoiceDirection,
+    EInvoiceProfile,
 )
 
 # Geliştirme modülü
 from database.models.development import (
     ErrorLog,
     ErrorSeverity,
+    TraceSession,
+    TraceEvent,
+    TraceStatus,
+    TraceEventType,
 )
 
 # Satış modülü
@@ -332,6 +360,14 @@ from database.models.workflow import (
     WorkflowAction,
 )
 
+# Rota Planlama Modülü
+from database.models.route import (
+    Route,
+    RouteStop,
+    RouteStatus,
+    RouteStopType,
+)
+
 __all__.extend(
     [
         "TransportUnit",
@@ -348,6 +384,11 @@ __all__.extend(
         "ShipmentStatus",
         "ShipmentItem",
         "ShipmentLoad",
+        # Rota Planlama
+        "Route",
+        "RouteStop",
+        "RouteStatus",
+        "RouteStopType",
         # Workflow
         "WorkflowStatus",
         "WorkflowActionType",
@@ -355,5 +396,13 @@ __all__.extend(
         "WorkflowStep",
         "WorkflowInstance",
         "WorkflowAction",
+        # e-Fatura / e-Arşiv
+        "EInvoice",
+        "EInvoiceSeries",
+        "EInvoiceSettings",
+        "EInvoiceType",
+        "EInvoiceStatus",
+        "EInvoiceDirection",
+        "EInvoiceProfile",
     ]
 )

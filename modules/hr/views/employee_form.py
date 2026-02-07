@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QFormLayout,
     QPushButton,
     QLineEdit,
@@ -54,67 +55,92 @@ class EmployeeFormDialog(QDialog):
         self.setMinimumSize(600, 500)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
         # Tab widget
         tabs = QTabWidget()
+        tabs.setStyleSheet(
+            """
+            QTabWidget::pane { border: 1px solid #3e3e42; border-radius: 4px; }
+            QTabBar::tab { height: 32px; padding: 0 16px; min-width: 100px; }
+        """
+        )
 
-        # Temel Bilgiler Tab - 2 kolonlu layout
+        # --- Temel Bilgiler Tab ---
         basic_tab = QWidget()
-        basic_main_layout = QHBoxLayout(basic_tab)
-        basic_main_layout.setSpacing(20)
+        basic_layout = QHBoxLayout(basic_tab)
+        basic_layout.setSpacing(24)
+        basic_layout.setContentsMargins(16, 16, 16, 16)
 
-        # Sol taraf - Form alanları
-        form_widget = QWidget()
-        basic_layout = QFormLayout(form_widget)
-        basic_layout.setSpacing(12)
+        # Sol Kolon (Kişisel Bilgiler)
+        left_col = QVBoxLayout()
+        left_col.setSpacing(16)
+
+        # Grup: Kimlik Bilgileri
+        id_group = QGroupBox("Kimlik Bilgileri")
+        id_layout = QGridLayout(id_group)
+        id_layout.setSpacing(12)
+        id_layout.setColumnStretch(1, 1)
 
         self.employee_no = QLineEdit()
-        self.employee_no.setPlaceholderText("Otomatik oluşturulur")
-        basic_layout.addRow("Sicil No:", self.employee_no)
+        self.employee_no.setPlaceholderText("Otomatik")
+        self.employee_no.setFixedHeight(32)
+        id_layout.addWidget(QLabel("Sicil No:"), 0, 0)
+        id_layout.addWidget(self.employee_no, 0, 1)
 
         self.first_name = QLineEdit()
-        basic_layout.addRow("Ad:", self.first_name)
+        self.first_name.setFixedHeight(32)
+        id_layout.addWidget(QLabel("Ad:"), 1, 0)
+        id_layout.addWidget(self.first_name, 1, 1)
 
         self.last_name = QLineEdit()
-        basic_layout.addRow("Soyad:", self.last_name)
-
-        self.email = QLineEdit()
-        basic_layout.addRow("Email:", self.email)
-
-        self.phone = QLineEdit()
-        basic_layout.addRow("Telefon:", self.phone)
+        self.last_name.setFixedHeight(32)
+        id_layout.addWidget(QLabel("Soyad:"), 2, 0)
+        id_layout.addWidget(self.last_name, 2, 1)
 
         self.tc_no = QLineEdit()
         self.tc_no.setMaxLength(11)
-        basic_layout.addRow("TC Kimlik No:", self.tc_no)
+        self.tc_no.setFixedHeight(32)
+        id_layout.addWidget(QLabel("TC No:"), 3, 0)
+        id_layout.addWidget(self.tc_no, 3, 1)
+
+        self.gender = QComboBox()
+        self.gender.setFixedHeight(32)
+        self.gender.addItems(["Erkek", "Kadın", "Diğer"])
+        self.gender.setItemData(0, Gender.MALE)
+        self.gender.setItemData(1, Gender.FEMALE)
+        self.gender.setItemData(2, Gender.OTHER)
+        id_layout.addWidget(QLabel("Cinsiyet:"), 4, 0)
+        id_layout.addWidget(self.gender, 4, 1)
 
         self.birth_date = QDateEdit()
         self.birth_date.setCalendarPopup(True)
         self.birth_date.setDate(QDate(1990, 1, 1))
-        basic_layout.addRow("Doğum Tarihi:", self.birth_date)
+        self.birth_date.setFixedHeight(32)
+        id_layout.addWidget(QLabel("Doğum Tarihi:"), 5, 0)
+        id_layout.addWidget(self.birth_date, 5, 1)
 
-        self.gender = QComboBox()
-        self.gender.addItem("Erkek", Gender.MALE)
-        self.gender.addItem("Kadın", Gender.FEMALE)
-        self.gender.addItem("Diğer", Gender.OTHER)
-        basic_layout.addRow("Cinsiyet:", self.gender)
+        left_col.addWidget(id_group)
+        basic_layout.addLayout(left_col, stretch=2)
 
-        basic_main_layout.addWidget(form_widget, stretch=1)
+        # Sağ Kolon (Fotoğraf ve İletişim Özeti)
+        right_col = QVBoxLayout()
+        right_col.setSpacing(16)
 
-        # Sağ taraf - Fotoğraf alanı
+        # Grup: Fotoğraf
         photo_group = QGroupBox("Fotoğraf")
         photo_layout = QVBoxLayout(photo_group)
         photo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.photo_label = QLabel()
-        self.photo_label.setFixedSize(120, 150)
+        self.photo_label.setFixedSize(140, 160)
         self.photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.photo_label.setStyleSheet(
             """
             QLabel {
-                background-color: #1e293b;
-                border: 2px dashed #475569;
+                background-color: #1e1e1e;
+                border: 2px dashed #3e3e42;
                 border-radius: 8px;
                 color: #64748b;
             }
@@ -123,70 +149,129 @@ class EmployeeFormDialog(QDialog):
         self.photo_label.setText("👤\nFotoğraf")
         photo_layout.addWidget(self.photo_label)
 
-        photo_btn_layout = QHBoxLayout()
+        btn_row = QHBoxLayout()
         select_photo_btn = QPushButton("📂 Seç")
+        select_photo_btn.setFixedHeight(30)
         select_photo_btn.clicked.connect(self._select_photo)
-        photo_btn_layout.addWidget(select_photo_btn)
+        btn_row.addWidget(select_photo_btn)
 
         clear_photo_btn = QPushButton("🗑 Kaldır")
+        clear_photo_btn.setFixedHeight(30)
         clear_photo_btn.clicked.connect(self._clear_photo)
-        photo_btn_layout.addWidget(clear_photo_btn)
+        btn_row.addWidget(clear_photo_btn)
+        photo_layout.addLayout(btn_row)
 
-        photo_layout.addLayout(photo_btn_layout)
-
-        basic_main_layout.addWidget(photo_group)
+        right_col.addWidget(photo_group)
+        right_col.addStretch()
+        basic_layout.addLayout(right_col, stretch=1)
 
         tabs.addTab(basic_tab, "Temel Bilgiler")
 
-        # İş Bilgileri Tab
+        # --- İş Bilgileri Tab ---
         work_tab = QWidget()
-        work_layout = QFormLayout(work_tab)
-        work_layout.setSpacing(12)
+        work_layout = QVBoxLayout(work_tab)
+        work_layout.setContentsMargins(16, 16, 16, 16)
+        work_layout.setSpacing(16)
+
+        # Grup: Organizasyon
+        org_group = QGroupBox("Organizasyon")
+        org_grid = QGridLayout(org_group)
+        org_grid.setSpacing(12)
+        org_grid.setColumnStretch(1, 1)
+        org_grid.setColumnStretch(3, 1)
 
         self.department = QComboBox()
-        work_layout.addRow("Departman:", self.department)
+        self.department.setFixedHeight(32)
+        org_grid.addWidget(QLabel("Departman:"), 0, 0)
+        org_grid.addWidget(self.department, 0, 1)
 
         self.position = QComboBox()
-        work_layout.addRow("Pozisyon:", self.position)
+        self.position.setFixedHeight(32)
+        org_grid.addWidget(QLabel("Pozisyon:"), 0, 2)
+        org_grid.addWidget(self.position, 0, 3)
 
         self.manager = QComboBox()
-        work_layout.addRow("Yönetici:", self.manager)
+        self.manager.setFixedHeight(32)
+        org_grid.addWidget(QLabel("Yönetici:"), 1, 0)
+        org_grid.addWidget(self.manager, 1, 1)
+
+        self.shift_team = QComboBox()
+        self.shift_team.setFixedHeight(32)
+        org_grid.addWidget(QLabel("Vardiya Ekibi:"), 1, 2)
+        org_grid.addWidget(self.shift_team, 1, 3)
+
+        work_layout.addWidget(org_group)
+
+        # Grup: İstihdam Detayları
+        emp_group = QGroupBox("İstihdam Detayları")
+        emp_grid = QGridLayout(emp_group)
+        emp_grid.setSpacing(12)
+        emp_grid.setColumnStretch(1, 1)
+        emp_grid.setColumnStretch(3, 1)
 
         self.hire_date = QDateEdit()
         self.hire_date.setCalendarPopup(True)
         self.hire_date.setDate(QDate.currentDate())
-        work_layout.addRow("İşe Giriş:", self.hire_date)
+        self.hire_date.setFixedHeight(32)
+        emp_grid.addWidget(QLabel("İşe Giriş:"), 0, 0)
+        emp_grid.addWidget(self.hire_date, 0, 1)
 
         self.employment_type = QComboBox()
+        self.employment_type.setFixedHeight(32)
         self.employment_type.addItem("Tam Zamanlı", EmploymentType.FULL_TIME)
         self.employment_type.addItem("Yarı Zamanlı", EmploymentType.PART_TIME)
         self.employment_type.addItem("Sözleşmeli", EmploymentType.CONTRACT)
         self.employment_type.addItem("Stajyer", EmploymentType.INTERN)
         self.employment_type.addItem("Geçici", EmploymentType.TEMPORARY)
-        work_layout.addRow("İstihdam Türü:", self.employment_type)
-
-        self.shift_team = QComboBox()
-        work_layout.addRow("Vardiya Ekibi:", self.shift_team)
+        emp_grid.addWidget(QLabel("Çalışma Şekli:"), 0, 2)
+        emp_grid.addWidget(self.employment_type, 0, 3)
 
         self.salary = QLineEdit()
         self.salary.setPlaceholderText("0.00")
-        work_layout.addRow("Maaş:", self.salary)
+        self.salary.setFixedHeight(32)
+        emp_grid.addWidget(QLabel("Maaş (TL):"), 1, 0)
+        emp_grid.addWidget(self.salary, 1, 1)
+
+        work_layout.addWidget(emp_group)
+        work_layout.addStretch()
 
         tabs.addTab(work_tab, "İş Bilgileri")
 
-        # Adres Tab
-        address_tab = QWidget()
-        address_layout = QFormLayout(address_tab)
-        address_layout.setSpacing(12)
+        # --- İletişim Tab ---
+        contact_tab = QWidget()
+        contact_layout = QVBoxLayout(contact_tab)
+        contact_layout.setContentsMargins(16, 16, 16, 16)
+        contact_layout.setSpacing(16)
+
+        contact_group = QGroupBox("İletişim")
+        contact_grid = QGridLayout(contact_group)
+        contact_grid.setSpacing(12)
+        contact_grid.setColumnStretch(1, 1)
+
+        self.email = QLineEdit()
+        self.email.setFixedHeight(32)
+        contact_grid.addWidget(QLabel("E-Posta:"), 0, 0)
+        contact_grid.addWidget(self.email, 0, 1)
+
+        self.phone = QLineEdit()
+        self.phone.setFixedHeight(32)
+        contact_grid.addWidget(QLabel("Telefon:"), 1, 0)
+        contact_grid.addWidget(self.phone, 1, 1)
 
         self.mobile = QLineEdit()
-        address_layout.addRow("Cep Telefonu:", self.mobile)
+        self.mobile.setFixedHeight(32)
+        contact_grid.addWidget(QLabel("Cep Telefonu:"), 2, 0)
+        contact_grid.addWidget(self.mobile, 2, 1)
 
         self.address = QTextEdit()
-        self.address.setMaximumHeight(100)
-        address_layout.addRow("Adres:", self.address)
+        self.address.setPlaceholderText("Açık adres...")
+        contact_grid.addWidget(QLabel("Adres:"), 3, 0, 1, 2)
+        contact_grid.addWidget(self.address, 4, 0, 1, 2)
 
-        tabs.addTab(address_tab, "İletişim")
+        contact_layout.addWidget(contact_group)
+        contact_layout.addStretch()
+
+        tabs.addTab(contact_tab, "İletişim")
 
         layout.addWidget(tabs)
 

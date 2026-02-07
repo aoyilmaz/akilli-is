@@ -1,13 +1,11 @@
-"""
-Akıllı İş - Sevkiyat Ana Modülü
-"""
-
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
+    QTabWidget,
 )
 
 from .views import ShipmentModule
+from .views.route_planning import RoutePlanningWidget
 
 
 class ShippingMainModule(QWidget):
@@ -24,11 +22,22 @@ class ShippingMainModule(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # Tab Widget
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+
         # Sevkiyat sayfası
         self.shipment_page = ShipmentModule()
-        layout.addWidget(self.shipment_page)
+        self.tabs.addTab(self.shipment_page, "Sevkiyat Yönetimi")
+
+        # Rota Planlama sayfası
+        self.route_planning_page = RoutePlanningWidget()
+        self.tabs.addTab(self.route_planning_page, "Rota ve Taşıyıcı Planlama")
 
     def _load_data(self):
         """Verileri yükle"""
         if hasattr(self.shipment_page, "_load_data"):
             self.shipment_page._load_data()
+
+        if hasattr(self.route_planning_page, "refresh_data"):
+            self.route_planning_page.refresh_data()

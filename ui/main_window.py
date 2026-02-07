@@ -164,11 +164,24 @@ except ImportError:
     PurchaseInvoiceModule = MissingModule
 
 try:
+    from modules.einvoice import EInvoiceModule
+except ImportError:
+    EInvoiceModule = MissingModule
+
+try:
     from modules.accounting.views.account_module import AccountModule
     from modules.accounting.views.journal_module import JournalModule
     from modules.accounting.views.reports_module import AccountingReportsModule
+    from modules.accounting.views.budget_module import BudgetModule
 except ImportError:
-    AccountModule = JournalModule = AccountingReportsModule = MissingModule
+    AccountModule = JournalModule = AccountingReportsModule = BudgetModule = (
+        MissingModule
+    )
+
+try:
+    from modules.fixed_assets import FixedAssetModule
+except ImportError:
+    FixedAssetModule = MissingModule
 
 try:
     from modules.finance.views.receipt_module import ReceiptModule
@@ -200,10 +213,11 @@ try:
         SupplierPerformanceModule,
     )
     from modules.reports.views.receivables_aging_module import ReceivablesAgingModule
+    from modules.reports.views.oee_monitoring_module import OEEMonitoringModule
 except ImportError:
     SalesReportsModule = StockAgingModule = ProductionOEEModule = (
         SupplierPerformanceModule
-    ) = ReceivablesAgingModule = MissingModule
+    ) = ReceivablesAgingModule = OEEMonitoringModule = MissingModule
 
 try:
     from modules.hr.views.employee_module import EmployeeModule
@@ -241,6 +255,19 @@ try:
     from modules.shipping import ShippingMainModule, FleetMainModule
 except ImportError:
     ShippingMainModule = FleetMainModule = MissingModule
+
+try:
+    from modules.quality.views import (
+        InspectionModule,
+        NCRModule,
+        ComplaintModule,
+        CAPAModule,
+        TemplateModule,
+    )
+except ImportError:
+    InspectionModule = NCRModule = ComplaintModule = CAPAModule = TemplateModule = (
+        MissingModule
+    )
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -930,6 +957,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} - {APP_DESCRIPTION}")
         self.resize(1280, 800)
         screen = self.screen().availableGeometry()
+        # Pencerenin ekran boyutunu aşmasını engelle
+        self.setMaximumSize(screen.width(), screen.height())
         self.move(
             (screen.width() - self.width()) // 2, (screen.height() - self.height()) // 2
         )
@@ -961,6 +990,12 @@ class MainWindow(QMainWindow):
         self.pages["plan-list"] = MPSPlanListPage()
         self.pages["capacity-analysis"] = CapacityAnalysisPage()
         self.pages["operator-panel"] = OperatorPanel()
+        # Kalite modülü sayfaları
+        self.pages["quality-inspections"] = InspectionModule()
+        self.pages["quality-ncr"] = NCRModule()
+        self.pages["quality-complaints"] = ComplaintModule()
+        self.pages["quality-capa"] = CAPAModule()
+        self.pages["quality-templates"] = TemplateModule()
         # Satınalma modülü sayfaları
         self.pages["suppliers"] = SupplierModule()
         self.pages["purchase-requests"] = PurchaseRequestModule()
@@ -977,10 +1012,14 @@ class MainWindow(QMainWindow):
         # Sevkiyat modülü sayfaları
         self.pages["shipping"] = ShippingMainModule()
         self.pages["fleet-management"] = FleetMainModule()
+        # e-Dönüşüm modülü sayfaları
+        self.pages["einvoices"] = EInvoiceModule()
         # Muhasebe modülü sayfaları
         self.pages["accounts"] = AccountModule()
         self.pages["journals"] = JournalModule()
         self.pages["accounting-reports"] = AccountingReportsModule()
+        self.pages["fixed-assets"] = FixedAssetModule()
+        self.pages["budgets"] = BudgetModule()
         # Finans modülü sayfaları
         self.pages["receipts"] = ReceiptModule()
         self.pages["payments"] = PaymentModule()
@@ -990,10 +1029,17 @@ class MainWindow(QMainWindow):
         self.pages["sales-reports"] = SalesReportsModule()
         self.pages["stock-aging"] = StockAgingModule()
         self.pages["production-oee"] = ProductionOEEModule()
+        self.pages["oee-monitoring"] = OEEMonitoringModule()
         self.pages["supplier-performance"] = SupplierPerformanceModule()
         self.pages["receivables-aging"] = ReceivablesAgingModule()
         # Geliştirme modülü
         self.pages["error-logs"] = DevelopmentModule()
+        try:
+            from modules.development.views.trace_viewer_module import TraceViewerModule
+
+            self.pages["trace-viewer"] = TraceViewerModule()
+        except ImportError:
+            self.pages["trace-viewer"] = MissingModule("TraceViewerModule yüklenemedi")
         # İnsan Kaynakları modülü
         self.pages["employees"] = EmployeeModule()
         self.pages["departments"] = DepartmentModule()
@@ -1052,8 +1098,20 @@ class MainWindow(QMainWindow):
         self.tabs.setMovable(True)
         self.tabs.setTabsClosable(True)
 
+        # Sekme genişliği kontrolü - pencerenin sağa uzamasını önle
+        tab_bar = self.tabs.tabBar()
+        tab_bar.setElideMode(Qt.TextElideMode.ElideRight)  # Uzun isimleri kısalt
+        tab_bar.setExpanding(False)  # Sekmelerin genişlemesini engelle
+        tab_bar.setUsesScrollButtons(
+            True
+        )  # Çok fazla sekme olunca scroll butonları göster
+
         # === STACKED WIDGET (Tabs vs Empty State) ===
         self.stacked_widget = QStackedWidget()
+        # İçeriğin pencereyi genişletmesini engelle
+        self.stacked_widget.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
+        )
 
         # 1. Tabs View
         self.stacked_widget.addWidget(self.tabs)
@@ -1090,6 +1148,8 @@ class MainWindow(QMainWindow):
                 padding: 0 10px;
                 background: #1e1e1e;
                 color: #888888;
+                max-width: 180px;
+                min-width: 80px;
             }
             QTabBar::tab:selected {
                 background: #252526;
@@ -1150,6 +1210,9 @@ class MainWindow(QMainWindow):
 
         self.status_user_layout.addWidget(self.status_user_icon_label)
         self.status_user_layout.addWidget(self.status_user_label)
+
+        # Trace toggle butonu
+        self._setup_trace_button()
 
         self.status_bar.addPermanentWidget(self.status_user_container)
 
@@ -1246,6 +1309,8 @@ class MainWindow(QMainWindow):
             border-right: 1px solid {t.border};
             border-top: 1px solid transparent;
             height: 32px;
+            max-width: 180px;
+            min-width: 80px;
         }}
         QTabBar::tab:selected {{
             background: {t.bg_primary};
@@ -1607,6 +1672,142 @@ class MainWindow(QMainWindow):
     def go_next_tab(self):
         if (i := self.tabs.currentIndex()) < self.tabs.count() - 1:
             self.tabs.setCurrentIndex(i + 1)
+
+    # ==================== TRACE SYSTEM ====================
+
+    def _setup_trace_button(self):
+        """Trace toggle butonunu status bar'a ekle"""
+        self.trace_button = QPushButton()
+        self.trace_button.setCheckable(True)
+        self.trace_button.setChecked(False)
+        self.trace_button.setText("Destek Modu")
+        self.trace_button.setToolTip(
+            "Hata izleme modunu baslatin.\n"
+            "Aktifken tum islemleriniz kaydedilir.\n"
+            "Hata aldiginizda otomatik durur ve rapor olusturulur."
+        )
+        self.trace_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 2px 8px;
+                color: #aaa;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #3a3a3a;
+                border-color: #666;
+            }
+            QPushButton:checked {
+                background-color: #8B0000;
+                border-color: #FF4444;
+                color: #fff;
+            }
+            QPushButton:checked:hover {
+                background-color: #A00000;
+            }
+        """
+        )
+        self.trace_button.toggled.connect(self._on_trace_toggled)
+        self.status_bar.addPermanentWidget(self.trace_button)
+
+        # Trace sinyallerini bağla
+        self._connect_trace_signals()
+
+    def _connect_trace_signals(self):
+        """Trace service sinyallerini bağla"""
+        try:
+            from modules.development.trace_service import TraceService
+
+            # Sinyalleri bağla
+            TraceService().signals.trace_started.connect(self._on_trace_started)
+            TraceService().signals.trace_stopped.connect(self._on_trace_stopped)
+            TraceService().signals.trace_timeout.connect(self._on_trace_timeout)
+        except Exception as e:
+            print(f"[MainWindow] Trace signals connection failed: {e}")
+
+    def _on_trace_toggled(self, checked: bool):
+        """Trace butonu toggle edildiğinde"""
+        try:
+            from modules.development.trace_service import TraceService
+            from modules.development.event_interceptor import trace_event_filter
+            from modules.development.sql_tracer import sql_tracer
+
+            if checked:
+                # Trace başlat
+                user_id = (
+                    self._current_user.id
+                    if hasattr(self, "_current_user") and self._current_user
+                    else 1
+                )
+                session_id = TraceService.start_trace(user_id=user_id, reason="manual")
+
+                if session_id:
+                    # Event filter'ı install et
+                    trace_event_filter.install()
+                    trace_event_filter.set_breadcrumb_provider(
+                        self._get_current_breadcrumb
+                    )
+
+                    # SQL tracer'ı etkinleştir
+                    sql_tracer.init_listeners()
+                    sql_tracer.enable()
+
+                    self.trace_button.setText("Kayit Aliniyor...")
+                    self.show_notification("Hata izleme modu baslatildi", "info")
+                else:
+                    # Zaten aktif
+                    self.trace_button.setChecked(False)
+            else:
+                # Trace durdur
+                user_id = (
+                    self._current_user.id
+                    if hasattr(self, "_current_user") and self._current_user
+                    else None
+                )
+                TraceService.stop_trace(user_id=user_id)
+
+                # Event filter'ı kaldır
+                trace_event_filter.uninstall()
+
+                # SQL tracer'ı devre dışı bırak
+                sql_tracer.disable()
+
+                self.trace_button.setText("Destek Modu")
+                self.show_notification("Hata izleme modu durduruldu", "info")
+
+        except Exception as e:
+            print(f"[MainWindow] Trace toggle error: {e}")
+            self.trace_button.setChecked(False)
+
+    def _on_trace_started(self, session_id: int):
+        """Trace başladığında"""
+        self.trace_button.setChecked(True)
+        self.trace_button.setText("Kayit Aliniyor...")
+
+    def _on_trace_stopped(self, session_id: int):
+        """Trace durduğunda"""
+        self.trace_button.setChecked(False)
+        self.trace_button.setText("Destek Modu")
+
+    def _on_trace_timeout(self, user_id: int):
+        """Trace timeout olduğunda"""
+        self.trace_button.setChecked(False)
+        self.trace_button.setText("Destek Modu")
+        self.show_notification("Hata izleme modu zaman asimina ugradi", "warning")
+
+    def _get_current_breadcrumb(self) -> str:
+        """Mevcut breadcrumb'ı döndür (trace için)"""
+        try:
+            # Mevcut tab'daki sayfanın path'ini al
+            current_widget = self.tabs.currentWidget()
+            if current_widget and hasattr(current_widget, "page_title"):
+                return current_widget.page_title
+            return self.tabs.tabText(self.tabs.currentIndex())
+        except Exception:
+            return ""
 
 
 if __name__ == "__main__":

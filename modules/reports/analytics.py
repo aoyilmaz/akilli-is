@@ -31,7 +31,7 @@ class AnalyticsService:
         oee_score = oee_data.get("oee", 0)
 
         # 2. Aktif Siparişler
-        active_orders_count = (
+        active_orders = (
             self.session.query(WorkOrder)
             .filter(
                 WorkOrder.status.in_(
@@ -39,8 +39,10 @@ class AnalyticsService:
                 ),
                 WorkOrder.is_active == True,
             )
-            .count()
+            .all()
         )
+        active_orders_count = len(active_orders)
+        high_risk_count = sum(1 for wo in active_orders if wo.delay_risk == "high")
 
         # 3. Haftalık Üretim Hacmi (Son 7 Gün)
         weekly_volume = (
@@ -138,6 +140,7 @@ class AnalyticsService:
         return {
             "oee_score": oee_score,
             "active_orders": active_orders_count,
+            "high_risk_orders": high_risk_count,
             "weekly_volume": float(weekly_volume),
             "cost_efficiency": float(avg_cost_efficiency),
             "production_trend": production_trend,

@@ -11,7 +11,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from .planning_page import ProductionPlanningPage
 
-from database.models.production import WorkOrderStatus
+from database.models.production import WorkOrderStatus, WorkOrderOperationStatus
 
 
 class PlanningModule(QWidget):
@@ -171,7 +171,7 @@ class PlanningModule(QWidget):
                 if wo.operations:
                     for op in wo.operations:
                         # Tamamlanan operasyonları Gantt'ta gösterme
-                        if op.status == "completed":
+                        if op.status == WorkOrderOperationStatus.COMPLETED:
                             continue
 
                         # Operasyon zamanlarını hesapla
@@ -196,9 +196,9 @@ class PlanningModule(QWidget):
 
                         # İlerleme hesapla
                         progress = 0
-                        if op.status == "completed":
+                        if op.status == WorkOrderOperationStatus.COMPLETED:
                             progress = 100
-                        elif op.status == "in_progress":
+                        elif op.status == WorkOrderOperationStatus.IN_PROGRESS:
                             progress = 50  # Varsayılan
                             if op.completed_quantity and wo.planned_quantity:
                                 progress = float(
@@ -207,7 +207,10 @@ class PlanningModule(QWidget):
 
                         # İş emri durumunu al
                         wo_status = wo.status.value if wo.status else "draft"
-                        op_status = wo_status  # İş emri durumunu kullan
+                        # Operasyon bazlı WIP takibi için kendi durumunu kullan (yeni)
+                        # Ama Gantt renkleri için şimdilik WO durumuna sadık kalmak istenebilir.
+                        # Ancak op.status.value daha doğru bir yaklaşım.
+                        op_status_val = op.status.value if op.status else wo_status
 
                         operations.append(
                             {
@@ -219,7 +222,7 @@ class PlanningModule(QWidget):
                                 "operation_name": op.name,
                                 "start_time": op_start,
                                 "end_time": op_end,
-                                "status": op_status,
+                                "status": op_status_val,
                                 "progress": progress,
                                 "setup_time": op.planned_setup_time or 0,
                                 "run_time": op.planned_run_time or 0,

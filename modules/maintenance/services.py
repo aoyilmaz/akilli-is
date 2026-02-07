@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, and_, or_
+from sqlalchemy import desc, func, and_, or_, case
 import shutil
 import os
 
@@ -1126,6 +1126,16 @@ class MaintenanceService:
                 User.last_name,
                 func.count(MaintenanceWorkOrder.id).label("completed_count"),
                 func.sum(MaintenanceWorkOrder.actual_hours).label("total_hours"),
+                func.sum(
+                    case(
+                        (
+                            MaintenanceWorkOrder.completed_date
+                            <= MaintenanceWorkOrder.due_date,
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("on_time_count"),
             )
             .join(MaintenanceWorkOrder, MaintenanceWorkOrder.assigned_to_id == User.id)
             .filter(
@@ -1137,18 +1147,26 @@ class MaintenanceService:
             .all()
         )
 
-        return [
-            {
-                "user_id": r.id,
-                "name": f"{r.first_name or ''} {r.last_name or ''}".strip()
-                or "Bilinmiyor",
-                "completed_count": r.completed_count,
-                "total_hours": float(r.total_hours or 0),
-                "avg_hours": float(r.total_hours or 0) / max(r.completed_count, 1),
-                "success_rate": 100.0,  # Basitleştirilmiş
-            }
-            for r in results
-        ]
+        final_results = []
+        for r in results:
+            completed = r.completed_count or 0
+            on_time = r.on_time_count or 0
+            rate = (on_time / completed * 100) if completed > 0 else 0.0
+
+            final_results.append(
+                {
+                    "user_id": r.id,
+                    "name": f"{r.first_name or ''} {r.last_name or ''}".strip()
+                    or "Bilinmiyor",
+                    "completed_count": completed,
+                    "total_hours": float(r.total_hours or 0),
+                    "avg_hours": float(r.total_hours or 0) / max(completed, 1),
+                    "success_rate": rate,
+                    "on_time_count": on_time,
+                }
+            )
+
+        return final_results
 
     # ==================== SATINALMA ENTEGRASYONU ====================
 

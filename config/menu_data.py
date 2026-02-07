@@ -51,6 +51,21 @@ MENU_DATA = {
         "items": [
             ("İş Emirleri", "ph.clipboard-text", "work-orders"),
             ("Operatör Paneli", "ph.desktop", "operator-panel"),
+            ("Canlı OEE İzleme", "ph.monitor", "oee-monitoring"),
+        ],
+    },
+    "quality": {
+        "title": "KALİTE KONTROL",
+        "items": [
+            ("Denetimler", "ph.check-square", "quality-inspections"),
+            ("Uygunsuzluklar (NCR)", "ph.warning-octagon", "quality-ncr"),
+            ("Müşteri Şikayetleri", "ph.user-focus", "quality-complaints"),
+            (
+                "Düzeltici Önleyici Faal. (CAPA)",
+                "ph.arrows-counter-clockwise",
+                "quality-capa",
+            ),
+            ("Denetim Şablonları", "ph.clipboard-text", "quality-templates"),
         ],
     },
     "maintenance": {
@@ -91,12 +106,20 @@ MENU_DATA = {
             ("Araç ve Sürücüler", "ph.car", "fleet-management"),
         ],
     },
+    "einvoice": {
+        "title": "e-DÖNÜŞÜM",
+        "items": [
+            ("e-Faturalar", "ph.receipt", "einvoices"),
+        ],
+    },
     "accounting": {
         "title": "MUHASEBE",
         "items": [
             ("Hesap Planı", "ph.tree-structure", "accounts"),
             ("Yevmiye Fişleri", "ph.book", "journals"),
             ("Muhasebe Raporları", "ph.file", "accounting-reports"),
+            ("Sabit Kıymetler", "ph.armchair", "fixed-assets"),
+            ("Bütçe Yönetimi", "ph.chart-pie", "budgets"),
         ],
     },
     "finance": {
@@ -143,9 +166,9 @@ MENU_DATA = {
             ("İş Akışları", "ph.flow-arrow", "workflow-admin"),
             ("Tema Ayarları", "ph.palette", "theme-settings"),
             ("İşlem Geçmişi", "ph.clock-counter-clockwise", "audit-logs"),
-            ("Genel Ayarlar", "ph.sliders", "settings"),
             ("Yazdırma Şablonları", "ph.printer", "label-templates"),
             ("Hata Kayıtları", "ph.bug", "error-logs"),
+            ("Trace Görüntüle", "ph.activity", "trace-viewer"),
         ],
     },
 }

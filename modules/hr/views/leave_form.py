@@ -43,6 +43,12 @@ class LeaveFormDialog(QDialog):
         form.setSpacing(12)
 
         self.employee_combo = QComboBox()
+        self.employee_combo.setEditable(True)
+        self.employee_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.employee_combo.completer().setCompletionMode(
+            self.employee_combo.completer().CompletionMode.PopupCompletion
+        )
+        self.employee_combo.completer().setFilterMode(Qt.MatchFlag.MatchContains)
         form.addRow("Çalışan:", self.employee_combo)
 
         self.type_combo = QComboBox()

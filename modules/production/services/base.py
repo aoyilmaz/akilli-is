@@ -26,6 +26,7 @@ from database.models.production import (
     WorkOrderOperation,
     WorkOrderByProduct,
     WorkOrderStatus,
+    WorkOrderOperationStatus,
     WorkOrderOperationPersonnel,
     BackflushMode,
 )
@@ -36,6 +37,7 @@ from database.models.inventory import (
     StockMovementType,
     StockBalance,
 )
+from modules.inventory.services import StockMovementService
 
 
 # ============================================================
@@ -509,7 +511,8 @@ class WorkStationService:
                     self.session.query(WorkOrderOperation)
                     .filter(
                         WorkOrderOperation.work_station_id == alt_station.id,
-                        WorkOrderOperation.status == "in_progress",
+                        WorkOrderOperation.status
+                        == WorkOrderOperationStatus.IN_PROGRESS,
                     )
                     .count()
                 )
@@ -907,7 +910,7 @@ class WorkOrderService:
         Yeni Özellik: Rezervasyonu serbest bırakır ve malzemeleri stoktan düşer
         - Rezerve edilen malzemeleri serbest bırakır
         - Malzemeleri fiziksel olarak stoktan düşer
-        - URETIM_GIRIS hareketi oluşturur
+        - URETIM_CIKIS hareketi (malzeme tüketimi) oluşturur
         """
         order = self.get_by_id(order_id)
         if not order:
@@ -948,46 +951,41 @@ class WorkOrderService:
                     )
                     line.is_reserved = False
 
-                # Stok bakiyesini al
-                balance = self._get_balance(line.item_id, warehouse_id)
-                current_cost = (
-                    balance.unit_cost if balance else (line.unit_cost or Decimal(0))
-                )
-
-                # Stok hareketi oluştur (URETIM_GIRIS = üretim için malzeme çıkışı)
-                movement = StockMovement(
+                # Stok hareketi oluştur (URETIM_CIKIS = Malzeme Çıkışı / Tüketim)
+                # Not: unit_cost'u servise unit_price olarak geçiyoruz
+                movement = stock_service.create_movement(
                     item_id=line.item_id,
-                    movement_type=StockMovementType.URETIM_GIRIS,
-                    quantity=line.required_quantity,
-                    unit_price=current_cost,
-                    total_price=line.required_quantity * current_cost,
+                    movement_type=StockMovementType.URETIM_CIKIS,
+                    quantity=float(line.required_quantity),
                     from_warehouse_id=warehouse_id,
+                    unit_price=line.unit_cost,  # Anlık maliyet (veya servisin otomatik bulduğu)
                     document_no=order.order_no,
                     document_type="work_order",
                     description=f"İş Emri: {order.order_no} - Malzeme çıkışı",
                     movement_date=datetime.now(),
                 )
-                self.session.add(movement)
 
-                # Bakiyeyi güncelle
-                if balance:
-                    balance.quantity -= line.required_quantity
-                    if balance.quantity < 0:
-                        balance.quantity = Decimal(0)
+                # Servis zaten bakiyeyi güncellediği için manuel güncellemeye gerek yok.
+                # Maliyeti hareketten veya mevcut line cost'tan al
+                line_cost = (
+                    movement.total_price
+                    if movement.total_price
+                    else (line.required_quantity * (line.unit_cost or 0))
+                )
 
                 # İş emri satırını güncelle
                 line.issued_quantity = line.required_quantity
-                line.actual_unit_cost = current_cost
-                line.actual_line_cost = line.required_quantity * current_cost
+                line.actual_unit_cost = (
+                    movement.unit_price if movement.unit_price else line.unit_cost
+                )
+                line.actual_line_cost = line_cost
 
-                actual_material_cost += line.actual_line_cost
+                actual_material_cost += line_cost
 
             # İş emrini güncelle
             order.status = WorkOrderStatus.IN_PROGRESS
             order.actual_start = datetime.now()
-            order.source_warehouse_id = (
-                warehouse_id  # DÜZELTME: warehouse_id → source_warehouse_id
-            )
+            order.source_warehouse_id = warehouse_id
             order.actual_material_cost = actual_material_cost
 
             # Transaction'ı tamamla
@@ -1039,36 +1037,34 @@ class WorkOrderService:
         try:
             # === TRANSACTION BAŞLANGICI ===
 
+            # Stok servisini paylaşılan session ile başlat (Transaction Bütünlüğü)
+            stock_service = StockMovementService(session=self.session)
+
             # Backflush: ON_COMPLETE modunda malzeme düşümü
             if order.backflush_mode == BackflushMode.ON_COMPLETE:
                 source_wh = order.source_warehouse_id
                 if source_wh:
                     for line in order.lines:
                         if line.required_quantity > 0:
-                            # Malzeme düşümü
-                            mat_movement = StockMovement(
+                            # Malzeme düşümü (URETIM_CIKIS = Hammadde/Yarı mamül çıkışı)
+                            stock_service.create_movement(
+                                movement_type=StockMovementType.URETIM_CIKIS,
                                 item_id=line.item_id,
-                                movement_type=StockMovementType.URETIM_GIRIS,
-                                quantity=line.required_quantity,
-                                unit_price=Decimal(0),
-                                total_price=Decimal(0),
+                                quantity=float(line.required_quantity),
                                 from_warehouse_id=source_wh,
                                 document_no=order.order_no,
                                 document_type="work_order_backflush",
-                                description=(
-                                    f"Backflush: {order.order_no} - "
-                                    f"{line.item.code if line.item else ''}"
-                                ),
-                                movement_date=datetime.now(),
+                                description=f"Backflush: {order.order_no}",
+                                # unit_cost serviste otomatik hesaplanacak (FIFO/Avg)
                             )
-                            self.session.add(mat_movement)
 
-                            # Bakiye güncelle
-                            balance = self._get_balance(line.item_id, source_wh)
-                            if balance:
-                                balance.quantity -= line.required_quantity
-                                if balance.quantity < 0:
-                                    balance.quantity = Decimal(0)
+                            # İş emri satırını güncelle
+                            # Not: create_movement balance'ı güncelledi,
+                            # burada sadece line takibi yapılabilir ama line servisi yok.
+                            # DB ilişkisinden line.used_quantity güncellenebilir.
+                            line.used_quantity = (
+                                line.used_quantity or 0
+                            ) + line.required_quantity
 
             # Birim maliyet hesapla
             total_cost = (
@@ -1086,39 +1082,30 @@ class WorkOrderService:
                 else Decimal(0)
             )
 
-            # Mamül stok girişi (URETIM_CIKIS = üretimden mamül girişi)
-            movement = StockMovement(
-                item_id=order.item_id,
-                movement_type=StockMovementType.URETIM_CIKIS,
-                quantity=completed_quantity,
-                unit_price=unit_cost,
-                total_price=completed_quantity * unit_cost,
-                to_warehouse_id=warehouse_id,
-                document_no=order.order_no,
-                document_type="work_order",
-                description=f"İş Emri: {order.order_no} - Mamül girişi",
-                movement_date=datetime.now(),
-            )
-            self.session.add(movement)
-
-            # Bakiyeyi güncelle (mamül için)
-            balance = self._get_or_create_balance(order.item_id, warehouse_id)
-            old_qty = balance.quantity
-            old_cost = balance.unit_cost
-            new_qty = old_qty + completed_quantity
-
-            # Ağırlıklı ortalama maliyet
-            if new_qty > 0:
-                balance.unit_cost = (
-                    (old_qty * old_cost) + (completed_quantity * unit_cost)
-                ) / new_qty
-            balance.quantity = new_qty
+            # Kalite Yönetimi ve Mamül Girişi
+            if send_to_qc:
+                # QC'ye gönderildiğinde stok hareketi YAPILMAZ.
+                # Sadece durum güncellenir.
+                order.status = WorkOrderStatus.QUALITY_CHECK
+            else:
+                # QC yoksa direkt mamül girişi (URETIM_GIRIS = Üretimden Giriş)
+                stock_service.create_movement(
+                    movement_type=StockMovementType.URETIM_GIRIS,
+                    item_id=order.item_id,
+                    quantity=float(completed_quantity),
+                    to_warehouse_id=warehouse_id,
+                    unit_price=unit_cost,
+                    document_no=order.order_no,
+                    document_type="work_order",
+                    description=f"İş Emri: {order.order_no} - Mamül girişi",
+                )
+                order.status = WorkOrderStatus.COMPLETED
 
             # Yan ürünleri stoğa al
             try:
                 from modules.inventory.services import StockMovementService
 
-                movement_service = StockMovementService()
+                movement_service = StockMovementService(session=self.session)
 
                 if order.by_products:
                     for bp in order.by_products:
@@ -1127,8 +1114,6 @@ class WorkOrderService:
                         if by_product_quantities and bp.id in by_product_quantities:
                             completed_qty = Decimal(str(by_product_quantities[bp.id]))
                         elif bp.planned_quantity > 0:
-                            # Oranla: Üretilen / Planlanan * BP Planlanan
-                            # Basitçe hepsi üretildi varsayalım veya 0
                             completed_qty = bp.planned_quantity
 
                         if completed_qty > 0:
@@ -1143,12 +1128,12 @@ class WorkOrderService:
                                 document_type="work_order_by_product",
                                 document_no=order.order_no,
                                 description=f"İş Emri Yan Ürün: {order.order_no}",
-                                unit_cost=0,  # Yan ürün maliyeti 0 kabul ediliyor
+                                unit_price=Decimal(0),
                             )
             except Exception as e:
                 print(f"Yan ürün stok hatası: {e}")
 
-            # Fire varsa
+            # Fire varsa (Raporlama amaçlı, bakiye düşmez)
             if scrap_quantity > 0:
                 scrap_movement = StockMovement(
                     item_id=order.item_id,
@@ -1163,15 +1148,6 @@ class WorkOrderService:
                     movement_date=datetime.now(),
                 )
                 self.session.add(scrap_movement)
-
-            # İş emrini güncelle
-            if send_to_qc:
-                # Kalite kontrole gönder
-                order.status = WorkOrderStatus.QUALITY_CHECK
-                # Stok henüz eklenmez, kalite onayından sonra eklenecek
-            else:
-                # Direkt tamamla (kalite kontrolsüz)
-                order.status = WorkOrderStatus.COMPLETED
 
             order.actual_end = datetime.now()
             order.completed_quantity = completed_quantity
@@ -1213,7 +1189,8 @@ class WorkOrderService:
         if order.status == WorkOrderStatus.RELEASED and warehouse_id:
             from modules.inventory.services import StockMovementService
 
-            stock_service = StockMovementService()
+            # Paylaşılan session kullan
+            stock_service = StockMovementService(session=self.session)
 
             for line in order.lines:
                 if line.is_reserved and line.required_quantity > 0:
@@ -1279,33 +1256,25 @@ class WorkOrderService:
             )
 
             # Onaylanan mamülü stoğa ekle
-            movement = StockMovement(
+            # Paylaşılan session kullan
+            stock_service = StockMovementService(session=self.session)
+
+            stock_service.create_movement(
+                movement_type=StockMovementType.URETIM_GIRIS,
                 item_id=order.item_id,
-                movement_type=StockMovementType.URETIM_CIKIS,
-                quantity=approved_quantity,
-                unit_price=unit_cost,
-                total_price=approved_quantity * unit_cost,
+                quantity=float(approved_quantity),
                 to_warehouse_id=warehouse_id,
+                unit_price=unit_cost,
                 document_no=order.order_no,
                 document_type="work_order_qc",
                 description=f"İş Emri: {order.order_no} - Kalite Onaylı Mamül",
-                movement_date=datetime.now(),
             )
-            self.session.add(movement)
 
-            # Bakiyeyi güncelle
-            balance = self._get_or_create_balance(order.item_id, warehouse_id)
-            old_qty = balance.quantity
-            old_cost = balance.unit_cost
-            new_qty = old_qty + approved_quantity
-
-            if new_qty > 0:
-                balance.unit_cost = (
-                    (old_qty * old_cost) + (approved_quantity * unit_cost)
-                ) / new_qty
-            balance.quantity = new_qty
+            # NOT: Balance güncellemesi artık servis içinde yapılıyor.
 
             # Reddedilen miktar varsa fire olarak kaydet
+            # Burası için servis KULLANMIYORUZ çünkü ürün henüz stoğa girmedi, düşemeyiz.
+            # Sadece raporlama amaçlı hareket kaydı atıyoruz.
             if rejected_quantity > 0:
                 scrap_movement = StockMovement(
                     item_id=order.item_id,
@@ -1523,14 +1492,14 @@ class WorkOrderService:
             raise ProductionError("Operasyon bulunamadı!")
 
         # Zaten çalışıyorsa hata ver
-        if op.status == "in_progress":
+        if op.status == WorkOrderOperationStatus.IN_PROGRESS:
             raise ProductionError("Operasyon zaten devam ediyor!")
 
         # 1. Önceki operasyon tamamlanmış mı kontrol et
         # A) predecessor_id tanımlıysa o kontrol edilir
         if op.predecessor_id:
             predecessor = self.session.query(WorkOrderOperation).get(op.predecessor_id)
-            if predecessor and predecessor.status != "completed":
+            if predecessor and predecessor.status != WorkOrderOperationStatus.COMPLETED:
                 raise ProductionError(
                     f"Önceki operasyon ({predecessor.name}) tamamlanmadan "
                     f"bu operasyona başlayamazsınız!"
@@ -1544,7 +1513,7 @@ class WorkOrderService:
                 )
                 .first()
             )
-            if prev_op and prev_op.status != "completed":
+            if prev_op and prev_op.status != WorkOrderOperationStatus.COMPLETED:
                 raise ProductionError(
                     f"Önceki operasyon ({prev_op.name}) tamamlanmadan "
                     f"bu operasyona başlayamazsınız!"
@@ -1569,7 +1538,7 @@ class WorkOrderService:
 
         # Devam etme (Resume) veya İlk Başlama
         op.last_start_time = datetime.now()
-        op.status = "in_progress"
+        op.status = WorkOrderOperationStatus.IN_PROGRESS
 
         # İş emrinin durumu güncelle
         if op.work_order and op.work_order.status != WorkOrderStatus.IN_PROGRESS:
@@ -1603,7 +1572,7 @@ class WorkOrderService:
         if not op:
             raise ProductionError("Operasyon bulunamadı!")
 
-        if op.status != "in_progress":
+        if op.status != WorkOrderOperationStatus.IN_PROGRESS:
             raise ProductionError("Sadece devam eden operasyon duraklatılabilir!")
 
         # Süre hesapla ve ekle
@@ -1613,7 +1582,7 @@ class WorkOrderService:
             op.actual_run_time = (op.actual_run_time or 0) + added_minutes
 
         op.last_start_time = None
-        op.status = "paused"
+        op.status = WorkOrderOperationStatus.PAUSED
 
         self.session.commit()
         return op
@@ -1797,7 +1766,7 @@ class WorkOrderService:
             raise ProductionError("Operasyon bulunamadı!")
 
         op.actual_end = datetime.now()
-        op.status = "completed"
+        op.status = WorkOrderOperationStatus.COMPLETED
 
         if actual_run_time:
             op.actual_run_time = actual_run_time

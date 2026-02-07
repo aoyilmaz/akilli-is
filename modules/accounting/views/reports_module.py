@@ -17,34 +17,22 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QFrame,
     QTabWidget,
-    QAbstractItemView,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
 
 from config.styles import (
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BG_TERTIARY,
-    BG_HOVER,
-    BORDER,
-    TEXT_PRIMARY,
-    TEXT_MUTED,
     ACCENT,
     SUCCESS,
     WARNING,
     ERROR,
-    INPUT_BG,
-    INPUT_BORDER,
-    get_tab_style,
-    get_table_style,
     get_button_style,
-    get_input_style,
     BTN_HEIGHT_NORMAL,
     ICONS,
 )
 from modules.accounting.services import AccountingService
+from modules.accounting.cost_service import CostAccountingService
 
 
 class AccountingReportsModule(QWidget):
@@ -76,8 +64,128 @@ class AccountingReportsModule(QWidget):
         self.balance_page = self._create_balance_sheet_page()
         self.tabs.addTab(self.balance_page, "Bilanco")
 
+        # KDV Raporu
+        self.vat_page = self._create_vat_report_page()
+        self.tabs.addTab(self.vat_page, "KDV Raporu")
+
+        # Maliyet Analizi
+        self.cost_page = self._create_cost_report_page()
+        self.tabs.addTab(self.cost_page, "Maliyet Analizi")
+
         self.tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self.tabs)
+
+    # ... methods ...
+
+    def _create_cost_report_page(self) -> QWidget:
+        """Üretim Maliyet Raporu"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        # Filtre
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("Tarih:"))
+        self.cost_start = QDateEdit()
+        self.cost_start.setDate(QDate.currentDate().addMonths(-1))
+        self.cost_start.setCalendarPopup(True)
+        filter_layout.addWidget(self.cost_start)
+
+        filter_layout.addWidget(QLabel("-"))
+        self.cost_end = QDateEdit()
+        self.cost_end.setDate(QDate.currentDate())
+        self.cost_end.setCalendarPopup(True)
+        filter_layout.addWidget(self.cost_end)
+
+        gen_btn = QPushButton(f"{ICONS['report']} Maliyet Analizi")
+        gen_btn.setStyleSheet(get_button_style("primary"))
+        gen_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        gen_btn.clicked.connect(self._generate_cost_report)
+        filter_layout.addWidget(gen_btn)
+
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
+
+        # Summary
+        self.cost_summary = QLabel()
+        layout.addWidget(self.cost_summary)
+
+        # Table
+        self.cost_table = QTableWidget()
+        self.cost_table.setColumnCount(7)
+        self.cost_table.setHorizontalHeaderLabels(
+            [
+                "İş Emri",
+                "Miktar",
+                "Malzeme",
+                "İşçilik",
+                "G. Gider",
+                "Toplam",
+                "Birim Fiyat",
+            ]
+        )
+        header = self.cost_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.cost_table)
+
+        return page
+
+    def _generate_cost_report(self):
+        qstart = self.cost_start.date()
+        qend = self.cost_end.date()
+        start = date(qstart.year(), qstart.month(), qstart.day())
+        end = date(qend.year(), qend.month(), qend.day())
+
+        service = None
+        try:
+            service = CostAccountingService()
+            costs = service.get_production_costs(start, end)
+
+            self.cost_table.setRowCount(len(costs))
+            total_prod_cost = 0
+
+            for i, c in enumerate(costs):
+                self.cost_table.setItem(i, 0, QTableWidgetItem(c["order_no"]))
+                self.cost_table.setItem(
+                    i, 1, QTableWidgetItem(f"{c['completed_quantity']:,.2f}")
+                )
+
+                self.cost_table.setItem(
+                    i, 2, QTableWidgetItem(f"₺{c['material_cost']:,.2f}")
+                )
+                self.cost_table.setItem(
+                    i, 3, QTableWidgetItem(f"₺{c['labor_cost']:,.2f}")
+                )
+                self.cost_table.setItem(
+                    i, 4, QTableWidgetItem(f"₺{c['overhead_cost']:,.2f}")
+                )
+
+                self.cost_table.setItem(
+                    i, 5, QTableWidgetItem(f"₺{c['total_cost']:,.2f}")
+                )
+                self.cost_table.setItem(
+                    i, 6, QTableWidgetItem(f"₺{c['unit_cost']:,.2f}")
+                )
+
+                total_prod_cost += c["total_cost"]
+
+                # Right align numbers
+                for col in range(1, 7):
+                    item = self.cost_table.item(i, col)
+                    if item:
+                        item.setTextAlignment(
+                            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                        )
+
+            self.cost_summary.setText(
+                f"Toplam Üretim Maliyeti: ₺{total_prod_cost:,.2f} ({len(costs)} İş Emri)"
+            )
+
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
+        finally:
+            if service:
+                service.close()
 
         # Ilk tab icin hesaplari yukle
         self._load_accounts_for_ledger()
@@ -399,5 +507,158 @@ class AccountingReportsModule(QWidget):
                 )
         except Exception as e:
             QMessageBox.warning(self, "Uyarı", str(e))
+        finally:
+            self._close_service()
+
+    def _create_vat_report_page(self) -> QWidget:
+        """KDV raporu sayfası"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        # Filtre
+        filter_layout = QHBoxLayout()
+
+        filter_layout.addWidget(QLabel("Dönem:"))
+        self.vat_start = QDateEdit()
+        self.vat_start.setDate(QDate.currentDate().addMonths(-1))
+        self.vat_start.setCalendarPopup(True)
+        filter_layout.addWidget(self.vat_start)
+
+        filter_layout.addWidget(QLabel("-"))
+        self.vat_end = QDateEdit()
+        self.vat_end.setDate(QDate.currentDate())
+        self.vat_end.setCalendarPopup(True)
+        filter_layout.addWidget(self.vat_end)
+
+        gen_btn = QPushButton(f"{ICONS['report']} KDV Raporu")
+        gen_btn.setStyleSheet(get_button_style("primary"))
+        gen_btn.setFixedHeight(BTN_HEIGHT_NORMAL)
+        gen_btn.clicked.connect(self._generate_vat_report)
+        filter_layout.addWidget(gen_btn)
+
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
+
+        # Kartlar
+        cards_layout = QHBoxLayout()
+        self.vat_sales_card = self._create_summary_card(
+            "HESAPLANAN (SATIŞ)", "₺0", WARNING
+        )
+        cards_layout.addWidget(self.vat_sales_card)
+
+        self.vat_purchase_card = self._create_summary_card(
+            "İNDİRİLECEK (ALIŞ)", "₺0", SUCCESS
+        )
+        cards_layout.addWidget(self.vat_purchase_card)
+
+        self.vat_net_card = self._create_summary_card(
+            "NET KDV (ÖDENECEK)", "₺0", ACCENT
+        )
+        cards_layout.addWidget(self.vat_net_card)
+
+        layout.addLayout(cards_layout)
+
+        # Detay Tablosu
+        self.vat_table = QTableWidget()
+        self.vat_table.setColumnCount(4)
+        self.vat_table.setHorizontalHeaderLabels(
+            ["KDV Oranı", "Hesaplanan (Satış)", "İndirilecek (Alış)", "Fark"]
+        )
+        header = self.vat_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.vat_table)
+
+        return page
+
+    def _generate_vat_report(self):
+        qstart = self.vat_start.date()
+        qend = self.vat_end.date()
+        start = date(qstart.year(), qstart.month(), qstart.day())
+        end = date(qend.year(), qend.month(), qend.day())
+
+        try:
+            service = self._get_service()
+            data = service.get_tax_report(start, end)
+
+            sales_tax = data["sales"]["tax"]
+            purchase_tax = data["purchases"]["tax"]
+            net_tax = data["net_tax"]
+
+            self.vat_sales_card.findChild(QLabel, "value").setText(f"₺{sales_tax:,.2f}")
+            self.vat_purchase_card.findChild(QLabel, "value").setText(
+                f"₺{purchase_tax:,.2f}"
+            )
+
+            try:
+                # Try to find the title label (first label in layout)
+                layout = self.vat_net_card.layout()
+                for i in range(layout.count()):
+                    widget = layout.itemAt(i).widget()
+                    if isinstance(widget, QLabel) and widget.objectName() != "value":
+                        net_label = (
+                            "NET KDV (ÖDENECEK)"
+                            if net_tax >= 0
+                            else "NET KDV (İADE/DEVREDEN)"
+                        )
+                        widget.setText(net_label)
+                        break
+            except:
+                pass
+
+            self.vat_net_card.findChild(QLabel, "value").setText(
+                f"₺{abs(net_tax):,.2f}"
+            )
+
+            # Fill table by rate
+            rates = set()
+            # Handle integer keys from service
+            for k in data["sales"]["by_rate"]:
+                rates.add(int(k))
+            for k in data["purchases"]["by_rate"]:
+                rates.add(int(k))
+
+            sorted_rates = sorted(list(rates))
+
+            self.vat_table.setRowCount(len(sorted_rates))
+            for i, rate in enumerate(sorted_rates):
+                # Helper to get tax safely
+                def get_tax(source, r):
+                    if r in source:
+                        return source[r]["tax"]
+                    if str(r) in source:
+                        return source[str(r)]["tax"]
+                    return 0
+
+                s_tax = get_tax(data["sales"]["by_rate"], rate)
+                p_tax = get_tax(data["purchases"]["by_rate"], rate)
+                diff = s_tax - p_tax
+
+                self.vat_table.setItem(i, 0, QTableWidgetItem(f"%{rate}"))
+
+                s_item = QTableWidgetItem(f"₺{s_tax:,.2f}")
+                s_item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.vat_table.setItem(i, 1, s_item)
+
+                p_item = QTableWidgetItem(f"₺{p_tax:,.2f}")
+                p_item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                self.vat_table.setItem(i, 2, p_item)
+
+                diff_item = QTableWidgetItem(f"₺{diff:,.2f}")
+                diff_item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
+                if diff > 0:
+                    diff_item.setForeground(QColor(WARNING))  # Owed
+                else:
+                    diff_item.setForeground(QColor(SUCCESS))  # Deductible
+                self.vat_table.setItem(i, 3, diff_item)
+
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", str(e))
         finally:
             self._close_service()

@@ -17,18 +17,16 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QLineEdit,
     QTextEdit,
+    QFrame,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+import qtawesome as qta
 
-from config.styles import (
-    BG_SECONDARY,
-    BORDER,
-    TEXT_PRIMARY,
-    ACCENT,
-    SUCCESS,
-    get_button_style,
-    get_title_style,
-)
+from config.icons import ICONS
+from config.styles import COLORS
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
 from modules.quality.services import QualityService
 from database.models.quality import (
     ComplaintCategory,
@@ -51,12 +49,20 @@ PRIORITY_LABELS = {
     ComplaintPriority.CRITICAL: "Kritik",
 }
 
+PRIORITY_COLORS = {
+    ComplaintPriority.LOW: COLORS["info"],
+    ComplaintPriority.MEDIUM: COLORS["text_secondary"],
+    ComplaintPriority.HIGH: COLORS["warning"],
+    ComplaintPriority.CRITICAL: COLORS["error"],
+}
+
 STATUS_LABELS = {
     ComplaintStatus.OPEN: "Açık",
     ComplaintStatus.INVESTIGATION: "İnceleme",
     ComplaintStatus.RESOLUTION: "Çözüm",
     ComplaintStatus.CLOSED: "Kapalı",
 }
+
 
 class ComplaintFormDialog(QDialog):
     """Yeni şikayet dialogu"""
@@ -68,56 +74,84 @@ class ComplaintFormDialog(QDialog):
 
     def setup_ui(self):
         self.setWindowTitle("Yeni Müşteri Şikayeti")
-        self.setMinimumSize(450, 400)
+        self.setMinimumSize(500, 500)
 
         layout = QVBoxLayout(self)
-        form = QFormLayout()
-        form.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        form_frame = QFrame()
+        form_layout = QFormLayout(form_frame)
+        form_layout.setSpacing(15)
+        form_layout.setContentsMargins(0, 0, 0, 0)
 
         self.category = QComboBox()
         for c, label in CATEGORY_LABELS.items():
             self.category.addItem(label, c)
-        form.addRow("Kategori:", self.category)
+        form_layout.addRow("Kategori:", self.category)
 
         self.priority = QComboBox()
         for p, label in PRIORITY_LABELS.items():
             self.priority.addItem(label, p)
         self.priority.setCurrentIndex(1)  # Orta
-        form.addRow("Öncelik:", self.priority)
+        form_layout.addRow("Öncelik:", self.priority)
 
         self.product_info = QLineEdit()
-        form.addRow("Ürün Bilgisi:", self.product_info)
+        self.product_info.setPlaceholderText("Ürün kodu/adı...")
+        form_layout.addRow("Ürün Bilgisi:", self.product_info)
 
         self.lot_no = QLineEdit()
-        form.addRow("Parti No:", self.lot_no)
+        self.lot_no.setPlaceholderText("Parti/Lot numarası...")
+        form_layout.addRow("Parti No:", self.lot_no)
 
         self.description = QTextEdit()
+        self.description.setPlaceholderText("Şikayet detayları...")
         self.description.setMaximumHeight(100)
-        form.addRow("Şikayet Açıklaması:", self.description)
+        form_layout.addRow("Şikayet Açıklaması:", self.description)
 
         self.immediate_action = QTextEdit()
+        self.immediate_action.setPlaceholderText("Alınan ilk aksiyon...")
         self.immediate_action.setMaximumHeight(80)
-        form.addRow("Acil Aksiyon:", self.immediate_action)
+        form_layout.addRow("Acil Aksiyon:", self.immediate_action)
 
-        layout.addLayout(form)
+        layout.addWidget(form_frame)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
+        cancel_btn.setMinimumSize(100, 35)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
+        save_btn.setMinimumSize(100, 35)
         save_btn.setProperty("class", "primary")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="white"))
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 
         layout.addLayout(btn_layout)
 
+        self.setStyleSheet(
+            f"""
+            QDialog {{ background-color: {COLORS['bg_primary']}; }}
+            QLabel {{ color: {COLORS['text_secondary']}; font-weight: 500; }}
+            QLineEdit, QComboBox, QTextEdit {{
+                padding: 8px;
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                background-color: {COLORS['bg_secondary']};
+                color: {COLORS['text_primary']};
+            }}
+        """
+        )
+
     def save(self):
-        if not self.description.toPlainText().strip():
+        desc = self.description.toPlainText().strip()
+        if not desc:
             QMessageBox.warning(self, "Uyarı", "Şikayet açıklaması zorunludur.")
+            return
 
         try:
             data = {
@@ -125,7 +159,7 @@ class ComplaintFormDialog(QDialog):
                 "priority": self.priority.currentData(),
                 "product_info": self.product_info.text().strip() or None,
                 "lot_no": self.lot_no.text().strip() or None,
-                "description": self.description.toPlainText().strip(),
+                "description": desc,
                 "immediate_action": self.immediate_action.toPlainText().strip() or None,
             }
             self.service.create_complaint(data)
@@ -137,56 +171,45 @@ class ComplaintFormDialog(QDialog):
         self.service.close()
         super().closeEvent(event)
 
-class ComplaintModule(QWidget):
+
+class ComplaintModule(BaseListPage):
     """Müşteri şikayetleri modülü"""
 
-    page_title = "Müşteri Şikayetleri"
-
     def __init__(self, parent=None):
-        super().__init__(parent)
+        columns = [
+            ColumnConfig("complaint_no", "Şikayet No", width=120, filterable=True),
+            ColumnConfig("category", "Kategori", width=120, filter_type="enum"),
+            ColumnConfig("priority", "Öncelik", width=100, filter_type="enum"),
+            ColumnConfig(
+                "description", "Açıklama", width=300, stretch=True, filterable=True
+            ),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
+            ColumnConfig("complaint_date", "Tarih", width=120, filterable=True),
+        ]
+
+        super().__init__(
+            title="Müşteri Şikayetleri",
+            icon=ICONS.CUSTOMER,
+            table_id="quality_complaint_list",
+            columns=columns,
+            add_text="Yeni Şikayet",
+            show_export=True,
+            parent=parent,
+        )
+
         self.service = None
-        self.setup_ui()
+        self._setup_additional_ui()
         self.load_data()
 
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        header = QHBoxLayout()
-        title = QLabel("Müşteri Şikayetleri")
-        header.addWidget(title)
-        header.addStretch()
-
-        new_btn = QPushButton("Yeni Şikayet")
-        new_btn.setProperty("class", "primary")
-        new_btn.clicked.connect(self._new_complaint)
-        header.addWidget(new_btn)
-
-        layout.addLayout(header)
-
-        filter_row = QHBoxLayout()
-        self.status_combo = QComboBox()
-        self.status_combo.setFixedWidth(150)
-        self.status_combo.addItem("Tüm Durumlar", None)
-        for s, label in STATUS_LABELS.items():
-            self.status_combo.addItem(label, s)
-        self.status_combo.currentIndexChanged.connect(self.load_data)
-        filter_row.addWidget(self.status_combo)
-        filter_row.addStretch()
-        layout.addLayout(filter_row)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(
-            ["Şikayet No", "Kategori", "Öncelik", "Açıklama", "Durum", "Tarih"]
+    def _setup_additional_ui(self):
+        self.footer.add_stat("open", "Açık", ICONS.INFO, COLORS["error"])
+        self.footer.add_stat(
+            "investigation", "İncelemede", ICONS.CHART, COLORS["warning"]
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout.addWidget(self.table)
+        self.footer.add_stat("closed", "Kapalı", ICONS.SUCCESS, COLORS["success"])
+
+        self.add_clicked.connect(self._on_add)
+        self.refresh_requested.connect(self.load_data)
 
     def _get_service(self):
         if self.service is None:
@@ -201,53 +224,70 @@ class ComplaintModule(QWidget):
     def load_data(self):
         try:
             service = self._get_service()
-            status = self.status_combo.currentData()
-            complaints = service.get_all_complaints(status=status)
+            complaints = service.get_all_complaints()
 
             self.table.setRowCount(len(complaints))
+            self.update_count(len(complaints))
+
+            stats = {"open": 0, "investigation": 0, "closed": 0}
+
             for row, c in enumerate(complaints):
-                self.table.setItem(row, 0, QTableWidgetItem(c.complaint_no))
+                # Şikayet No
+                item_no = QTableWidgetItem(c.complaint_no)
+                item_no.setData(Qt.ItemDataRole.UserRole, c.id)
+                self.table.setItem(row, 0, item_no)
+
+                # Kategori
                 self.table.setItem(
                     row, 1, QTableWidgetItem(CATEGORY_LABELS.get(c.category, "-"))
                 )
 
-                pri_text = PRIORITY_LABELS.get(c.priority, "-")
+                # Öncelik
+                pri_text = PRIORITY_LABELS.get(c.priority, str(c.priority))
                 pri_item = QTableWidgetItem(pri_text)
-                if c.priority == ComplaintPriority.CRITICAL:
-                    pri_item.setForeground(Qt.GlobalColor.red)
-                elif c.priority == ComplaintPriority.HIGH:
-                    pri_item.setForeground(Qt.GlobalColor.yellow)
+                pri_item.setForeground(
+                    QColor(PRIORITY_COLORS.get(c.priority, COLORS["text_primary"]))
+                )
                 self.table.setItem(row, 2, pri_item)
 
-                desc = (
-                    c.description[:40] + "..."
-                    if len(c.description) > 40
-                    else c.description
-                )
-                self.table.setItem(row, 3, QTableWidgetItem(desc))
+                # Açıklama
+                desc_text = c.description
+                if len(desc_text) > 80:
+                    desc_text = desc_text[:77] + "..."
+                self.table.setItem(row, 3, QTableWidgetItem(desc_text))
 
-                status_text = STATUS_LABELS.get(c.status, "-")
+                # Durum
+                status_text = STATUS_LABELS.get(c.status, str(c.status))
                 status_item = QTableWidgetItem(status_text)
                 if c.status == ComplaintStatus.CLOSED:
-                    status_item.setForeground(Qt.GlobalColor.green)
+                    status_item.setForeground(QColor(COLORS["success"]))
+                elif c.status == ComplaintStatus.OPEN:
+                    status_item.setForeground(QColor(COLORS["error"]))
                 self.table.setItem(row, 4, status_item)
 
-                self.table.setItem(
-                    row,
-                    5,
-                    QTableWidgetItem(
-                        c.complaint_date.strftime("%d.%m.%Y")
-                        if c.complaint_date
-                        else "-"
-                    ),
+                # Tarih
+                date_str = (
+                    c.complaint_date.strftime("%d.%m.%Y") if c.complaint_date else "-"
                 )
+                self.table.setItem(row, 5, QTableWidgetItem(date_str))
+
+                # Stats
+                if c.status == ComplaintStatus.OPEN:
+                    stats["open"] += 1
+                elif c.status == ComplaintStatus.CLOSED:
+                    stats["closed"] += 1
+                elif c.status == ComplaintStatus.INVESTIGATION:
+                    stats["investigation"] += 1
+
+            for key, val in stats.items():
+                self.update_stat_card(key, str(val))
 
         except Exception as e:
-            QMessageBox.warning(self, "Uyarı", f"Hata: {str(e)}")
+            self.show_error("Veri Yükleme Hatası", str(e))
         finally:
             self._close_service()
 
-    def _new_complaint(self):
+    def _on_add(self):
         dialog = ComplaintFormDialog(parent=self)
         if dialog.exec():
             self.load_data()

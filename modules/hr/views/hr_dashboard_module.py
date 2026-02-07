@@ -48,6 +48,7 @@ class HRDashboardModule(QWidget):
             title="İK Dashboard",
             icon=ICONS.DASHBOARD,
             show_search=False,
+            show_add=False,
             parent=self,
         )
         self.header.refresh_clicked.connect(self._load_data)

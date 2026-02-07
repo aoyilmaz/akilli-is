@@ -24,11 +24,16 @@ from database.models.production import (
     WorkOrderStatus,
     WorkStation,
 )
-from database.models.inventory import Item, ItemType
+from database.models.inventory import Item, ItemType, Warehouse
 from database.models.sales import (
     SalesOrder,
     SalesOrderItem,
     SalesOrderStatus,
+)
+from database.models.purchasing import (
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderStatus,
 )
 from database.models.calendar import ProductionHoliday
 from modules.production.services.base import WorkOrderService
@@ -568,7 +573,7 @@ class MPSService:
 
     def approve_plan(self, plan_id: int, user_id: int) -> ProductionPlan:
         """
-        Planı onayla.
+        Planı onayla ve hammadde rezervasyonu yap.
 
         Args:
             plan_id: Plan ID
@@ -584,13 +589,69 @@ class MPSService:
         if plan.status != ProductionPlanStatus.DRAFT:
             raise MPSError(f"Sadece taslak planlar onaylanabilir: {plan.status.value}")
 
+        # 1. Plan durumunu güncelle
         plan.status = ProductionPlanStatus.APPROVED
         plan.approved_by = user_id
         plan.approved_at = datetime.now()
 
+        # 2. Hammadde rezervasyonu yap
+        try:
+            self._reserve_materials_for_plan(plan)
+        except Exception as e:
+            # Rezervasyon hatası onayı engellememeli mi?
+            # Genelde MPS bir taahhüttür, rezervasyon başarısızsa (kod hatası vb) durmalı.
+            # Ancak yetersiz stok allow_negative=True ile aşılacak.
+            print(f"MPS Hammadde Rezervasyon Hatası: {e}")
+            raise MPSError(f"Hammadde rezervasyonu sırasında hata oluştu: {e}")
+
         self.session.commit()
 
         return plan
+
+    def _reserve_materials_for_plan(self, plan: ProductionPlan):
+        """Plan içindeki ürünlerin hammaddelerini rezerve et"""
+        from modules.inventory.services.base import StockMovementService
+
+        stock_service = StockMovementService()
+
+        # Varsayılan depo (tercihen üretim deposu)
+        default_warehouse = (
+            self.session.query(Warehouse)
+            .filter(Warehouse.is_production == True)
+            .first()
+            or self.session.query(Warehouse)
+            .filter(Warehouse.is_default == True)
+            .first()
+        )
+        default_warehouse_id = default_warehouse.id if default_warehouse else 1
+
+        for line in plan.lines:
+            # Ürünün aktif reçetesini bul
+            bom = (
+                self.session.query(BillOfMaterials)
+                .filter(
+                    BillOfMaterials.item_id == line.item_id,
+                    BillOfMaterials.status == BOMStatus.ACTIVE,
+                )
+                .first()
+            )
+
+            if not bom:
+                continue
+
+            for bom_line in bom.lines:
+                # Toplam ihtiyaç = Planlanan Miktar * Reçete Miktarı
+                required_qty = line.planned_quantity * bom_line.quantity
+
+                # Rezervasyon yap (Gelecek planlaması için yetersiz stok olsa da devam et)
+                stock_service.reserve_stock(
+                    item_id=bom_line.item_id,
+                    warehouse_id=default_warehouse_id,
+                    quantity=required_qty,
+                    reference_type="mps",
+                    reference_id=plan.id,
+                    allow_negative=True,
+                )
 
     # =========================================
     # SORGULAR
@@ -802,15 +863,19 @@ class MPSService:
         result = {
             "periods": [],
             "period_dates": [],
-            "demand": [0] * num_periods,
-            "incoming": [0] * num_periods,
-            "mps": [0] * num_periods,
-            "projected_stock": [0] * num_periods,
+            "demand": [0.0] * num_periods,
+            "incoming": [0.0] * num_periods,
+            "mps": [0.0] * num_periods,
+            "projected_stock": [0.0] * num_periods,
+            "safety_stock": 0.0,
+            "risks": ["none"] * num_periods,
         }
 
-        # Mevcut stok
+        # Mevcut stok ve emniyet stoğu
         item = self.session.query(Item).get(item_id)
         current_stock = float(item.total_stock or 0) if item else 0
+        safety_stock = float(item.safety_stock or 0) if item else 0
+        result["safety_stock"] = safety_stock
 
         # Plan satırlarını çek
         lines = (
@@ -846,8 +911,50 @@ class MPSService:
                     p_mps += float(line.planned_quantity or 0)
 
             # Beklenen girişler (Satınalma / İş Emirleri)
-            # NOT: Şimdilik dummy, ileride PurchaseService'den bağlanacak
             p_incoming = 0
+
+            # 1. Satınalma Emirleri (WAITING veya PARTIAL)
+            purchase_items = (
+                self.session.query(PurchaseOrderItem)
+                .join(PurchaseOrder)
+                .filter(
+                    PurchaseOrderItem.item_id == item_id,
+                    PurchaseOrderItem.is_active.is_(True),
+                    PurchaseOrder.is_active.is_(True),
+                    PurchaseOrder.status.in_(
+                        [PurchaseOrderStatus.CONFIRMED, PurchaseOrderStatus.PARTIAL]
+                    ),
+                    # Teslim tarihi bu periyoda düşenler
+                    PurchaseOrder.delivery_date.between(p_start, p_end),
+                )
+                .all()
+            )
+            p_incoming += sum(
+                float(pi.quantity or 0) - float(pi.delivered_quantity or 0)
+                for pi in purchase_items
+            )
+
+            # 2. Planlanmış/Devam Eden İş Emirleri (Bu üretim planından bağımsız olanlar)
+            # NOT: Kendi planımızdaki MPS zaten "mps" satırında. Burada "harici" gelenler olmalı mı?
+            # Veya released olmuş iş emirleri artık "mps" değil "incoming" mi sayılır?
+            # Standart: Released WO artık "Scheduled Receipt" (Gelen) olur, MPS (Planned Order) değildir.
+            # O yüzden Released ve InProgress olanları incoming ekleyelim.
+            work_orders = (
+                self.session.query(WorkOrder)
+                .filter(
+                    WorkOrder.item_id == item_id,
+                    WorkOrder.is_active.is_(True),
+                    WorkOrder.status.in_(
+                        [WorkOrderStatus.RELEASED, WorkOrderStatus.IN_PROGRESS]
+                    ),
+                    WorkOrder.planned_end.between(p_start, p_end),
+                )
+                .all()
+            )
+            p_incoming += sum(
+                float(wo.planned_quantity or 0) - float(wo.completed_quantity or 0)
+                for wo in work_orders
+            )
 
             # Hesaplamalar
             running_stock = running_stock + p_incoming + p_mps - p_demand
@@ -856,6 +963,12 @@ class MPSService:
             result["incoming"][i] = p_incoming
             result["mps"][i] = p_mps
             result["projected_stock"][i] = running_stock
+
+            # Risk Belirleme
+            if running_stock < 0:
+                result["risks"][i] = "critical"
+            elif running_stock < safety_stock:
+                result["risks"][i] = "warning"
 
         return result
 
@@ -909,3 +1022,139 @@ class MPSService:
 
         self.session.commit()
         return line
+
+    def get_planning_variance(
+        self,
+        start_date: date,
+        end_date: date,
+        item_id: Optional[int] = None,
+    ) -> List[Dict]:
+        """
+        Planlanan vs Gerçekleşen Üretim Raporu.
+        MPS (ProductionPlanLine) ile bağlı WorkOrder verilerini karşılaştırır.
+        """
+        query = self.session.query(ProductionPlanLine).filter(
+            ProductionPlanLine.demand_date.between(start_date, end_date)
+        )
+
+        if item_id:
+            query = query.filter(ProductionPlanLine.item_id == item_id)
+
+        lines = query.all()
+        results = []
+
+        for line in lines:
+            planned = float(line.planned_quantity or 0)
+            actual = 0.0
+
+            if line.work_order:
+                actual = float(line.work_order.completed_quantity or 0)
+
+            variance = actual - planned
+            variance_pct = (variance / planned * 100) if planned > 0 else 0
+
+            results.append(
+                {
+                    "date": line.demand_date.isoformat(),
+                    "item_code": line.item.code if line.item else "",
+                    "item_name": line.item.name if line.item else "",
+                    "plan_no": line.plan.plan_no if line.plan else "",
+                    "planned_qty": planned,
+                    "actual_qty": actual,
+                    "variance": variance,
+                    "variance_pct": round(variance_pct, 1),
+                    "status": (
+                        line.work_order.status.value if line.work_order else "PLANNED"
+                    ),
+                }
+            )
+
+    def get_period_capacity_analysis(self, plan_id: int) -> Dict:
+        """
+        Periyot bazlı kapasite yük analizi.
+
+        Returns:
+            {
+                "periods": ["W1", "W2", ...],
+                "stations": [
+                    {"name": "Kesim", "utilizations": [80.5, 120.0, 90.0, ...]},
+                    ...
+                ]
+            }
+        """
+        plan = self.get_by_id(plan_id)
+        if not plan:
+            return {"periods": [], "stations": []}
+
+        # Periyot tarihlerini al
+        # NOT: mps_grid_data ile uyumlu olması için oradan da çekebiliriz
+        # Şimdilik plan satırlarından tarihlerini gruplayalım
+        period_dates = sorted(list(set(line.demand_date for line in plan.lines)))
+        period_labels = [d.strftime("%d.%m") for d in period_dates]
+
+        stations = (
+            self.session.query(WorkStation)
+            .filter(WorkStation.is_active.is_(True))
+            .all()
+        )
+
+        # İstasyon günlük kapasiteleri
+        station_caps = {s.id: float(s.daily_capacity_minutes or 0) for s in stations}
+        station_names = {s.id: s.name for s in stations}
+
+        # Grid hazırlığı: {station_id: [load_per_period]}
+        grid = {s.id: [0.0] * len(period_dates) for s in stations}
+
+        date_to_idx = {d: i for i, d in enumerate(period_dates)}
+
+        for line in plan.lines:
+            qty = float(line.planned_quantity or 0)
+            if qty <= 0 or line.demand_date not in date_to_idx:
+                continue
+
+            idx = date_to_idx[line.demand_date]
+
+            # BOM operasyonlarını bul
+            bom = (
+                self.session.query(BillOfMaterials)
+                .options(joinedload(BillOfMaterials.operations))
+                .filter(
+                    BillOfMaterials.item_id == line.item_id,
+                    BillOfMaterials.status == BOMStatus.ACTIVE,
+                    BillOfMaterials.is_active.is_(True),
+                )
+                .first()
+            )
+
+            if not bom:
+                continue
+
+            for op in bom.operations:
+                if op.work_station_id in grid:
+                    load = (op.setup_time or 0) + (float(op.run_time or 0) * qty)
+                    grid[op.work_station_id][idx] += load
+
+        # Sonuçları orana çevir
+        res_stations = []
+        for s_id, loads in grid.items():
+            if sum(loads) == 0:
+                continue  # Yükü olmayanları gösterme
+
+            # Varsayım: Her periyot arası kabaca iş günü sayısı (Basitleştirme: 5 gün)
+            # Daha stabil bir dashboard için dinamik iş günü hesaplanabilir
+            work_days = 5
+            max_cap = station_caps[s_id] * work_days
+
+            utils = []
+            for load in loads:
+                u = (load / max_cap * 100) if max_cap > 0 else 0
+                utils.append(round(u, 1))
+
+            res_stations.append({"name": station_names[s_id], "utilizations": utils})
+
+        return {
+            "periods": period_labels,
+            "stations": sorted(
+                res_stations, key=lambda x: max(x["utilizations"]), reverse=True
+            ),
+        }

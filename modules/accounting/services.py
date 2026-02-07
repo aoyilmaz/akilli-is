@@ -4,8 +4,8 @@ Akıllı İş - Muhasebe Servisleri
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
-from sqlalchemy import func, and_, desc
+from typing import List, Dict, Optional
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from database.base import get_session
@@ -15,7 +15,11 @@ from database.models.accounting import (
     JournalEntry,
     JournalEntryLine,
     JournalEntryStatus,
-    FiscalPeriod,
+)
+from database.models.sales import Invoice, InvoiceStatus
+from database.models.purchasing import (
+    PurchaseInvoice,
+    PurchaseInvoiceStatus,
 )
 from modules.inventory.services import ServiceBase
 
@@ -166,6 +170,18 @@ class AccountingService(ServiceBase):
 
         # Satırları ekle
         for i, line_data in enumerate(lines_data):
+            # account_code varsa id'ye çevir
+            if "account_code" in line_data:
+                code = line_data.pop("account_code")
+                account = self.get_account_by_code(code)
+                if account:
+                    line_data["account_id"] = account.id
+                else:
+                    # Hesap bulunamazsa sessizce devam et veya hata fırlat
+                    # Şimdilik sessizce logluyoruz (modül bazlı)
+                    print(f"[Muhasebe] Hesap bulunamadı: {code}")
+                    continue
+
             line = JournalEntryLine(
                 journal_entry_id=journal.id, line_order=i, **line_data
             )
@@ -424,6 +440,107 @@ class AccountingService(ServiceBase):
             "equity": equity,
             "total_liabilities_equity": liabilities["total"] + equity,
             "balanced": abs(assets["total"] - (liabilities["total"] + equity)) < 0.01,
+        }
+
+    def get_tax_report(self, start_date: date, end_date: date) -> Dict:
+        """KDV Raporu"""
+
+        # 1. Satış Faturaları
+        sales_invoices = (
+            self.session.query(Invoice)
+            .filter(
+                Invoice.invoice_date.between(start_date, end_date),
+                Invoice.status.notin_([InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]),
+            )
+            .all()
+        )
+
+        sales_data = {"base": Decimal(0), "tax": Decimal(0), "by_rate": {}}
+
+        for inv in sales_invoices:
+            rate = inv.exchange_rate or Decimal(1)
+
+            # Invoice totals
+            sales_data["base"] += (inv.subtotal or Decimal(0)) * rate
+            sales_data["tax"] += (inv.tax_amount or Decimal(0)) * rate
+
+            # Item breakdown
+            if inv.items:
+                for item in inv.items:
+                    tax_rate = int(item.tax_rate or 0)
+                    if tax_rate not in sales_data["by_rate"]:
+                        sales_data["by_rate"][tax_rate] = {
+                            "base": Decimal(0),
+                            "tax": Decimal(0),
+                        }
+
+                    # Re-calculate line in base currency
+                    qty = item.quantity or Decimal(0)
+                    price = item.unit_price or Decimal(0)
+                    disc = item.discount_rate or Decimal(0)
+
+                    line_net = qty * price * (1 - disc / 100)
+                    line_tax = line_net * Decimal(tax_rate) / 100
+
+                    sales_data["by_rate"][tax_rate]["base"] += line_net * rate
+                    sales_data["by_rate"][tax_rate]["tax"] += line_tax * rate
+
+        # 2. Alış Faturaları
+        purchase_invoices = (
+            self.session.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.invoice_date.between(start_date, end_date),
+                PurchaseInvoice.status.notin_(
+                    [PurchaseInvoiceStatus.DRAFT, PurchaseInvoiceStatus.CANCELLED]
+                ),
+            )
+            .all()
+        )
+
+        purchase_data = {"base": Decimal(0), "tax": Decimal(0), "by_rate": {}}
+
+        for inv in purchase_invoices:
+            rate = getattr(inv, "exchange_rate", Decimal(1)) or Decimal(1)
+
+            purchase_data["base"] += (inv.subtotal or Decimal(0)) * rate
+            purchase_data["tax"] += (inv.tax_amount or Decimal(0)) * rate
+
+            if inv.items:
+                for item in inv.items:
+                    tax_rate = int(item.tax_rate or 0)
+                    if tax_rate not in purchase_data["by_rate"]:
+                        purchase_data["by_rate"][tax_rate] = {
+                            "base": Decimal(0),
+                            "tax": Decimal(0),
+                        }
+
+                    qty = item.quantity or Decimal(0)
+                    price = item.unit_price or Decimal(0)
+                    disc = item.discount_rate or Decimal(0)
+
+                    line_net = qty * price * (1 - disc / 100)
+                    line_tax = line_net * Decimal(tax_rate) / 100
+
+                    purchase_data["by_rate"][tax_rate]["base"] += line_net * rate
+                    purchase_data["by_rate"][tax_rate]["tax"] += line_tax * rate
+
+        # Summary
+        net_tax = sales_data["tax"] - purchase_data["tax"]
+
+        return {
+            "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+            "sales": {
+                "base": float(sales_data["base"]),
+                "tax": float(sales_data["tax"]),
+                "by_rate": sales_data["by_rate"],  # keys are int, values specific dict
+            },
+            "purchases": {
+                "base": float(purchase_data["base"]),
+                "tax": float(purchase_data["tax"]),
+                "by_rate": purchase_data["by_rate"],
+            },
+            "net_tax": float(net_tax),
+            "status": "ÖDENECEK" if net_tax >= 0 else "İADE/DEVREDEN",
         }
 
     # =====================

@@ -3,16 +3,13 @@ Bakım Modülü - İş Emri Yönetimi
 """
 
 from typing import Optional
-from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QFormLayout,
     QTextEdit,
     QComboBox,
@@ -26,60 +23,76 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QListWidget,
     QListWidgetItem,
+    QMenu,
 )
 from PyQt6.QtCore import Qt, QDateTime
+from PyQt6.QtGui import QAction, QColor
+import qtawesome as qta
 from config.icons import ICONS
 
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
+
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
 from database.models.maintenance import (
     MaintenancePriority,
-    MaintenanceType,
-    MaintenanceStatus,
     MaintenanceWorkOrderStatus as WorkOrderStatus,
 )
 
 
-class WorkOrderManagerWidget(MaintenanceBaseWidget):
+class WorkOrderManagerWidget(BaseListPage):
     """İş Emri Yönetimi Widget'ı"""
 
     def __init__(self, parent=None):
-        super().__init__("İş Emri Yönetimi", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
 
-    def setup_ui(self):
-        # Base widget'tan gelen başlığı temizle
-        if self.layout.count() > 0:
-            item = self.layout.itemAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+        columns = [
+            ColumnConfig("order_no", "İş Emri No", width=110, filterable=True),
+            ColumnConfig(
+                "equipment", "Ekipman", width=150, filterable=True, stretch=True
+            ),
+            ColumnConfig("request", "Talep No", width=110, filterable=True),
+            ColumnConfig("priority", "Öncelik", width=100, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
+            ColumnConfig("planned", "Planlanan", width=120),
+            ColumnConfig("assigned", "Atanan", width=130),
+            ColumnConfig("cost", "Maliyet", width=100),
+        ]
 
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
-        self.header = PageHeader(
+        super().__init__(
             title="İş Emri Yönetimi",
             icon=ICONS.MAINTENANCE,
-            show_search=False,
-            show_refresh=False,
-            show_add=False,  # Custom add butonu kullanacagiz
-            parent=self,
+            table_id="maintenance_work_orders",
+            columns=columns,
+            show_add=False,  # Custom add action handled via button for now or we can use standard
+            parent=parent,
         )
 
+        # BaseListPage'in add butonunu kullanabiliriz ama custom isimlendirme istenmisti "Yeni İş Emri".
+        # Header'in show_add'ini True yapip text degistirebiliriz ama asagida custom button ekliyoruz.
+        # Bu durumda show_add=False birakip kendi butonumuzu ekleyelim.
+
+        self._setup_extra_ui()
+        self.refresh_requested.connect(self.refresh_data)
+
+    def closeEvent(self, event):
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(event)
+
+    def _setup_extra_ui(self):
         h_layout = self.header.header_layout()
 
         # Yeni İş Emri
         self.btn_new = QPushButton("Yeni İş Emri")
-        self.btn_new.setFixedSize(120, 36)
+        self.btn_new.setFixedSize(
+            120, 32
+        )  # Standard height is usually around 32-36 in new design
         self.btn_new.setProperty("class", "btn-primary")
         self.btn_new.clicked.connect(self.show_create_dialog)
         h_layout.addWidget(self.btn_new)
-
-        # Detay / İşlem Yap
-        self.btn_detail = QPushButton("Detay / İşlem Yap")
-        self.btn_detail.setFixedSize(140, 36)
-        self.btn_detail.setProperty("class", "btn-secondary")
-        self.btn_detail.clicked.connect(self.open_details)
-        h_layout.addWidget(self.btn_detail)
 
         # Filtreler (Durum)
         h_layout.addSpacing(16)
@@ -88,40 +101,23 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
         self.cmb_status.addItem("Aktifler", "active")
         self.cmb_status.addItem("Tümü", "all")
         self.cmb_status.addItem("Tamamlananlar", "completed")
-        self.cmb_status.setFixedWidth(120)
-        self.cmb_status.setFixedHeight(36)
+        self.cmb_status.setFixedWidth(130)
+        self.cmb_status.setFixedHeight(32)
         self.cmb_status.currentIndexChanged.connect(self.refresh_data)
         h_layout.addWidget(self.cmb_status)
 
-        self.layout.addWidget(self.header)
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "İş Emri No",
-                "Ekipman",
-                "Talep No",
-                "Öncelik",
-                "Durum",
-                "Planlanan",
-                "Atanan",
-                "Maliyet",
-            ]
+        # Filtre seçenekleri
+        self.table.set_filter_options(
+            "status",
+            ["Taslak", "Atandı", "Devam Ediyor", "Tamamlandı", "Kapandı", "İptal"],
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.table.doubleClicked.connect(self.open_details)
-        self.layout.addWidget(self.table)
 
-        # Tablo stilini güncellemek gerekebilir ama base styles kullanıyor sanırım.
-        # Manuel stil tanımları varsa kaldıralım (yok gibi).
-
-        self.refresh_data()
+        priorities = ["Düşük", "Normal", "Yüksek", "Kritik"]
+        self.table.set_filter_options("priority", priorities)
 
     def refresh_data(self):
         status_filter = self.cmb_status.currentData()
@@ -133,32 +129,49 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
         else:
             orders = self.service.get_all_work_orders()
 
-        self.table.setRowCount(len(orders))
-        for i, wo in enumerate(orders):
-            self.table.setItem(i, 0, QTableWidgetItem(wo.order_no))
-            self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, wo.id)
+        self.load_data(orders)
 
+    def load_data(self, orders: list):
+        self.table.setRowCount(len(orders))
+
+        for i, wo in enumerate(orders):
+            # Order No
+            item = QTableWidgetItem(wo.order_no)
+            item.setData(Qt.ItemDataRole.UserRole, wo.id)
+            self.table.setItem(i, 0, item)
+
+            # Equipment
             self.table.setItem(
                 i, 1, QTableWidgetItem(wo.equipment.name if wo.equipment else "-")
             )
+
+            # Request No
             self.table.setItem(
                 i, 2, QTableWidgetItem(wo.request.request_no if wo.request else "-")
             )
 
-            # Öncelik - renkli
-            priority_item = QTableWidgetItem(wo.priority.value.capitalize())
+            # Priority
+            priority_val = {
+                MaintenancePriority.LOW: "Düşük",
+                MaintenancePriority.NORMAL: "Normal",
+                MaintenancePriority.HIGH: "Yüksek",
+                MaintenancePriority.CRITICAL: "Kritik",
+            }.get(wo.priority, wo.priority.value.capitalize())
+
+            priority_item = QTableWidgetItem(priority_val)
             priority_colors = {
                 MaintenancePriority.LOW: Qt.GlobalColor.darkGreen,
                 MaintenancePriority.NORMAL: Qt.GlobalColor.blue,
                 MaintenancePriority.HIGH: Qt.GlobalColor.darkYellow,
                 MaintenancePriority.CRITICAL: Qt.GlobalColor.red,
             }
+            # EnhancedTable uses QColor for item foreground usually, convert GlobalColor to QColor or use hex
             priority_item.setForeground(
-                priority_colors.get(wo.priority, Qt.GlobalColor.black)
+                QColor(priority_colors.get(wo.priority, Qt.GlobalColor.black))
             )
             self.table.setItem(i, 3, priority_item)
 
-            # Durum - renkli
+            # Status
             status_text = {
                 WorkOrderStatus.DRAFT: "Taslak",
                 WorkOrderStatus.ASSIGNED: "Atandı",
@@ -167,6 +180,7 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
                 WorkOrderStatus.CLOSED: "Kapandı",
                 WorkOrderStatus.CANCELLED: "İptal",
             }.get(wo.status, wo.status.value)
+
             status_item = QTableWidgetItem(status_text)
             if wo.status == WorkOrderStatus.COMPLETED:
                 status_item.setForeground(Qt.GlobalColor.darkGreen)
@@ -176,37 +190,53 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
                 status_item.setForeground(Qt.GlobalColor.gray)
             self.table.setItem(i, 4, status_item)
 
-            self.table.setItem(
-                i,
-                5,
-                QTableWidgetItem(
-                    wo.planned_start_date.strftime("%d.%m.%Y")
-                    if wo.planned_start_date
-                    else "-"
-                ),
+            # Planned
+            planned = (
+                wo.planned_start_date.strftime("%d.%m.%Y")
+                if wo.planned_start_date
+                else "-"
             )
+            self.table.setItem(i, 5, QTableWidgetItem(planned))
 
+            # Assigned
             self.table.setItem(
                 i,
                 6,
                 QTableWidgetItem(wo.assigned_to.full_name if wo.assigned_to else "-"),
             )
 
+            # Cost
             self.table.setItem(i, 7, QTableWidgetItem(f"₺{wo.total_cost or 0:,.2f}"))
 
+        self.update_count(len(orders))
+
     def get_selected_work_order_id(self) -> Optional[int]:
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            return None
-        return self.table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        return self.table.get_selected_id()
+
+    def _show_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+
+        wo_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu(self)
+
+        detail_action = QAction(
+            qta.icon(ICONS.INFO, color="#3b82f6"), "Detay / İşlem Yap", self
+        )
+        detail_action.triggered.connect(lambda: self.open_details(wo_id))
+        menu.addAction(detail_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def show_create_dialog(self):
         dialog = WorkOrderDialog(self.service, self)
         if dialog.exec():
             self.refresh_data()
 
-    def open_details(self):
-        work_order_id = self.get_selected_work_order_id()
+    def open_details(self, wo_id=None):
+        work_order_id = wo_id or self.get_selected_work_order_id()
         if not work_order_id:
             QMessageBox.warning(self, "Uyarı", "Lütfen bir iş emri seçin.")
             return
@@ -215,7 +245,15 @@ class WorkOrderManagerWidget(MaintenanceBaseWidget):
         if dialog.exec():
             self.refresh_data()
 
+    # -- BaseListPage interface --
+    def get_filters(self) -> dict:
+        return {"status": self.cmb_status.currentData()}
 
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
+
+
+# Dialog Classes Re-exported
 class WorkOrderDialog(QDialog):
     """İş Emri Oluşturma Dialogu"""
 
@@ -223,7 +261,7 @@ class WorkOrderDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.request_id = request_id
-
+        # ... rest of implementation same as before
         self.setWindowTitle("Yeni İş Emri Oluştur")
         self.setMinimumSize(550, 600)
 

@@ -24,7 +24,11 @@ import qtawesome as qta
 from config.icons import ICONS
 
 from modules.production.services import WorkOrderService, WorkStationService
-from database.models.production import WorkOrderOperation, WorkOrderLine
+from database.models.production import (
+    WorkOrderOperation,
+    WorkOrderLine,
+    WorkOrderOperationStatus,
+)
 
 
 from config.styles import (
@@ -546,6 +550,7 @@ class OperatorPanel(QWidget):
             WorkOrderOperation,
             WorkOrder,
             WorkOrderStatus,
+            WorkOrderOperationStatus,
         )
 
         operations = (
@@ -553,7 +558,12 @@ class OperatorPanel(QWidget):
             .join(WorkOrder)
             .filter(
                 WorkOrderOperation.work_station_id == self.current_station.id,
-                WorkOrderOperation.status.in_(["pending", "in_progress"]),
+                WorkOrderOperation.status.in_(
+                    [
+                        WorkOrderOperationStatus.WAITING,
+                        WorkOrderOperationStatus.IN_PROGRESS,
+                    ]
+                ),
                 WorkOrder.status.in_(
                     [WorkOrderStatus.RELEASED, WorkOrderStatus.IN_PROGRESS]
                 ),
@@ -563,7 +573,9 @@ class OperatorPanel(QWidget):
         )
 
         for op in operations:
-            status_icon = "🔄" if op.status == "in_progress" else "⏳"
+            status_icon = (
+                "🔄" if op.status == WorkOrderOperationStatus.IN_PROGRESS else "⏳"
+            )
             text = f"{status_icon} {op.work_order.order_no}\n   {op.name}"
             item = QListWidgetItem(text)
             item.setData(Qt.ItemDataRole.UserRole, op)
@@ -591,7 +603,7 @@ class OperatorPanel(QWidget):
         # Öncül kontrolü
         if op.predecessor_id:
             pred = self.service.get_operation_by_id(op.predecessor_id)
-            if pred and pred.status != "completed":
+            if pred and pred.status != WorkOrderOperationStatus.COMPLETED:
                 self.warning_box.setText(
                     f"⚠ Önceki operasyon tamamlanmadı: {pred.name}"
                 )
@@ -602,7 +614,7 @@ class OperatorPanel(QWidget):
             self.warning_box.hide()
 
         # Durum
-        if op.status == "in_progress":
+        if op.status == WorkOrderOperationStatus.IN_PROGRESS:
             self._set_ui_state("running")
             self._start_timer_from_operation()
         else:

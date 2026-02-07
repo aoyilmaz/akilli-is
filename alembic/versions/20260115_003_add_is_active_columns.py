@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
 revision: str = "c3d4e5f6g7h8"
@@ -18,42 +19,56 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def add_column_safe(table_name, column_name, column_type, default=None):
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table(table_name):
+        return  # Or handle error? But here if table missing, adding col fails anyway.
+        # Since 001 ensures existence, we assume it exists.
+
+    columns = [c["name"] for c in insp.get_columns(table_name)]
+    if column_name not in columns:
+        with op.batch_alter_table(table_name, schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column(
+                    column_name, column_type, nullable=True, server_default=default
+                )
+            )
+    else:
+        print(f"Column {column_name} already exists in {table_name}, skipping.")
+
+
 def upgrade() -> None:
-    # Add is_active to equipment_downtimes
-    with op.batch_alter_table('equipment_downtimes', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-    # Add is_active to equipment_spare_parts
-    with op.batch_alter_table('equipment_spare_parts', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-    # Add is_active to maintenance_checklist_items
-    with op.batch_alter_table('maintenance_checklist_items', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-    # Add is_active to maintenance_request_attachments
-    with op.batch_alter_table('maintenance_request_attachments', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-    # Add is_active to work_order_attachments
-    with op.batch_alter_table('work_order_attachments', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-    # Add is_active to work_order_checklist_results
-    with op.batch_alter_table('work_order_checklist_results', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'))
-
-
-def downgrade() -> None:
     tables = [
-        'equipment_downtimes',
-        'equipment_spare_parts',
-        'maintenance_checklist_items',
-        'maintenance_request_attachments',
-        'work_order_attachments',
-        'work_order_checklist_results',
+        "equipment_downtimes",
+        "equipment_spare_parts",
+        "maintenance_checklist_items",
+        "maintenance_request_attachments",
+        "work_order_attachments",
+        "work_order_checklist_results",
     ]
 
     for table in tables:
-        with op.batch_alter_table(table, schema=None) as batch_op:
-            batch_op.drop_column('is_active')
+        add_column_safe(table, "is_active", sa.Boolean(), "true")
+
+
+def downgrade() -> None:
+    # Downgrade logic also safe check
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    tables = [
+        "equipment_downtimes",
+        "equipment_spare_parts",
+        "maintenance_checklist_items",
+        "maintenance_request_attachments",
+        "work_order_attachments",
+        "work_order_checklist_results",
+    ]
+
+    for table in tables:
+        if insp.has_table(table):
+            columns = [c["name"] for c in insp.get_columns(table)]
+            if "is_active" in columns:
+                with op.batch_alter_table(table, schema=None) as batch_op:
+                    batch_op.drop_column("is_active")

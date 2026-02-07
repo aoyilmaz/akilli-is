@@ -149,6 +149,15 @@ class ProductionDashboard(QWidget):
         )
 
         self.kpi_layout.addWidget(
+            MetricCard(
+                "Gecikme Riski",
+                str(data["high_risk_orders"]),
+                "İş Emri",
+                color=ERROR if data["high_risk_orders"] > 0 else SUCCESS,
+            )
+        )
+
+        self.kpi_layout.addWidget(
             MetricCard("Haftalık Üretim", f"{data['weekly_volume']:.0f}", "Br")
         )
 

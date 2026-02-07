@@ -10,7 +10,7 @@ KRİTİK DÜZELTMELER:
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
-from sqlalchemy import func
+from sqlalchemy import func, case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -24,6 +24,7 @@ from database.models import (
     StockMovementType,
     StockBalance,
     Currency,
+    ItemBarcode,
     SalesOrder,
     DeliveryNote,
     PurchaseOrder,
@@ -39,8 +40,8 @@ Category = ItemCategory
 class ServiceBase:
     """Temel servis sınıfı"""
 
-    def __init__(self):
-        self.session: Session = get_session()
+    def __init__(self, session: Session = None):
+        self.session: Session = session or get_session()
 
     def close(self):
         if self.session:
@@ -106,7 +107,20 @@ class ItemService(ServiceBase):
     def get_by_barcode(self, barcode: str) -> Optional[Item]:
         if not barcode:
             return None
-        return self.session.query(Item).filter(Item.barcode == barcode).first()
+
+        # Tek sorgu ile: Barcode OR EAN OR ItemBarcode
+        return (
+            self.session.query(Item)
+            .outerjoin(ItemBarcode, Item.id == ItemBarcode.item_id)
+            .filter(
+                or_(
+                    Item.barcode == barcode,
+                    Item.barcode_ean == barcode,
+                    ItemBarcode.barcode == barcode,
+                )
+            )
+            .first()
+        )
 
     def check_unique_code(self, code: str, exclude_id: int = None) -> bool:
         """Kod benzersiz mi kontrol et"""
@@ -124,10 +138,22 @@ class ItemService(ServiceBase):
             query = query.filter(Item.id != exclude_id)
         return query.first() is None
 
+    def check_unique_ean(self, barcode_ean: str, exclude_id: int = None) -> bool:
+        """EAN Barkod benzersiz mi kontrol et"""
+        if not barcode_ean:
+            return True
+        query = self.session.query(Item).filter(Item.barcode_ean == barcode_ean)
+        if exclude_id:
+            query = query.filter(Item.id != exclude_id)
+        return query.first() is None
+
     def create(self, **kwargs) -> Item:
         """Yeni stok kartı oluştur - Unique kontrollü"""
         code = kwargs.get("code", "").strip().upper()
         barcode = kwargs.get("barcode", "").strip() if kwargs.get("barcode") else None
+        barcode_ean = (
+            kwargs.get("barcode_ean", "").strip() if kwargs.get("barcode_ean") else None
+        )
 
         # Unique kontrolleri
         if not self.check_unique_code(code):
@@ -136,8 +162,12 @@ class ItemService(ServiceBase):
         if barcode and not self.check_unique_barcode(barcode):
             raise DuplicateCodeError("Barkod", barcode)
 
+        if barcode_ean and not self.check_unique_ean(barcode_ean):
+            raise DuplicateCodeError("EAN Barkod", barcode_ean)
+
         kwargs["code"] = code
         kwargs["barcode"] = barcode
+        kwargs["barcode_ean"] = barcode_ean
 
         item = Item(**kwargs)
         self.session.add(item)
@@ -164,6 +194,14 @@ class ItemService(ServiceBase):
                 if not self.check_unique_barcode(new_barcode, item_id):
                     raise DuplicateCodeError("Barkod", new_barcode)
             kwargs["barcode"] = new_barcode
+
+        # EAN Barkod değişiyorsa unique kontrol
+        if "barcode_ean" in kwargs:
+            new_ean = kwargs["barcode_ean"].strip() if kwargs["barcode_ean"] else None
+            if new_ean and new_ean != item.barcode_ean:
+                if not self.check_unique_ean(new_ean, item_id):
+                    raise DuplicateCodeError("EAN Barkod", new_ean)
+            kwargs["barcode_ean"] = new_ean
 
         for key, value in kwargs.items():
             if hasattr(item, key):
@@ -215,6 +253,17 @@ class ItemService(ServiceBase):
 
         q = self.session.query(Item)
 
+        # Tablo filtreleri için gerekli join'ler
+        if table_filters:
+            if "category" in table_filters:
+                q = q.outerjoin(Item.category)
+            if "unit" in table_filters:
+                q = q.outerjoin(Item.unit)
+
+        # Arama terimi varsa Barkod tablosuyla join yap (performans için outerjoin)
+        if search_term:
+            q = q.outerjoin(ItemBarcode, Item.id == ItemBarcode.item_id)
+
         # Aktiflik filtresi (None ise hepsi, True/False ise ona göre)
         if is_active is not None:
             q = q.filter(Item.is_active == is_active)
@@ -225,6 +274,8 @@ class ItemService(ServiceBase):
                     Item.code.ilike(f"%{search_term}%")
                     | Item.name.ilike(f"%{search_term}%")
                     | Item.barcode.ilike(f"%{search_term}%")
+                    | Item.barcode_ean.ilike(f"%{search_term}%")
+                    | ItemBarcode.barcode.ilike(f"%{search_term}%")
                 )
             )
 
@@ -236,6 +287,9 @@ class ItemService(ServiceBase):
 
         if table_filters:
             q = self._apply_table_filters(q, table_filters)
+
+        # Duplicate sonuçları engelle (barcode join yüzünden olabilir)
+        q = q.group_by(Item.id)
 
         return q.order_by(Item.code.asc()).offset(offset).limit(limit).all()
 
@@ -260,7 +314,10 @@ class ItemService(ServiceBase):
             if "unit" in table_filters:
                 q = q.outerjoin(Item.unit)
 
-        # Aktiflik filtresi
+        if search_term:
+            q = q.outerjoin(ItemBarcode, Item.id == ItemBarcode.item_id)
+
+        # Aktiflik filtresi (None ise hepsi, True/False ise ona göre)
         if is_active is not None:
             q = q.filter(Item.is_active == is_active)
 
@@ -270,6 +327,8 @@ class ItemService(ServiceBase):
                     Item.code.ilike(f"%{search_term}%")
                     | Item.name.ilike(f"%{search_term}%")
                     | Item.barcode.ilike(f"%{search_term}%")
+                    | Item.barcode_ean.ilike(f"%{search_term}%")
+                    | ItemBarcode.barcode.ilike(f"%{search_term}%")
                 )
             )
 
@@ -282,7 +341,19 @@ class ItemService(ServiceBase):
         if table_filters:
             q = self._apply_table_filters(q, table_filters)
 
-        return q.count()
+        # distinct(Item.id) yerine func.count(distinct(Item.id)) kullanımı daha performanslı olabilir
+        from sqlalchemy import func
+
+        # Mevcut query'nin filtrelerini kopyalayarak count query oluştur
+        # q zaten Item entity'si üzerinden kurulu, filtreler eklenmiş durumda.
+        # Ancak q.count() direkt çalıştırılırsa subquery üretir.
+        # Biz sadece ID'leri saymak istiyoruz.
+
+        # count_q = self.session.query(func.count(func.distinct(Item.id)))
+        # Ama q üzerindeki filtreleri (joinler vs) aktarmak lazım.
+        # En temizi mevcut q.with_entities(func.count(func.distinct(Item.id))) yapmak.
+
+        return q.with_entities(func.count(func.distinct(Item.id))).scalar() or 0
 
     def get_stats(
         self,
@@ -293,66 +364,133 @@ class ItemService(ServiceBase):
         stock_status: str = None,
         table_filters: dict = None,
     ) -> dict:
-        """Stok istatistiklerini hesapla"""
+        """
+        Stok istatistiklerini hesapla (SQL Aggregate)
+        Tüm ürünleri belleğe çekmeden veritabanında hesaplar.
+        """
         search_term = keyword or query or ""
 
-        q = self.session.query(Item)
+        q = self.session.query(
+            func.count(func.distinct(Item.id)).label("total"),
+            # NOT: SQL içinde karmaşık stock_status mantığını birebir uygulamak zordur.
+            # Ancak genel stok değeri ve basit durumlar için aggregate kullanılabilir.
+            # Eğer stock_status filtresi çok karmaşıksa (dynamic python property),
+            # bunu tamamen SQL'e dökmek için StockBalance ile join yapmak gerekir.
+        )
+
+        # Stok değerini hesaplamak için StockBalance ile join yapmalıyız
+        # Item -> StockBalance (One-to-Many)
+        # Toplam değer = Sum(Balance.qty * Balance.cost)
+        # Ancak filtreler Item üzerinde.
+
+        # 1. Filtrelenmiş Item ID'lerini bul (Subquery daha güvenli)
+        item_q = self.session.query(Item.id)
 
         if table_filters:
             if "category" in table_filters:
-                q = q.outerjoin(Item.category)
+                item_q = item_q.outerjoin(Item.category)
             if "unit" in table_filters:
-                q = q.outerjoin(Item.unit)
-
-        if is_active is not None:
-            q = q.filter(Item.is_active == is_active)
+                item_q = item_q.outerjoin(Item.unit)
 
         if search_term:
-            q = q.filter(
+            item_q = item_q.outerjoin(ItemBarcode, Item.id == ItemBarcode.item_id)
+
+        if is_active is not None:
+            item_q = item_q.filter(Item.is_active == is_active)
+
+        if search_term:
+            item_q = item_q.filter(
                 (
                     Item.code.ilike(f"%{search_term}%")
                     | Item.name.ilike(f"%{search_term}%")
                     | Item.barcode.ilike(f"%{search_term}%")
+                    | Item.barcode_ean.ilike(f"%{search_term}%")
+                    | ItemBarcode.barcode.ilike(f"%{search_term}%")
                 )
             )
 
         if item_type:
-            q = q.filter(Item.item_type == item_type)
+            item_q = item_q.filter(Item.item_type == item_type)
 
         if stock_status:
-            q = self._apply_stock_status_filter(q, stock_status)
+            item_q = self._apply_stock_status_filter(item_q, stock_status)
 
         if table_filters:
-            q = self._apply_table_filters(q, table_filters)
+            item_q = self._apply_table_filters(item_q, table_filters)
 
-        # Performans için sadece gerekli kolonları ve ilişkileri çekmek gerekebilir
-        # Şimdilik tutarlılık için model üzerinden gidiyoruz
-        items = q.all()
+        # distinct ID listesini subquery yap
+        filtered_items_sub = item_q.distinct().subquery()
+
+        # 2. İstatistikleri hesapla
+        # Toplam Değer: Bu ürünlere ait tüm bakiyelerin (miktar * maliyet) toplamı
+        total_value_q = self.session.query(
+            func.sum(StockBalance.quantity * StockBalance.unit_cost)
+        ).filter(StockBalance.item_id.in_(self.session.query(filtered_items_sub.c.id)))
+        total_value = total_value_q.scalar() or Decimal(0)
+
+        # Toplam Kayıt Sayısı
+        total_count = (
+            self.session.query(func.count(filtered_items_sub.c.id)).scalar() or 0
+        )
+
+        # Durum Analizi (Normal, Low, Critical, Out of Stock)
+        # Bu kısım karmaşık logic içerdiği için ve genellikle kullanıcı arayüzünde
+        # sadece sayıları merak edildiği için, eğer kayıt sayısı çok fazla değilse (<2000)
+        # Python tarafında, çok fazlaysa basitleştirilmiş SQL ile yapılabilir.
+        # Kullanıcının şikayeti performans olduğu için, burada hibrit bir yaklaşım izleyelim.
+        # Ancak stock_status property'si karmaşık (min_stock, reorder_point vb. bakıyor).
+        # Şimdilik sadece Total ve Total Value SQL ile, diğer detaylar için
+        # ana sorgudaki itemların statuslarını basitçe saymak yerine,
+        # bu detaylar dashboard'da genelde tüm stok için istenir, filtrelenmiş liste için değil.
+        # Yine de filtreye göre isteniyor.
+
+        # Basitleştirilmiş çözüm:
+        # Eğer filtre sonucu çok fazlaysa (>1000) sadece total ve value dön, durumları 0 dön veya tahmin et.
+        # Değilse Python'da hesapla.
+
+        # Ancak tam çözüm:
+        # SQL ile Item bazında toplam stoğu bulup, limitlerle kıyaslamak.
+
+        # Şimdilik mevcut yapıyı koruyarak (Python döngüsü) sadece
+        # item fetching kısmını optimize edeceğiz demiştik ama
+        # tüm itemları çekmek yerine sadece status hesaplamak için gerekli alanları çekelim.
+
+        items_data = (
+            self.session.query(
+                Item.id,
+                Item.min_stock,
+                Item.reorder_point,
+                # Toplam stok (aggregate)
+                func.sum(StockBalance.quantity).label("total_stock"),
+            )
+            .outerjoin(StockBalance, Item.id == StockBalance.item_id)
+            .filter(Item.id.in_(self.session.query(filtered_items_sub.c.id)))
+            .group_by(Item.id)
+            .all()
+        )
 
         stats = {
-            "total": len(items),
+            "total": total_count,
             "normal": 0,
             "low": 0,
             "critical": 0,
             "out_of_stock": 0,
-            "total_value": Decimal(0),
+            "total_value": total_value,
         }
 
-        for item in items:
-            status = item.stock_status
-            if status == "normal":
-                stats["normal"] += 1
-            elif status == "low":
-                stats["low"] += 1
-            elif status == "critical":
-                stats["critical"] += 1
-            elif status == "out_of_stock":
-                stats["out_of_stock"] += 1
+        for i_id, min_s, re_p, t_stock in items_data:
+            t_stock = t_stock or Decimal(0)
+            min_s = min_s or Decimal(0)
+            re_p = re_p or Decimal(0)
 
-            # Stok değeri
-            qty = item.total_stock
-            price = item.purchase_price or Decimal(0)
-            stats["total_value"] += qty * price
+            if t_stock <= 0:
+                stats["out_of_stock"] += 1
+            elif t_stock <= min_s:
+                stats["critical"] += 1
+            elif t_stock <= re_p:
+                stats["low"] += 1
+            else:
+                stats["normal"] += 1
 
         return stats
 
@@ -783,8 +921,8 @@ class StockMovementService(ServiceBase):
     3. Maliyet hesaplama - çıkışlarda mevcut stok maliyeti kullanılır
     """
 
-    def __init__(self, allow_negative_stock: bool = False):
-        super().__init__()
+    def __init__(self, session: Session = None, allow_negative_stock: bool = False):
+        super().__init__(session=session)
         self.allow_negative_stock = allow_negative_stock
 
     def get_all(self, limit: int = 100) -> List[StockMovement]:
@@ -946,79 +1084,170 @@ class StockMovementService(ServiceBase):
         if secondary_quantity is not None:
             secondary_quantity = Decimal(str(secondary_quantity))
 
+        # --- SNAPSHOT VERİLERİ İÇİN HAZIRLIK ---
+        # 1. Stok kartı bilgilerini çek
+        item = self.session.query(Item).filter(Item.id == item_id).first()
+        if not item:
+            raise ValueError(f"Stok kartı bulunamadı! ID: {item_id}")
+
+        item_snapshot = {
+            "item_code": item.code,
+            "item_name": item.name,
+            "unit_id": item.unit_id,  # Hareketin birimi stok kartının ana birimidir
+        }
+
+        # 2. Bakiye bilgilerini çek (İşlemden Önceki)
+        balance_before = Decimal(0)
+        target_warehouse_id_for_balance = None
+
+        if to_warehouse_id:  # Giriş veya Transfer Hedef
+            target_warehouse_id_for_balance = to_warehouse_id
+        elif from_warehouse_id:  # Çıkış
+            target_warehouse_id_for_balance = from_warehouse_id
+
+        # Ancak hareketin yönüne göre hangi bakiyeyi takip ettiğimiz önemli.
+        # Giriş işlemlerinde --> Hedef Depo Bakiyesi
+        # Çıkış işlemlerinde --> Kaynak Depo Bakiyesi
+        # Transfer işlemlerinde --> Kaynak Depo Bakiyesi (Genelde kaynak takip edilir)
+
+        relevant_warehouse_id = None
+
         # Hareket tipine göre kontroller ve maliyet belirleme
         if movement_type in [
             StockMovementType.GIRIS,
             StockMovementType.SATIN_ALMA,
-            StockMovementType.URETIM_CIKIS,
+            StockMovementType.URETIM_GIRIS,
             StockMovementType.SAYIM_FAZLA,
-            StockMovementType.IADE_ALIS,
+            StockMovementType.IADE_SATIS,
         ]:
             # GİRİŞ işlemleri - to_warehouse zorunlu
             if not to_warehouse_id:
                 raise ValueError("Giriş işlemleri için hedef depo zorunludur!")
 
+            relevant_warehouse_id = to_warehouse_id
+
             # Giriş maliyeti (TL)
-            # Eğer yukarıda kur ile çarptıysak movement_cost TL'dir.
-            # Eğer kur yoksa movement_cost = unit_price (TL)
             pass
 
         elif movement_type in [
             StockMovementType.CIKIS,
             StockMovementType.SATIS,
-            StockMovementType.URETIM_GIRIS,
+            StockMovementType.URETIM_CIKIS,
             StockMovementType.SAYIM_EKSIK,
             StockMovementType.FIRE,
-            StockMovementType.IADE_SATIS,
+            StockMovementType.IADE_ALIS,
         ]:
             # ÇIKIŞ işlemleri - from_warehouse zorunlu
             if not from_warehouse_id:
                 raise ValueError("Çıkış işlemleri için kaynak depo zorunludur!")
 
+            relevant_warehouse_id = from_warehouse_id
+
             # NEGATİF STOK KONTROLÜ
-            available = self.get_available_quantity(item_id, from_warehouse_id)
-            if not self.allow_negative_stock and available < quantity:
-                item = self.session.query(Item).filter(Item.id == item_id).first()
+            # (item zaten çekildi, available hesapla)
+            current_balance_obj = self.get_balance(item_id, from_warehouse_id)
+            current_qty = (
+                current_balance_obj.quantity if current_balance_obj else Decimal(0)
+            )
+            reserved_qty = (
+                current_balance_obj.reserved_quantity
+                if current_balance_obj
+                else Decimal(0)
+            )
+            available = current_qty - reserved_qty
+
+            if not self.allow_negative_stock:
                 warehouse = (
                     self.session.query(Warehouse)
                     .filter(Warehouse.id == from_warehouse_id)
                     .first()
                 )
-                raise NegativeStockError(
-                    item.code if item else str(item_id),
-                    warehouse.name if warehouse else str(from_warehouse_id),
-                    available,
-                    quantity,
+
+                # Global yasak olsa bile, depo özelinde izin verilmiş olabilir
+                warehouse_allows_negative = (
+                    warehouse.allow_negative if warehouse else False
                 )
 
-            # ÇIKIŞ MALİYETİ = MEVCUT STOK MALİYETİ (düzeltilmiş)
-            movement_cost = self.get_current_cost(item_id, from_warehouse_id)
+                if not warehouse_allows_negative and available < quantity:
+                    raise NegativeStockError(
+                        item.code,
+                        warehouse.name if warehouse else str(from_warehouse_id),
+                        available,
+                        quantity,
+                    )
+
+            # ÇIKIŞ MALİYETİ = MEVCUT STOK MALİYETİ
+            movement_cost = (
+                current_balance_obj.unit_cost
+                if current_balance_obj
+                else item.purchase_price
+            )
 
         elif movement_type == StockMovementType.TRANSFER:
             # Transfer - her iki depo da zorunlu
             if not from_warehouse_id or not to_warehouse_id:
                 raise ValueError("Transfer için kaynak ve hedef depo zorunludur!")
 
+            relevant_warehouse_id = from_warehouse_id
+
             # NEGATİF STOK KONTROLÜ
-            available = self.get_available_quantity(item_id, from_warehouse_id)
-            if not self.allow_negative_stock and available < quantity:
-                item = self.session.query(Item).filter(Item.id == item_id).first()
+            current_balance_obj = self.get_balance(item_id, from_warehouse_id)
+            current_qty = (
+                current_balance_obj.quantity if current_balance_obj else Decimal(0)
+            )
+            reserved_qty = (
+                current_balance_obj.reserved_quantity
+                if current_balance_obj
+                else Decimal(0)
+            )
+            available = current_qty - reserved_qty
+
+            if not self.allow_negative_stock:
                 warehouse = (
                     self.session.query(Warehouse)
                     .filter(Warehouse.id == from_warehouse_id)
                     .first()
                 )
-                raise NegativeStockError(
-                    item.code if item else str(item_id),
-                    warehouse.name if warehouse else str(from_warehouse_id),
-                    available,
-                    quantity,
+
+                # Global yasak olsa bile, depo özelinde izin verilmiş olabilir
+                warehouse_allows_negative = (
+                    warehouse.allow_negative if warehouse else False
                 )
 
+                if not warehouse_allows_negative and available < quantity:
+                    raise NegativeStockError(
+                        item.code,
+                        warehouse.name if warehouse else str(from_warehouse_id),
+                        available,
+                        quantity,
+                    )
+
             # Transfer maliyeti = kaynak depodaki maliyet
-            movement_cost = self.get_current_cost(item_id, from_warehouse_id)
+            movement_cost = (
+                current_balance_obj.unit_cost
+                if current_balance_obj
+                else item.purchase_price
+            )
         else:
             movement_cost = unit_price
+
+        # Balance Before Hesapla
+        if relevant_warehouse_id:
+            bal = self.get_balance(item_id, relevant_warehouse_id)
+            balance_before = bal.quantity if bal else Decimal(0)
+
+        # Balance After Hesapla (+ or -)
+        balance_after = balance_before
+        if movement_type in [
+            StockMovementType.GIRIS,
+            StockMovementType.SATIN_ALMA,
+            StockMovementType.URETIM_GIRIS,
+            StockMovementType.SAYIM_FAZLA,
+            StockMovementType.IADE_SATIS,
+        ]:
+            balance_after += quantity
+        else:  # Çıkış ve Transfer (Kaynaktan çıkıyor)
+            balance_after -= quantity
 
         try:
             # === TRANSACTION BAŞLANGICI ===
@@ -1043,6 +1272,12 @@ class StockMovementService(ServiceBase):
                 # Currency
                 currency_id=currency_id,
                 exchange_rate=exchange_rate,
+                # Snapshot Alanları
+                item_code=item_snapshot["item_code"],
+                item_name=item_snapshot["item_name"],
+                unit_id=item_snapshot["unit_id"],
+                balance_before=balance_before,
+                balance_after=balance_after,
             )
             self.session.add(movement)
 
@@ -1140,12 +1375,17 @@ class StockMovementService(ServiceBase):
                     warehouse_id=from_warehouse_id,
                     quantity=-quantity,
                     unit_cost=unit_cost,
+                    total_cost=(-quantity * unit_cost),
                     secondary_quantity=(
                         -secondary_quantity if secondary_quantity else None
                     ),
                     secondary_unit_id=secondary_unit_id,
                 )
                 self.session.add(from_balance)
+
+            # Toplam maliyet güncelle (from_balance modified above)
+            if from_balance:
+                from_balance.total_cost = from_balance.quantity * from_balance.unit_cost
 
         # Giriş yapılacak depoya ekle
         if to_warehouse_id:
@@ -1178,10 +1418,15 @@ class StockMovementService(ServiceBase):
                     warehouse_id=to_warehouse_id,
                     quantity=quantity,
                     unit_cost=unit_cost,
+                    total_cost=(quantity * unit_cost),
                     secondary_quantity=secondary_quantity,
                     secondary_unit_id=secondary_unit_id,
                 )
                 self.session.add(to_balance)
+
+            # Toplam maliyet güncelle (to_balance modified above)
+            if to_balance:
+                to_balance.total_cost = to_balance.quantity * to_balance.unit_cost
 
     def get_stock_summary(self, item_id: int) -> dict:
         """Stok özeti - tüm depolardaki bakiye"""
@@ -1256,6 +1501,7 @@ class StockMovementService(ServiceBase):
 
         balance.quantity = max(Decimal(0), quantity)
         balance.unit_cost = total_value / quantity if quantity > 0 else Decimal(0)
+        balance.total_cost = balance.quantity * balance.unit_cost
 
         self.session.commit()
         return balance
@@ -1267,6 +1513,7 @@ class StockMovementService(ServiceBase):
         quantity: Decimal,
         reference_type: str = None,
         reference_id: int = None,
+        allow_negative: bool = False,
     ) -> bool:
         """
         Stok rezerve et (fiziksel çıkış yapmadan)
@@ -1291,7 +1538,7 @@ class StockMovementService(ServiceBase):
 
         # Kullanılabilir miktarı kontrol et
         available = self.get_available_quantity(item_id, warehouse_id)
-        if available < quantity:
+        if not allow_negative and available < quantity:
             item = self.session.query(Item).filter(Item.id == item_id).first()
             warehouse = (
                 self.session.query(Warehouse)

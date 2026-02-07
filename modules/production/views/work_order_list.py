@@ -4,40 +4,29 @@ Akıllı İş - İş Emirleri Liste Sayfası
 
 from datetime import datetime
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QTableWidgetItem,
     QMenu,
-    QMessageBox,
-    QFrame,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QAction
 
 from config.icons import ICONS
 import qtawesome as qta
 from core.export_manager import ExportManager
 from core.label_manager import LabelManager
-from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
-    ColumnConfig,
-    MiniStatCard,
-)
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
 
 
-class WorkOrderListPage(QWidget):
+class WorkOrderListPage(BaseListPage):
     """İş emirleri listesi."""
 
-    # Sinyaller
-    new_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    view_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
+    # BaseListPage sinyallerini kullan: add_clicked, edit_clicked, view_clicked, delete_clicked, refresh_requested
     status_change_requested = pyqtSignal(int, str)
-    refresh_requested = pyqtSignal()
+    new_clicked = (
+        pyqtSignal()
+    )  # BaseListPage add_clicked'i buna bağlayabiliriz veya direkt onu kullanabiliriz.
+    # Uyumlu olması için add_clicked -> new_clicked emit edelim.
 
     STATUS_DISPLAY = {
         "draft": ("Taslak", "#94a3b8"),
@@ -58,130 +47,79 @@ class WorkOrderListPage(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self._total_count = 0
-        self._setup_ui()
-        self._connect_signals()
-
-        # Otomatik yenileme
-        self._auto_refresh_timer = QTimer(self)
-        self._auto_refresh_timer.timeout.connect(
-            lambda: self.refresh_requested.emit()
-        )
-        self._auto_refresh_timer.start(30000)
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
-            title="İş Emirleri",
-            icon=ICONS.WORK_ORDER,
-            show_search=True,
-            show_add=True,
-            show_export=True,
-            add_text="Yeni İş Emri",
-            search_placeholder="İş emri ara...",
-            parent=self,
-        )
-
-        # Export menüsüne etiket ekleme
-        if self.header.export_btn:
-            export_menu = ExportManager.create_export_menu(
-                self, self._get_export_data
-            )
-            export_menu.addSeparator()
-            label_action = QAction("Etiket Bas", self)
-            label_action.setIcon(qta.icon(ICONS.TAG, color="#ffffff"))
-            label_action.triggered.connect(self._print_labels)
-            export_menu.addAction(label_action)
-            self.header.export_btn.setMenu(export_menu)
-
-        layout.addWidget(self.header)
-
-        # Tablo
         columns = [
-            ColumnConfig("order_no", "İş Emri No", width=120),
-            ColumnConfig("item_name", "Mamul", width=180, stretch=True),
+            ColumnConfig("order_no", "İş Emri No", width=120, filterable=True),
+            ColumnConfig(
+                "item_name", "Mamul", width=180, stretch=True, filterable=True
+            ),
             ColumnConfig("quantity", "Miktar", width=100, filter_type="number"),
             ColumnConfig("start", "Planlanan Başlangıç", width=140),
             ColumnConfig("end", "Planlanan Bitiş", width=140),
-            ColumnConfig("progress", "İlerleme", width=100),
+            ColumnConfig("progress", "İlerleme", width=100, filter_type="number"),
+            ColumnConfig("oee", "OEE", width=80, filter_type="number"),
+            ColumnConfig("risk", "Risk", width=80, filter_type="enum"),
             ColumnConfig("priority", "Öncelik", width=90, filter_type="enum"),
             ColumnConfig("status", "Durum", width=110, filter_type="enum"),
         ]
 
-        self.table = EnhancedTableWidget(
+        super().__init__(
+            title="İş Emirleri",
+            icon=ICONS.WORK_ORDER,
             table_id="work_orders",
             columns=columns,
-            parent=self,
+            show_add=True,
+            show_export=True,
+            add_text="Yeni İş Emri",
+            search_placeholder="İş emri ara...",
+            parent=parent,
         )
-        self.table.set_standard_row_height(48)
+
+        # Ekstra UI ayarları
+        self._setup_extra_ui()
+
+        # Sinyal yönlendirmeleri
+        self.add_clicked.connect(self.new_clicked.emit)
+
+    def _setup_extra_ui(self):
+        # Export menüsüne etiket ekleme
+        if self.header.export_btn:
+            export_menu = ExportManager.create_export_menu(self, self._get_export_data)
+            export_menu.addSeparator()
+            label_action = QAction("Etiket Bas", self)
+            label_action.setIcon(
+                qta.icon(ICONS.TAG, color="#ffffff")
+            )  # color beyaz olsun dark mode uyumlu? original white
+            label_action.triggered.connect(self._print_labels)
+            export_menu.addAction(label_action)
+            self.header.export_btn.setMenu(export_menu)
+
+        # Footer İstatistikleri
+        self.footer.add_stat("in_progress", "Üretimde", ICONS.PLAY, "warning")
+        self.footer.add_stat("completed", "Tamamlanan", ICONS.CHECK, "success")
+        self.footer.add_stat("delayed", "Geciken", ICONS.WARNING, "error")
+
+        # Context Menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
-        layout.addWidget(self.table)
 
-        # Footer
-        self._setup_footer(layout)
-
-    def _setup_footer(self, layout: QVBoxLayout):
-        """Footer - kayıt sayısı ve istatistikler"""
-        footer = QFrame()
-        footer.setProperty("class", "table-footer")
-        footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(0, 8, 0, 0)
-        footer_layout.setSpacing(16)
-
-        # Sol: Kayıt sayısı
-        self.count_label = QLabel("Toplam: 0 iş emri")
-        self.count_label.setProperty("class", "footer-count")
-        footer_layout.addWidget(self.count_label)
-
-        # İstatistik kartları (horizontal)
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", orientation="horizontal", icon=ICONS.WORK_ORDER
+        # Filtre seçenekleri
+        self.table.set_filter_options(
+            "status", [v[0] for v in self.STATUS_DISPLAY.values()]
         )
-        self.stat_cards["in_progress"] = MiniStatCard(
-            "Üretimde", "0", "warning", orientation="horizontal", icon=ICONS.PLAY
+        self.table.set_filter_options(
+            "priority", [v[0] for v in self.PRIORITY_DISPLAY.values()]
         )
-        self.stat_cards["completed"] = MiniStatCard(
-            "Tamamlanan", "0", "success", orientation="horizontal", icon=ICONS.CHECK
-        )
-        self.stat_cards["delayed"] = MiniStatCard(
-            "Geciken", "0", "error", orientation="horizontal", icon=ICONS.WARNING
-        )
-
-        for card in self.stat_cards.values():
-            footer_layout.addWidget(card)
-
-        footer_layout.addStretch()
-
-        # Sağ: Otomatik yenileme göstergesi
-        refresh_indicator = QLabel("⟳")
-        refresh_indicator.setProperty("class", "refresh-indicator")
-        refresh_indicator.setToolTip("Otomatik yenileme: 30s")
-        footer_layout.addWidget(refresh_indicator)
-
-        layout.addWidget(footer)
-
-    def _connect_signals(self):
-        self.header.add_clicked.connect(self.new_clicked.emit)
-        self.header.search_changed.connect(self._on_search)
-        self.table.row_double_clicked.connect(self.view_clicked.emit)
-        self.table.filter_changed.connect(self._update_visible_count)
+        self.table.set_filter_options("risk", ["Yok", "Düşük", "Yüksek"])
 
     def load_data(self, work_orders: list):
         self.table.setRowCount(len(work_orders))
-        visible_cols = self.table.get_visible_columns()
 
         now = datetime.now()
         in_progress_count = completed_count = delayed_count = 0
 
+        self.table.setSortingEnabled(False)
         for row, wo in enumerate(work_orders):
-            self._populate_row(row, wo, visible_cols, now)
+            self._populate_row(row, wo, now)
 
             status = wo.get("status", "draft")
             if status == "in_progress":
@@ -192,107 +130,106 @@ class WorkOrderListPage(QWidget):
             end = wo.get("planned_end")
             if end and status in ["planned", "released", "in_progress"] and end < now:
                 delayed_count += 1
+        self.table.setSortingEnabled(True)
 
         # Kartları güncelle
-        self.stat_cards["total"].update_value(str(len(work_orders)))
-        self.stat_cards["in_progress"].update_value(str(in_progress_count))
-        self.stat_cards["completed"].update_value(str(completed_count))
-        self.stat_cards["delayed"].update_value(str(delayed_count))
+        self.update_count(len(work_orders))
+        self.update_stat_card("in_progress", str(in_progress_count))
+        self.update_stat_card("completed", str(completed_count))
+        self.update_stat_card("delayed", str(delayed_count))
 
-        self._total_count = len(work_orders)
-        self.count_label.setText(f"Toplam: {self._total_count} iş emri")
+        # Filtreleri uygula
+        self.table.apply_saved_filters()
 
-    def _populate_row(self, row: int, wo: dict, visible_cols: list, now):
+    def _populate_row(self, row: int, wo: dict, now):
         wo_id = wo.get("id")
 
-        for col_idx, col_key in enumerate(visible_cols):
-            if col_key == "order_no":
-                item = QTableWidgetItem(wo.get("order_no", ""))
-                item.setData(Qt.ItemDataRole.UserRole, wo_id)
-                item.setForeground(QColor("#818cf8"))
-                self.table.setItem(row, col_idx, item)
+        # order_no
+        item = QTableWidgetItem(wo.get("order_no", ""))
+        item.setData(Qt.ItemDataRole.UserRole, wo_id)
+        item.setForeground(QColor("#818cf8"))
+        self.table.setItem(row, 0, item)
 
-            elif col_key == "item_name":
-                self.table.setItem(
-                    row, col_idx, QTableWidgetItem(wo.get("item_name", "-"))
-                )
+        # item_name
+        self.table.setItem(row, 1, QTableWidgetItem(wo.get("item_name", "-")))
 
-            elif col_key == "quantity":
-                planned = wo.get("planned_quantity", 0)
-                completed = wo.get("completed_quantity", 0)
-                qty_text = f"{completed:,.0f} / {planned:,.0f}"
-                item = QTableWidgetItem(qty_text)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, col_idx, item)
+        # quantity
+        planned = wo.get("planned_quantity", 0)
+        completed = wo.get("completed_quantity", 0)
+        qty_text = f"{completed:,.0f} / {planned:,.0f}"  # 0/100
+        # Sort by planned quantity maybe? Or progress?
+        # Let's use custom numeric item with planned quantity value for sorting
+        from ui.components.enhanced_table import NumericTableWidgetItem
 
-            elif col_key == "start":
-                start = wo.get("planned_start")
-                start_text = start.strftime("%d.%m.%Y %H:%M") if start else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(start_text))
+        item = NumericTableWidgetItem(planned, qty_text)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row, 2, item)
 
-            elif col_key == "end":
-                end = wo.get("planned_end")
-                end_text = end.strftime("%d.%m.%Y %H:%M") if end else "-"
-                item = QTableWidgetItem(end_text)
-                status = wo.get("status", "draft")
-                if (
-                    end
-                    and status in ["planned", "released", "in_progress"]
-                    and end < now
-                ):
-                    item.setForeground(QColor("#ef4444"))
-                self.table.setItem(row, col_idx, item)
+        # start
+        start = wo.get("planned_start")
+        start_text = start.strftime("%d.%m.%Y %H:%M") if start else "-"
+        self.table.setItem(row, 3, QTableWidgetItem(start_text))
 
-            elif col_key == "progress":
-                progress = wo.get("progress_rate", 0)
-                item = QTableWidgetItem(f"%{progress:.0f}")
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                if progress >= 100:
-                    item.setForeground(QColor("#10b981"))
-                elif progress > 0:
-                    item.setForeground(QColor("#f59e0b"))
-                self.table.setItem(row, col_idx, item)
+        # end
+        end = wo.get("planned_end")
+        end_text = end.strftime("%d.%m.%Y %H:%M") if end else "-"
+        item = QTableWidgetItem(end_text)
+        status = wo.get("status", "draft")
+        if end and status in ["planned", "released", "in_progress"] and end < now:
+            item.setForeground(QColor("#ef4444"))
+        self.table.setItem(row, 4, item)
 
-            elif col_key == "priority":
-                priority = wo.get("priority", "normal")
-                text, color = self.PRIORITY_DISPLAY.get(
-                    priority, ("Normal", "#3b82f6")
-                )
-                item = QTableWidgetItem(text)
-                item.setForeground(QColor(color))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, col_idx, item)
+        # progress
+        progress = wo.get("progress_rate", 0)
+        from ui.components.enhanced_table import NumericTableWidgetItem
 
-            elif col_key == "status":
-                status = wo.get("status", "draft")
-                text, color = self.STATUS_DISPLAY.get(status, ("?", "#ffffff"))
-                item = QTableWidgetItem(text)
-                item.setForeground(QColor(color))
-                self.table.setItem(row, col_idx, item)
+        item = NumericTableWidgetItem(progress, f"%{progress:.0f}")
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if progress >= 100:
+            item.setForeground(QColor("#10b981"))
+        elif progress > 0:
+            item.setForeground(QColor("#f59e0b"))
+        self.table.setItem(row, 5, item)
 
-    def _on_search(self, text: str):
-        text = text.lower()
-        for row in range(self.table.rowCount()):
-            match = any(
-                self.table.item(row, col)
-                and text in self.table.item(row, col).text().lower()
-                for col in range(self.table.columnCount())
-            )
-            self.table.setRowHidden(row, not match)
-        self._update_visible_count()
+        # OEE
+        oee = wo.get("total_oee", 0)
+        item = NumericTableWidgetItem(oee, f"%{oee:.0f}")
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if oee >= 85:
+            item.setForeground(QColor("#10b981"))
+        elif oee > 0:
+            item.setForeground(QColor("#f59e0b"))
+        self.table.setItem(row, 6, item)
 
-    def _update_visible_count(self, filters: dict = None):
-        """Görünen satır sayısını güncelle"""
-        visible_count = sum(
-            1 for row in range(self.table.rowCount())
-            if not self.table.isRowHidden(row)
-        )
-        if visible_count == self._total_count:
-            self.count_label.setText(f"Toplam: {self._total_count} iş emri")
-        else:
-            self.count_label.setText(
-                f"Gösterilen: {visible_count} / {self._total_count} iş emri"
-            )
+        # Risk
+        risk = wo.get("delay_risk", "none")
+        risk_map = {
+            "none": ("Yok", "#94a3b8", ""),
+            "low": ("Düşük", "#f59e0b", ICONS.WARNING),
+            "high": ("Yüksek", "#ef4444", ICONS.WARNING),
+        }
+        risk_text, risk_color, risk_icon = risk_map.get(risk, ("Yok", "#94a3b8", ""))
+        item = QTableWidgetItem(risk_text)
+        item.setForeground(QColor(risk_color))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if risk_icon:
+            item.setIcon(qta.icon(risk_icon, color=risk_color))
+        self.table.setItem(row, 7, item)
+
+        # priority
+        priority = wo.get("priority", "normal")
+        text, color = self.PRIORITY_DISPLAY.get(priority, ("Normal", "#3b82f6"))
+        item = QTableWidgetItem(text)
+        item.setForeground(QColor(color))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row, 8, item)
+
+        # status
+        status = wo.get("status", "draft")
+        text, color = self.STATUS_DISPLAY.get(status, ("?", "#ffffff"))
+        item = QTableWidgetItem(text)
+        item.setForeground(QColor(color))
+        self.table.setItem(row, 9, item)
 
     def _show_context_menu(self, position):
         row = self.table.rowAt(position.y())
@@ -364,14 +301,18 @@ class WorkOrderListPage(QWidget):
         menu.exec(self.table.viewport().mapToGlobal(position))
 
     def _confirm_delete(self, wo_id: int):
-        reply = QMessageBox.question(
-            self,
-            "Silme Onayı",
-            "Bu iş emrini silmek istediğinize emin misiniz?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        if self.confirm_delete("iş emrini"):
             self.delete_clicked.emit(wo_id)
+
+    def get_filters(self) -> dict:
+        return {
+            "keyword": self.header.get_search_text(),
+            # "status": self.filter_status_combo.currentData() if hasattr ... (WorkOrderListPage UI doesnt have combo filters in header yet, derived from table filters mostly)
+            # Standard implementation typically just returns keyword if no specific header controls exist
+        }
+
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
     def _get_export_data(self):
         return ExportManager.extract_data_from_table(self.table)
@@ -379,11 +320,3 @@ class WorkOrderListPage(QWidget):
     def _print_labels(self):
         data = self._get_export_data()
         LabelManager.print_work_order_labels(self, data)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._auto_refresh_timer.start(30000)
-
-    def hideEvent(self, event):
-        super().hideEvent(event)
-        self._auto_refresh_timer.stop()

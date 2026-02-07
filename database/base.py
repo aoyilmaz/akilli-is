@@ -3,8 +3,7 @@ Akıllı İş - Veritabanı Bağlantısı ve Base Model
 """
 
 from datetime import datetime
-from typing import Any
-from sqlalchemy import create_engine, Column, Integer, DateTime, Boolean, event
+from sqlalchemy import create_engine, Column, Integer, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, scoped_session
 from sqlalchemy.pool import QueuePool
 
@@ -57,7 +56,7 @@ SessionLocal = get_session
 def init_database():
     """Veritabanı tablolarını oluşturur"""
     # Tüm modelleri import et
-    from database.models import user, inventory, common
+    from database.models import user, inventory, common, shipping, einvoice, fixed_asset
 
     engine = get_engine()
     Base.metadata.create_all(bind=engine)

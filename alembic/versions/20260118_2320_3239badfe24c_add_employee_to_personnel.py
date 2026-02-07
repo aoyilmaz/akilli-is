@@ -12,6 +12,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -22,19 +23,38 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [
+        c["name"] for c in inspector.get_columns("work_order_operation_personnel")
+    ]
+    fks = [
+        fk["name"]
+        for fk in inspector.get_foreign_keys("work_order_operation_personnel")
+    ]
+
     with op.batch_alter_table(
         "work_order_operation_personnel", schema=None
     ) as batch_op:
-        # employee_id ekle
-        batch_op.add_column(sa.Column("employee_id", sa.Integer(), nullable=True))
+        # employee_id ekle (idempotent)
+        if "employee_id" not in columns:
+            batch_op.add_column(sa.Column("employee_id", sa.Integer(), nullable=True))
+
         # user_id artık nullable
         batch_op.alter_column("user_id", existing_type=sa.INTEGER(), nullable=True)
-        # Index ekle
-        batch_op.create_index("idx_woopp_emp", ["employee_id"], unique=False)
+
+        # Index ekle (handled separately safely or via batch if we knew it didn't exist, but safest is raw SQL outside)
+        # batch_op.create_index("idx_woopp_emp", ["employee_id"], unique=False)
+
         # Foreign key ekle
-        batch_op.create_foreign_key(
-            "fk_woopp_employee", "employees", ["employee_id"], ["id"]
-        )
+        if "fk_woopp_employee" not in fks:
+            batch_op.create_foreign_key(
+                "fk_woopp_employee", "employees", ["employee_id"], ["id"]
+            )
+
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_woopp_emp ON work_order_operation_personnel (employee_id)"
+    )
 
 
 def downgrade() -> None:

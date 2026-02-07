@@ -19,52 +19,45 @@ from PyQt6.QtGui import QColor, QAction
 from config import COLORS
 from config.icons import ICONS
 from database.models import TransportUnitType, TransportUnitStatus
-from ui.components import (
-    PageHeader,
-    EnhancedTableWidget,
-    ColumnConfig,
-    MiniStatCard,
-)
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
 
 
-class SSCCListPage(QWidget):
+class SSCCListPage(BaseListPage):
     """Taşıma birimleri (SSCC) liste sayfası."""
 
-    # Sinyaller
     unit_selected = pyqtSignal(int)
-    add_clicked = pyqtSignal()
-    edit_clicked = pyqtSignal(int)
-    delete_clicked = pyqtSignal(int)
-    refresh_requested = pyqtSignal()
+    # add_clicked, edit_clicked, delete_clicked BaseListPage'den geliyor
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.units_data = []
-        self._total_count = 0
-        self._setup_ui()
-        self._connect_signals()
+        columns = [
+            ColumnConfig("sscc", "SSCC Kodu", width=160),
+            ColumnConfig("type", "Tip", width=100, filter_type="enum"),
+            ColumnConfig("status", "Durum", width=100, filter_type="enum"),
+            ColumnConfig("warehouse", "Depo", width=150),
+            ColumnConfig("location", "Raf/Konum", width=100),
+            ColumnConfig("item_count", "Kalem", width=80),
+            ColumnConfig("created_at", "Oluşturulma", width=140),
+            ColumnConfig("notes", "Notlar", width=200, stretch=True),
+        ]
 
-        # Otomatik yenileme
-        self._auto_refresh_timer = QTimer(self)
-        self._auto_refresh_timer.timeout.connect(lambda: self.refresh_requested.emit())
-        self._auto_refresh_timer.start(30000)
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        self.header = PageHeader(
+        super().__init__(
             title="Taşıma Birimleri (SSCC)",
             icon=ICONS.INVENTORY,
-            show_search=True,
+            table_id="sscc_units",
+            columns=columns,
             show_add=True,
             show_export=True,
             add_text="Yeni Palet/Koli",
             search_placeholder="SSCC, barkod veya notlarda ara...",
-            parent=self,
+            parent=parent,
         )
+
+        self.units_data = []
+        self._setup_extra_ui()
+
+    def _setup_extra_ui(self):
+        """Header filtreleri ve footer istatistikleri"""
 
         # Filtreleri header'a ekle
         self.type_combo = QComboBox()
@@ -86,101 +79,46 @@ class SSCCListPage(QWidget):
         if self.header.search_input:
             h_layout = self.header.header_layout()
             idx = h_layout.indexOf(self.header.search_input)
-            h_layout.insertWidget(idx, QLabel("Tip:"))
-            h_layout.insertWidget(idx + 1, self.type_combo)
-            h_layout.insertWidget(idx + 2, QLabel("Durum:"))
-            h_layout.insertWidget(idx + 3, self.status_combo)
+            # Arama kutusunun yanına ekle
+            if idx != -1:
+                h_layout.insertWidget(idx, QLabel("Tip:"))
+                h_layout.insertWidget(idx + 1, self.type_combo)
+                h_layout.insertWidget(idx + 2, QLabel("Durum:"))
+                h_layout.insertWidget(idx + 3, self.status_combo)
 
-        layout.addWidget(self.header)
+        # Footer İstatistikleri
+        self.footer.add_stat("open", "Açık", ICONS.UNLOCKED, "success")
+        self.footer.add_stat("closed", "Kapalı", ICONS.LOCKED, "warning")
+        self.footer.add_stat("shipped", "Sevk Edildi", ICONS.TRUCK, "error")
 
-        # Tablo
-        columns = [
-            ColumnConfig("sscc", "SSCC Kodu", width=160),
-            ColumnConfig("type", "Tip", width=100, filter_type="enum"),
-            ColumnConfig("status", "Durum", width=100, filter_type="enum"),
-            ColumnConfig("warehouse", "Depo", width=150),
-            ColumnConfig("location", "Raf/Konum", width=100),
-            ColumnConfig("item_count", "Kalem", width=80),
-            ColumnConfig("created_at", "Oluşturulma", width=140),
-            ColumnConfig("notes", "Notlar", width=200, stretch=True),
-        ]
-
-        self.table = EnhancedTableWidget(
-            table_id="sscc_units",
-            columns=columns,
-            parent=self,
-        )
-        self.table.set_standard_row_height(48)
+        # Context Menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        layout.addWidget(self.table)
+        # Sinyal bağlantıları (BaseListPage sinyallerini kendi sinyallerimize yönlendirebiliriz gerekirse)
+        # Ancak BaseListPage edit_clicked -> int bekler. SSCCListPage de öyle.
+        # BaseListPage row double click -> view_clicked. SSCCListPage -> edit_clicked.
+        # Bu mapping farkını yönetelim.
+        self.view_clicked.connect(self.edit_clicked.emit)
 
-        # Footer
-        self._setup_footer(layout)
+        # Filtre seçenekleri
+        self.table.set_filter_options("type", [t.value for t in TransportUnitType])
+        self.table.set_filter_options("status", [s.value for s in TransportUnitStatus])
 
-        # Arama debounce timer
-        self.search_timer = QTimer()
-        self.search_timer.setSingleShot(True)
-        self.search_timer.timeout.connect(self._do_search)
-
-    def _setup_footer(self, layout: QVBoxLayout):
-        """Footer - kayıt sayısı ve istatistikler"""
-        footer = QFrame()
-        footer.setProperty("class", "table-footer")
-        footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(0, 8, 0, 0)
-        footer_layout.setSpacing(16)
-
-        # Sol: Kayıt sayısı
-        self.count_label = QLabel("Toplam: 0 taşıma birimi")
-        self.count_label.setProperty("class", "footer-count")
-        footer_layout.addWidget(self.count_label)
-
-        # İstatistik kartları (horizontal)
-        self.stat_cards = {}
-        self.stat_cards["total"] = MiniStatCard(
-            "Toplam", "0", "info", orientation="horizontal", icon=ICONS.INVENTORY
-        )
-        self.stat_cards["open"] = MiniStatCard(
-            "Açık", "0", "success", orientation="horizontal", icon=ICONS.UNLOCKED
-        )
-        self.stat_cards["closed"] = MiniStatCard(
-            "Kapalı", "0", "warning", orientation="horizontal", icon=ICONS.LOCKED
-        )
-        self.stat_cards["shipped"] = MiniStatCard(
-            "Sevk Edildi", "0", "error", orientation="horizontal", icon=ICONS.TRUCK
-        )
-
-        for card in self.stat_cards.values():
-            footer_layout.addWidget(card)
-
-        footer_layout.addStretch()
-
-        # Sağ: Otomatik yenileme göstergesi
-        refresh_indicator = QLabel("⟳")
-        refresh_indicator.setProperty("class", "refresh-indicator")
-        refresh_indicator.setToolTip("Otomatik yenileme: 30s")
-        footer_layout.addWidget(refresh_indicator)
-
-        layout.addWidget(footer)
-
-    def _connect_signals(self):
-        self.header.add_clicked.connect(self.add_clicked.emit)
-        self.header.search_changed.connect(self._on_search_changed)
-        self.table.row_double_clicked.connect(self.edit_clicked.emit)
-        self.table.filter_changed.connect(self._update_visible_count)
+    def _do_search(self):
+        """Filtre değiştiğinde"""
+        self.refresh_requested.emit()
 
     def load_data(self, units: list):
         """Tabloyu verilerle doldur"""
         self.units_data = units
         self.table.setRowCount(len(units))
-        visible_cols = self.table.get_visible_columns()
 
         open_count = closed_count = shipped_count = 0
 
+        self.table.setSortingEnabled(False)
         for row, unit in enumerate(units):
-            self._populate_row(row, unit, visible_cols)
+            self._populate_row(row, unit)
 
             # İstatistikler
             if unit.status == TransportUnitStatus.ACIK:
@@ -189,86 +127,62 @@ class SSCCListPage(QWidget):
                 closed_count += 1
             elif unit.status == TransportUnitStatus.SEVK_EDILDI:
                 shipped_count += 1
+        self.table.setSortingEnabled(True)
 
         # İstatistik kartlarını güncelle
-        self.stat_cards["total"].update_value(str(len(units)))
-        self.stat_cards["open"].update_value(str(open_count))
-        self.stat_cards["closed"].update_value(str(closed_count))
-        self.stat_cards["shipped"].update_value(str(shipped_count))
+        self.update_count(len(units))
+        self.update_stat_card("open", str(open_count))
+        self.update_stat_card("closed", str(closed_count))
+        self.update_stat_card("shipped", str(shipped_count))
 
-        self._total_count = len(units)
-        self.count_label.setText(f"Toplam: {self._total_count} taşıma birimi")
+        # Tablo filtrelerini uygula
+        self.table.apply_saved_filters()
 
-    def _update_visible_count(self, filters: dict = None):
-        """Görünen satır sayısını güncelle"""
-        visible_count = sum(
-            1 for row in range(self.table.rowCount())
-            if not self.table.isRowHidden(row)
+    def _populate_row(self, row: int, unit):
+        # sscc
+        cell = QTableWidgetItem(unit.sscc)
+        cell.setData(Qt.ItemDataRole.UserRole, unit.id)
+        cell.setForeground(QColor("#818cf8"))
+        self.table.setItem(row, 0, cell)
+
+        # type
+        self.table.setItem(row, 1, QTableWidgetItem(unit.unit_type.value))
+
+        # status
+        status = unit.status
+        cell = QTableWidgetItem(status.value)
+        if status == TransportUnitStatus.ACIK:
+            cell.setForeground(QColor(COLORS["success"]))
+        elif status == TransportUnitStatus.KAPALI:
+            cell.setForeground(QColor(COLORS["warning"]))
+        elif status == TransportUnitStatus.SEVK_EDILDI:
+            cell.setForeground(QColor(COLORS["info"]))
+        elif status == TransportUnitStatus.IPTAL:
+            cell.setForeground(QColor(COLORS["error"]))
+        self.table.setItem(row, 2, cell)
+
+        # warehouse
+        wh_text = unit.warehouse.name if unit.warehouse else "-"
+        self.table.setItem(row, 3, QTableWidgetItem(wh_text))
+
+        # location
+        loc_text = unit.location.name if unit.location else "-"
+        self.table.setItem(row, 4, QTableWidgetItem(loc_text))
+
+        # item_count
+        count = len(unit.items) if unit.items else 0
+        cell = QTableWidgetItem(str(count))
+        cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row, 5, cell)
+
+        # created_at
+        date_str = (
+            unit.created_date.strftime("%d.%m.%Y %H:%M") if unit.created_date else "-"
         )
-        if visible_count == self._total_count:
-            self.count_label.setText(
-                f"Toplam: {self._total_count} taşıma birimi"
-            )
-        else:
-            self.count_label.setText(
-                f"Gösterilen: {visible_count} / {self._total_count} taşıma birimi"
-            )
+        self.table.setItem(row, 6, QTableWidgetItem(date_str))
 
-    def _populate_row(self, row: int, unit, visible_cols: list):
-        for col_idx, col_key in enumerate(visible_cols):
-            if col_key == "sscc":
-                cell = QTableWidgetItem(unit.sscc)
-                cell.setData(Qt.ItemDataRole.UserRole, unit.id)
-                cell.setForeground(QColor("#818cf8"))
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "type":
-                self.table.setItem(row, col_idx, QTableWidgetItem(unit.unit_type.value))
-
-            elif col_key == "status":
-                status = unit.status
-                cell = QTableWidgetItem(status.value)
-                if status == TransportUnitStatus.ACIK:
-                    cell.setForeground(QColor(COLORS["success"]))
-                elif status == TransportUnitStatus.KAPALI:
-                    cell.setForeground(QColor(COLORS["warning"]))
-                elif status == TransportUnitStatus.SEVK_EDILDI:
-                    cell.setForeground(QColor(COLORS["info"]))
-                elif status == TransportUnitStatus.IPTAL:
-                    cell.setForeground(QColor(COLORS["error"]))
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "warehouse":
-                wh_text = unit.warehouse.name if unit.warehouse else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(wh_text))
-
-            elif col_key == "location":
-                loc_text = unit.location.name if unit.location else "-"
-                self.table.setItem(row, col_idx, QTableWidgetItem(loc_text))
-
-            elif col_key == "item_count":
-                count = len(unit.items) if unit.items else 0
-                cell = QTableWidgetItem(str(count))
-                cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, col_idx, cell)
-
-            elif col_key == "created_at":
-                date_str = (
-                    unit.created_date.strftime("%d.%m.%Y %H:%M")
-                    if unit.created_date
-                    else "-"
-                )
-                self.table.setItem(row, col_idx, QTableWidgetItem(date_str))
-
-            elif col_key == "notes":
-                self.table.setItem(row, col_idx, QTableWidgetItem(unit.notes or ""))
-
-    def _on_search_changed(self, text: str):
-        self.search_timer.stop()
-        self.search_timer.start(300)
-
-    def _do_search(self):
-        self.refresh_requested.emit()
+        # notes
+        self.table.setItem(row, 7, QTableWidgetItem(unit.notes or ""))
 
     def get_filters(self) -> dict:
         return {
@@ -276,9 +190,6 @@ class SSCCListPage(QWidget):
             "unit_type": self.type_combo.currentData(),
             "status": self.status_combo.currentData(),
         }
-
-    def get_search_text(self) -> str:
-        return self.header.get_search_text()
 
     def _show_context_menu(self, position):
         row = self.table.rowAt(position.y())
@@ -299,11 +210,3 @@ class SSCCListPage(QWidget):
         menu.addAction(print_action)
 
         menu.exec(self.table.viewport().mapToGlobal(position))
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._auto_refresh_timer.start(30000)
-
-    def hideEvent(self, event):
-        super().hideEvent(event)
-        self._auto_refresh_timer.stop()

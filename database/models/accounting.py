@@ -278,3 +278,79 @@ class JournalEntryLine(Base):
 
     def __repr__(self):
         return f"<JournalEntryLine {self.account.code if self.account else '?'} B:{self.debit} A:{self.credit}>"
+
+
+class BudgetStatus(str, Enum):
+    """Bütçe durumları"""
+
+    DRAFT = "draft"  # Taslak
+    APPROVED = "approved"  # Onaylandı
+    ACTIVE = "active"  # Aktif/Kullanımda
+    CLOSED = "closed"  # Kapandı
+    CANCELLED = "cancelled"  # İptal
+
+
+class Budget(Base):
+    """
+    Bütçe Tanımı
+
+    Belirli bir dönem için mali hedefler.
+    """
+
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True)
+
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Dönem
+    period_year = Column(Integer, nullable=False)  # 2026
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+
+    status = Column(SQLEnum(BudgetStatus), default=BudgetStatus.DRAFT)
+
+    total_amount = Column(Numeric(18, 2), default=0)
+
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    lines = relationship(
+        "BudgetLine", back_populates="budget", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self):
+        return f"<Budget {self.name} ({self.period_year})>"
+
+
+class BudgetLine(Base):
+    """
+    Bütçe Kalemleri
+
+    Hesap bazlı bütçe hedefleri.
+    """
+
+    __tablename__ = "budget_lines"
+
+    id = Column(Integer, primary_key=True)
+
+    budget_id = Column(
+        Integer, ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False
+    )
+    budget = relationship("Budget", back_populates="lines")
+
+    # Hedef Hesap (Genelde Gider veya Gelir hesapları)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    account = relationship("Account")
+
+    # Hedeflenen Tutar
+    planned_amount = Column(Numeric(18, 2), default=0)
+
+    # Gerçekleşen (Cache/Raporlama amaçlı, opsiyonel)
+    actual_amount = Column(Numeric(18, 2), default=0)
+
+    description = Column(String(200), nullable=True)
+
+    def __repr__(self):
+        return f"<BudgetLine {self.account_id}: {self.planned_amount}>"

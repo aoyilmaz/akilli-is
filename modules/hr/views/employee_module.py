@@ -38,7 +38,8 @@ class EmployeeModule(QWidget):
         # Form Sayfası (Dinamik oluşturulacak)
         self.form_container = QWidget()
         self.form_layout = QVBoxLayout(self.form_container)
-        self.form_layout.setContentsMargins(0, 0, 0, 0)
+        self.form_layout.setContentsMargins(24, 24, 24, 24)
+        self.form_layout.setSpacing(16)
         self.stacked_widget.addWidget(self.form_container)
 
         self.load_data()
@@ -73,14 +74,7 @@ class EmployeeModule(QWidget):
         id_card_btn.clicked.connect(self._show_id_card)
         h_layout.addWidget(id_card_btn)
 
-        # Departman filtresi
-        h_layout.addSpacing(16)
-        h_layout.addWidget(QLabel("Departman:"))
-        self.dept_combo = QComboBox()
-        self.dept_combo.setFixedWidth(200)
-        self.dept_combo.setFixedHeight(36)
-        self.dept_combo.currentIndexChanged.connect(self.load_data)
-        h_layout.addWidget(self.dept_combo)
+        # Departman filtresi kaldırıldı (Tablodan yapılabilir)
 
         layout.addWidget(self.header)
 
@@ -120,19 +114,10 @@ class EmployeeModule(QWidget):
         try:
             service = self._get_service()
 
-            # Departman combobox'ı doldur (ilk yüklemede)
-            if self.dept_combo.count() == 0:
-                self.dept_combo.addItem("Tüm Departmanlar", None)
-                for dept in service.get_all_departments():
-                    self.dept_combo.addItem(dept.name, dept.id)
-
             # Filtreler
             search = self.header.search_input.text().strip() or None
-            dept_id = self.dept_combo.currentData()
 
-            employees = service.get_all_employees(
-                search=search, department_id=dept_id, limit=500
-            )
+            employees = service.get_all_employees(search=search, limit=500)
 
             self.table.setRowCount(len(employees))
             visible_cols = self.table.get_visible_columns()
@@ -201,18 +186,14 @@ class EmployeeModule(QWidget):
             title=title,
             icon=ICONS.EMPLOYEE,
             show_back=True,
+            show_search=False,
             show_add=False,
             parent=self,
         )
         form_header.back_clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         self.form_layout.addWidget(form_header)
 
-        # Form content
-        form_content = QWidget()
-        form_content_layout = QVBoxLayout(form_content)
-        form_content_layout.setContentsMargins(24, 0, 24, 24)
-
-        # Dialog sınıfının UI kısmını widget olarak kullanmak
+        # Dialog sınıfını widget olarak kullan
         # Dialog.setup_ui(form_content) yapabiliriz ama Dialog QDialog'dan türer.
         # Bu yüzden dialogu sarmalayan bir yapı kuralım:
         dialog = EmployeeFormDialog(employee_id=employee_id, parent=self)

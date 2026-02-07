@@ -15,11 +15,34 @@ from sqlalchemy import (
     ForeignKey,
     Enum,
     Index,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 import enum
 
 from database.base import BaseModel
+
+
+class MrpType(enum.Enum):
+    """Malzeme İhtiyaç Planlaması (MRP) Türleri"""
+
+    AUTO = "AUTO"  # Otomatik
+    MANUAL = "MANUAL"  # Manuel
+    ROP = "ROP"  # Yeniden Sipariş Noktası (Reorder Point)
+
+
+class LotSizePolicy(enum.Enum):
+    """Lot Büyüklüğü Politikası"""
+
+    LFL = "LFL"  # Lot-for-Lot (İhtiyaç Kadar)
+    FIXED = "FIXED"  # Sabit Miktar
+
+
+class ValuationMethod(enum.Enum):
+    """Değerleme Yöntemi"""
+
+    AVERAGE = "AVERAGE"  # Ağırlıklı Ortalama
+    STANDARD = "STANDARD"  # Standart Maliyet
 
 
 class ItemType(enum.Enum):
@@ -192,6 +215,7 @@ class Item(BaseModel):
 
     # === Kodlar ===
     barcode = Column(String(100), nullable=True, index=True)
+    barcode_ean = Column(String(20), unique=True, nullable=True)  # EAN/GTIN Barkodu
     manufacturer_code = Column(String(100), nullable=True)
     supplier_code = Column(String(100), nullable=True)
     gtip_code = Column(String(20), nullable=True)
@@ -206,6 +230,9 @@ class Item(BaseModel):
     # === Vergiler ===
     vat_rate = Column(Numeric(5, 2), default=20)
     withholding_rate = Column(Numeric(5, 2), default=0)
+    tax_rate_buy = Column(Numeric(5, 2), default=0)  # Alış KDV
+    tax_rate_sell = Column(Numeric(5, 2), default=0)  # Satış KDV
+    valuation_method = Column(Enum(ValuationMethod), default=ValuationMethod.AVERAGE)
 
     # === Stok Limitleri ===
     min_stock = Column(Numeric(18, 4), default=0)
@@ -219,6 +246,9 @@ class Item(BaseModel):
     min_order_qty = Column(Numeric(18, 4), default=1)  # Minimum sipariş miktarı
     order_multiple = Column(Numeric(18, 4), default=1)  # Sipariş katı
     procurement_type = Column(String(20), default="purchase")  # purchase/manufacture
+    mrp_type = Column(Enum(MrpType), default=MrpType.MANUAL)
+    lot_size_policy = Column(Enum(LotSizePolicy), default=LotSizePolicy.LFL)
+    rounding_value = Column(Numeric(18, 4), default=0)
     lot_sizing_procedure = Column(
         Enum(LotSizingProcedure), default=LotSizingProcedure.EXACT, nullable=False
     )
@@ -228,6 +258,8 @@ class Item(BaseModel):
     track_lot = Column(Boolean, default=False)
     track_serial = Column(Boolean, default=False)
     track_expiry = Column(Boolean, default=False)
+    is_batch_managed = Column(Boolean, default=False)
+    is_serial_managed = Column(Boolean, default=False)
     shelf_life_days = Column(Integer, nullable=True)
 
     # === Fiziksel Özellikler ===
@@ -238,6 +270,7 @@ class Item(BaseModel):
     width = Column(Numeric(18, 4), nullable=True)
     height = Column(Numeric(18, 4), nullable=True)
     depth = Column(Numeric(18, 4), nullable=True)
+    dimensions = Column(JSON, nullable=True)  # {length, width, height, unit}
 
     # === Marka/Model ===
     brand = Column(String(100), nullable=True)

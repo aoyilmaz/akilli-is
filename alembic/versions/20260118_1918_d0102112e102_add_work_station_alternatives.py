@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -21,17 +22,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Alternatif istasyon tablosu oluştur
-    op.create_table(
-        "work_station_alternatives",
-        sa.Column("station_id", sa.Integer(), nullable=False),
-        sa.Column("alt_station_id", sa.Integer(), nullable=False),
-        sa.Column("priority", sa.Integer(), default=1),
-        sa.Column("efficiency_factor", sa.Numeric(precision=5, scale=2), default=100),
-        sa.ForeignKeyConstraint(["alt_station_id"], ["work_stations.id"]),
-        sa.ForeignKeyConstraint(["station_id"], ["work_stations.id"]),
-        sa.PrimaryKeyConstraint("station_id", "alt_station_id"),
-    )
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    if not insp.has_table("work_station_alternatives"):
+        # Alternatif istasyon tablosu oluştur
+        op.create_table(
+            "work_station_alternatives",
+            sa.Column("station_id", sa.Integer(), nullable=False),
+            sa.Column("alt_station_id", sa.Integer(), nullable=False),
+            sa.Column("priority", sa.Integer(), default=1),
+            sa.Column(
+                "efficiency_factor", sa.Numeric(precision=5, scale=2), default=100
+            ),
+            sa.ForeignKeyConstraint(["alt_station_id"], ["work_stations.id"]),
+            sa.ForeignKeyConstraint(["station_id"], ["work_stations.id"]),
+            sa.PrimaryKeyConstraint("station_id", "alt_station_id"),
+        )
 
 
 def downgrade() -> None:

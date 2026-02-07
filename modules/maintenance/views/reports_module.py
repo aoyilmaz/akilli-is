@@ -10,15 +10,15 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QTableWidgetItem,
-    QHeaderView,
     QComboBox,
     QDateEdit,
     QTabWidget,
-    QFrame,
-    QGridLayout,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QDate
 import qtawesome as qta
+import pandas as pd
 
 from config.icons import ICONS
 from modules.maintenance.views.base import MaintenanceBaseWidget
@@ -35,6 +35,20 @@ class ReportingWidget(MaintenanceBaseWidget):
         self.setup_ui()
 
     def setup_ui(self):
+        # Header Container
+        header_container = QWidget()
+        header_container.setObjectName("headerContainer")
+        header_container.setStyleSheet(
+            """
+            QWidget#headerContainer {
+                background-color: transparent;
+            }
+        """
+        )
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(24, 24, 24, 16)
+        header_layout.setSpacing(0)
+
         # Header
         self.header = PageHeader(
             title="Bakım Raporları",
@@ -71,7 +85,16 @@ class ReportingWidget(MaintenanceBaseWidget):
         btn_refresh.clicked.connect(self.refresh_data)
         h_layout.addWidget(btn_refresh)
 
-        self.layout.addWidget(self.header)
+        h_layout.addSpacing(10)
+        btn_export = QPushButton("Excel'e Aktar")
+        btn_export.setIcon(qta.icon(ICONS.EXCEL, color="#ffffff"))
+        btn_export.setProperty("class", "btn-success")
+        btn_export.setFixedHeight(36)
+        btn_export.clicked.connect(self.export_to_excel)
+        h_layout.addWidget(btn_export)
+
+        header_layout.addWidget(self.header)
+        self.layout.addWidget(header_container)
 
         # Tab widget
         self.tabs = QTabWidget()
@@ -101,7 +124,8 @@ class ReportingWidget(MaintenanceBaseWidget):
 
     def setup_summary_tab(self):
         layout = QVBoxLayout(self.tab_summary)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         self.summary_stats_layout = QHBoxLayout()
         self.summary_stats = {
@@ -128,7 +152,8 @@ class ReportingWidget(MaintenanceBaseWidget):
 
     def setup_cost_tab(self):
         layout = QVBoxLayout(self.tab_cost)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         cols = [
             ColumnConfig("equipment", "Ekipman", width=250, stretch=True),
@@ -144,7 +169,8 @@ class ReportingWidget(MaintenanceBaseWidget):
 
     def setup_technician_tab(self):
         layout = QVBoxLayout(self.tab_technician)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         cols = [
             ColumnConfig("name", "Teknisyen", width=200, stretch=True),
@@ -160,7 +186,8 @@ class ReportingWidget(MaintenanceBaseWidget):
 
     def setup_overdue_tab(self):
         layout = QVBoxLayout(self.tab_overdue)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         cols = [
             ColumnConfig("equipment", "Ekipman", width=200, stretch=True),
@@ -253,7 +280,17 @@ class ReportingWidget(MaintenanceBaseWidget):
                 elif key == "avg":
                     val = f"{tech.get('avg_hours', 0):.1f}"
                 elif key == "rate":
-                    val = f"{tech.get('success_rate', 0):.1f}%"
+                    rate = tech.get("success_rate", 0)
+                    val = f"{rate:.1f}%"
+                    item = QTableWidgetItem(val)
+                    if rate >= 90:
+                        item.setForeground(Qt.GlobalColor.darkGreen)
+                    elif rate >= 75:
+                        item.setForeground(Qt.GlobalColor.darkYellow)
+                    else:
+                        item.setForeground(Qt.GlobalColor.red)
+                    self.tech_table.setItem(i, c, item)
+                    continue
                 self.tech_table.setItem(i, c, QTableWidgetItem(val))
 
     def _refresh_overdue(self):
@@ -287,6 +324,63 @@ class ReportingWidget(MaintenanceBaseWidget):
                         else "-"
                     )
                 self.overdue_table.setItem(i, c, QTableWidgetItem(val))
+
+    def export_to_excel(self):
+        """Aktif tablodaki verileri Excel'e aktarır"""
+        current_tab_index = self.tabs.currentIndex()
+        if current_tab_index == 0:
+            table = self.summary_table
+            filename = "bakim_ozet_raporu"
+        elif current_tab_index == 1:
+            table = self.cost_table
+            filename = "bakim_maliyet_analizi"
+        elif current_tab_index == 2:
+            table = self.tech_table
+            filename = "teknisyen_performansi"
+        elif current_tab_index == 3:
+            table = self.overdue_table
+            filename = "geciken_bakimlar"
+        else:
+            return
+
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            "Excel Olarak Kaydet",
+            f"{filename}_{QDate.currentDate().toString('yyyyMMdd')}.xlsx",
+            "Excel Dosyaları (*.xlsx)",
+        )
+
+        if not file_name:
+            return
+
+        try:
+            # Tablo verilerini topla
+            data = []
+            headers = []
+
+            # Başlıkları al
+            for c in range(table.columnCount()):
+                headers.append(table.horizontalHeaderItem(c).text())
+
+            # Satırları al
+            for r in range(table.rowCount()):
+                row_data = []
+                for c in range(table.columnCount()):
+                    item = table.item(r, c)
+                    row_data.append(item.text() if item else "")
+                data.append(row_data)
+
+            # DataFrame oluştur ve kaydet
+            df = pd.DataFrame(data, columns=headers)
+            df.to_excel(file_name, index=False)
+
+            QMessageBox.information(
+                self, "Başarılı", "Rapor başarıyla Excel'e aktarıldı."
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Hata", f"Dışa aktarım sırasında hata oluştu:\n{str(e)}"
+            )
 
 
 class KPIDashboardWidget(MaintenanceBaseWidget):
@@ -394,7 +488,15 @@ class KPIDashboardWidget(MaintenanceBaseWidget):
                 if key == "equipment":
                     val = kpi.get("equipment_name", "-")
                 elif key == "mtbf":
-                    val = f"{kpi.get('mtbf', 0):.1f}"
+                    val = kpi.get("mtbf", 0)
+                    item = QTableWidgetItem(f"{val:.1f}")
+                    # MTBF < 48 saat ise kırmızı (Örnek eşik)
+                    if val < 48:
+                        item.setForeground(Qt.GlobalColor.red)
+                    elif val < 168:  # 1 hafta
+                        item.setForeground(Qt.GlobalColor.darkYellow)
+                    self.detail_table.setItem(i, c, item)
+                    continue
                 elif key == "mttr":
                     val = f"{kpi.get('mttr', 0):.1f}"
                 elif key == "avail":

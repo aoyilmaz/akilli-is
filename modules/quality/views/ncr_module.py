@@ -16,17 +16,17 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFormLayout,
     QTextEdit,
+    QLineEdit,
+    QFrame,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+import qtawesome as qta
 
-from config.styles import (
-    BG_SECONDARY,
-    BORDER,
-    TEXT_PRIMARY,
-    ACCENT,
-    get_button_style,
-    get_title_style,
-)
+from config.icons import ICONS
+from config.styles import COLORS
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
 from modules.quality.services import QualityService
 from database.models.quality import NCRSeverity, NCRStatus
 
@@ -34,6 +34,12 @@ SEVERITY_LABELS = {
     NCRSeverity.MINOR: "Küçük",
     NCRSeverity.MAJOR: "Büyük",
     NCRSeverity.CRITICAL: "Kritik",
+}
+
+SEVERITY_COLORS = {
+    NCRSeverity.MINOR: COLORS["info"],
+    NCRSeverity.MAJOR: COLORS["warning"],
+    NCRSeverity.CRITICAL: COLORS["error"],
 }
 
 STATUS_LABELS = {
@@ -44,6 +50,7 @@ STATUS_LABELS = {
     NCRStatus.CLOSED: "Kapalı",
 }
 
+
 class NCRFormDialog(QDialog):
     """Yeni NCR dialogu"""
 
@@ -53,50 +60,76 @@ class NCRFormDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setWindowTitle("Yeni Uygunsuzluk Kaydı")
-        self.setMinimumSize(450, 350)
+        self.setWindowTitle("Yeni Uygunsuzluk Kaydı (NCR)")
+        self.setMinimumSize(500, 450)
 
         layout = QVBoxLayout(self)
-        form = QFormLayout()
-        form.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        form_frame = QFrame()
+        form_layout = QFormLayout(form_frame)
+        form_layout.setSpacing(15)
+        form_layout.setContentsMargins(0, 0, 0, 0)
 
         self.severity = QComboBox()
         for s, label in SEVERITY_LABELS.items():
             self.severity.addItem(label, s)
-        form.addRow("Şiddet:", self.severity)
+        form_layout.addRow("Şiddet Derecesi:", self.severity)
 
         self.description = QTextEdit()
+        self.description.setPlaceholderText("Uygunsuzluk detayları...")
         self.description.setMaximumHeight(100)
-        form.addRow("Açıklama:", self.description)
+        form_layout.addRow("Açıklama:", self.description)
 
         self.root_cause = QTextEdit()
-        self.root_cause.setMaximumHeight(80)
-        form.addRow("Kök Neden:", self.root_cause)
+        self.root_cause.setPlaceholderText("Tespit edilen kök neden (isteğe bağlı)...")
+        self.root_cause.setMaximumHeight(100)
+        form_layout.addRow("Kök Neden:", self.root_cause)
 
-        layout.addLayout(form)
+        layout.addWidget(form_frame)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("İptal")
+        cancel_btn.setMinimumSize(100, 35)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Kaydet")
+        save_btn.setMinimumSize(100, 35)
         save_btn.setProperty("class", "primary")
+        save_btn.setIcon(qta.icon(ICONS.SAVE, color="white"))
         save_btn.clicked.connect(self.save)
         btn_layout.addWidget(save_btn)
 
         layout.addLayout(btn_layout)
 
+        self.setStyleSheet(
+            f"""
+            QDialog {{ background-color: {COLORS['bg_primary']}; }}
+            QLabel {{ color: {COLORS['text_secondary']}; font-weight: 500; }}
+            QComboBox, QTextEdit {{
+                padding: 8px;
+                border: 1px solid {COLORS['border']};
+                border-radius: 6px;
+                background-color: {COLORS['bg_secondary']};
+                color: {COLORS['text_primary']};
+            }}
+        """
+        )
+
     def save(self):
-        if not self.description.toPlainText().strip():
-            QMessageBox.warning(self, "Uyarı", "Açıklama zorunludur.")
+        desc_text = self.description.toPlainText().strip()
+        if not desc_text:
+            QMessageBox.warning(self, "Uyarı", "Lütfen bir açıklama giriniz.")
+            return
 
         try:
             data = {
                 "severity": self.severity.currentData(),
-                "description": self.description.toPlainText().strip(),
+                "description": desc_text,
                 "root_cause": self.root_cause.toPlainText().strip() or None,
             }
             self.service.create_ncr(data)
@@ -108,57 +141,42 @@ class NCRFormDialog(QDialog):
         self.service.close()
         super().closeEvent(event)
 
-class NCRModule(QWidget):
+
+class NCRModule(BaseListPage):
     """NCR yönetim modülü"""
 
-    page_title = "Uygunsuzluklar"
-
     def __init__(self, parent=None):
-        super().__init__(parent)
+        columns = [
+            ColumnConfig("ncr_no", "NCR No", width=120, filterable=True),
+            ColumnConfig("severity", "Şiddet", width=100, filter_type="enum"),
+            ColumnConfig(
+                "description", "Açıklama", width=300, stretch=True, filterable=True
+            ),
+            ColumnConfig("status", "Durum", width=120, filter_type="enum"),
+            ColumnConfig("created_at", "Tarih", width=120, filterable=True),
+        ]
+
+        super().__init__(
+            title="Uygunsuzluklar (NCR)",
+            icon=ICONS.WARNING,
+            table_id="quality_ncr_list",
+            columns=columns,
+            add_text="Yeni NCR",
+            show_export=True,
+            parent=parent,
+        )
+
         self.service = None
-        self.setup_ui()
+        self._setup_additional_ui()
         self.load_data()
 
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+    def _setup_additional_ui(self):
+        self.footer.add_stat("open", "Açık", ICONS.INFO, COLORS["error"])
+        self.footer.add_stat("analysis", "Analizde", ICONS.CHART, COLORS["warning"])
+        self.footer.add_stat("closed", "Kapalı", ICONS.SUCCESS, COLORS["success"])
 
-        header = QHBoxLayout()
-        title = QLabel("Uygunsuzluk Kayıtları (NCR)")
-        header.addWidget(title)
-        header.addStretch()
-
-        new_btn = QPushButton("Yeni NCR")
-        new_btn.setProperty("class", "primary")
-        new_btn.clicked.connect(self._new_ncr)
-        header.addWidget(new_btn)
-
-        layout.addLayout(header)
-
-        # Filtre
-        filter_row = QHBoxLayout()
-        self.status_combo = QComboBox()
-        self.status_combo.setFixedWidth(150)
-        self.status_combo.addItem("Tüm Durumlar", None)
-        for s, label in STATUS_LABELS.items():
-            self.status_combo.addItem(label, s)
-        self.status_combo.currentIndexChanged.connect(self.load_data)
-        filter_row.addWidget(self.status_combo)
-        filter_row.addStretch()
-        layout.addLayout(filter_row)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["NCR No", "Şiddet", "Açıklama", "Durum", "Tarih"]
-        )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout.addWidget(self.table)
+        self.add_clicked.connect(self._on_add)
+        self.refresh_requested.connect(self.load_data)
 
     def _get_service(self):
         if self.service is None:
@@ -173,44 +191,65 @@ class NCRModule(QWidget):
     def load_data(self):
         try:
             service = self._get_service()
-            status = self.status_combo.currentData()
-            ncrs = service.get_all_ncrs(status=status)
+            ncrs = service.get_all_ncrs()
 
             self.table.setRowCount(len(ncrs))
-            for row, ncr in enumerate(ncrs):
-                self.table.setItem(row, 0, QTableWidgetItem(ncr.ncr_no))
+            self.update_count(len(ncrs))
 
-                sev_text = SEVERITY_LABELS.get(ncr.severity, "-")
+            stats = {"open": 0, "analysis": 0, "closed": 0}
+
+            for row, ncr in enumerate(ncrs):
+                # NCR No
+                item_no = QTableWidgetItem(ncr.ncr_no)
+                item_no.setData(Qt.ItemDataRole.UserRole, ncr.id)
+                self.table.setItem(row, 0, item_no)
+
+                # Şiddet
+                sev_text = SEVERITY_LABELS.get(ncr.severity, str(ncr.severity))
                 sev_item = QTableWidgetItem(sev_text)
-                if ncr.severity == NCRSeverity.CRITICAL:
-                    sev_item.setForeground(Qt.GlobalColor.red)
-                elif ncr.severity == NCRSeverity.MAJOR:
-                    sev_item.setForeground(Qt.GlobalColor.yellow)
+                sev_item.setForeground(
+                    QColor(SEVERITY_COLORS.get(ncr.severity, COLORS["text_primary"]))
+                )
                 self.table.setItem(row, 1, sev_item)
 
-                desc = (
-                    ncr.description[:50] + "..."
-                    if len(ncr.description) > 50
-                    else ncr.description
+                # Açıklama
+                desc_text = ncr.description
+                if len(desc_text) > 100:
+                    desc_text = desc_text[:97] + "..."
+                self.table.setItem(row, 2, QTableWidgetItem(desc_text))
+
+                # Durum
+                status_text = STATUS_LABELS.get(ncr.status, str(ncr.status))
+                status_item = QTableWidgetItem(status_text)
+                if ncr.status == NCRStatus.CLOSED:
+                    status_item.setForeground(QColor(COLORS["success"]))
+                elif ncr.status == NCRStatus.OPEN:
+                    status_item.setForeground(QColor(COLORS["error"]))
+                self.table.setItem(row, 3, status_item)
+
+                # Tarih
+                date_str = (
+                    ncr.created_at.strftime("%d.%m.%Y") if ncr.created_at else "-"
                 )
-                self.table.setItem(row, 2, QTableWidgetItem(desc))
-                self.table.setItem(
-                    row, 3, QTableWidgetItem(STATUS_LABELS.get(ncr.status, "-"))
-                )
-                self.table.setItem(
-                    row,
-                    4,
-                    QTableWidgetItem(
-                        ncr.created_at.strftime("%d.%m.%Y") if ncr.created_at else "-"
-                    ),
-                )
+                self.table.setItem(row, 4, QTableWidgetItem(date_str))
+
+                # Stats
+                if ncr.status == NCRStatus.OPEN:
+                    stats["open"] += 1
+                elif ncr.status == NCRStatus.CLOSED:
+                    stats["closed"] += 1
+                else:
+                    stats["analysis"] += 1
+
+            for key, val in stats.items():
+                self.update_stat_card(key, str(val))
 
         except Exception as e:
-            QMessageBox.warning(self, "Uyarı", f"Hata: {str(e)}")
+            self.show_error("Veri Yükleme Hatası", str(e))
         finally:
             self._close_service()
 
-    def _new_ncr(self):
+    def _on_add(self):
         dialog = NCRFormDialog(parent=self)
         if dialog.exec():
             self.load_data()

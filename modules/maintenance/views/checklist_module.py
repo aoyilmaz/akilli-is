@@ -18,122 +18,132 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QGroupBox,
     QCheckBox,
+    QMenu,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 import qtawesome as qta
 
 from config.icons import ICONS
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
 from database.models.maintenance import MaintenanceType
-from ui.components.page_header import PageHeader
-from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
 
 
-class ChecklistEditorWidget(MaintenanceBaseWidget):
+class ChecklistEditorWidget(BaseListPage):
     """Kontrol Listesi Editörü Widget'ı"""
 
     def __init__(self, parent=None):
-        super().__init__("Kontrol Listesi Şablonları", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
 
-    def setup_ui(self):
-        # Header
-        self.header = PageHeader(
-            title="Kontrol Listesi Şablonları",
-            icon=ICONS.LIST,
-            show_search=False,
-            show_add=True,
-            add_text="Yeni Şablon",
-            parent=self,
-        )
-        self.header.add_clicked.connect(self.create_checklist)
-        self.header.refresh_clicked.connect(self.refresh_data)
-
-        h_layout = self.header.header_layout()
-        h_layout.addStretch()
-
-        self.btn_edit = QPushButton("Düzenle")
-        self.btn_edit.setIcon(qta.icon(ICONS.EDIT, color="#ffffff"))
-        self.btn_edit.setProperty("class", "btn-secondary")
-        self.btn_edit.setFixedHeight(36)
-        self.btn_edit.clicked.connect(self.edit_checklist)
-        h_layout.addWidget(self.btn_edit)
-
-        self.btn_duplicate = QPushButton("Kopyala")
-        self.btn_duplicate.setIcon(qta.icon(ICONS.INVOICE, color="#ffffff"))
-        self.btn_duplicate.setFixedHeight(36)
-        self.btn_duplicate.clicked.connect(self.duplicate_checklist)
-        h_layout.addWidget(self.btn_duplicate)
-
-        self.btn_delete = QPushButton("Sil")
-        self.btn_delete.setIcon(qta.icon(ICONS.DELETE, color="#ffffff"))
-        self.btn_delete.setProperty("class", "btn-danger")
-        self.btn_delete.setFixedHeight(36)
-        self.btn_delete.clicked.connect(self.delete_checklist)
-        h_layout.addWidget(self.btn_delete)
-
-        self.layout.addWidget(self.header)
-
-        # Tablo
-        cols = [
-            ColumnConfig("name", "Şablon Adı", width=250, stretch=True),
-            ColumnConfig("equipment", "Ekipman", width=200),
-            ColumnConfig("type", "Bakım Türü", width=120),
+        columns = [
+            ColumnConfig(
+                "name", "Şablon Adı", width=250, filterable=True, stretch=True
+            ),
+            ColumnConfig("equipment", "Ekipman", width=200, filterable=True),
+            ColumnConfig("type", "Bakım Türü", width=120, filterable=True),
             ColumnConfig("items", "Madde Sayısı", width=120),
         ]
-        self.table = EnhancedTableWidget(
-            table_id="maint_checklists", columns=cols, parent=self
-        )
-        self.table.row_double_clicked.connect(self.edit_checklist)
-        self.layout.addWidget(self.table)
 
-        self.refresh_data()
+        super().__init__(
+            title="Kontrol Listesi Şablonları",
+            icon=ICONS.LIST,
+            table_id="maintenance_checklists",
+            columns=columns,
+            show_add=True,
+            add_text="Yeni Şablon",
+            parent=parent,
+        )
+
+        self._setup_extra_ui()
+        self.add_clicked.connect(self.create_checklist)
+        self.refresh_requested.connect(self.refresh_data)
+
+    def closeEvent(self, event):
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(event)
+
+    def _setup_extra_ui(self):
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
+
+        # Filters (Maintenance Type) - Manual population for now as enum handling is basic
+        t_map = {
+            MaintenanceType.BREAKDOWN: "Arıza",
+            MaintenanceType.PREVENTIVE: "Periyodik",
+            MaintenanceType.PREDICTIVE: "Kestirimci",
+            MaintenanceType.CALIBRATION: "Kalibrasyon",
+        }
+        self.table.set_filter_options("type", list(t_map.values()))
 
     def refresh_data(self):
         checklists = self.service.get_all_checklists()
-        self.table.setRowCount(len(checklists))
-        visible_cols = self.table.get_visible_columns()
-        for i, cl in enumerate(checklists):
-            self._populate_row(i, cl, visible_cols)
+        self.load_data(checklists)
 
-    def _populate_row(self, row, cl, visible_cols):
-        for col_idx, col_key in enumerate(visible_cols):
-            if col_key == "name":
-                item = QTableWidgetItem(cl.name)
-                item.setData(Qt.ItemDataRole.UserRole, cl.id)
-                self.table.setItem(row, col_idx, item)
-            elif col_key == "equipment":
-                val = cl.equipment.name if cl.equipment else "Genel"
-                self.table.setItem(row, col_idx, QTableWidgetItem(val))
-            elif col_key == "type":
-                t_map = {
-                    MaintenanceType.BREAKDOWN: "Arıza",
-                    MaintenanceType.PREVENTIVE: "Periyodik",
-                    MaintenanceType.PREDICTIVE: "Kestirimci",
-                    MaintenanceType.CALIBRATION: "Kalibrasyon",
-                }
-                val = (
-                    t_map.get(cl.maintenance_type, "-")
-                    if cl.maintenance_type
-                    else "Tümü"
-                )
-                self.table.setItem(row, col_idx, QTableWidgetItem(val))
-            elif col_key == "items":
-                val = str(len(cl.items)) if cl.items else "0"
-                self.table.setItem(row, col_idx, QTableWidgetItem(val))
+    def load_data(self, checklists):
+        self.table.setRowCount(len(checklists))
+
+        for i, cl in enumerate(checklists):
+            # Name
+            item = QTableWidgetItem(cl.name)
+            item.setData(Qt.ItemDataRole.UserRole, cl.id)
+            self.table.setItem(i, 0, item)
+
+            # Equipment
+            val = cl.equipment.name if cl.equipment else "Genel"
+            self.table.setItem(i, 1, QTableWidgetItem(val))
+
+            # Type
+            t_map = {
+                MaintenanceType.BREAKDOWN: "Arıza",
+                MaintenanceType.PREVENTIVE: "Periyodik",
+                MaintenanceType.PREDICTIVE: "Kestirimci",
+                MaintenanceType.CALIBRATION: "Kalibrasyon",
+            }
+            val = t_map.get(cl.maintenance_type, "-") if cl.maintenance_type else "Tümü"
+            self.table.setItem(i, 2, QTableWidgetItem(val))
+
+            # Items
+            val = str(len(cl.items)) if cl.items else "0"
+            self.table.setItem(i, 3, QTableWidgetItem(val))
+
+        self.update_count(len(checklists))
 
     def get_selected_checklist_id(self) -> Optional[int]:
-        row = self.table.currentRow()
+        return self.table.get_selected_id()
+
+    def _show_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
         if row < 0:
-            return None
-        return self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            return
+
+        menu = QMenu(self)
+
+        edit_action = QAction(qta.icon(ICONS.EDIT, color="#f59e0b"), "Düzenle", self)
+        edit_action.triggered.connect(self.edit_checklist)
+        menu.addAction(edit_action)
+
+        dup_action = QAction(qta.icon(ICONS.INVOICE, color="#3b82f6"), "Kopyala", self)
+        dup_action.triggered.connect(self.duplicate_checklist)
+        menu.addAction(dup_action)
+
+        del_action = QAction(qta.icon(ICONS.DELETE, color="#ef4444"), "Sil", self)
+        del_action.triggered.connect(self.delete_checklist)
+        menu.addAction(del_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def create_checklist(self):
         if ChecklistDialog(self.service, self).exec():
             self.refresh_data()
 
     def edit_checklist(self, cl_id=None):
-        if cl_id is None:
+        if cl_id is None or isinstance(cl_id, bool):  # Handle signal specific arg
             cl_id = self.get_selected_checklist_id()
         if not cl_id:
             QMessageBox.warning(self, "Uyarı", "Lütfen bir şablon seçin.")
@@ -173,6 +183,10 @@ class ChecklistEditorWidget(MaintenanceBaseWidget):
                 self.refresh_data()
             except Exception as e:
                 QMessageBox.critical(self, "Hata", str(e))
+
+    # Interface Implementation
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
 
 
 class ChecklistDialog(QDialog):

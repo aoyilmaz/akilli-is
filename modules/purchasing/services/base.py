@@ -23,7 +23,6 @@ from database.models.purchasing import (
     PurchaseOrderStatus,
     GoodsReceiptStatus,
     PurchaseInvoiceStatus,
-    Currency,
 )
 from database.models.common import Currency as FinanceCurrency
 from database.models.inventory import StockMovementType
@@ -39,7 +38,7 @@ class SupplierService:
         """Tüm tedarikçileri getir"""
         query = self.session.query(Supplier)
         if active_only:
-            query = query.filter(Supplier.is_active == True)
+            query = query.filter(Supplier.is_active)
         return query.order_by(Supplier.name).all()
 
     def get_by_id(self, supplier_id: int) -> Optional[Supplier]:
@@ -57,7 +56,7 @@ class SupplierService:
             self.session.query(Supplier)
             .filter(
                 and_(
-                    Supplier.is_active == True,
+                    Supplier.is_active,
                     or_(
                         Supplier.code.ilike(keyword),
                         Supplier.name.ilike(keyword),
@@ -71,6 +70,12 @@ class SupplierService:
 
     def create(self, **data) -> Supplier:
         """Yeni tedarikçi oluştur"""
+        code = data.get("code")
+        if code and self.get_by_code(code):
+            from modules.inventory.services.base import DuplicateCodeError
+
+            raise DuplicateCodeError("Tedarikçi Kodu", code)
+
         supplier = Supplier(**data)
         self.session.add(supplier)
         self.session.commit()
@@ -114,7 +119,9 @@ class PurchaseRequestService:
     def __init__(self):
         self.session = get_session()
 
-    def get_all(self, status: PurchaseRequestStatus = None) -> List[PurchaseRequest]:
+    def get_all(
+        self, status: Optional[PurchaseRequestStatus] = None
+    ) -> List[PurchaseRequest]:
         """Tüm talepleri getir"""
         query = self.session.query(PurchaseRequest).options(
             joinedload(PurchaseRequest.items)
@@ -216,7 +223,8 @@ class PurchaseRequestService:
 
             # Koşul değerlendirmesi için context hazırla
             total_amount = sum(
-                (item.quantity or 0) * (item.estimated_price or 0) for item in request.items
+                (item.quantity or 0) * (item.estimated_price or 0)
+                for item in request.items
             )
 
             context = {
@@ -474,6 +482,13 @@ class PurchaseOrderService:
             order.actual_delivery_date = date.today()
         elif any_received:
             order.status = PurchaseOrderStatus.PARTIAL
+        else:
+            # Hiç teslimat yoksa veya hepsi iptal edildiyse sipariş onaylı duruma döner
+            if order.status in [
+                PurchaseOrderStatus.PARTIAL,
+                PurchaseOrderStatus.RECEIVED,
+            ]:
+                order.status = PurchaseOrderStatus.CONFIRMED
 
         self.session.commit()
 
@@ -550,9 +565,23 @@ class GoodsReceiptService:
         self.session.flush()
 
         for item_data in items_data:
+            # Miktar validasyonu
+            qty = Decimal(str(item_data.get("quantity", 0)))
+            if qty < 0:
+                raise ValueError("Miktar negatif olamaz")
+
             # Varsayılan kabul miktarı
             if "accepted_quantity" not in item_data:
-                item_data["accepted_quantity"] = item_data.get("quantity", 0)
+                item_data["accepted_quantity"] = qty
+
+            accepted_qty = Decimal(str(item_data["accepted_quantity"]))
+            if accepted_qty < 0:
+                raise ValueError("Kabul edilen miktar negatif olamaz")
+            if accepted_qty > qty:
+                # KRİTİK: İrsaliye miktarından fazla kabul yapılamaz kuralı
+                raise ValueError(
+                    f"Kabul edilen miktar ({accepted_qty}), gelen miktardan ({qty}) fazla olamaz"
+                )
 
             item = GoodsReceiptItem(receipt_id=receipt.id, **item_data)
             self.session.add(item)
@@ -581,23 +610,12 @@ class GoodsReceiptService:
         data["supplier_id"] = order.supplier_id
         data["warehouse_id"] = warehouse_id
 
-        # receipt_date yoksa bugünün tarihini kullan
-        if "receipt_date" not in data or data["receipt_date"] is None:
-            data["receipt_date"] = date.today()
+        data["receipt_date"] = date.today()
 
         receipt = self.create(items_data, **data)
 
-        # Sipariş kalemlerini güncelle
-        for grn_item in receipt.items:
-            if grn_item.po_item_id:
-                po_item = self.session.query(PurchaseOrderItem).get(grn_item.po_item_id)
-                if po_item:
-                    po_item.received_quantity = Decimal(
-                        str(po_item.received_quantity or 0)
-                    ) + Decimal(str(grn_item.accepted_quantity or 0))
-
-        # Sipariş durumunu güncelle
-        po_service.update_received_quantities(order_id)
+        # Miktar güncellemelerini complete() aşamasına taşıdığımız için buradan kaldırdık.
+        # po_service.update_received_quantities(order_id)
 
         return receipt
 
@@ -611,16 +629,19 @@ class GoodsReceiptService:
         try:
             from modules.inventory.services import StockMovementService
 
-            movement_service = StockMovementService()
+            # KRİTİK: Aynı session'ı StockMovementService'e geçirerek tek transaction sağlıyoruz
+            movement_service = StockMovementService(session=self.session)
 
             # Siparişin döviz cinsini ID'ye çevirmek için cache
             currency_map = {}
             if receipt.purchase_order:
-                po_currency_code = (
-                    receipt.purchase_order.currency.value
-                    if receipt.purchase_order.currency
-                    else "TRY"
-                )
+                if receipt.purchase_order.currency:
+                    if hasattr(receipt.purchase_order.currency, "value"):
+                        po_currency_code = receipt.purchase_order.currency.value
+                    else:
+                        po_currency_code = str(receipt.purchase_order.currency)
+                else:
+                    po_currency_code = "TRY"
                 # FinanceCurrency tablosundan ID bul
                 fin_curr = (
                     self.session.query(FinanceCurrency)
@@ -644,7 +665,14 @@ class GoodsReceiptService:
                         # Sipariş üzerinden döviz bilgileri
                         if receipt.purchase_order:
                             po = receipt.purchase_order
-                            currency_code = po.currency.value if po.currency else "TRY"
+                            if po.currency:
+                                if hasattr(po.currency, "value"):
+                                    currency_code = po.currency.value
+                                else:
+                                    currency_code = str(po.currency)
+                            else:
+                                currency_code = "TRY"
+
                             exchange_rate = po.exchange_rate or Decimal(1)
 
                             # ID'yi mapten al veya sorgula
@@ -665,7 +693,6 @@ class GoodsReceiptService:
                         item_id=item.item_id,
                         to_warehouse_id=receipt.warehouse_id,
                         quantity=float(item.accepted_quantity),
-                        unit_id=item.unit_id,  # Birim
                         unit_price=unit_price,  # Fiyat
                         currency_id=currency_id,  # Döviz
                         exchange_rate=exchange_rate,  # Kur
@@ -673,6 +700,24 @@ class GoodsReceiptService:
                         document_no=receipt.receipt_no,
                         description=f"Mal Kabul: {receipt.receipt_no}",
                     )
+
+            # Sipariş kalemlerini ve durumunu güncelle (Complete aşamasında yapıyoruz)
+            if receipt.purchase_order:
+                po_service = PurchaseOrderService()
+                po_service.session = self.session  # Aynı session
+
+                for grn_item in receipt.items:
+                    if grn_item.po_item_id:
+                        po_item = self.session.get(
+                            PurchaseOrderItem, grn_item.po_item_id
+                        )
+                        if po_item:
+                            po_item.received_quantity = Decimal(
+                                str(po_item.received_quantity or 0)
+                            ) + Decimal(str(grn_item.accepted_quantity or 0))
+
+                self.session.flush()
+                po_service.update_received_quantities(int(receipt.purchase_order_id))
 
             receipt.status = GoodsReceiptStatus.COMPLETED
             self.session.commit()
@@ -684,11 +729,67 @@ class GoodsReceiptService:
         return receipt
 
     def cancel(self, receipt_id: int) -> Optional[GoodsReceipt]:
-        """Mal kabul iptal"""
+        """Mal kabul iptal (Tamamlanmış ise stokları ve PO miktarlarını geri alır)"""
         receipt = self.get_by_id(receipt_id)
-        if receipt and receipt.status == GoodsReceiptStatus.DRAFT:
+        if not receipt:
+            return None
+
+        if receipt.status == GoodsReceiptStatus.CANCELLED:
+            return receipt
+
+        if receipt.status == GoodsReceiptStatus.COMPLETED:
+            # KRİTİK: Geri dönüş akışı (Reverse GRN)
+            try:
+                from modules.inventory.services import StockMovementService
+
+                movement_service = StockMovementService(session=self.session)
+
+                # 1. Stokları geri al (Ters hareket oluştur)
+                for item in receipt.items:
+                    if item.accepted_quantity and item.accepted_quantity > 0:
+                        movement_service.create_movement(
+                            movement_type=StockMovementType.IADE_ALIS,  # Çıkış tipi
+                            item_id=int(item.item_id),
+                            from_warehouse_id=int(
+                                receipt.warehouse_id
+                            ),  # Depodan çıkış
+                            quantity=float(item.accepted_quantity),
+                            document_type="goods_receipt_cancel",
+                            document_no=receipt.receipt_no,
+                            description=f"İPTAL: Mal Kabul {receipt.receipt_no}",
+                        )
+
+                # 2. PO miktarlarını geri al
+                if receipt.purchase_order:
+                    for grn_item in receipt.items:
+                        if grn_item.po_item_id:
+                            po_item = self.session.get(
+                                PurchaseOrderItem, grn_item.po_item_id
+                            )
+                            if po_item:
+                                po_item.received_quantity = max(
+                                    Decimal(0),
+                                    Decimal(str(po_item.received_quantity or 0))
+                                    - Decimal(str(grn_item.accepted_quantity or 0)),
+                                )
+
+                    self.session.flush()
+                    po_service = PurchaseOrderService()
+                    po_service.session = self.session
+                    po_service.update_received_quantities(
+                        int(receipt.purchase_order_id)
+                    )
+
+                receipt.status = GoodsReceiptStatus.CANCELLED
+                self.session.commit()
+            except Exception as e:
+                self.session.rollback()
+                raise e
+        else:
+            # Sadece taslak ise basitçe iptal et
             receipt.status = GoodsReceiptStatus.CANCELLED
             self.session.commit()
+
         return receipt
 
     def delete(self, receipt_id: int) -> bool:
@@ -812,55 +913,62 @@ class PurchaseInvoiceService:
 
         return invoice
 
-    def create_from_goods_receipt(
-        self, goods_receipt_id: int, **data
-    ) -> PurchaseInvoice:
-        """Mal kabulden fatura oluştur"""
-        gr_service = GoodsReceiptService()
-        receipt = gr_service.get_by_id(goods_receipt_id)
+    def validate_3way_match(self, invoice_id: int) -> Dict[str, Any]:
+        """
+        3-Way Match Kontrolü (Sipariş - Mal Kabul - Fatura)
+        """
+        invoice = self.get_by_id(invoice_id)
+        if not invoice:
+            return {"status": "error", "message": "Fatura bulunamadı"}
 
-        if not receipt:
-            raise ValueError("Mal kabul bulunamadı")
+        results = {
+            "status": "success",
+            "matches": [],
+            "mismatches": [],
+            "total_mismatch": False,
+        }
 
-        if receipt.status != GoodsReceiptStatus.COMPLETED:
-            raise ValueError("Fatura için mal kabul tamamlanmış olmalıdır")
+        for inv_item in invoice.items:
+            # Mal kabul miktarını bul
+            grn_qty = Decimal(0)
+            if invoice.goods_receipt:
+                for grn_item in invoice.goods_receipt.items:
+                    if grn_item.item_id == inv_item.item_id:
+                        grn_qty += Decimal(str(grn_item.accepted_quantity or 0))
 
-        data["goods_receipt_id"] = goods_receipt_id
-        data["supplier_id"] = receipt.supplier_id
-        data["purchase_order_id"] = receipt.purchase_order_id
+            # Sipariş miktarını ve fiyatını bul
+            po_qty = Decimal(0)
+            po_price = Decimal(0)
+            if invoice.purchase_order:
+                for po_item in invoice.purchase_order.items:
+                    if po_item.item_id == inv_item.item_id:
+                        po_qty += Decimal(str(po_item.quantity or 0))
+                        po_price = Decimal(str(po_item.unit_price or 0))
 
-        if "invoice_date" not in data or data["invoice_date"] is None:
-            data["invoice_date"] = date.today()
+            inv_qty = Decimal(str(inv_item.quantity or 0))
+            inv_price = Decimal(str(inv_item.unit_price or 0))
 
-        # Siparişten döviz bilgilerini al
-        if receipt.purchase_order:
-            data["currency"] = receipt.purchase_order.currency
-            data["exchange_rate"] = receipt.purchase_order.exchange_rate
+            match_info = {
+                "item_id": inv_item.item_id,
+                "item_name": inv_item.item.name if inv_item.item else "Bilinmeyen",
+                "po_qty": po_qty,
+                "grn_qty": grn_qty,
+                "inv_qty": inv_qty,
+                "po_price": po_price,
+                "inv_price": inv_price,
+            }
 
-        # Kalemler
-        items_data = []
-        for grn_item in receipt.items:
-            if grn_item.accepted_quantity and grn_item.accepted_quantity > 0:
-                # Birim fiyatı varsa kullan
-                unit_price = 0
-                if grn_item.po_item_id:
-                    po_item = self.session.query(PurchaseOrderItem).get(
-                        grn_item.po_item_id
-                    )
-                    if po_item:
-                        unit_price = po_item.unit_price
+            # Kontroller
+            price_match = inv_price <= po_price
+            qty_match = inv_qty <= grn_qty
 
-                items_data.append(
-                    {
-                        "item_id": grn_item.item_id,
-                        "quantity": grn_item.accepted_quantity,
-                        "unit_id": grn_item.unit_id,
-                        "unit_price": unit_price,
-                        "tax_rate": 18,
-                    }
-                )
+            if not price_match or not qty_match:
+                results["mismatches"].append(match_info)
+                results["total_mismatch"] = True
+            else:
+                results["matches"].append(match_info)
 
-        return self.create(items_data, **data)
+        return results
 
     def update(
         self, invoice_id: int, items_data: List[Dict] = None, **data
@@ -896,7 +1004,15 @@ class PurchaseInvoiceService:
         """Faturayı onayla ve cari hareket oluştur"""
         invoice = self.get_by_id(invoice_id)
         if invoice and invoice.status == PurchaseInvoiceStatus.DRAFT:
-            invoice.status = PurchaseInvoiceStatus.RECEIVED
+            # 3-Way Match Kontrolü
+            match_results = self.validate_3way_match(invoice_id)
+            if match_results["total_mismatch"]:
+                raise ValueError(
+                    f"Fatura miktar/fiyat uyumsuzluğu tespit edildi: "
+                    f"{match_results['mismatches']}"
+                )
+
+            invoice.status = PurchaseInvoiceStatus.RECEIVED  # type: ignore
             self.session.commit()
 
             # FİNANS ENTEGRASYONU: Tedarikçi cari hareketi oluştur

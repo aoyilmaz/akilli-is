@@ -4,7 +4,7 @@ Akıllı İş - Satış Modülü Servisleri
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from sqlalchemy import desc, and_, or_
 from sqlalchemy.orm import joinedload
 
@@ -680,7 +680,9 @@ class SalesOrderService:
             context = {
                 "total_amount": float(order.total or 0),
                 "customer_name": order.customer.name if order.customer else None,
-                "order_date": order.order_date.isoformat() if order.order_date else None,
+                "order_date": (
+                    order.order_date.isoformat() if order.order_date else None
+                ),
             }
             instance_id = start_workflow_for_document(
                 table_name="sales_orders",
@@ -768,6 +770,10 @@ class SalesOrderService:
             order.actual_delivery_date = date.today()
         elif any_delivered:
             order.status = SalesOrderStatus.PARTIAL
+        else:
+            # Hiç teslimat yoksa veya hepsi iptal edildiyse sipariş onaylı duruma döner
+            if order.status in [SalesOrderStatus.PARTIAL, SalesOrderStatus.DELIVERED]:
+                order.status = SalesOrderStatus.CONFIRMED
 
         self.session.commit()
 
@@ -909,17 +915,8 @@ class DeliveryNoteService:
 
         delivery = self.create(items_data, **data)
 
-        # Sipariş kalemlerini güncelle
-        for dn_item in delivery.items:
-            if dn_item.so_item_id:
-                so_item = self.session.query(SalesOrderItem).get(dn_item.so_item_id)
-                if so_item:
-                    so_item.delivered_quantity = Decimal(
-                        str(so_item.delivered_quantity or 0)
-                    ) + Decimal(str(dn_item.quantity or 0))
-
-        # Sipariş durumunu güncelle
-        order_service.update_delivered_quantities(order_id)
+        # NOT: Sipariş kalemlerini güncelleme işlemini complete() aşamasına taşıyoruz.
+        # Burada sadece irsaliye oluşturuluyor.
 
         return delivery
 
@@ -953,22 +950,61 @@ class DeliveryNoteService:
         ):
             return None
 
+        # KRİTİK: Sevkiyat kontrolü - Mükerrer stok düşüşünü engellemek için
+        # Eğer aktif bir sevkiyata bağlıysa manuel tamamlamayı engelle
+        try:
+            from database.models.shipping import ShipmentItem, Shipment, ShipmentStatus
+
+            shipment_link = (
+                self.session.query(ShipmentItem)
+                .join(Shipment)
+                .filter(
+                    ShipmentItem.delivery_note_id == delivery_id,
+                    Shipment.status != ShipmentStatus.IPTAL,
+                )
+                .first()
+            )
+            if shipment_link:
+                raise ValueError(
+                    f"Bu irsaliye aktif bir sevkiyata ({shipment_link.shipment.shipment_no}) "
+                    f"bağlıdır. Lütfen işlemi sevkiyat modülü üzerinden yapınız."
+                )
+        except ImportError:
+            # Sevkiyat modülü yüklü değilse kontrolü atla
+            pass
+
         try:
             from modules.inventory.services import StockMovementService
 
-            movement_service = StockMovementService()
+            # KRİTİK: Aynı session'ı kullanarak işlem bütünlüğü sağlıyoruz
+            movement_service = StockMovementService(session=self.session)
 
             for item in delivery.items:
                 if item.quantity and item.quantity > 0:
                     movement_service.create_movement(
                         movement_type=StockMovementType.SATIS,
-                        item_id=item.item_id,
-                        from_warehouse_id=delivery.source_warehouse_id,
+                        item_id=int(item.item_id),
+                        from_warehouse_id=int(delivery.source_warehouse_id),
                         quantity=float(item.quantity),
                         document_type="delivery_note",
                         document_no=delivery.delivery_no,
                         description=f"Satış İrsaliyesi: {delivery.delivery_no}",
                     )
+
+            # Sipariş kalemlerini güncelle
+            if delivery.sales_order:
+                for dn_item in delivery.items:
+                    if dn_item.so_item_id:
+                        so_item = self.session.get(SalesOrderItem, dn_item.so_item_id)
+                        if so_item:
+                            so_item.delivered_quantity = Decimal(
+                                str(so_item.delivered_quantity or 0)
+                            ) + Decimal(str(dn_item.quantity or 0))
+
+                self.session.flush()
+                order_service = SalesOrderService()
+                order_service.session = self.session
+                order_service.update_delivered_quantities(delivery.sales_order_id)
 
             delivery.status = DeliveryNoteStatus.DELIVERED
             delivery.actual_delivery_date = date.today()
@@ -983,9 +1019,61 @@ class DeliveryNoteService:
     def cancel(self, delivery_id: int) -> Optional[DeliveryNote]:
         """İrsaliye iptal"""
         delivery = self.get_by_id(delivery_id)
-        if delivery and delivery.status == DeliveryNoteStatus.DRAFT:
+        if not delivery:
+            return None
+
+        if delivery.status == DeliveryNoteStatus.CANCELLED:
+            return delivery
+
+        if delivery.status == DeliveryNoteStatus.DELIVERED:
+            # KRİTİK: Ters Akış (Geri Dönüş)
+            try:
+                from modules.inventory.services import StockMovementService
+
+                movement_service = StockMovementService(session=self.session)
+
+                # 1. Stokları iade al
+                for item in delivery.items:
+                    if item.quantity and item.quantity > 0:
+                        movement_service.create_movement(
+                            movement_type=StockMovementType.IADE_SATIS,
+                            item_id=int(item.item_id),
+                            to_warehouse_id=int(delivery.source_warehouse_id),
+                            quantity=float(item.quantity),
+                            document_type="delivery_note_cancel",
+                            document_no=delivery.delivery_no,
+                            description=f"İPTAL: Satış İrsaliyesi {delivery.delivery_no}",
+                        )
+
+                # 2. Sipariş miktarlarını geri çek
+                if delivery.sales_order:
+                    for dn_item in delivery.items:
+                        if dn_item.so_item_id:
+                            so_item = self.session.get(
+                                SalesOrderItem, dn_item.so_item_id
+                            )
+                            if so_item:
+                                so_item.delivered_quantity = max(
+                                    Decimal(0),
+                                    Decimal(str(so_item.delivered_quantity or 0))
+                                    - Decimal(str(dn_item.quantity or 0)),
+                                )
+
+                    self.session.flush()
+                    order_service = SalesOrderService()
+                    order_service.session = self.session
+                    order_service.update_delivered_quantities(delivery.sales_order_id)
+
+                delivery.status = DeliveryNoteStatus.CANCELLED
+                self.session.commit()
+            except Exception as e:
+                self.session.rollback()
+                raise e
+        else:
+            # Taslak ise basitçe iptal et
             delivery.status = DeliveryNoteStatus.CANCELLED
             self.session.commit()
+
         return delivery
 
     def delete(self, delivery_id: int) -> bool:
@@ -1213,10 +1301,77 @@ class InvoiceService:
 
         return self.create(items_data, **data)
 
+    def validate_match(self, invoice_id: int) -> Dict[str, Any]:
+        """
+        Match Kontrolü (Sipariş - İrsaliye - Fatura)
+        """
+        invoice = self.get_by_id(invoice_id)
+        if not invoice:
+            return {"status": "error", "message": "Fatura bulunamadı"}
+
+        results = {
+            "status": "success",
+            "matches": [],
+            "mismatches": [],
+            "total_mismatch": False,
+        }
+
+        for inv_item in invoice.items:
+            # İrsaliye miktarını bul
+            dn_qty = Decimal(0)
+            if invoice.delivery_note:
+                for dn_item in invoice.delivery_note.items:
+                    if dn_item.item_id == inv_item.item_id:
+                        dn_qty += Decimal(str(dn_item.quantity or 0))
+
+            # Sipariş miktarını ve fiyatını bul
+            so_qty = Decimal(0)
+            so_price = Decimal(0)
+            if invoice.sales_order:
+                for so_item in invoice.sales_order.items:
+                    if so_item.item_id == inv_item.item_id:
+                        so_qty += Decimal(str(so_item.quantity or 0))
+                        so_price = Decimal(str(so_item.unit_price or 0))
+
+            inv_qty = Decimal(str(inv_item.quantity or 0))
+            inv_price = Decimal(str(inv_item.unit_price or 0))
+
+            match_info = {
+                "item_id": inv_item.item_id,
+                "item_name": inv_item.item.name if inv_item.item else "Bilinmeyen",
+                "so_qty": so_qty,
+                "dn_qty": dn_qty,
+                "inv_qty": inv_qty,
+                "so_price": so_price,
+                "inv_price": inv_price,
+            }
+
+            # Kontroller
+            # Satışta genelde fiyat sipariş fiyatından düşük olmamalı (veya yukarıda kontrol edilir)
+            # İrsaliye miktarından fazla fatura kesilemez
+            price_match = inv_price >= so_price if so_price > 0 else True
+            qty_match = inv_qty <= dn_qty if dn_qty > 0 else True
+
+            if not price_match or not qty_match:
+                results["mismatches"].append(match_info)
+                results["total_mismatch"] = True
+            else:
+                results["matches"].append(match_info)
+
+        return results
+
     def issue(self, invoice_id: int) -> Optional[Invoice]:
         """Faturayı kes"""
         invoice = self.get_by_id(invoice_id)
         if invoice and invoice.status == InvoiceStatus.DRAFT:
+            # Match Kontrolü
+            match_results = self.validate_match(invoice_id)
+            if match_results["total_mismatch"]:
+                raise ValueError(
+                    f"Fatura miktar/fiyat uyumsuzluğu tespit edildi: "
+                    f"{match_results['mismatches']}"
+                )
+
             invoice.status = InvoiceStatus.ISSUED
             self.session.commit()
 
@@ -1236,9 +1391,17 @@ class InvoiceService:
 
                 context = {
                     "total_amount": float(invoice.total or 0),
-                    "customer_name": invoice.customer.name if invoice.customer else None,
-                    "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
-                    "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
+                    "customer_name": (
+                        invoice.customer.name if invoice.customer else None
+                    ),
+                    "invoice_date": (
+                        invoice.invoice_date.isoformat()
+                        if invoice.invoice_date
+                        else None
+                    ),
+                    "due_date": (
+                        invoice.due_date.isoformat() if invoice.due_date else None
+                    ),
                 }
                 instance_id = start_workflow_for_document(
                     table_name="invoices",

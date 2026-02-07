@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-<img src="[https://img.shields.io/badge/Python-3.12-blue.svg](https://www.google.com/search?q=https://img.shields.io/badge/Python-3.12-blue.svg)" alt="Python">
-<img src="[https://img.shields.io/badge/PyQt6-6.4+-green.svg](https://img.shields.io/badge/PyQt6-6.4+-green.svg)" alt="PyQt6">
-<img src="[https://img.shields.io/badge/PostgreSQL-13+-orange.svg](https://img.shields.io/badge/PostgreSQL-13+-orange.svg)" alt="PostgreSQL">
-<img src="[https://img.shields.io/badge/Architecture-Modular_Bridge-red.svg](https://www.google.com/search?q=https://img.shields.io/badge/Architecture-Modular_Bridge-red.svg)" alt="Architecture">
+<img src="https://img.shields.io/badge/Python-3.12-blue.svg" alt="Python">
+<img src="https://img.shields.io/badge/PyQt6-6.4+-green.svg" alt="PyQt6">
+<img src="https://img.shields.io/badge/PostgreSQL-13+-orange.svg" alt="PostgreSQL">
+<img src="https://img.shields.io/badge/Architecture-Modular_Bridge-red.svg" alt="Architecture">
 </p>
 
 ---
@@ -42,6 +42,7 @@
 ### 💰 Finans ve Muhasebe (Finance/Accounting)
 
 * **Genel Muhasebe:** Tekdüzen hesap planı ve otomatik yevmiye fişi entegrasyonu.
+* **Bütçe Yönetimi:** Dönemsel bütçe planlama, kalem bazlı gerçekleşme takibi ve varyans raporlama.
 * **Cari Yönetimi:** Müşteri/Tedarikçi bakiyeleri, yaşlandırma ve mutabakat araçları.
 * **Döviz:** TCMB entegrasyonlu canlı döviz kurları ve kur farkı yönetimi.
 
@@ -104,7 +105,8 @@ python main.py
 
 ### **Düzenleme Notları:**
 
-1. **Hata Giderildi:** Eski README'deki "Planlanan Modüller" kısmındaki Finance, CRM ve HR modülleri artık aktif oldukları için ana listeye taşındı.
-2. **Teknik Detay eklendi:** Python versiyonu 3.12'ye güncellendi.
-3. **İzlenebilirlik:** SSCC ve Dual-Unit gibi ileri seviye lojistik özellikler eklendi.
-4. **Güvenlik:** `AuditEngine` ve `AuthService` yapıları vurgulandı.
+1. **Bütçe Yönetimi:** Muhasebe modülüne bütçe planlama ve gerçekleşme raporlama özellikleri eklendi.
+2. **Hata Giderildi:** Eski README'deki "Planlanan Modüller" kısmındaki Finance, CRM ve HR modülleri artık aktif oldukları için ana listeye taşındı.
+3. **Teknik Detay eklendi:** Python versiyonu 3.12'ye güncellendi.
+4. **İzlenebilirlik:** SSCC ve Dual-Unit gibi ileri seviye lojistik özellikler eklendi.
+5. **Güvenlik:** `AuditEngine` ve `AuthService` yapıları vurgulandı.

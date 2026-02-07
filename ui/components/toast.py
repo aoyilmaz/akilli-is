@@ -165,8 +165,7 @@ class NotificationManager:
         target_x = screen_geo.right() - toast.width() - margin
         target_y = screen_geo.bottom() - current_y_offset - toast.height()
 
-        # Debug print
-        print(f"DEBUG: Toast: {message} -> Pos: {target_x}, {target_y}")
+        # Debug print removed
 
         toast.show_animated(QPoint(target_x, target_y))
 

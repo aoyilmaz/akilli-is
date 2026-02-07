@@ -26,7 +26,14 @@ from ui.components.toast import show_toast
 from ui.components import CurrencyInput
 from config.icons import ICONS
 
-from database.models import Item, ItemType, LotSizingProcedure
+from database.models import (
+    Item,
+    ItemType,
+    LotSizingProcedure,
+    MrpType,
+    LotSizePolicy,
+    ValuationMethod,
+)
 
 
 class StockFormPage(QWidget):
@@ -183,7 +190,11 @@ class StockFormPage(QWidget):
         )
 
         self.barcode_input = QLineEdit()
-        form2.addRow("Barkod / EAN", self.barcode_input)
+        form2.addRow("Barkod", self.barcode_input)
+
+        self.barcode_ean_input = QLineEdit()
+        self.barcode_ean_input.setPlaceholderText("EAN-13 / GTIN")
+        form2.addRow("EAN Barkod", self.barcode_ean_input)
 
         self.manufacturer_code_input = QLineEdit()
         form2.addRow("Üretici / Tedarikçi Kodu", self.manufacturer_code_input)
@@ -379,7 +390,13 @@ class StockFormPage(QWidget):
 
         self.min_sale_price_input = CurrencyInput()
         self.min_sale_price_input.setDecimals(4)
+
         form.addRow("Min. Satış Fiyatı", self.min_sale_price_input)
+
+        self.valuation_combo = QComboBox()
+        self.valuation_combo.addItem("Ağırlıklı Ortalama", ValuationMethod.AVERAGE)
+        self.valuation_combo.addItem("Standart Maliyet", ValuationMethod.STANDARD)
+        form.addRow("Değerleme Yöntemi", self.valuation_combo)
 
         price_layout.addLayout(form)
         price_layout.addStretch()
@@ -404,7 +421,18 @@ class StockFormPage(QWidget):
         self.vat_combo.addItem("%10", 10)
         self.vat_combo.addItem("%1", 1)
         self.vat_combo.addItem("%0", 0)
+        self.vat_combo.addItem("%0", 0)
         form2.addRow("KDV Oranı", self.vat_combo)
+
+        self.tax_rate_buy_input = QDoubleSpinBox()
+        self.tax_rate_buy_input.setRange(0, 100)
+        self.tax_rate_buy_input.setSuffix(" %")
+        form2.addRow("Alış KDV", self.tax_rate_buy_input)
+
+        self.tax_rate_sell_input = QDoubleSpinBox()
+        self.tax_rate_sell_input.setRange(0, 100)
+        self.tax_rate_sell_input.setSuffix(" %")
+        form2.addRow("Satış KDV", self.tax_rate_sell_input)
 
         self.withholding_input = QDoubleSpinBox()
         self.withholding_input.setRange(0, 100)
@@ -447,13 +475,28 @@ class StockFormPage(QWidget):
         self.procurement_combo = QComboBox()
         self.procurement_combo.addItem("Satınalma", "purchase")
         self.procurement_combo.addItem("Üretim", "manufacture")
+
         form.addRow("Tedarik Tipi", self.procurement_combo)
+
+        self.mrp_type_combo = QComboBox()
+        self.mrp_type_combo.addItem("Otomatik (AUTO)", MrpType.AUTO)
+        self.mrp_type_combo.addItem("Manuel", MrpType.MANUAL)
+        self.mrp_type_combo.addItem("Yeniden Sipariş (ROP)", MrpType.ROP)
+        form.addRow("MRP Türü", self.mrp_type_combo)
 
         self.lot_sizing_combo = QComboBox()
         self.lot_sizing_combo.addItem("Tam Miktar (L4L)", LotSizingProcedure.EXACT)
         self.lot_sizing_combo.addItem("Sabit Miktar", LotSizingProcedure.FIXED)
         self.lot_sizing_combo.addItem("Periyodik", LotSizingProcedure.PERIOD)
-        form.addRow("Lotlama Yöntemi", self.lot_sizing_combo)
+
+        form.addRow("Lotlama Prosedürü", self.lot_sizing_combo)
+
+        self.lot_size_policy_combo = QComboBox()
+        self.lot_size_policy_combo.addItem(
+            "Lot-for-Lot (İhtiyaç Kadar)", LotSizePolicy.LFL
+        )
+        self.lot_size_policy_combo.addItem("Sabit Miktar", LotSizePolicy.FIXED)
+        form.addRow("Lot Büyüklüğü Politikası", self.lot_size_policy_combo)
 
         self.planning_fence_input = QSpinBox()
         self.planning_fence_input.setRange(0, 999)
@@ -486,7 +529,13 @@ class StockFormPage(QWidget):
         self.order_multiple_input = QDoubleSpinBox()
         self.order_multiple_input.setRange(0, 999999)
         self.order_multiple_input.setDecimals(2)
+
         form2.addRow("Sipariş Katı", self.order_multiple_input)
+
+        self.rounding_value_input = QDoubleSpinBox()
+        self.rounding_value_input.setRange(0, 999999)
+        self.rounding_value_input.setDecimals(2)
+        form2.addRow("Yuvarlama Değeri", self.rounding_value_input)
 
         right_layout.addLayout(form2)
         right_layout.addStretch()
@@ -516,7 +565,14 @@ class StockFormPage(QWidget):
         track_layout.addWidget(self.track_serial_check)
 
         self.track_expiry_check = QCheckBox("Son Kullanma Tarihi Takibi")
+
         track_layout.addWidget(self.track_expiry_check)
+
+        self.is_batch_managed_check = QCheckBox("Parti (Batch) Yönetimi")
+        track_layout.addWidget(self.is_batch_managed_check)
+
+        self.is_serial_managed_check = QCheckBox("Seri No Yönetimi")
+        track_layout.addWidget(self.is_serial_managed_check)
 
         track_layout.addSpacing(16)
 
@@ -620,6 +676,7 @@ class StockFormPage(QWidget):
         self.name_input.setText(self.item.name)
         self.short_name_input.setText(self.item.short_name or "")
         self.barcode_input.setText(self.item.barcode or "")
+        self.barcode_ean_input.setText(self.item.barcode_ean or "")
         self.manufacturer_code_input.setText(self.item.manufacturer_code or "")
         self.brand_input.setText(self.item.brand or "")
         self.model_input.setText(self.item.model or "")
@@ -667,13 +724,24 @@ class StockFormPage(QWidget):
         self._update_currency_symbols()
 
         # Vergiler
+        # Vergiler
         self.withholding_input.setValue(float(self.item.withholding_rate or 0))
+        self.tax_rate_buy_input.setValue(float(self.item.tax_rate_buy or 0))
+        self.tax_rate_sell_input.setValue(float(self.item.tax_rate_sell or 0))
+
+        # Değerleme Yöntemi
+        for i in range(self.valuation_combo.count()):
+            if self.valuation_combo.itemData(i) == self.item.valuation_method:
+                self.valuation_combo.setCurrentIndex(i)
+                break
         self.gtip_input.setText(self.item.gtip_code or "")
 
         # Takip
-        self.track_lot_check.setChecked(self.item.track_lot)
-        self.track_serial_check.setChecked(self.item.track_serial)
-        self.track_expiry_check.setChecked(self.item.track_expiry)
+        self.track_lot_check.setChecked(bool(self.item.track_lot))
+        self.track_serial_check.setChecked(bool(self.item.track_serial))
+        self.track_expiry_check.setChecked(bool(self.item.track_expiry))
+        self.is_batch_managed_check.setChecked(bool(self.item.is_batch_managed))
+        self.is_serial_managed_check.setChecked(bool(self.item.is_serial_managed))
         self.shelf_life_input.setValue(self.item.shelf_life_days or 0)
 
         # MRP
@@ -690,12 +758,23 @@ class StockFormPage(QWidget):
         self.planning_fence_input.setValue(self.item.planning_time_fence or 0)
         self.min_order_qty_input.setValue(float(self.item.min_order_qty or 0))
         self.order_multiple_input.setValue(float(self.item.order_multiple or 0))
+        self.rounding_value_input.setValue(float(self.item.rounding_value or 0))
+
+        for i in range(self.mrp_type_combo.count()):
+            if self.mrp_type_combo.itemData(i) == self.item.mrp_type:
+                self.mrp_type_combo.setCurrentIndex(i)
+                break
+
+        for i in range(self.lot_size_policy_combo.count()):
+            if self.lot_size_policy_combo.itemData(i) == self.item.lot_size_policy:
+                self.lot_size_policy_combo.setCurrentIndex(i)
+                break
 
         # Durum
-        self.is_purchasable_check.setChecked(self.item.is_purchasable)
-        self.is_saleable_check.setChecked(self.item.is_saleable)
-        self.is_producible_check.setChecked(self.item.is_producible)
-        self.is_active_check.setChecked(self.item.is_active)
+        self.is_purchasable_check.setChecked(bool(self.item.is_purchasable))
+        self.is_saleable_check.setChecked(bool(self.item.is_saleable))
+        self.is_producible_check.setChecked(bool(self.item.is_producible))
+        self.is_active_check.setChecked(bool(self.item.is_active))
 
     def set_duplicate_mode(self):
         """Formu kopyalama moduna ayarla"""
@@ -705,7 +784,9 @@ class StockFormPage(QWidget):
 
         # ID ve kod alanlarını temizle
         self.code_input.clear()
+        self.code_input.clear()
         self.barcode_input.clear()
+        self.barcode_ean_input.clear()
 
     def _generate_code(self):
         """Otomatik kod üret - sinyal gönder"""
@@ -850,4 +931,13 @@ class StockFormPage(QWidget):
             "planning_time_fence": self.planning_fence_input.value(),
             "min_order_qty": Decimal(str(self.min_order_qty_input.value())),
             "order_multiple": Decimal(str(self.order_multiple_input.value())),
+            "rounding_value": Decimal(str(self.rounding_value_input.value())),
+            "barcode_ean": self.barcode_ean_input.text().strip() or None,
+            "mrp_type": self.mrp_type_combo.currentData(),
+            "lot_size_policy": self.lot_size_policy_combo.currentData(),
+            "is_batch_managed": self.is_batch_managed_check.isChecked(),
+            "is_serial_managed": self.is_serial_managed_check.isChecked(),
+            "tax_rate_buy": Decimal(str(self.tax_rate_buy_input.value())),
+            "tax_rate_sell": Decimal(str(self.tax_rate_sell_input.value())),
+            "valuation_method": self.valuation_combo.currentData(),
         }

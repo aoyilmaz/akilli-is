@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -21,18 +22,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
     # BOMOperation'a requires_qc ekle
-    with op.batch_alter_table("bom_operations", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("requires_qc", sa.Boolean(), default=False, nullable=True)
-        )
+    bom_cols = [c["name"] for c in insp.get_columns("bom_operations")]
+    if "requires_qc" not in bom_cols:
+        with op.batch_alter_table("bom_operations", schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column("requires_qc", sa.Boolean(), default=False, nullable=True)
+            )
 
     # WorkOrderOperation'a requires_qc ve qc_status ekle
+    wo_cols = [c["name"] for c in insp.get_columns("work_order_operations")]
+
     with op.batch_alter_table("work_order_operations", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("requires_qc", sa.Boolean(), default=False, nullable=True)
-        )
-        batch_op.add_column(sa.Column("qc_status", sa.String(length=20), nullable=True))
+        if "requires_qc" not in wo_cols:
+            batch_op.add_column(
+                sa.Column("requires_qc", sa.Boolean(), default=False, nullable=True)
+            )
+        if "qc_status" not in wo_cols:
+            batch_op.add_column(
+                sa.Column("qc_status", sa.String(length=20), nullable=True)
+            )
 
 
 def downgrade() -> None:

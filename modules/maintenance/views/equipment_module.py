@@ -3,16 +3,14 @@ Bakım Modülü - Ekipman Yönetimi
 """
 
 from typing import Optional
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QAction
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QFormLayout,
     QLineEdit,
     QTextEdit,
@@ -25,74 +23,76 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QDateEdit,
     QDoubleSpinBox,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QSplitter,
+    QMenu,
+    QTableWidget,
+    QHeaderView,
 )
 from PyQt6.QtCore import Qt, QDate
 import qtawesome as qta
 from config.icons import ICONS
 from config.themes import get_theme
 
-from modules.maintenance.views.base import MaintenanceBaseWidget
+from ui.components.base_list_page import BaseListPage
+from ui.components.enhanced_table import ColumnConfig
+
+# MaintenanceBaseWidget functionality integrated or mixedin?
+# BaseListPage inherits QWidget. MaintenanceBaseWidget also inherits QWidget.
+# We can just use MaintenanceService directly or mixin.
+# Let's import service here directly to avoid MRO complexity for now, or just use `self.service` if we were inheriting.
+# Given BaseListPage assumes it owns the page, we should inherit BaseListPage.
+# We can re-implement the db session logic or copy it.
+from database.base import get_session
+from modules.maintenance.services import MaintenanceService
 from database.models.maintenance import (
     Equipment,
     CriticalityLevel,
-    MaintenanceWorkOrder,
-    EquipmentDowntime,
 )
 
 
-class EquipmentListWidget(MaintenanceBaseWidget):
+class EquipmentListWidget(BaseListPage):
     """Ekipman Listesi ve Yönetimi"""
 
     def __init__(self, parent=None):
-        super().__init__("Ekipman Yönetimi", parent)
-        self.setup_ui()
+        self.db_session = get_session()
+        self.service = MaintenanceService(self.db_session)
 
-    def setup_ui(self):
-        # Base widget'tan gelen başlığı temizle
-        if self.layout.count() > 0:
-            item = self.layout.itemAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+        columns = [
+            ColumnConfig("code", "Kod", width=100, filterable=True),
+            ColumnConfig("name", "İsim", width=150, filterable=True, stretch=True),
+            ColumnConfig("brand_model", "Marka/Model", width=150, filterable=True),
+            ColumnConfig("location", "Lokasyon", width=120, filterable=True),
+            ColumnConfig("criticality", "Kritiklik", width=100, filter_type="enum"),
+            ColumnConfig(
+                "running_hours", "Çalışma Saati", width=100, filter_type="number"
+            ),
+            ColumnConfig("status", "Durum", width=100, filter_type="enum"),
+            ColumnConfig("last_maintenance", "Son Bakım", width=100),
+        ]
 
-        # === Header - PageHeader kullanarak ===
-        from ui.components.page_header import PageHeader
-
-        self.header = PageHeader(
+        super().__init__(
             title="Ekipman Yönetimi",
             icon=ICONS.PRODUCTION,
-            show_search=False,
-            show_refresh=False,
+            table_id="equipment_list",
+            columns=columns,
             show_add=True,
             add_text="Yeni Ekipman",
-            parent=self,
+            parent=parent,
         )
-        self.header.add_clicked.connect(self.show_add_dialog)
 
+        self._setup_extra_ui()
+        self.add_clicked.connect(self.show_add_dialog)
+        self.refresh_requested.connect(
+            self.refresh_data
+        )  # Overwrite default behavior if needed, standard calls load_data
+
+    def closeEvent(self, event):
+        if hasattr(self, "db_session") and self.db_session:
+            self.db_session.close()
+        super().closeEvent(event)
+
+    def _setup_extra_ui(self):
+        # Header'a ekstra butonlar
         h_layout = self.header.header_layout()
-
-        # Düzenle Butonu
-        self.btn_edit = QPushButton("Düzenle")
-        self.btn_edit.setFixedSize(100, 36)
-        self.btn_edit.setProperty("class", "btn-secondary")
-        self.btn_edit.clicked.connect(self.show_edit_dialog)
-        h_layout.addWidget(self.btn_edit)
-
-        # Detay Butonu
-        self.btn_detail = QPushButton("Detay")
-        self.btn_detail.setFixedSize(100, 36)
-        self.btn_detail.setProperty("class", "btn-secondary")
-        self.btn_detail.clicked.connect(self.show_detail_dialog)
-        h_layout.addWidget(self.btn_detail)
-
-        # Pasife Al Butonu
-        self.btn_delete = QPushButton("Pasife Al")
-        self.btn_delete.setFixedSize(100, 36)
-        self.btn_delete.setProperty("class", "btn-danger")
-        self.btn_delete.clicked.connect(self.delete_equipment)
-        h_layout.addWidget(self.btn_delete)
 
         # Filtre (Durum)
         h_layout.addSpacing(16)
@@ -102,111 +102,117 @@ class EquipmentListWidget(MaintenanceBaseWidget):
         self.cmb_filter.addItem("Aktif", True)
         self.cmb_filter.addItem("Pasif", False)
         self.cmb_filter.setFixedWidth(100)
-        self.cmb_filter.setFixedHeight(36)
+        self.cmb_filter.setFixedHeight(32)
         self.cmb_filter.currentIndexChanged.connect(self.refresh_data)
         h_layout.addWidget(self.cmb_filter)
 
-        self.layout.addWidget(self.header)
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
-        # Tablo
-        self.table = QTableWidget()
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "Kod",
-                "İsim",
-                "Marka/Model",
-                "Lokasyon",
-                "Kritiklik",
-                "Çalışma Saati",
-                "Durum",
-                "Son Bakım",
-            ]
+        # Filtre seçenekleri
+        self.table.set_filter_options("status", ["Aktif", "Pasif"])
+        self.table.set_filter_options(
+            "criticality", [c.value for c in CriticalityLevel]
         )
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        self.table.doubleClicked.connect(self.show_detail_dialog)
-        self.layout.addWidget(self.table)
-
-        self.refresh_data()
 
     def refresh_data(self):
         filter_active = self.cmb_filter.currentData()
         equipments = self.service.get_equipment_list(active_only=filter_active)
+        self.load_data(equipments)
 
+    def load_data(self, equipments: list):
         self.table.setRowCount(len(equipments))
-        for i, eq in enumerate(equipments):
-            self.table.setItem(i, 0, QTableWidgetItem(eq.code))
-            # Store ID for later use
-            self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, eq.id)
+        t = get_theme()
 
+        for i, eq in enumerate(equipments):
+            # Code
+            item = QTableWidgetItem(eq.code)
+            item.setData(Qt.ItemDataRole.UserRole, eq.id)
+            self.table.setItem(i, 0, item)
+
+            # Name
             self.table.setItem(i, 1, QTableWidgetItem(eq.name))
+
+            # Brand/Model
             self.table.setItem(
                 i, 2, QTableWidgetItem(f"{eq.brand or ''} {eq.model or ''}".strip())
             )
+
+            # Location
             self.table.setItem(i, 3, QTableWidgetItem(eq.location or "-"))
 
-            # Kritiklik - renkli
-            crit_item = QTableWidgetItem(
-                eq.criticality.value if eq.criticality else "-"
-            )
+            # Criticality
+            crit_val = eq.criticality.value if eq.criticality else "-"
+            crit_item = QTableWidgetItem(crit_val)
             if eq.criticality == CriticalityLevel.CRITICAL:
-                crit_item.setBackground(Qt.GlobalColor.red)
-                crit_item.setForeground(Qt.GlobalColor.white)
+                crit_item.setForeground(QColor("#ef4444"))
             elif eq.criticality == CriticalityLevel.HIGH:
-                crit_item.setBackground(Qt.GlobalColor.darkYellow)
+                crit_item.setForeground(QColor("#f59e0b"))
             self.table.setItem(i, 4, crit_item)
 
-            # Çalışma saati
+            # Hours
             hours = eq.running_hours or 0
             self.table.setItem(i, 5, QTableWidgetItem(f"{hours:.1f} saat"))
 
-            # Durum
-            # Durum
+            # Status
             status_item = QTableWidgetItem()
-            t = get_theme()
             if eq.is_active:
                 status_item.setText("Aktif")
-                status_item.setIcon(
-                    qta.icon(ICONS.STATUS_ICONS["active"], color=t.success)
-                )
                 status_item.setForeground(QColor(t.success))
             else:
                 status_item.setText("Pasif")
-                status_item.setIcon(
-                    qta.icon(ICONS.STATUS_ICONS["passive"], color=t.text_muted)
-                )
                 status_item.setForeground(QColor(t.text_muted))
-
             self.table.setItem(i, 6, status_item)
 
-            # Son bakım
+            # Last Maintenance
             last_maintenance = self.service.get_last_maintenance_date(eq.id)
-            self.table.setItem(
-                i,
-                7,
-                QTableWidgetItem(
-                    last_maintenance.strftime("%d.%m.%Y") if last_maintenance else "-"
-                ),
+            date_str = (
+                last_maintenance.strftime("%d.%m.%Y") if last_maintenance else "-"
             )
+            self.table.setItem(i, 7, QTableWidgetItem(date_str))
+
+        self.update_count(len(equipments))
 
     def get_selected_equipment_id(self) -> Optional[int]:
-        """Seçili ekipman ID'sini döndürür"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            return None
-        return self.table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        return self.table.get_selected_id()
+
+    def _show_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+
+        eq_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu(self)
+
+        detail_action = QAction(
+            qta.icon(ICONS.INFO, color="#3b82f6"), "Detay Görüntüle", self
+        )
+        detail_action.triggered.connect(lambda: self.show_detail_dialog(eq_id))
+        menu.addAction(detail_action)
+
+        edit_action = QAction(qta.icon(ICONS.EDIT, color="#f59e0b"), "Düzenle", self)
+        edit_action.triggered.connect(lambda: self.show_edit_dialog(eq_id))
+        menu.addAction(edit_action)
+
+        menu.addSeparator()
+
+        delete_action = QAction(
+            qta.icon(ICONS.DELETE, color="#ef4444"), "Pasife Al / Sil", self
+        )
+        delete_action.triggered.connect(lambda: self.delete_equipment(eq_id))
+        menu.addAction(delete_action)
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def show_add_dialog(self):
         dialog = EquipmentDialog(self.service, self)
         if dialog.exec():
             self.refresh_data()
 
-    def show_edit_dialog(self):
-        equipment_id = self.get_selected_equipment_id()
+    def show_edit_dialog(self, eq_id=None):
+        equipment_id = eq_id or self.get_selected_equipment_id()
         if not equipment_id:
             QMessageBox.warning(self, "Uyarı", "Lütfen düzenlenecek ekipmanı seçin.")
             return
@@ -220,8 +226,8 @@ class EquipmentListWidget(MaintenanceBaseWidget):
         if dialog.exec():
             self.refresh_data()
 
-    def show_detail_dialog(self):
-        equipment_id = self.get_selected_equipment_id()
+    def show_detail_dialog(self, eq_id=None):
+        equipment_id = eq_id or self.get_selected_equipment_id()
         if not equipment_id:
             QMessageBox.warning(self, "Uyarı", "Lütfen bir ekipman seçin.")
             return
@@ -229,8 +235,8 @@ class EquipmentListWidget(MaintenanceBaseWidget):
         dialog = EquipmentDetailDialog(self.service, equipment_id, self)
         dialog.exec()
 
-    def delete_equipment(self):
-        equipment_id = self.get_selected_equipment_id()
+    def delete_equipment(self, eq_id=None):
+        equipment_id = eq_id or self.get_selected_equipment_id()
         if not equipment_id:
             QMessageBox.warning(self, "Uyarı", "Lütfen silinecek ekipmanı seçin.")
             return
@@ -246,6 +252,17 @@ class EquipmentListWidget(MaintenanceBaseWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.service.deactivate_equipment(equipment_id)
             self.refresh_data()
+
+    # -- Missing Methods for BaseListPage interface if needed --
+    def get_filters(self) -> dict:
+        return {"status": self.cmb_filter.currentData()}
+
+    def get_search_text(self) -> str:
+        return self.header.get_search_text()
+
+
+# Re-exporting Dialog classes unchanged (omitted for brevity in this replace block if possible,
+# but replace_file overwrites. I must keep them.)
 
 
 class EquipmentDialog(QDialog):

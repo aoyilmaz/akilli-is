@@ -45,6 +45,7 @@ class ICONS:
     ARROW_DOWN = "ph.arrow-down"
     SORT_UP = "ph.arrow-up"
     SORT_DOWN = "ph.arrow-down"
+    EXCEL = "fa5s.file-excel"
 
     # --- STOK & ENVANTER ---
     INVENTORY = "ph.package"
@@ -75,7 +76,9 @@ class ICONS:
     PAYMENT = "ph.credit-card"
     WALLET = "ph.wallet"
     TREND_UP = "ph.trend-up"
+    TREND_UP = "ph.trend-up"
     TREND_DOWN = "ph.trend-down"
+    BUDGET = "ph.chart-pie"
 
     # --- ÜRETİM ---
     PRODUCTION = "ph.factory"

@@ -5,7 +5,7 @@ Akıllı İş - Sevkiyat Modülü Servisleri
 from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional, Dict
-from sqlalchemy import desc, and_, or_
+from sqlalchemy import desc, and_, or_, func
 from sqlalchemy.orm import joinedload
 
 from database.base import get_session
@@ -295,8 +295,8 @@ class DriverService:
 class ShipmentService:
     """Sevkiyat yönetimi servisi"""
 
-    def __init__(self):
-        self.session = get_session()
+    def __init__(self, session=None):
+        self.session = session if session else get_session()
         self.stock_service = StockMovementService()
 
     def _validate_strict_order_link(self, shipment: Shipment):
@@ -464,7 +464,9 @@ class ShipmentService:
                     # İrsaliye kalemini oluştur
                     item = ShipmentItem(shipment_id=shipment.id, delivery_note_id=dn.id)
                     self.session.add(item)
-                    # İrsaliye durumunu güncelle (Örn: SHIPPED yapılabilir veya shipment status değişince yapılır)
+
+        # Sıkı sipariş kontrolü - Erken doğrulama
+        self._validate_strict_order_link(shipment)
 
         # Eski tip items (manuel kalem ekleme varsa, opsiyonel)
         if items:
@@ -521,6 +523,9 @@ class ShipmentService:
                     item = ShipmentItem(shipment_id=shipment.id, delivery_note_id=dn.id)
                     self.session.add(item)
 
+        # Sıkı sipariş kontrolü - Güncelleme sonrası doğrulama
+        self._validate_strict_order_link(shipment)
+
         # Manuel kalemleri güncelle (Eski yapı desteği)
         if items is not None:
             # delivery_note_ids zaten temizlediği için burada sadece ekleme yapabiliriz
@@ -550,9 +555,6 @@ class ShipmentService:
         # Sıkı sipariş kontrolü
         self._validate_strict_order_link(shipment)
 
-        # Kapasite ve barkod kontrolleri burada yapılabilir (UI'da yapılıyor ama backend de yapmalı)
-        # TODO: Barkod doğrulama kontrolü (Phase 2 Requirement 4)
-
         if not shipment.departure_time:
             shipment.departure_time = datetime.now()
 
@@ -567,25 +569,42 @@ class ShipmentService:
             dn = s_item.delivery_note
             if not dn or not dn.items:
                 continue
-
             dn.status = DeliveryNoteStatus.SHIPPED
             source_wh_id = dn.source_warehouse_id
 
+            # Eğer in_transit_warehouse varsa TRANSFER yap, yoksa SATIS (Direkt düşüş)
+            # NOT: Eğer YÜKLEME aşamasında TRANSFER yapıldıysa burada sadece kalanı transfer etmeli.
             for dn_item in dn.items:
-                # Eğer in_transit_warehouse varsa TRANSFER yap, yoksa SATIS (Direkt düşüş)
                 if shipment.in_transit_warehouse_id:
-                    self.stock_service.create_movement(
-                        item_id=dn_item.item_id,
-                        from_warehouse_id=source_wh_id,
-                        to_warehouse_id=shipment.in_transit_warehouse_id,
-                        movement_type=StockMovementType.TRANSFER,
-                        quantity=float(dn_item.quantity),
-                        document_type="shipment",
-                        document_no=shipment.shipment_no,
-                        description=f"Transit Transfer: {shipment.shipment_no}",
+                    # Mükerrer kontrolü: Toplam ne kadar transfer edildi?
+                    from database.models.inventory import StockMovement
+                    from sqlalchemy import func
+
+                    already_transferred = (
+                        self.session.query(func.sum(StockMovement.quantity))
+                        .filter(
+                            StockMovement.document_no == shipment.shipment_no,
+                            StockMovement.item_id == dn_item.item_id,
+                            StockMovement.movement_type == StockMovementType.TRANSFER,
+                        )
+                        .scalar()
+                        or 0
                     )
+
+                    remaining = float(dn_item.quantity) - float(already_transferred)
+
+                    if remaining > 0:
+                        self.stock_service.create_movement(
+                            item_id=dn_item.item_id,
+                            from_warehouse_id=source_wh_id,
+                            to_warehouse_id=shipment.in_transit_warehouse_id,
+                            movement_type=StockMovementType.TRANSFER,
+                            quantity=remaining,
+                            document_type="shipment",
+                            document_no=shipment.shipment_no,
+                            description=f"Transit Transfer: {shipment.shipment_no}",
+                        )
                 else:
-                    # Klasik yöntem: Direkt satış gibi düş
                     self.stock_service.create_movement(
                         item_id=dn_item.item_id,
                         from_warehouse_id=source_wh_id,
@@ -615,26 +634,179 @@ class ShipmentService:
 
         shipment.status = ShipmentStatus.TESLIM_EDILDI
 
-        # İrsaliyeleri güncelle ve Yoldaki Stoktan Düş
-        for s_item in shipment.items:
-            if s_item.delivery_note:
-                s_item.delivery_note.status = DeliveryNoteStatus.DELIVERED
-                s_item.delivery_note.actual_delivery_date = date.today()
+        # İrsaliyeleri güncelle ve Yoldaki Stoktan Düş + Sipariş Güncelle
+        try:
+            from modules.sales.services.base import SalesOrderService
+            from database.models.sales import SalesOrderItem
 
-                # Eğer Transit Depo kullanıldıysa, oradan ÇIKIS/SATIS yap
-                if shipment.in_transit_warehouse_id:
-                    for dn_item in s_item.delivery_note.items:
-                        self.stock_service.create_movement(
-                            item_id=dn_item.item_id,
-                            from_warehouse_id=shipment.in_transit_warehouse_id,
-                            movement_type=StockMovementType.SATIS,  # veya CIKIS
-                            quantity=float(dn_item.quantity),
-                            document_type="shipment",
-                            document_no=shipment.shipment_no,
-                            description=f"Teslimat Çıkışı: {shipment.shipment_no}",
-                        )
+            order_service = SalesOrderService()
+            order_service.session = self.session
+        except ImportError:
+            order_service = None
+
+        for s_item in shipment.items:
+            dn = s_item.delivery_note
+            if not dn:
+                continue
+
+            dn.status = DeliveryNoteStatus.DELIVERED
+            dn.actual_delivery_date = date.today()
+
+            # 1. Eğer Transit Depo kullanıldıysa, oradan SATIS yap
+            if shipment.in_transit_warehouse_id:
+                for dn_item in dn.items:
+                    self.stock_service.create_movement(
+                        item_id=dn_item.item_id,
+                        from_warehouse_id=shipment.in_transit_warehouse_id,
+                        movement_type=StockMovementType.SATIS,
+                        quantity=float(dn_item.quantity),
+                        document_type="shipment",
+                        document_no=shipment.shipment_no,
+                        description=f"Teslimat Çıkışı: {shipment.shipment_no}",
+                    )
+
+            # 2. Sipariş kalemlerini güncelle (Miktar Senkronizasyonu)
+            if order_service and dn.sales_order_id:
+                for dn_item in dn.items:
+                    if dn_item.so_item_id:
+                        so_item = self.session.get(SalesOrderItem, dn_item.so_item_id)
+                        if so_item:
+                            so_item.delivered_quantity = Decimal(
+                                str(so_item.delivered_quantity or 0)
+                            ) + Decimal(str(dn_item.quantity or 0))
+
+                self.session.flush()
+                order_service.update_delivered_quantities(dn.sales_order_id)
 
         self.session.commit()
+
+    def cancel(self, shipment_id: int):
+        """Sevkiyatı iptal et ve stokları/siparişleri geri al"""
+        shipment = self.get_by_id(shipment_id)
+        if not shipment:
+            raise ValueError("Sevkiyat bulunamadı.")
+
+        if shipment.status == ShipmentStatus.TESLIM_EDILDI:
+            raise ValueError("Teslim edilmiş sevkiyat iptal edilemez.")
+
+        current_status = shipment.status
+        shipment.status = ShipmentStatus.IPTAL
+
+        # Sürücüyü müsait yap
+        if shipment.driver:
+            shipment.driver.status = DriverStatus.MUSAIT
+
+        # Eğer YUKLENIYOR veya YOLDA ise yapılan stok hareketlerini geri al
+        if current_status in [ShipmentStatus.YUKLENIYOR, ShipmentStatus.YOLDA]:
+            from database.models.inventory import StockMovement
+
+            for s_item in shipment.items:
+                dn = s_item.delivery_note
+                if not dn:
+                    continue
+
+                # İrsaliye durumunu geri çek
+                dn.status = DeliveryNoteStatus.DRAFT
+
+                for dn_item in dn.items:
+                    # Bu sevkiyat ve bu kalem için yapılmış TRANSFER veya SATIS hareketlerini bul
+                    movements = (
+                        self.session.query(StockMovement)
+                        .filter(
+                            StockMovement.document_no == shipment.shipment_no,
+                            StockMovement.item_id == dn_item.item_id,
+                        )
+                        .all()
+                    )
+
+                    for mov in movements:
+                        # Hareketi tersine çevir
+                        if mov.movement_type == StockMovementType.TRANSFER:
+                            # Transitten ana depoya geri transfer
+                            self.stock_service.create_movement(
+                                item_id=mov.item_id,
+                                from_warehouse_id=mov.to_warehouse_id,
+                                to_warehouse_id=mov.from_warehouse_id,
+                                movement_type=StockMovementType.TRANSFER,
+                                quantity=float(mov.quantity),
+                                document_type="shipment_cancel",
+                                document_no=shipment.shipment_no,
+                                description=f"İptal Geri Transfer: {shipment.shipment_no}",
+                            )
+                        elif mov.movement_type == StockMovementType.SATIS:
+                            # Direkt satış yapıldıysa iade al
+                            self.stock_service.create_movement(
+                                item_id=mov.item_id,
+                                to_warehouse_id=mov.from_warehouse_id,
+                                movement_type=StockMovementType.IADE_SATIS,
+                                quantity=float(mov.quantity),
+                                document_type="shipment_cancel",
+                                document_no=shipment.shipment_no,
+                                description=f"İptal Stok İadesi: {shipment.shipment_no}",
+                            )
+
+        self.session.commit()
+
+    def load_item_barcode(self, shipment_id: int, barcode: str, quantity: float = 1.0):
+        """Barkod okutulduğunda ürünü transite aktar"""
+        shipment = self.get_by_id(shipment_id)
+        if not shipment:
+            raise ValueError("Sevkiyat bulunamadı.")
+
+        if not shipment.in_transit_warehouse_id:
+            # TODO: Sistem ayarlarından varsayılan transit depo çekilebilir
+            raise ValueError("Sevkiyat için transit depo tanımlanmamış.")
+
+        # Ürünü bul
+        from database.models.inventory import Item
+
+        item = (
+            self.session.query(Item)
+            .filter(or_(Item.barcode == barcode, Item.code == barcode))
+            .first()
+        )
+
+        if not item:
+            raise ValueError(f"Ürün bulunamadı: {barcode}")
+
+        # Bu ürünün bu sevkiyatın irsaliyelerinde olup olmadığını kontrol edelim (opsiyonel ama iyi olur)
+        found_in_dn = False
+        source_wh_id = None
+        for s_item in shipment.items:
+            dn = s_item.delivery_note
+            if not dn:
+                continue
+            for dn_item in dn.items:
+                if dn_item.item_id == item.id:
+                    found_in_dn = True
+                    source_wh_id = dn.source_warehouse_id
+                    break
+            if found_in_dn:
+                break
+
+        if not found_in_dn:
+            raise ValueError(
+                f"Bu ürün ({item.code}) bu sevkiyatın irsaliyelerinde bulunmuyor."
+            )
+
+        # Sevkiyat durumunu YÜKLENİYOR yap (eğer henüz değilse)
+        if shipment.status == ShipmentStatus.PLANLANDI:
+            shipment.status = ShipmentStatus.YUKLENIYOR
+
+        # Transfer hareketini yap
+        self.stock_service.create_movement(
+            item_id=item.id,
+            from_warehouse_id=source_wh_id,
+            to_warehouse_id=shipment.in_transit_warehouse_id,
+            movement_type=StockMovementType.TRANSFER,
+            quantity=quantity,
+            document_type="shipment",
+            document_no=shipment.shipment_no,
+            description=f"Barkodlu Yükleme: {shipment.shipment_no}",
+        )
+
+        self.session.commit()
+        return True
 
     def update_status(
         self, shipment_id: int, status: ShipmentStatus

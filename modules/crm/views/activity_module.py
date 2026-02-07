@@ -21,6 +21,20 @@ class ActivityModule(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # Header Container
+        header_container = QWidget()
+        header_container.setObjectName("headerContainer")
+        header_container.setStyleSheet(
+            """
+            QWidget#headerContainer {
+                background-color: transparent;
+            }
+        """
+        )
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(24, 24, 24, 16)
+        header_layout.setSpacing(0)
+
         # === Header - PageHeader kullanarak ===
         from ui.components.page_header import PageHeader
 
@@ -35,7 +49,8 @@ class ActivityModule(QWidget):
         self.header.add_clicked.connect(self._show_add_form)
         self.header.refresh_clicked.connect(self._load_data)
 
-        layout.addWidget(self.header)
+        header_layout.addWidget(self.header)
+        layout.addWidget(header_container)
 
         self.stack = QStackedWidget()
 
