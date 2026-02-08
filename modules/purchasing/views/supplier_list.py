@@ -7,9 +7,16 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QTableWidgetItem,
+    QPushButton,
 )
 from PyQt6.QtCore import Qt
 
+try:
+    import qtawesome as qta
+except ImportError:
+    qta = None
+
+from modules.purchasing.views.vendor_rating_dialog import VendorRatingDialog
 from config.icons import ICONS
 from ui.components import (
     BaseListPage,
@@ -124,8 +131,12 @@ class SupplierListPage(BaseListPage):
                 self.table.setItem(row, col_idx, QTableWidgetItem(str(vade)))
 
             elif col_key == "rating":
-                rating = sup.get("rating", 0) or 0
-                stars = "⭐" * rating if rating > 0 else "-"
+                rating_val = sup.get("rating", 0) or 0
+                # 0-100 arası puanı 5 yıldıza çevir
+                num_stars = (
+                    max(1, min(5, round(rating_val / 20))) if rating_val > 0 else 0
+                )
+                stars = "⭐" * num_stars if num_stars > 0 else "-"
                 self.table.setItem(row, col_idx, QTableWidgetItem(stars))
 
             elif col_key == "actions":
@@ -155,12 +166,31 @@ class SupplierListPage(BaseListPage):
                 btn_edit.clicked.connect(callbacks["edit"])
                 layout.addWidget(btn_edit)
 
+                btn_perf = QPushButton()
+                btn_perf.setToolTip("Performans Değerlendirme")
+                if qta:
+                    btn_perf.setIcon(qta.icon("fa5s.chart-line", color="#2196F3"))
+                btn_perf.clicked.connect(lambda _, rid=sup_id: self._open_rating(rid))
+                layout.addWidget(btn_perf)
+
                 btn_del = create_delete_button(widget)
                 btn_del.clicked.connect(callbacks["delete"])
                 layout.addWidget(btn_del)
 
                 layout.addStretch()
                 self.table.setCellWidget(row, col_idx, widget)
+
+    def _open_rating(self, supplier_id: int):
+        from database.base import get_session
+        from database.models.purchasing import Supplier
+
+        session = get_session()
+        supplier = session.query(Supplier).get(supplier_id)
+        if supplier:
+            dlg = VendorRatingDialog(supplier, self)
+            if dlg.exec():
+                self.refresh_clicked.emit()
+        session.close()
 
     def _confirm_delete(self, supplier_id: int):
         if self.confirm_delete("tedarikçi"):

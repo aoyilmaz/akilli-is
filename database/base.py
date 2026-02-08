@@ -56,7 +56,16 @@ SessionLocal = get_session
 def init_database():
     """Veritabanı tablolarını oluşturur"""
     # Tüm modelleri import et
-    from database.models import user, inventory, common, shipping, einvoice, fixed_asset
+    from database.models import (
+        user,
+        inventory,
+        common,
+        shipping,
+        einvoice,
+        fixed_asset,
+        contracts,
+        rfq,
+    )
 
     engine = get_engine()
     Base.metadata.create_all(bind=engine)

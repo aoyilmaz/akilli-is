@@ -15,6 +15,7 @@ from .training_module import TrainingModule
 from .personnel_module import PersonnelModule
 from .hr_dashboard_module import HRDashboardModule
 from .shift_planning_module import ShiftPlanningModule
+from .recruitment_module import RecruitmentModule
 
 __all__ = [
     "EmployeeModule",
@@ -30,4 +31,5 @@ __all__ = [
     "PersonnelModule",
     "HRDashboardModule",
     "ShiftPlanningModule",
+    "RecruitmentModule",
 ]

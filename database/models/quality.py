@@ -176,6 +176,10 @@ class InspectionCriteria(BaseModel):
     unit = Column(String(20), nullable=True)
     is_required = Column(Boolean, default=True)
 
+    # SPC Meta Verileri
+    is_spc = Column(Boolean, default=False)  # SPC takibi yapılacak mı?
+    spc_sample_size = Column(Integer, default=1)  # Örneklem büyüklüğü (örn: 5 ölçüm)
+
     # İlişkiler
     template = relationship("InspectionTemplate", back_populates="criteria")
     results = relationship("InspectionResult", back_populates="criteria")
@@ -240,8 +244,59 @@ class InspectionResult(BaseModel):
     # İlişkiler
     inspection = relationship("Inspection", back_populates="results")
     criteria = relationship("InspectionCriteria", back_populates="results")
+    observations = relationship(
+        "SPCObservation", back_populates="result", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("idx_result_insp", "inspection_id"),)
+
+
+class SPCObservation(BaseModel):
+    """SPC Bireysel Ölçüm Gözlemleri"""
+
+    __tablename__ = "spc_observations"
+
+    result_id = Column(
+        Integer, ForeignKey("inspection_results.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Gözlem sırası (1, 2, 3...)
+    observation_no = Column(Integer, nullable=False)
+
+    # Sayısal ölçüm değeri
+    value = Column(Numeric(18, 6), nullable=False)
+
+    # İlişkiler
+    result = relationship("InspectionResult", back_populates="observations")
+
+    def __repr__(self):
+        return f"<SPCObservation {self.observation_no}: {self.value}>"
+
+
+class SPCControlLimit(BaseModel):
+    """Hesaplanan Kontrol Limitleri"""
+
+    __tablename__ = "spc_control_limits"
+
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+    criteria_id = Column(Integer, ForeignKey("inspection_criteria.id"), nullable=False)
+
+    # Limit türü (X-bar, R, S vb.)
+    chart_type = Column(String(20), default="X-bar")
+
+    ucl = Column(Numeric(18, 6))  # Upper Control Limit
+    lcl = Column(Numeric(18, 6))  # Lower Control Limit
+    cl = Column(Numeric(18, 6))  # Central Line (Mean)
+
+    # Hesaplama tarihi
+    calculated_at = Column(DateTime, default=datetime.now)
+
+    # İlişkiler
+    item = relationship("Item")
+    criteria = relationship("InspectionCriteria")
+
+    def __repr__(self):
+        return f"<SPCControlLimit {self.chart_type} for {self.criteria_id}>"
 
 
 class NonConformance(BaseModel):

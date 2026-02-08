@@ -7,3 +7,4 @@ from .performance_service import PerformanceService
 from .training_service import TrainingService
 from .personnel_service import PersonnelService
 from .dashboard_service import HRDashboardService
+from .recruitment import RecruitmentService

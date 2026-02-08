@@ -30,37 +30,43 @@
 ### 🏭 Üretim ve Planlama (Production/MRP)
 
 * **MRP II:** Malzeme ihtiyaç planlaması ve satın alma/üretim önerileri.
+* **APS (İleri Planlama):** Sonlu kapasite çizelgeleme ve darboğaz analizi.
 * **Operatör Paneli:** Saha çalışanları için basitleştirilmiş üretim takip ve duruş girişi ekranı.
 * **OEE Raporlama:** Ekipman verimliliği, duruş nedenleri ve verimlilik analizleri.
+* **İzlenebilirlik (Traceability):** Lot ve Seri numarası bazlı uçtan uca (Hammadde -> Mamül) soyağacı takibi.
 
 ### 📦 Stok ve Depo Yönetimi (Inventory)
 
 * **Çoklu Lokasyon:** Hiyerarşik depo ve raf bazlı adresleme sistemi.
 * **SSCC Takibi:** Palet ve taşıma birimi bazlı lojistik yönetim.
 * **Maliyetlendirme:** Ağırlıklı Ortalama Maliyet (Moving Average) ve envanter yaşlandırma raporları.
+* **Kalite Entegrasyonu:** Mal kabul ve üretim süreçlerinde numune alma, NCR ve karantina yönetimi.
+* **SPC (İstatistiksel Proses Kontrol):** X-bar/R grafikleri ile süreç yeterlilik (Cp, Cpk) analizi.
 
 ### 💰 Finans ve Muhasebe (Finance/Accounting)
 
 * **Genel Muhasebe:** Tekdüzen hesap planı ve otomatik yevmiye fişi entegrasyonu.
-* **Bütçe Yönetimi:** Dönemsel bütçe planlama, kalem bazlı gerçekleşme takibi ve varyans raporlama.
-* **Cari Yönetimi:** Müşteri/Tedarikçi bakiyeleri, yaşlandırma ve mutabakat araçları.
-* **Döviz:** TCMB entegrasyonlu canlı döviz kurları ve kur farkı yönetimi.
+* **Bütçe ve Maliyet:** Dönemsel bütçe planlama, kalem bazlı gerçekleşme ve varyans analizi.
+* **Cari Yönetimi:** Müşteri/Tedarikçi bakiyeleri, yaşlandırma raporları.
+* **Döviz:** TCMB entegrasyonlu canlı döviz kurları.
+* **E-Belge:** E-Fatura, E-Arşiv ve E-İrsaliye oluşturma ve görüntüleme.
 
-### 🤝 CRM ve Satış (Sales)
+### 🤝 Satış ve Tedarik Zinciri (Sales & SCM)
 
-* **Satış Hunisi:** Kanban tabanlı fırsat ve aday müşteri (Lead) yönetimi.
-* **Tekliften Faturaya:** Teklif -> Sipariş -> İrsaliye -> Fatura tam zinciri.
+* **CRM:** Satış hunisi, fırsat ve aday müşteri (Lead) yönetimi.
+* **Sipariş Yönetimi:** Teklif -> Sipariş -> İrsaliye -> Fatura döngüsü.
+* **Sözleşme Yönetimi:** Müşteri ve tedarikçi sözleşmeleri, vade takibi.
+* **İade Yönetimi (RMA):** Satış ve satınalma iadeleri, neden analizleri.
+* **RFQ (Teklif Talebi):** Tedarikçilerden çoklu teklif toplama ve karşılaştırma matrisi.
+* **Tedarikçi Değerlendirme:** Kalite, teslimat ve fiyat performansına göre otomatik puanlama.
 
-### 👥 İnsan Kaynakları (HR)
+### 👥 İnsan Kaynakları ve Proje (HR & Project)
 
-* **Bordro:** Parametrik bordro hesaplama ve muhasebe tahakkuku.
-* **Performans:** 360 derece performans değerlendirme ve yetkinlik takibi.
-* **Eğitim:** Personel eğitim planları ve sertifika yönetimi.
-
-### ✅ Kalite ve Bakım (Quality/Maintenance)
-
-* **Kalite Kontrol:** Mal kabul ve üretim aşamalarında muayene, NCR ve CAPA süreçleri.
-* **Bakım:** Makine ekipman kartları, periyodik bakım planları ve arıza müdahale takibi.
+* **Bordro:** Parametrik bordro hesaplama ve muhasebe entegrasyonu.
+* **İşe Alım (Recruitment):** İş ilanı, aday havuzu, mülakat takvimi ve işe alım hunisi.
+* **Performans Yönetimi:** Dönemsel değerlendirmeler, yetkinlik ve hedef bazlı skorlama.
+* **Eğitim:** Personel eğitim planları ve sertifika takibi.
+* **Proje Yönetimi:** Kanban panosu, Gantt şeması, kaynak planlama ve efor takibi.
 
 ## 🛠️ Teknik Kurulum
 
@@ -90,23 +96,24 @@ python main.py
 ## 📁 Proje Yapısı
 
 * `core/`: API entegrasyonları, yetkilendirme ve ortak thread yönetimi.
-* `database/`: Veri modelleri ve SQLAlchemy `AuditEngine`.
-* `modules/`: İş mantığı modülleri (Inventory, Production, Finance, vb.).
-* `ui/`: PyQt6 tabanlı modern arayüz bileşenleri ve `LabelDesigner`.
+* `database/`: Veri modelleri, `AuditEngine` ve Repository katmanı.
+* `modules/`: İş mantığı modülleri (Inventory, Production, Finance, HR, vb.).
+* `ui/`: PyQt6 tabanlı modern arayüz bileşenleri, `LabelDesigner` ve raporlama araçları.
+* `tests/`: Kapsamlı test altyapısı (Unit, Integration, E2E) ve doğrulama scriptleri.
 
 ## 🚧 Yol Haritası (Gelecek Planlar)
 
 * [ ] **B2B / Müşteri Portali:** Müşterilerin kendi siparişlerini takip edebileceği web arayüzü.
 * [ ] **IoT Gateway:** Makinelerden PLC verilerinin anlık olarak OEE modülüne aktarılması.
 * [ ] **Mobil Uygulama (Flutter/React Native):** Depo işlemleri için el terminali desteği.
-* [ ] **E-Defter Entegrasyonu:** Resmi muhasebe beratlarının gönderimi.
+* [ ] **BI Dashboard:** Yönetim için gelişmiş iş zekası panoları.
 
 ---
 
-### **Düzenleme Notları:**
+### **Son Güncelleme (v2.1):**
 
-1. **Bütçe Yönetimi:** Muhasebe modülüne bütçe planlama ve gerçekleşme raporlama özellikleri eklendi.
-2. **Hata Giderildi:** Eski README'deki "Planlanan Modüller" kısmındaki Finance, CRM ve HR modülleri artık aktif oldukları için ana listeye taşındı.
-3. **Teknik Detay eklendi:** Python versiyonu 3.12'ye güncellendi.
-4. **İzlenebilirlik:** SSCC ve Dual-Unit gibi ileri seviye lojistik özellikler eklendi.
-5. **Güvenlik:** `AuditEngine` ve `AuthService` yapıları vurgulandı.
+1. **APS & SPC:** İleri planlama ve istatistiksel kalite kontrol modülleri eklendi.
+2. **HR Suite:** İşe alım, performans ve eğitim modülleri ile İK süreçleri tamamlandı.
+3. **Proje Yönetimi:** Dahili proje ve görev takip sistemi (Kanban/Gantt) geliştirildi.
+4. **SCM Genişlemesi:** Sözleşme, İade, RFQ ve Tedarikçi Değerlendirme özellikleri eklendi.
+5. **Test Altyapısı:** Tüm modüller için `tests/scripts` altında doğrulama mekanizmaları kuruldu.

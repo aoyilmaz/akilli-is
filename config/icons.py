@@ -46,6 +46,8 @@ class ICONS:
     SORT_UP = "ph.arrow-up"
     SORT_DOWN = "ph.arrow-down"
     EXCEL = "fa5s.file-excel"
+    RETURN = "ph.arrow-u-up-left"
+    CONTRACT = "ph.file-text"
 
     # --- STOK & ENVANTER ---
     INVENTORY = "ph.package"
@@ -141,3 +143,5 @@ class ICONS:
         "low": "ph.warning",
         "normal": "ph.check-circle",
     }
+
+    PROJECT_DIAGRAM = "ph.project-diagram"

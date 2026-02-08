@@ -1,21 +1,17 @@
-"""
-Akıllı İş - Satın Alma Modülü Veritabanı Modelleri
-"""
-
 from enum import Enum
+from datetime import date, datetime
 from decimal import Decimal
+
 from sqlalchemy import (
     Column,
     Integer,
     String,
     Text,
-    Boolean,
     Date,
     DateTime,
     ForeignKey,
     Numeric,
     Enum as SQLEnum,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from database.base import BaseModel
@@ -97,7 +93,7 @@ class Supplier(BaseModel):
     # Ticari bilgiler
     payment_term_days = Column(Integer, default=30)
     credit_limit = Column(Numeric(15, 2), default=0)
-    currency = Column(SQLEnum(Currency), default=Currency.TRY)
+    currency: Currency = Column(SQLEnum(Currency), default=Currency.TRY)
 
     # Banka bilgileri
     bank_name = Column(String(100))
@@ -114,6 +110,11 @@ class Supplier(BaseModel):
     # İlişkiler
     purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
     goods_receipts = relationship("GoodsReceipt", back_populates="supplier")
+    ratings = relationship(
+        "VendorRating",
+        back_populates="supplier",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Supplier {self.code}: {self.name}>"
@@ -136,7 +137,10 @@ class PurchaseRequest(BaseModel):
     department = Column(String(100))
 
     # Durum
-    status = Column(SQLEnum(PurchaseRequestStatus), default=PurchaseRequestStatus.DRAFT)
+    status: PurchaseRequestStatus = Column(
+        SQLEnum(PurchaseRequestStatus),
+        default=PurchaseRequestStatus.DRAFT,
+    )
 
     # Öncelik
     priority = Column(Integer, default=2)
@@ -154,7 +158,9 @@ class PurchaseRequest(BaseModel):
 
     # İlişkiler
     items = relationship(
-        "PurchaseRequestItem", back_populates="request", cascade="all, delete-orphan"
+        "PurchaseRequestItem",
+        back_populates="request",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -183,7 +189,9 @@ class PurchaseRequestItem(BaseModel):
     __tablename__ = "purchase_request_items"
 
     request_id = Column(
-        Integer, ForeignKey("purchase_requests.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("purchase_requests.id", ondelete="CASCADE"),
+        nullable=False,
     )
     item_id = Column(
         Integer, ForeignKey("items.id"), nullable=True
@@ -227,14 +235,17 @@ class PurchaseOrder(BaseModel):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
 
     # Durum
-    status = Column(SQLEnum(PurchaseOrderStatus), default=PurchaseOrderStatus.DRAFT)
+    status: PurchaseOrderStatus = Column(
+        SQLEnum(PurchaseOrderStatus),
+        default=PurchaseOrderStatus.DRAFT,
+    )
 
     # Tarihler
     delivery_date = Column(Date)
     actual_delivery_date = Column(Date)
 
     # Fiyatlandırma
-    currency = Column(SQLEnum(Currency), default=Currency.TRY)
+    currency: Currency = Column(SQLEnum(Currency), default=Currency.TRY)
     exchange_rate = Column(Numeric(10, 4), default=1)
 
     subtotal = Column(Numeric(15, 2), default=0)
@@ -390,7 +401,10 @@ class GoodsReceipt(BaseModel):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
 
     # Durum
-    status = Column(SQLEnum(GoodsReceiptStatus), default=GoodsReceiptStatus.DRAFT)
+    status: GoodsReceiptStatus = Column(
+        SQLEnum(GoodsReceiptStatus),
+        default=GoodsReceiptStatus.DRAFT,
+    )
 
     # Depo
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
@@ -503,7 +517,7 @@ class PurchaseInvoice(BaseModel):
     goods_receipt_id = Column(Integer, ForeignKey("goods_receipts.id"), nullable=True)
 
     # Durum
-    status = Column(
+    status: PurchaseInvoiceStatus = Column(
         SQLEnum(PurchaseInvoiceStatus, values_callable=lambda x: [e.value for e in x]),
         default=PurchaseInvoiceStatus.DRAFT,
     )
@@ -541,13 +555,11 @@ class PurchaseInvoice(BaseModel):
 
     @property
     def is_overdue(self) -> bool:
-        from datetime import date
-
         if self.due_date and self.status not in [
             PurchaseInvoiceStatus.PAID,
             PurchaseInvoiceStatus.CANCELLED,
         ]:
-            return date.today() > self.due_date
+            return bool(date.today() > self.due_date)
         return False
 
     @property
@@ -622,3 +634,35 @@ class PurchaseInvoiceItem(BaseModel):
 
     def __repr__(self):
         return f"<PurchaseInvoiceItem {self.invoice_id}-{self.item_id}>"
+
+
+# === TEDARİKÇİ DEĞERLENDİRME ===
+
+
+class VendorRating(BaseModel):
+    """Tedarikçi değerlendirme puanları ve tarihçesi"""
+
+    __tablename__ = "vendor_ratings"
+
+    supplier_id = Column(
+        Integer,
+        ForeignKey("suppliers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    rating_date = Column(Date, nullable=False, default=date.today)
+
+    # Puanlar (0-100)
+    quality_score = Column(Numeric(5, 2), default=0)
+    delivery_score = Column(Numeric(5, 2), default=0)
+    cost_score = Column(Numeric(5, 2), default=0)
+    total_score = Column(Numeric(5, 2), default=0)
+
+    # Detaylar
+    comments = Column(Text)
+    rated_by = Column(String(100))
+
+    # İlişkiler
+    supplier = relationship("Supplier", back_populates="ratings")
+
+    def __repr__(self):
+        return f"<VendorRating {self.supplier_id} - {self.rating_date}>"

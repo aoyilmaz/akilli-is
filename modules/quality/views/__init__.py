@@ -7,6 +7,7 @@ from .ncr_module import NCRModule
 from .complaint_module import ComplaintModule
 from .capa_module import CAPAModule
 from .template_module import TemplateModule
+from .spc_module import SPCModule
 
 __all__ = [
     "InspectionModule",
@@ -14,4 +15,5 @@ __all__ = [
     "ComplaintModule",
     "CAPAModule",
     "TemplateModule",
+    "SPCModule",
 ]

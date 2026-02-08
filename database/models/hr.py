@@ -391,3 +391,124 @@ class Payroll(BaseModel):
 
     def __repr__(self):
         return f"<Payroll {self.employee_id} {self.period_year}/{self.period_month}>"
+
+
+class JobPostingStatus(enum.Enum):
+    """İş ilanı durumu"""
+
+    DRAFT = "draft"
+    OPEN = "open"
+    CLOSED = "closed"
+    FILLED = "filled"
+    CANCELLED = "cancelled"
+
+
+class ApplicationStatus(enum.Enum):
+    """Başvuru durumu"""
+
+    NEW = "new"
+    SCREENING = "screening"
+    INTERVIEW = "interview"
+    ASSESSMENT = "assessment"
+    OFFER = "offer"
+    HIRED = "hired"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
+class JobPosting(BaseModel):
+    """İş ilanları tablosu"""
+
+    __tablename__ = "job_postings"
+
+    code = Column(String(20), unique=True, nullable=False, index=True)
+    title = Column(String(100), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    position = Column(String(100), nullable=False)
+    headcount = Column(Integer, default=1)
+    status = Column(Enum(JobPostingStatus), default=JobPostingStatus.DRAFT)
+    description = Column(Text, nullable=True)
+    requirements = Column(Text, nullable=True)
+    salary_min = Column(Numeric(15, 2), nullable=True)
+    salary_max = Column(Numeric(15, 2), nullable=True)
+    posted_at = Column(DateTime, nullable=True)
+    deadline = Column(Date, nullable=True)
+    created_by = Column(Integer, ForeignKey("employees.id"), nullable=True)
+
+    # İlişkiler
+    department = relationship("Department")
+    applications = relationship("JobApplication", back_populates="posting")
+    creator = relationship("Employee", foreign_keys=[created_by])
+
+    __table_args__ = (
+        Index("idx_job_code", "code"),
+        Index("idx_job_dept", "department_id"),
+        Index("idx_job_status", "status"),
+    )
+
+    def __repr__(self):
+        return f"<JobPosting(code={self.code}, title={self.title})>"
+
+
+class JobApplication(BaseModel):
+    """İş başvuruları tablosu"""
+
+    __tablename__ = "job_applications"
+
+    code = Column(String(20), unique=True, nullable=False, index=True)
+    posting_id = Column(Integer, ForeignKey("job_postings.id"), nullable=False)
+    status = Column(Enum(ApplicationStatus), default=ApplicationStatus.NEW)
+
+    # Aday bilgileri
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=True)
+    resume_path = Column(String(255), nullable=True)  # DMS referansı
+    cover_letter = Column(Text, nullable=True)
+    source = Column(String(50), nullable=True)  # kariyer.net, linkedin, vb.
+
+    applied_at = Column(DateTime, default=datetime.now)
+    rating = Column(Integer, default=0)  # 1-5 arası
+    notes = Column(Text, nullable=True)
+
+    # İlişkileer
+    posting = relationship("JobPosting", back_populates="applications")
+    interviews = relationship("Interview", back_populates="application")
+
+    __table_args__ = (
+        Index("idx_app_code", "code"),
+        Index("idx_app_posting", "posting_id"),
+        Index("idx_app_status", "status"),
+    )
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    def __repr__(self):
+        return f"<JobApplication(code={self.code}, name={self.full_name})>"
+
+
+class Interview(BaseModel):
+    """Mülakatlar tablosu"""
+
+    __tablename__ = "interviews"
+
+    application_id = Column(Integer, ForeignKey("job_applications.id"), nullable=False)
+    interviewer_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    scheduled_at = Column(DateTime, nullable=False)
+    duration_min = Column(Integer, default=30)
+    interview_type = Column(String(50), nullable=True)  # teknik, İK, video, vb.
+    location = Column(String(100), nullable=True)
+    status = Column(String(20), default="scheduled")  # scheduled, completed, cancelled
+    rating = Column(Integer, nullable=True)
+    feedback = Column(Text, nullable=True)
+    result = Column(String(20), nullable=True)  # pass, fail, pending
+
+    # İlişkiler
+    application = relationship("JobApplication", back_populates="interviews")
+    interviewer = relationship("Employee")
+
+    def __repr__(self):
+        return f"<Interview(app_id={self.application_id}, date={self.scheduled_at})>"

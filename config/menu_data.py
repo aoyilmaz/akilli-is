@@ -31,6 +31,7 @@ MENU_DATA = {
             ("Siparişler", "ph.receipt", "purchase-orders"),
             ("Mal Kabul", "ph.package", "goods-receipts"),
             ("Faturalar", "ph.file-text", "purchase-invoices"),
+            ("Teklif Talepleri (RFQ)", "ph.chat-circle-dots", "rfq"),
         ],
     },
     "planning": {
@@ -66,6 +67,7 @@ MENU_DATA = {
                 "quality-capa",
             ),
             ("Denetim Şablonları", "ph.clipboard-text", "quality-templates"),
+            ("SPC (İstatistiksel Kontrol)", "ph.chart-line-up", "quality-spc"),
         ],
     },
     "maintenance": {
@@ -94,6 +96,8 @@ MENU_DATA = {
             ("Müşteriler", "ph.user-circle", "customers"),
             ("Teklifler", "ph.chat-dots", "sales-quotes"),
             ("Siparişler", "ph.shopping-cart", "sales-orders"),
+            ("İadeler", "ph.arrow-u-up-left", "sales-returns"),
+            ("Sözleşmeler", "ph.file-text", "sales-contracts"),
             ("İrsaliyeler", "ph.truck", "delivery-notes"),
             ("Faturalar", "ph.receipt", "invoices"),
             ("Fiyat Listeleri", "ph.list", "price-lists"),
@@ -146,6 +150,13 @@ MENU_DATA = {
             ("Eğitim", "ph.graduation-cap", "trainings"),
             ("Özlük Dosyası", "ph.folder", "personnel"),
             ("Vardiya Planlama", "ph.calendar", "shift-planning"),
+            ("İşe Alım", "ph.user-plus", "hr-recruitment"),
+        ],
+    },
+    "projects": {
+        "title": "PROJE YÖNETİMİ",
+        "items": [
+            ("Proje Masası", "ph.project-diagram", "project-management"),
         ],
     },
     "reports": {

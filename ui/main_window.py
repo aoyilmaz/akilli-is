@@ -40,7 +40,6 @@ from PyQt6.QtCore import (
     pyqtSignal,
     QPointF,
     QSize,
-    QTimer,
 )
 
 from PyQt6.QtGui import (
@@ -53,7 +52,6 @@ from PyQt6.QtGui import (
     QBrush,
     QLinearGradient,
     QPixmap,
-    QAction,
 )
 
 try:
@@ -121,10 +119,11 @@ try:
         GoodsReceiptModule,
         PurchaseOrderModule,
     )
+    from modules.rfq.views.rfq_module import RFQModule
 except ImportError:
     SupplierModule = PurchaseRequestModule = GoodsReceiptModule = (
         PurchaseOrderModule
-    ) = MissingModule
+    ) = RFQModule = MissingModule
 
 try:
     from modules.development.views import DevelopmentModule, ThemeSettingsPage
@@ -153,10 +152,12 @@ try:
         InvoiceModule,
     )
     from modules.sales.views.price_list_module import PriceListModule
+    from modules.returns.views.return_module import ReturnModule
+    from modules.contracts.views.contract_module import ContractModule
 except ImportError:
     CustomerModule = SalesQuoteModule = SalesOrderModule = DeliveryNoteModule = (
         InvoiceModule
-    ) = PriceListModule = MissingModule
+    ) = PriceListModule = ReturnModule = ContractModule = MissingModule
 
 try:
     from modules.purchasing.views.purchase_invoice_module import PurchaseInvoiceModule
@@ -232,11 +233,12 @@ try:
     from modules.hr.views.personnel_module import PersonnelModule
     from modules.hr.views.hr_dashboard_module import HRDashboardModule
     from modules.hr.views.shift_planning_module import ShiftPlanningModule
+    from modules.hr.views.recruitment_module import RecruitmentModule
 except ImportError:
     EmployeeModule = DepartmentModule = PositionModule = LeaveModule = MissingModule
     OrgChartModule = ShiftTeamOverview = AttendanceModule = MissingModule
     PerformanceModule = TrainingModule = PersonnelModule = MissingModule
-    HRDashboardModule = ShiftPlanningModule = MissingModule
+    HRDashboardModule = ShiftPlanningModule = RecruitmentModule = MissingModule
 
 try:
     from modules.maintenance.views import (
@@ -263,11 +265,12 @@ try:
         ComplaintModule,
         CAPAModule,
         TemplateModule,
+        SPCModule,
     )
 except ImportError:
     InspectionModule = NCRModule = ComplaintModule = CAPAModule = TemplateModule = (
-        MissingModule
-    )
+        SPCModule
+    ) = MissingModule
 
 
 # --- DASHBOARD BİLEŞENLERİ ---
@@ -996,16 +999,20 @@ class MainWindow(QMainWindow):
         self.pages["quality-complaints"] = ComplaintModule()
         self.pages["quality-capa"] = CAPAModule()
         self.pages["quality-templates"] = TemplateModule()
+        self.pages["quality-spc"] = SPCModule()
         # Satınalma modülü sayfaları
         self.pages["suppliers"] = SupplierModule()
         self.pages["purchase-requests"] = PurchaseRequestModule()
         self.pages["goods-receipts"] = GoodsReceiptModule()
         self.pages["purchase-orders"] = PurchaseOrderModule()
         self.pages["purchase-invoices"] = PurchaseInvoiceModule()
+        self.pages["rfq"] = RFQModule()
         # Satış modülü sayfaları
         self.pages["customers"] = CustomerModule()
         self.pages["sales-quotes"] = SalesQuoteModule()
         self.pages["sales-orders"] = SalesOrderModule()
+        self.pages["sales-returns"] = ReturnModule()
+        self.pages["sales-contracts"] = ContractModule()
         self.pages["delivery-notes"] = DeliveryNoteModule()
         self.pages["invoices"] = InvoiceModule()
         self.pages["price-lists"] = PriceListModule()
@@ -1053,6 +1060,9 @@ class MainWindow(QMainWindow):
         self.pages["personnel"] = PersonnelModule()
         self.pages["hr-dashboard"] = HRDashboardModule()
         self.pages["shift-planning"] = ShiftPlanningModule()
+        self.pages["hr-recruitment"] = RecruitmentModule()
+        # Proje Yönetimi
+        self.pages["project-management"] = ProjectMainModule()
         # Sistem ayarları
         self.pages["settings"] = PlaceholderPage("Ayarlar", "")
         self.pages["users"] = UserManagement()
@@ -1121,7 +1131,6 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.empty_state)
 
         # Stil (Tab Widget)
-        t = get_theme()
         self.tabs.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )

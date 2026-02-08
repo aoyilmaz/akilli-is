@@ -4,7 +4,6 @@ Akıllı İş - Performans Değerlendirme Modülü
 Çalışan performans değerlendirme UI bileşeni.
 """
 
-from datetime import date
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -13,29 +12,21 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidgetItem,
     QTabWidget,
-    QDialog,
-    QFormLayout,
-    QLineEdit,
-    QTextEdit,
-    QComboBox,
-    QDateEdit,
-    QDoubleSpinBox,
     QMessageBox,
-    QFrame,
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt
 import qtawesome as qta
 
 from config.icons import ICONS
-from config import COLORS
 from modules.hr.services import PerformanceService
-from database.models.performance import (
-    EvaluationPeriodType,
-    EvaluationStatus,
-    CompetencyCategory,
-)
 from ui.components import PageHeader
 from ui.components.enhanced_table import EnhancedTableWidget, ColumnConfig
+from modules.hr.views.performance_dialogs import (
+    EvaluationPeriodDialog,
+    CompetencyDialog,
+)
+
+# from modules.hr.views.evaluation_form import PerformanceEvaluationForm
 
 
 class PerformanceModule(QWidget):
@@ -77,8 +68,8 @@ class PerformanceModule(QWidget):
 
     def _setup_periods_tab(self):
         tab = QWidget()
-        l = QVBoxLayout(tab)
-        l.setContentsMargins(12, 12, 12, 12)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         cols = [
             ColumnConfig("name", "Dönem Adı", stretch=True),
@@ -90,13 +81,13 @@ class PerformanceModule(QWidget):
         self.periods_table = EnhancedTableWidget(
             table_id="perf_periods", columns=cols, parent=tab
         )
-        l.addWidget(self.periods_table)
+        layout.addWidget(self.periods_table)
         self.tabs.addTab(tab, "📅 Dönemler")
 
     def _setup_competencies_tab(self):
         tab = QWidget()
-        l = QVBoxLayout(tab)
-        l.setContentsMargins(12, 12, 12, 12)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         cols = [
             ColumnConfig("name", "Yetkinlik", stretch=True),
@@ -107,13 +98,22 @@ class PerformanceModule(QWidget):
         self.comp_table = EnhancedTableWidget(
             table_id="perf_comp", columns=cols, parent=tab
         )
-        l.addWidget(self.comp_table)
+        layout.addWidget(self.comp_table)
         self.tabs.addTab(tab, "⭐ Yetkinlikler")
+
+        # Yetkinlik Ekle Butonu
+        btn_layout = QHBoxLayout()
+        add_btn = QPushButton("Yetkinlik Ekle")
+        add_btn.setIcon(qta.icon("fa.plus"))
+        add_btn.clicked.connect(self._add_competency)
+        btn_layout.addStretch()
+        btn_layout.addWidget(add_btn)
+        layout.addLayout(btn_layout)
 
     def _setup_evals_tab(self):
         tab = QWidget()
-        l = QVBoxLayout(tab)
-        l.setContentsMargins(12, 12, 12, 12)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         cols = [
             ColumnConfig("emp", "Çalışan", stretch=True),
@@ -124,8 +124,11 @@ class PerformanceModule(QWidget):
         self.eval_table = EnhancedTableWidget(
             table_id="perf_eval", columns=cols, parent=tab
         )
-        l.addWidget(self.eval_table)
+        layout.addWidget(self.eval_table)
         self.tabs.addTab(tab, "📊 Değerlendirmeler")
+
+        # Çift tıklama ile form açma
+        self.eval_table.itemDoubleClicked.connect(self._open_evaluation)
 
     def _get_service(self):
         if self.service is None:
@@ -182,4 +185,36 @@ class PerformanceModule(QWidget):
             )
 
     def _add_period(self):
-        QMessageBox.information(self, "Bilgi", "Yeni Dönem formu yakında eklenecektir.")
+        try:
+            service = self._get_service()
+            dialog = EvaluationPeriodDialog(self)
+            if dialog.exec():
+                data = dialog.get_data()
+                service.create_period(**data)
+                self.load_data()
+                QMessageBox.information(self, "Başarılı", "Dönem oluşturuldu.")
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+        finally:
+            self._close_service()
+
+    def _add_competency(self):
+        try:
+            service = self._get_service()
+            dialog = CompetencyDialog(self)
+            if dialog.exec():
+                data = dialog.get_data()
+                service.create_competency(**data)
+                self.load_data()
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", str(e))
+        finally:
+            self._close_service()
+
+    def _open_evaluation(self, item):
+        # Placeholder: Evaluation ID'yi satırdan al
+        QMessageBox.information(self, "Bilgi", "Değerlendirme formu açılıyor...")
+        # form = PerformanceEvaluationForm(
+        #     self, evaluation_id=1, service=self._get_service()
+        # )
+        # form.exec()
