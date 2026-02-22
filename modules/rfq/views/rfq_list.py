@@ -59,7 +59,7 @@ class RFQListPage(BaseListPage):
                 self.table.setItem(row, 4, QTableWidgetItem(rfq.status_display))
                 self.table.setItem(row, 5, QTableWidgetItem(str(len(rfq.offers))))
 
-                self.table.set_row_id(row, rfq.id)
+                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, rfq.id)
 
             self.update_count(len(rfqs))
         except Exception as e:

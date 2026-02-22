@@ -156,7 +156,7 @@ MENU_DATA = {
     "projects": {
         "title": "PROJE YÖNETİMİ",
         "items": [
-            ("Proje Masası", "ph.project-diagram", "project-management"),
+            ("Proje Masası", "ph.briefcase", "project-management"),
         ],
     },
     "reports": {

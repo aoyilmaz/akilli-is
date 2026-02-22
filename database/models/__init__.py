@@ -309,6 +309,18 @@ from database.models.aps import (
     SchedulingMode,
 )
 
+# Messaging
+from database.models.messaging import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+    MessageAttachment,
+    MessageStar,
+    NotificationPreference,
+    ConversationType,
+    MessagePriority,
+)
+
 # Project Management
 from database.models.project import (
     Project,
@@ -559,4 +571,13 @@ __all__ = [
     "TaskPriority",
     "TaskStatus",
     "DependencyType",
+    # Messaging
+    "Conversation",
+    "ConversationParticipant",
+    "Message",
+    "MessageAttachment",
+    "MessageStar",
+    "NotificationPreference",
+    "ConversationType",
+    "MessagePriority",
 ]

@@ -6,6 +6,7 @@ from config.icons import ICONS
 from database.base import get_session as get_db
 from modules.contracts.services.contract_service import ContractService
 from database.models.contracts import ContractType
+from PyQt6.QtCore import Qt
 
 
 class ContractListPage(BaseListPage):
@@ -83,7 +84,7 @@ class ContractListPage(BaseListPage):
                 self.table.setItem(row, 5, QTableWidgetItem(amount_str))
 
                 # Store ID
-                self.table.set_row_id(row, contract.id)
+                self.table.item(row, 0).setData(Qt.ItemDataRole.UserRole, contract.id)
 
             self.update_count(len(contracts))
         except Exception as e:

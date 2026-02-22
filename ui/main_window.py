@@ -234,11 +234,13 @@ try:
     from modules.hr.views.hr_dashboard_module import HRDashboardModule
     from modules.hr.views.shift_planning_module import ShiftPlanningModule
     from modules.hr.views.recruitment_module import RecruitmentModule
+    from modules.project.views.project_module import ProjectMainModule
 except ImportError:
     EmployeeModule = DepartmentModule = PositionModule = LeaveModule = MissingModule
     OrgChartModule = ShiftTeamOverview = AttendanceModule = MissingModule
     PerformanceModule = TrainingModule = PersonnelModule = MissingModule
     HRDashboardModule = ShiftPlanningModule = RecruitmentModule = MissingModule
+    ProjectMainModule = MissingModule
 
 try:
     from modules.maintenance.views import (
@@ -1220,6 +1222,9 @@ class MainWindow(QMainWindow):
         self.status_user_layout.addWidget(self.status_user_icon_label)
         self.status_user_layout.addWidget(self.status_user_label)
 
+        # Mesajlaşma butonu
+        self._setup_messaging_button()
+
         # Trace toggle butonu
         self._setup_trace_button()
 
@@ -1681,6 +1686,22 @@ class MainWindow(QMainWindow):
     def go_next_tab(self):
         if (i := self.tabs.currentIndex()) < self.tabs.count() - 1:
             self.tabs.setCurrentIndex(i + 1)
+
+    # ==================== MESSAGING ====================
+
+    def _setup_messaging_button(self):
+        """Mesajlaşma butonunu status bar'a ekle"""
+        try:
+            from core.auth_service import AuthService
+            from modules.messaging.views.messaging_popup import MessagingButton
+
+            user = AuthService.get_current_user()
+            user_id = user.id if user else 1
+
+            self.messaging_button = MessagingButton(user_id=user_id, parent=self)
+            self.status_bar.addPermanentWidget(self.messaging_button)
+        except Exception as e:
+            print(f"Mesajlaşma butonu yüklenemedi: {e}")
 
     # ==================== TRACE SYSTEM ====================
 

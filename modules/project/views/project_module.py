@@ -26,7 +26,7 @@ class ProjectMainModule(QWidget):
         self.header = PageHeader(
             title="Proje Yönetimi",
             subtitle="Projeler, görevler ve zaman çizelgeleri",
-            icon="fa5s.project-diagram",
+            icon="ph.briefcase",
         )
         layout.addWidget(self.header)
 

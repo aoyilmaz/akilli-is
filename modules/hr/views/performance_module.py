@@ -104,7 +104,7 @@ class PerformanceModule(QWidget):
         # Yetkinlik Ekle Butonu
         btn_layout = QHBoxLayout()
         add_btn = QPushButton("Yetkinlik Ekle")
-        add_btn.setIcon(qta.icon("fa.plus"))
+        add_btn.setIcon(qta.icon("ph.plus"))
         add_btn.clicked.connect(self._add_competency)
         btn_layout.addStretch()
         btn_layout.addWidget(add_btn)

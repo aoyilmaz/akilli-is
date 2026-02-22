@@ -755,6 +755,7 @@ COLORS = {
     "text_muted": TEXT_MUTED,
     # Accent/Primary
     "primary": ACCENT,
+    "accent": ACCENT,
     "primary_hover": ACCENT_HOVER,
     # Status
     "success": SUCCESS,

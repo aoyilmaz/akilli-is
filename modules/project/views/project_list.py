@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QHeaderView,
     QMessageBox,
+    QAbstractItemView,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -78,7 +79,7 @@ class ProjectListView(QWidget):
             QHeaderView.ResizeMode.Stretch
         )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTriggers.NoEditTriggers)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
 
     def refresh_data(self):

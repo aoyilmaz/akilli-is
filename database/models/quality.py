@@ -152,6 +152,7 @@ class InspectionTemplate(BaseModel):
     item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
 
     # İlişkiler
+    item = relationship("Item")
     criteria = relationship(
         "InspectionCriteria", back_populates="template", cascade="all, delete-orphan"
     )

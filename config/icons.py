@@ -144,4 +144,16 @@ class ICONS:
         "normal": "ph.check-circle",
     }
 
-    PROJECT_DIAGRAM = "ph.project-diagram"
+    PROJECT_DIAGRAM = "ph.briefcase"
+    PURCHASE_ORDER = "ph.clipboard-text"
+
+    # --- MESAJLAŞMA ---
+    CHAT = "ph.chat-dots"
+    CHAT_CIRCLE = "ph.chat-circle"
+    ENVELOPE = "ph.envelope"
+    SEND = "ph.paper-plane-tilt"
+    BELL = "ph.bell"
+    PIN = "ph.push-pin"
+    REPLY = "ph.arrow-bend-up-left"
+    GROUP_CHAT = "ph.users-three"
+    ATTACHMENT = "ph.paperclip"
