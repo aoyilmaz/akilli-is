@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QGraphicsDropShadowEffect,
     QApplication,
+    QPushButton,
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QTimer, QEasingCurve
 from PyQt6.QtGui import QColor
@@ -31,6 +32,10 @@ class ToastNotification(QWidget):
         self.message = message
         self.level = level.upper()
         self.t = get_theme()
+
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.hide_animated)
 
         self._setup_ui()
         self._setup_animation()
@@ -95,6 +100,18 @@ class ToastNotification(QWidget):
         self.msg_label.setWordWrap(True)
         layout.addWidget(self.msg_label)
 
+        # Kapatma Butonu
+        self.close_btn = QPushButton("×")
+        self.close_btn.setFixedSize(24, 24)
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.close_btn.setToolTip("Kapat")
+        self.close_btn.setAccessibleName("Bildirimi Kapat")
+        self.close_btn.setStyleSheet(
+            f"background: transparent; color: {self.t.text_secondary}; border: none; font-weight: bold; font-size: 18px;"
+        )
+        self.close_btn.clicked.connect(self.hide_animated)
+        layout.addWidget(self.close_btn, alignment=Qt.AlignmentFlag.AlignTop)
+
         # Gölge Efekti
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(15)
@@ -129,9 +146,20 @@ class ToastNotification(QWidget):
         self.pos_anim.start()
 
         # Kapanma Timer'ı
-        QTimer.singleShot(5000, self.hide_animated)
+        self.timer.start(5000)
+
+    def enterEvent(self, event):
+        """Fare üzerine gelince kapanmayı durdur"""
+        self.timer.stop()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """Fare çıkınca tekrar sayaç başlat"""
+        self.timer.start(2000)  # Okumak için 2 saniye daha ver
+        super().leaveEvent(event)
 
     def hide_animated(self):
+        self.timer.stop()
         self.opacity_anim.setDirection(QPropertyAnimation.Direction.Backward)
         self.opacity_anim.finished.connect(self.close)
         self.opacity_anim.start()
