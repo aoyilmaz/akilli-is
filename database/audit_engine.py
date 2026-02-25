@@ -7,12 +7,17 @@ otomatik olarak AuditLog tablosuna kaydeder.
 
 from datetime import datetime
 from typing import Any, Dict, Set, Optional, List
+import threading
+import queue
+import atexit
+import time
 
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.attributes import get_history
 
-from database.base import Base
+from database.base import Base, get_engine
 from database.models.user import AuditLog
 
 
@@ -104,6 +109,23 @@ class AuditEngine:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    def __init__(self):
+        # Singleton pattern protection: ensure __init__ runs only once
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+
+        self._enabled = True
+        self._pending_logs = []
+
+        # Async logging setup
+        self._queue = queue.Queue()
+        self._stop_event = threading.Event()
+        self._worker_thread = threading.Thread(target=self._worker, daemon=True, name="AuditLogWorker")
+        self._worker_thread.start()
+        atexit.register(self.shutdown)
+
+        self._initialized = True
+
     def init_listeners(self) -> None:
         """SQLAlchemy event listener'larını kaydeder"""
         event.listen(DBSession, "before_flush", self._before_flush)
@@ -118,6 +140,63 @@ class AuditEngine:
         """Audit loglamayı devre dışı bırakır (migration, seed vb. için)"""
         self._enabled = False
 
+    def shutdown(self) -> None:
+        """Gracefully shutdown the audit worker"""
+        if not hasattr(self, "_worker_thread") or not self._worker_thread.is_alive():
+            return
+
+        # Signal stop
+        self._stop_event.set()
+
+        # Wait for queue to empty (optional, with timeout)
+        self._queue.put(None) # Sentinel to wake up if waiting
+        self._worker_thread.join(timeout=2.0)
+
+    def _worker(self) -> None:
+        """Background worker to process audit logs"""
+        # Create a dedicated session factory for the worker thread
+        engine = get_engine()
+        AuditSessionFactory = sessionmaker(bind=engine, expire_on_commit=False)
+
+        while True:
+            try:
+                # Block until an item is available or timeout to check stop event
+                try:
+                    logs_batch = self._queue.get(timeout=1.0)
+                except queue.Empty:
+                    if self._stop_event.is_set():
+                        break
+                    continue
+
+                if logs_batch is None: # Sentinel
+                    if self._stop_event.is_set():
+                        break
+                    continue
+
+                self._write_logs_to_db(logs_batch, AuditSessionFactory)
+                self._queue.task_done()
+
+            except Exception as e:
+                # Avoid printing to stdout in production, potentially log to file
+                # print(f"Audit worker error: {e}")
+                time.sleep(1) # Prevent tight loop on error
+
+    def _write_logs_to_db(self, logs: List[Dict[str, Any]], SessionFactory) -> None:
+        if not logs:
+            return
+
+        session = SessionFactory()
+        try:
+            for log_data in logs:
+                log = AuditLog(**log_data)
+                session.add(log)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"Audit log database error: {e}")
+        finally:
+            session.close()
+
     def _before_flush(self, session: DBSession, flush_context, instances) -> None:
         """Flush öncesi değişiklikleri yakalar"""
         if not self._enabled:
@@ -126,7 +205,11 @@ class AuditEngine:
         # Mevcut kullanıcı bilgilerini al
         from core.user_context import get_audit_user_info
 
-        user_info = get_audit_user_info()
+        try:
+            user_info = get_audit_user_info()
+        except LookupError:
+             # Context might not be set in some scenarios
+             user_info = {}
 
         # Yeni nesneler (INSERT)
         for obj in session.new:
@@ -169,7 +252,7 @@ class AuditEngine:
                 )
 
     def _after_commit(self, session: DBSession) -> None:
-        """Commit sonrası logları veritabanına yazar"""
+        """Commit sonrası logları kuyruğa ekler"""
         if not self._pending_logs:
             return
 
@@ -177,34 +260,8 @@ class AuditEngine:
         logs_to_write = self._pending_logs.copy()
         self._pending_logs.clear()
 
-        try:
-            # Bağımsız bir session oluştur (scoped_session'dan bağımsız)
-            from database.base import get_engine
-            from sqlalchemy.orm import sessionmaker
-
-            # Yeni bir session factory oluştur (scoped olmayan)
-            AuditSessionFactory = sessionmaker(
-                bind=get_engine(),
-                autocommit=False,
-                autoflush=True,
-                expire_on_commit=False,
-            )
-
-            audit_session = AuditSessionFactory()
-            try:
-                for log_data in logs_to_write:
-                    log = AuditLog(**log_data)
-                    audit_session.add(log)
-                audit_session.commit()
-            except Exception as e:
-                audit_session.rollback()
-                print(f"Audit log hatası: {e}")
-            finally:
-                audit_session.close()
-
-        except Exception as e:
-            # Audit log hatası ana işlemi etkilememeli
-            print(f"Audit log hatası: {e}")
+        # Kuyruğa ekle (Async)
+        self._queue.put(logs_to_write)
 
     def _after_rollback(self, session: DBSession) -> None:
         """Rollback sonrası bekleyen logları temizler"""
