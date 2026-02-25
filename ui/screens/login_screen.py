@@ -572,14 +572,10 @@ class LoginScreen(QWidget):
                 self.password_input.setFocus()
                 session.close()
 
-        except Exception:
-            # Development modunda: admin/admin ile giriş
-            if username == "admin" and password == "admin":
-                self._cleanup()
-                # Development mode - no AuthService login
-                self.login_successful.emit(None)
-            else:
-                self._show_error("Bağlantı hatası")
+        except Exception as e:
+            # Güvenlik önlemi: Asla hardcoded giriş izni verme
+            print(f"Login Error: {e}")
+            self._show_error("Bağlantı hatası")
 
     def _show_error(self, message: str):
         """Hata mesajı göster"""
