@@ -5,6 +5,8 @@ SQLAlchemy event listener'ları kullanarak veritabanı değişikliklerini
 otomatik olarak AuditLog tablosuna kaydeder.
 """
 
+import threading
+import queue
 from datetime import datetime
 from typing import Any, Dict, Set, Optional, List
 
@@ -98,10 +100,13 @@ class AuditEngine:
     _instance: Optional["AuditEngine"] = None
     _enabled: bool = True
     _pending_logs: List[Dict[str, Any]] = []
+    _queue: queue.Queue = None
+    _thread: threading.Thread = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance._queue = queue.Queue()
         return cls._instance
 
     def init_listeners(self) -> None:
@@ -109,6 +114,57 @@ class AuditEngine:
         event.listen(DBSession, "before_flush", self._before_flush)
         event.listen(DBSession, "after_commit", self._after_commit)
         event.listen(DBSession, "after_rollback", self._after_rollback)
+        self._start_worker()
+
+    def _start_worker(self):
+        """Audit log yazma iş parçacığını başlatır"""
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(
+                target=self._worker_loop, daemon=True, name="AuditLogWorker"
+            )
+            self._thread.start()
+
+    def _worker_loop(self):
+        """Kuyruktan logları alıp veritabanına yazar"""
+        from database.base import get_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Bağımsız bir session factory oluştur
+        AuditSessionFactory = sessionmaker(
+            bind=get_engine(),
+            autocommit=False,
+            autoflush=True,
+            expire_on_commit=False,
+        )
+
+        while True:
+            try:
+                # Logları al (bloklayarak bekle)
+                logs_to_write = self._queue.get()
+
+                if logs_to_write is None:  # Shutdown signal
+                    break
+
+                if not logs_to_write:
+                    self._queue.task_done()
+                    continue
+
+                # Veritabanına yaz
+                audit_session = AuditSessionFactory()
+                try:
+                    for log_data in logs_to_write:
+                        log = AuditLog(**log_data)
+                        audit_session.add(log)
+                    audit_session.commit()
+                except Exception as e:
+                    audit_session.rollback()
+                    print(f"Audit log yazma hatası: {e}")
+                finally:
+                    audit_session.close()
+                    self._queue.task_done()
+
+            except Exception as e:
+                print(f"Audit worker hatası: {e}")
 
     def enable(self) -> None:
         """Audit loglamayı etkinleştirir"""
@@ -169,42 +225,15 @@ class AuditEngine:
                 )
 
     def _after_commit(self, session: DBSession) -> None:
-        """Commit sonrası logları veritabanına yazar"""
+        """Commit sonrası logları kuyruğa ekler"""
         if not self._pending_logs:
             return
 
-        # Logları kopyala ve temizle (reentrant güvenliği)
+        # Logları kopyala ve kuyruğa at
         logs_to_write = self._pending_logs.copy()
         self._pending_logs.clear()
 
-        try:
-            # Bağımsız bir session oluştur (scoped_session'dan bağımsız)
-            from database.base import get_engine
-            from sqlalchemy.orm import sessionmaker
-
-            # Yeni bir session factory oluştur (scoped olmayan)
-            AuditSessionFactory = sessionmaker(
-                bind=get_engine(),
-                autocommit=False,
-                autoflush=True,
-                expire_on_commit=False,
-            )
-
-            audit_session = AuditSessionFactory()
-            try:
-                for log_data in logs_to_write:
-                    log = AuditLog(**log_data)
-                    audit_session.add(log)
-                audit_session.commit()
-            except Exception as e:
-                audit_session.rollback()
-                print(f"Audit log hatası: {e}")
-            finally:
-                audit_session.close()
-
-        except Exception as e:
-            # Audit log hatası ana işlemi etkilememeli
-            print(f"Audit log hatası: {e}")
+        self._queue.put(logs_to_write)
 
     def _after_rollback(self, session: DBSession) -> None:
         """Rollback sonrası bekleyen logları temizler"""
