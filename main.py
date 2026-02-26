@@ -38,14 +38,13 @@ class ApplicationController:
         self._db_session = None
 
     def start(self):
-        """Uygulama akışını başlat: Doğrudan MainWindow (Splash/Login bypass)"""
+        """Uygulama akışını başlat: Login ekranı ile"""
         # Audit engine'i başlat
         audit_engine.init_listeners()
         print("✓ Audit engine başlatıldı")
 
-        # Splash ve Login bypass - doğrudan ana pencere
-        self._setup_dev_user_context()
-        self._show_main_window()
+        # Login ekranını göster
+        self._show_login()
 
     def _show_splash(self):
         """Splash screen göster (ŞU AN DEVRE DIŞI)"""
