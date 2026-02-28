@@ -4,7 +4,7 @@ ui/components/action_buttons.py
 """
 
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtCore import QSize
+from PyQt6.QtCore import QSize, Qt
 import qtawesome as qta
 
 from config.icons import ICONS
@@ -42,6 +42,10 @@ def _apply_action_style(
     btn.setIconSize(ICON_SIZE)
     btn.setFixedSize(BTN_SIZE)
     btn.setToolTip(tooltip)
+
+    # UX & A11y improvements
+    btn.setAccessibleName(tooltip)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
     # Stil uygula
     btn.setStyleSheet(
