@@ -3,11 +3,15 @@ Akıllı İş ERP - Uygulama Ayarları
 """
 
 import os
+import secrets
 from pathlib import Path
 from dotenv import load_dotenv
 
 # .env dosyasını yükle
 load_dotenv()
+
+# Uygulama ayarları
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 # Temel dizinler
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,7 +33,12 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "akilli_is")
 DB_USER = os.getenv("DB_USER", "akilli_user")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "akilli123")
+
+# DB Password Security
+_db_password = os.getenv("DB_PASSWORD")
+if not _db_password and not DEBUG:
+    raise ValueError("DB_PASSWORD must be set in production environment!")
+DB_PASSWORD = _db_password or "akilli123"
 
 
 def get_database_url() -> str:
@@ -45,9 +54,15 @@ def get_database_url() -> str:
         raise ValueError(f"Desteklenmeyen veritabanı: {DB_ENGINE}")
 
 
-# Uygulama ayarları
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+# Secret Key Security
+_secret_key = os.getenv("SECRET_KEY")
+if not _secret_key:
+    if not DEBUG:
+        raise ValueError("SECRET_KEY must be set in production environment!")
+    SECRET_KEY = secrets.token_hex(32)
+else:
+    SECRET_KEY = _secret_key
+
 STRICT_SHIPMENT_ORDER_LINK = (
     os.getenv("STRICT_SHIPMENT_ORDER_LINK", "False").lower() == "true"
 )
