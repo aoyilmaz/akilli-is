@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import List, Dict, Optional
 from sqlalchemy import func, and_, or_, desc, extract, cast, String
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database.base import get_session
 from database.models import Item, StockMovement, StockBalance, Warehouse
@@ -499,6 +499,7 @@ class ReportsService:
         # Açık faturalar (tam ödenmemiş)
         open_invoices = (
             self.session.query(Invoice)
+            .options(joinedload(Invoice.customer))
             .filter(
                 Invoice.status.in_(
                     [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE]
